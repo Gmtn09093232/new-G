@@ -24,7 +24,6 @@
       justify-content: center;
     }
 
-    /* LOBBY & GAME PANELS — Glassmorphic core */
     .page {
       max-width: 500px;
       width: 100%;
@@ -73,6 +72,8 @@
       border: 1px solid #f39c12;
       box-shadow: 0 20px 35px rgba(0,0,0,0.5);
       text-align: center;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     .modal-content h3 {
       color: #ffd966;
@@ -113,6 +114,33 @@
     .close-modal {
       background: #4a2f2f;
       color: #ffb3b3;
+    }
+
+    /* Rules modal specific */
+    .rules-text {
+      text-align: left;
+      font-size: 0.9rem;
+      color: #e0e6ed;
+      line-height: 1.5;
+    }
+    .rules-text ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    .rules-text li {
+      margin-bottom: 10px;
+      padding-left: 22px;
+      position: relative;
+    }
+    .rules-text li::before {
+      content: "•";
+      position: absolute;
+      left: 5px;
+      color: #f39c12;
+      font-weight: bold;
+    }
+    .rules-text strong {
+      color: #f7b32b;
     }
 
     /* rest of existing styles (keep everything else) */
@@ -234,6 +262,26 @@
       letter-spacing: 2px;
       font-weight: 800;
       margin-top: 10px;
+    }
+
+    .rules-btn {
+      background: transparent;
+      border: 1px solid #f39c12;
+      color: #ffd966;
+      padding: 10px 20px;
+      border-radius: 60px;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      backdrop-filter: blur(4px);
+      cursor: pointer;
+    }
+    .rules-btn:active {
+      background: rgba(243,156,18,0.15);
     }
 
     .grid-100 {
@@ -369,7 +417,31 @@
     </div>
   </div>
 
-  <!-- Lobby & Game Pages (unchanged layout) -->
+  <!-- Rules Modal -->
+  <div id="rulesModal" class="modal">
+    <div class="modal-content" style="max-width: 400px; max-height: 80vh; overflow-y: auto;">
+      <h3>📜 Game Rules</h3>
+      <div class="rules-text">
+        <ul>
+          <li><strong>75‑ball Bingo</strong> – Numbers 1‑75 are used, arranged in B‑I‑N‑G‑O columns.</li>
+          <li><strong>Card layout</strong> – 5×5 grid. The center square is <strong>FREE</strong> (already marked).</li>
+          <li><strong>Entry fee</strong> – <strong>10 ETB</strong> is deducted from your balance when the game starts.</li>
+          <li><strong>Win condition</strong> – Complete any <strong>row, column, diagonal, or four corners</strong>.</li>
+          <li><strong>Calling numbers</strong> – Numbers are drawn every 4 seconds. Mark them by tapping your card.</li>
+          <li><strong>⏱️ CLAIM BINGO IMMEDIATELY</strong> – You must press <strong>"CLAIM BINGO!"</strong> <em>right after</em> the number that completes your pattern. If the next number is already called, your bingo is <strong>invalid</strong> (late bingo rule).</li>
+          <li><strong>Prize</strong> – 80% of the total entry fees goes to the winner.</li>
+          <li><strong>Balance</strong> – You need at least <strong>10 ETB</strong> to join a game. Deposit/withdraw using the buttons.</li>
+          <li><strong>One game at a time</strong> – A new lobby starts after each game ends.</li>
+        </ul>
+        <p style="margin-top: 14px; color: #aaa; font-size: 0.8rem;">
+          ❗ Late bingo claims are not accepted. Watch the last call carefully!
+        </p>
+      </div>
+      <button id="closeRulesBtn" style="margin-top: 18px; width: 100%; background: #2c3e4e; color: #ffd966;">Close</button>
+    </div>
+  </div>
+
+  <!-- Lobby & Game Pages -->
   <div id="lobbyPage" class="page">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
       <h2>🎰 NEBULA BINGO</h2>
@@ -395,6 +467,9 @@
     <div id="numberGrid" class="grid-100"></div>
     <div style="margin-top: 8px;">🎴 Your card preview</div>
     <div id="lobbyCardPreview" class="card-container"></div>
+    
+    <!-- 📜 Rules button at the bottom -->
+    <button id="rulesBtn" class="rules-btn">📜 Rules</button>
   </div>
 
   <div id="gamePage" class="page hidden">
@@ -470,7 +545,11 @@ winningBalanceEl=document.getElementById('winningBalance');
     const submitDepositBtn = document.getElementById('submitDepositBtn');
     const closeModalBtn = document.getElementById('closeModalBtn');
 
-    // --- Helper functions (renderCard, showLobby, etc.) ---
+    // Rules modal elements
+    const rulesModal = document.getElementById('rulesModal');
+    const closeRulesBtn = document.getElementById('closeRulesBtn');
+
+    // --- Helper functions ---
     function renderCard(card, id, clickable = false) {
   const cont = document.getElementById(id);
   if (!cont) return;
@@ -479,7 +558,6 @@ winningBalanceEl=document.getElementById('winningBalance');
   table.style.borderCollapse = 'separate';
   table.style.borderSpacing = '6px';
 
-  // BINGO header row
   const thead = document.createElement('thead');
   const headerRow = document.createElement('tr');
   const letters = ['B', 'I', 'N', 'G', 'O'];
@@ -500,7 +578,6 @@ winningBalanceEl=document.getElementById('winningBalance');
   thead.appendChild(headerRow);
   table.appendChild(thead);
 
-  // Card body
   const tbody = document.createElement('tbody');
   for (let r = 0; r < 5; r++) {
     const tr = document.createElement('tr');
@@ -550,26 +627,21 @@ winningBalanceEl=document.getElementById('winningBalance');
     }
     function updateGridWithTakenNumbers(nums){ takenNumbers=new Set(nums); buildNumberGrid(); }
 
-    // Helper: get BINGO letter from number
-function getBingoLetter(num) {
-  if (num >= 1 && num <= 15) return 'B';
-  if (num >= 16 && num <= 30) return 'I';
-  if (num >= 31 && num <= 45) return 'N';
-  if (num >= 46 && num <= 60) return 'G';
-  return 'O';
-}
+    function getBingoLetter(num) {
+      if (num >= 1 && num <= 15) return 'B';
+      if (num >= 16 && num <= 30) return 'I';
+      if (num >= 31 && num <= 45) return 'N';
+      if (num >= 46 && num <= 60) return 'G';
+      return 'O';
+    }
+    function formatCall(num) { return `${getBingoLetter(num)}-${num}`; }
 
-function formatCall(num) {
-  return `${getBingoLetter(num)}-${num}`;
-}
-
-    // --- Deposit with phone + image (FormData) ---
+    // --- Deposit ---
     function showDepositModal() {
       depositPhoneInput.value = '';
       proofImageInput.value = '';
       depositModal.classList.add('active');
     }
-
     function closeDepositModal() {
       depositModal.classList.remove('active');
     }
@@ -593,7 +665,7 @@ function formatCall(num) {
       try {
         const response = await fetch('/api/request-deposit', {
           method: 'POST',
-          body: formData  // multipart/form-data
+          body: formData
         });
         const data = await response.json();
         alert(`📢 ${data.message || data.error || 'Deposit request submitted'}\n📞 ${phone} | 💸 ${amount} ETB`);
@@ -603,7 +675,7 @@ function formatCall(num) {
       }
     }
 
-    // --- Improved Withdrawal (shows amount clearly) ---
+    // --- Withdrawal ---
     function handleWithdraw() {
       if (!socket) { alert('Not connected'); return; }
       const phone = prompt('📱 Your Ethio telecom number (09xxxxxxxx):');
@@ -625,7 +697,15 @@ function formatCall(num) {
       .catch(err => alert('Network error: ' + err.message));
     }
 
-    // --- Socket connection and event handlers (unchanged but keep) ---
+    // --- Rules modal ---
+    function showRulesModal() {
+      rulesModal.classList.add('active');
+    }
+    function closeRulesModal() {
+      rulesModal.classList.remove('active');
+    }
+
+    // --- Socket connection ---
     async function connect(){
       const initData=tg.initData; if(!initData){ alert('Open inside Telegram'); return; }
       try{
@@ -642,32 +722,24 @@ function formatCall(num) {
       socket.on('cardTaken',data=>{ updateGridWithTakenNumbers(data.takenNumbers); selectedCardNumber=null; selectedNumberEl.textContent='-'; });
       socket.on('cardSelectionFailed',msg=>alert(msg));
       socket.on('playersCount', c => {
-  playersCountEl.textContent = c;
-
-  if (gamePlayersCountEl) {
-    gamePlayersCountEl.textContent = c;
-  }
-
-  // Example winning calculation
- const entryFee = 10; // ETB per player
-const totalPool = c * entryFee;
-const prize = Math.floor(totalPool * 0.8);
-
-winningBalanceEl.textContent = prize;
-});
+        playersCountEl.textContent = c;
+        if (gamePlayersCountEl) gamePlayersCountEl.textContent = c;
+        const entryFee = 10;
+        const totalPool = c * entryFee;
+        const prize = Math.floor(totalPool * 0.8);
+        winningBalanceEl.textContent = prize;
+      });
       socket.on('gameStarted',showGame);
       socket.on('numberCalled', data => {
-  const formatted = formatCall(data.number);
-  currentCallEl.textContent = formatted;
-  const formattedList = (data.calledNumbers || []).map(n => formatCall(n));
-  calledListEl.textContent = 'Called: ' + formattedList.join(', ');
-  animateCall();
-});
-socket.on('calledNumbers', called => {
-  const formattedList = called.map(n => formatCall(n));
-  calledListEl.textContent = 'Called: ' + formattedList.join(', ');
-});
-      socket.on('calledNumbers',called=>{ calledListEl.textContent='Called: '+called.join(', '); });
+        const formatted = formatCall(data.number);
+        currentCallEl.textContent = formatted;
+        const formattedList = (data.calledNumbers || []).map(n => formatCall(n));
+        calledListEl.textContent = 'Called: ' + formattedList.join(', ');
+      });
+      socket.on('calledNumbers', called => {
+        const formattedList = called.map(n => formatCall(n));
+        calledListEl.textContent = 'Called: ' + formattedList.join(', ');
+      });
       socket.on('markedNumbers',nums=>{ markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
       socket.on('gameEnded',data=>{ isGameActive=false; alert(data.winner?'🏆 WINNER: '+data.winner:'Game ended'); if(socket) socket.emit('getBalance'); });
       socket.on('invalidBingo',()=>alert('❌ Not a valid bingo yet!'));
@@ -684,8 +756,12 @@ socket.on('calledNumbers', called => {
     document.getElementById('bingoBtn').onclick = () => { if(socket) socket.emit('claimBingo'); };
     submitDepositBtn.onclick = submitDepositWithProof;
     closeModalBtn.onclick = closeDepositModal;
-    // close modal on background click
     depositModal.onclick = (e) => { if(e.target === depositModal) closeDepositModal(); };
+
+    // Rules button listeners
+    document.getElementById('rulesBtn').onclick = showRulesModal;
+    closeRulesBtn.onclick = closeRulesModal;
+    rulesModal.onclick = (e) => { if(e.target === rulesModal) closeRulesModal(); };
 
     buildNumberGrid();
     connect();
