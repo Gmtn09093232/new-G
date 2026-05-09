@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎰 Bingo Admin Panel</title>
+  <style>
+    body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
+    .container { max-width: 1400px; margin: auto; }
+    h1 { color: #f39c12; }
+    .section { background: #16202a; margin: 20px 0; padding: 20px; border-radius: 24px; }
+    .request-card { background: #1e2a36; border-radius: 16px; margin: 12px 0; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
+    .request-info { flex: 2; }
+    .request-info p { margin: 5px 0; }
+    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; }
+    button { background: #f39c12; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 0 5px; }
+    button.approve { background: #2ecc71; color: #000; }
+    button.reject { background: #e74c3c; color: #fff; }
+    .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎰 Bingo Admin Panel</h1>
+  <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
+
+  <div class="section">
+    <h2>📸 Pending Deposit Requests</h2>
+    <div id="depositList">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h2>💰 Pending Withdrawal Requests</h2>
+    <div id="withdrawList">Loading...</div>
+  </div>
+
+  <div class="section">
+    <h2>➕ Manual Add Balance</h2>
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)" style="padding: 8px; border-radius: 20px; border: none;">
+    <input type="number" id="amount" placeholder="Amount" style="padding: 8px; border-radius: 20px; border: none;">
+    <button onclick="addBalance()">Add Balance</button>
+  </div>
+</div>
+
+<script>
+  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+  const API_BASE = '';
+
+  async function fetchAll() {
+    await fetchDeposits();
+    await fetchWithdrawals();
+  }
+
+  async function fetchDeposits() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      const container = document.getElementById('depositList');
+      if (!data.requests || data.requests.length === 0) {
+        container.innerHTML = '<p>✅ No pending deposits.</p>';
+        return;
+      }
+      container.innerHTML = data.requests.map(req => `
+        <div class="request-card">
+          <div class="request-info">
+            <p><strong>ID:</strong> ${req.id}</p>
+            <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+            <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
+            <p><strong>Amount:</strong> ${req.amount} ETB</p>
+            <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+            ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)" style="cursor:pointer;">` : '<p>No proof</p>'}
+          </div>
+          <div>
+            <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
+            <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error(err);
+      document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
+    }
+  }
+
+  async function fetchWithdrawals() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      const container = document.getElementById('withdrawList');
+      if (!data.requests || data.requests.length === 0) {
+        container.innerHTML = '<p>✅ No pending withdrawals.</p>';
+        return;
+      }
+      container.innerHTML = data.requests.map(req => `
+        <div class="request-card">
+          <div class="request-info">
+            <p><strong>ID:</strong> ${req.id}</p>
+            <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+            <p><strong>Phone:</strong> ${req.phone_number}</p>
+            <p><strong>Amount:</strong> ${req.amount} ETB</p>
+            <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+          </div>
+          <div>
+            <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
+            <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error(err);
+      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
+    }
+  }
+
+  async function processDeposit(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this deposit?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
+      fetchDeposits();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function processWithdrawal(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
+      fetchWithdrawals();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function addBalance() {
+    const telegramId = document.getElementById('userId').value.trim();
+    const amount = document.getElementById('amount').value.trim();
+    if (!telegramId || !amount) { alert('Fill all fields'); return; }
+    try {
+      const res = await fetch(`${API_BASE}/admin/add-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) })
+      });
+      const data = await res.json();
+      alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
+    } catch (err) { alert(err.message); }
+  }
+
+  fetchAll();
+  setInterval(fetchAll, 10000); // auto refresh every 10 sec
+</script>
+</body>
+</html>
