@@ -14,7 +14,7 @@ const fs = require('fs');
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// Multer config: store file with unique name
+// Multer config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
     cb(null, unique + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
 
 // ------------------- Supabase -------------------
 console.log('Connecting to Supabase...');
@@ -56,6 +56,15 @@ const sessionMiddleware = session({
 });
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
+
+// Deposit accounts endpoint
+app.get('/api/deposit-accounts', (req, res) => {
+  res.json({
+    telebirr: process.env.ADMIN_PHONE || '0924839730',
+    cbebirr: process.env.CBE_ACCOUNT || '1000123456789',
+    mpesa: process.env.MPESA_ACCOUNT || '251912345678'
+  });
+});
 
 app.get('/api/admin-phone', (req, res) => {
   res.json({ phone: process.env.ADMIN_PHONE || '0924839730' });
@@ -241,40 +250,25 @@ function startCalling() {
   }, 4000);
 }
 
-// 🟢 NEW: Helper to get all possible winning lines from a card
+// 🟢 Bingo validation helpers (late bingo rule)
 function getLines(card) {
   const lines = [];
-  // Rows
-  for (let r = 0; r < 5; r++) {
-    lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
-  }
-  // Columns
-  for (let c = 0; c < 5; c++) {
-    lines.push([card[0][c], card[1][c], card[2][c], card[3][c], card[4][c]]);
-  }
-  // Diagonals
+  for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
+  for (let c = 0; c < 5; c++) lines.push([card[0][c], card[1][c], card[2][c], card[3][c], card[4][c]]);
   lines.push([card[0][0], card[1][1], card[2][2], card[3][3], card[4][4]]);
   lines.push([card[0][4], card[1][3], card[2][2], card[3][1], card[4][0]]);
-  // Corners
   lines.push([card[0][0], card[0][4], card[4][0], card[4][4]]);
   return lines;
 }
-
-// 🟢 Helper: check if a line is fully covered by marked numbers/FREE
 function isLineComplete(line, marked) {
   return line.every(val => val === 'FREE' || marked.includes(val));
 }
-
-// 🟢 Strict bingo check: bingo must be won on the LAST called number
 function isBingoValidOnLastCall(card, marked, lastCalled) {
   if (lastCalled === null) return false;
   const lines = getLines(card);
   for (const line of lines) {
-    if (!isLineComplete(line, marked)) continue;          // not fully marked
-    if (!line.includes(lastCalled)) continue;             // winning number must be part of the line
-    // If we reach here: line is complete AND lastCalled is in it.
-    // Because numbers are unique and the line is now full,
-    // lastCalled necessarily is the number that completed it.
+    if (!isLineComplete(line, marked)) continue;
+    if (!line.includes(lastCalled)) continue;
     return true;
   }
   return false;
@@ -308,19 +302,19 @@ async function endGame(winnerTelegramId, isLate = false) {
   setTimeout(resetGame, 5000);
 }
 
-// ------------------- DEPOSIT (with phone + proof image) -------------------
+// ------------------- DEPOSIT (with payment_type) -------------------
 app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { phone, amount } = req.body;
+  const { phone, amount, payment_type } = req.body; // phone = user's own phone for reference? Keep as optional
   const file = req.file;
-  if (!phone || !/^0\d{9}$/.test(phone)) {
-    return res.status(400).json({ error: 'Valid phone number required (09xxxxxxxx)' });
-  }
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!file) return res.status(400).json({ error: 'Proof image required' });
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) {
+    return res.status(400).json({ error: 'Invalid payment type' });
+  }
 
   const user = await loadUser(userId, null);
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -334,7 +328,8 @@ app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
       username: user.username,
       amount: amt,
       status: 'pending',
-      phone: phone,
+      phone: phone || null,
+      payment_type,
       proof_path: proofPath
     })
     .select()
@@ -344,7 +339,7 @@ app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
     console.error('Deposit insert error:', error.message);
     return res.status(500).json({ error: 'Internal error' });
   }
-  res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB from ${phone} submitted with proof.` });
+  res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
 app.get('/admin/deposits', async (req, res) => {
@@ -396,7 +391,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ------------------- WITHDRAWAL -------------------
+// ------------------- WITHDRAWAL (unchanged) -------------------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -554,7 +549,7 @@ io.on('connection', async (socket) => {
     socket.emit('markedNumbers', player.markedNumbers);
   });
 
-  // 🔴 STRICT BINGO CLAIM (late bingo blocked)
+  // Strict bingo claim
   socket.on('claimBingo', () => {
     if (currentGame.status !== 'running') return;
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
@@ -564,17 +559,11 @@ io.on('connection', async (socket) => {
       ? currentGame.calledNumbers[currentGame.calledNumbers.length - 1]
       : null;
 
-    if (lastCalled === null) {
+    if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
       socket.emit('invalidBingo');
       return;
     }
-
-    // 🟢 Use the strict function that requires the last called number to be the winning piece
-    if (isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
-      endGame(socket.userId, false);
-    } else {
-      socket.emit('invalidBingo');
-    }
+    endGame(socket.userId, false);
   });
 
   socket.on('getBalance', async () => {
@@ -593,7 +582,6 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// Start the first lobby
 resetGame();
 
 const PORT = process.env.PORT || 3000;
