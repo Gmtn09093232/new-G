@@ -10,11 +10,10 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 
-// Create uploads folder if missing
+// ---------- Uploads setup ----------
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// Multer config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
@@ -22,9 +21,9 @@ const storage = multer.diskStorage({
     cb(null, unique + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// ------------------- Supabase -------------------
+// ---------- Supabase ----------
 console.log('Connecting to Supabase...');
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -57,7 +56,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// Deposit accounts endpoint
+// ---------- Endpoints ----------
 app.get('/api/deposit-accounts', (req, res) => {
   res.json({
     telebirr: process.env.ADMIN_PHONE || '0924839730',
@@ -71,9 +70,8 @@ app.get('/api/admin-phone', (req, res) => {
 });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/test-deposit', (req, res) => res.json({ ok: true }));
 
-// ------------------- User cache -------------------
+// ---------- User cache ----------
 const users = {};
 async function loadUser(telegramId, username) {
   const id = String(telegramId);
@@ -89,7 +87,7 @@ async function loadUser(telegramId, username) {
   return users[id];
 }
 
-// ------------------- Telegram verification -------------------
+// ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   const params = new URLSearchParams(initData);
   const hash = params.get('hash');
@@ -103,7 +101,6 @@ function verifyTelegram(initData) {
   return calculatedHash === hash;
 }
 
-// ------------------- Auth endpoint -------------------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) return res.status(403).json({ success: false });
@@ -123,7 +120,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   });
 });
 
-// ------------------- Admin add balance -------------------
+// ---------- Admin add balance ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -139,7 +136,7 @@ app.post('/admin/add-balance', async (req, res) => {
   res.json({ success: true, newBalance: user.balance });
 });
 
-// ------------------- Bingo card generator -------------------
+// ---------- Bingo card generator ----------
 function generateCard() {
   const columns = [
     [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
@@ -163,7 +160,7 @@ function generateCard() {
   return transposed;
 }
 
-// ------------------- Game state -------------------
+// ---------- Game state ----------
 const currentGame = {
   status: 'lobby',
   players: [],
@@ -192,23 +189,18 @@ function resetGame() {
 }
 
 async function startGame() {
-  // Remove players with insufficient balance
   const toRemove = [];
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
-    if (!user || user.balance < currentGame.entryFee) {
-      toRemove.push(p);
-    }
+    if (!user || user.balance < currentGame.entryFee) toRemove.push(p);
   }
-  if (toRemove.length > 0) {
-    for (const p of toRemove) {
-      const idx = currentGame.players.findIndex(player => player.telegramId === p.telegramId);
-      if (idx !== -1) currentGame.players.splice(idx, 1);
-      if (p.cardNumber) currentGame.takenCardNumbers.delete(p.cardNumber);
-    }
-    io.emit('cardTaken', { takenNumbers: Array.from(currentGame.takenCardNumbers) });
-    io.emit('playersCount', currentGame.players.length);
+  for (const p of toRemove) {
+    const idx = currentGame.players.findIndex(pl => pl.telegramId === p.telegramId);
+    if (idx !== -1) currentGame.players.splice(idx, 1);
+    if (p.cardNumber) currentGame.takenCardNumbers.delete(p.cardNumber);
   }
+  io.emit('cardTaken', { takenNumbers: Array.from(currentGame.takenCardNumbers) });
+  io.emit('playersCount', currentGame.players.length);
 
   if (currentGame.players.length === 0) {
     currentGame.status = 'ended';
@@ -216,7 +208,6 @@ async function startGame() {
     return;
   }
 
-  // Deduct entry fee
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
     if (user) {
@@ -250,7 +241,7 @@ function startCalling() {
   }, 4000);
 }
 
-// 🟢 Bingo validation helpers (late bingo rule)
+// ---------- Strict bingo check (late bingo rule) ----------
 function getLines(card) {
   const lines = [];
   for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
@@ -288,9 +279,7 @@ async function endGame(winnerTelegramId, isLate = false) {
 
       const sockets = await io.fetchSockets();
       const winnerSocket = sockets.find(s => s.userId === winner.telegramId);
-      if (winnerSocket) {
-        winnerSocket.emit('balanceUpdate', users[winner.telegramId].balance);
-      }
+      if (winnerSocket) winnerSocket.emit('balanceUpdate', users[winner.telegramId].balance);
       io.emit('gameEnded', { winner: winner.username, late: isLate });
     } else {
       io.emit('gameEnded', { winner: 'Unknown', late: isLate });
@@ -302,12 +291,12 @@ async function endGame(winnerTelegramId, isLate = false) {
   setTimeout(resetGame, 5000);
 }
 
-// ------------------- DEPOSIT (with payment_type) -------------------
+// ---------- DEPOSIT (with payment_type) ----------
 app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { phone, amount, payment_type } = req.body; // phone = user's own phone for reference? Keep as optional
+  const { phone, amount, payment_type } = req.body;
   const file = req.file;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
@@ -369,9 +358,8 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
     user.balance += reqData.amount;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-    const { error: updateErr } = await supabase
+    await supabase
       .from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
-    if (updateErr) return res.status(500).json({ error: updateErr.message });
 
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
@@ -381,9 +369,8 @@ app.post('/admin/process-deposit', async (req, res) => {
     }
     res.json({ success: true, newBalance: user.balance });
   } else {
-    const { error: updateErr } = await supabase
+    await supabase
       .from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
-    if (updateErr) return res.status(500).json({ error: updateErr.message });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
@@ -391,29 +378,40 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ------------------- WITHDRAWAL (unchanged) -------------------
+// ---------- WITHDRAWAL (with withdrawal_type) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { amount, phone } = req.body;
-  if (!phone || !/^0\d{9}$/.test(phone)) {
-    return res.status(400).json({ error: 'Invalid phone number' });
-  }
+  const { amount, phone, withdrawal_type } = req.body;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) {
+    return res.status(400).json({ error: 'Invalid withdrawal type' });
+  }
+  const receiver = (phone || '').trim();
+  if (!receiver || receiver.length < 10) {
+    return res.status(400).json({ error: 'Valid receiver phone/account required' });
+  }
 
   const user = await loadUser(userId, null);
   if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
 
   const { data, error } = await supabase
     .from('withdrawal_requests')
-    .insert({ telegram_id: userId, username: user.username, amount: amt, status: 'pending', phone_number: phone })
+    .insert({
+      telegram_id: userId,
+      username: user.username,
+      amount: amt,
+      status: 'pending',
+      phone_number: receiver,
+      withdrawal_type
+    })
     .select()
     .single();
 
   if (error) { console.error('Withdraw insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
-  res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB to ${phone} submitted.` });
+  res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.` });
 });
 
 app.get('/admin/withdrawals', async (req, res) => {
@@ -440,9 +438,8 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     if (!user || user.balance < reqData.amount) return res.status(400).json({ error: 'Insufficient balance now' });
     user.balance -= reqData.amount;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-    const { error: updateErr } = await supabase
+    await supabase
       .from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
-    if (updateErr) return res.status(500).json({ error: updateErr.message });
 
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
@@ -452,9 +449,8 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     }
     res.json({ success: true, newBalance: user.balance });
   } else {
-    const { error: updateErr } = await supabase
+    await supabase
       .from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
-    if (updateErr) return res.status(500).json({ error: updateErr.message });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
@@ -462,7 +458,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ------------------- Socket.IO -------------------
+// ---------- Socket.IO ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
   socket.userId = socket.request.session.userId;
@@ -498,13 +494,19 @@ io.on('connection', async (socket) => {
       socket.emit('cardSelectionFailed', 'This number is already taken.');
       return;
     }
-    const existingPlayer = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existingPlayer) {
-      currentGame.takenCardNumbers.delete(existingPlayer.cardNumber);
+    const existing = currentGame.players.find(p => p.telegramId === socket.userId);
+    if (existing) {
+      currentGame.takenCardNumbers.delete(existing.cardNumber);
       currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
     }
     currentGame.takenCardNumbers.add(num);
-    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[num - 1], markedNumbers: [], cardNumber: num };
+    const player = {
+      telegramId: socket.userId,
+      username: socket.username,
+      card: currentGame.cardSet[num - 1],
+      markedNumbers: [],
+      cardNumber: num
+    };
     currentGame.players.push(player);
     io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
@@ -522,13 +524,19 @@ io.on('connection', async (socket) => {
     for (let i = 1; i <= 100; i++) if (!currentGame.takenCardNumbers.has(i)) freeNumbers.push(i);
     if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
     const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
-    const existingPlayer = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existingPlayer) {
-      currentGame.takenCardNumbers.delete(existingPlayer.cardNumber);
+    const existing = currentGame.players.find(p => p.telegramId === socket.userId);
+    if (existing) {
+      currentGame.takenCardNumbers.delete(existing.cardNumber);
       currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
     }
     currentGame.takenCardNumbers.add(randomNum);
-    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum };
+    const player = {
+      telegramId: socket.userId,
+      username: socket.username,
+      card: currentGame.cardSet[randomNum - 1],
+      markedNumbers: [],
+      cardNumber: randomNum
+    };
     currentGame.players.push(player);
     io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
@@ -541,15 +549,14 @@ io.on('connection', async (socket) => {
     if (!player) return;
     const num = Number(number);
     if (number !== 'FREE' && (!Number.isInteger(num) || num < 1 || num > 75)) return;
-    const flatCard = player.card.flat();
-    if (!flatCard.includes(number)) return;
+    const flat = player.card.flat();
+    if (!flat.includes(number)) return;
     if (!currentGame.calledNumbers.includes(num) && number !== 'FREE') return;
     if (player.markedNumbers.includes(number)) return;
     player.markedNumbers.push(number);
     socket.emit('markedNumbers', player.markedNumbers);
   });
 
-  // Strict bingo claim
   socket.on('claimBingo', () => {
     if (currentGame.status !== 'running') return;
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
@@ -570,18 +577,15 @@ io.on('connection', async (socket) => {
     const u = await loadUser(socket.userId, socket.username);
     socket.emit('balanceUpdate', u.balance);
   });
-
-  socket.on('requestWithdraw', () => {
-    socket.emit('withdrawRequested', 'Withdraw request sent.');
-  });
 });
 
-// Error handling middleware
+// ---------- Error handling ----------
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+// ---------- Start first lobby ----------
 resetGame();
 
 const PORT = process.env.PORT || 3000;
