@@ -4,10 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🎰 Bingo Admin Panel</title>
-  <!-- QR code scanner -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <!-- OCR fallback -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
     .container { max-width: 1400px; margin: auto; }
@@ -16,7 +13,7 @@
     .request-card { background: #1e2a36; border-radius: 16px; margin: 12px 0; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
     .request-info { flex: 2; }
     .request-info p { margin: 5px 0; }
-    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; }
+    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; cursor: pointer; }
     button { background: #f39c12; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 0 5px; }
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
@@ -24,6 +21,7 @@
     .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
+    .qr-only-note { color: #aaa; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -33,6 +31,7 @@
 
   <div class="section">
     <h2>📸 Pending Deposit Requests</h2>
+    <p class="qr-only-note">🔍 QR codes are scanned instantly — no slow OCR needed.</p>
     <div id="depositList">Loading...</div>
   </div>
 
@@ -43,8 +42,8 @@
 
   <div class="section">
     <h2>➕ Manual Add Balance</h2>
-    <input type="text" id="userId" placeholder="Telegram ID (numeric)" style="padding: 8px; border-radius: 20px; border: none;">
-    <input type="number" id="amount" placeholder="Amount" style="padding: 8px; border-radius: 20px; border: none;">
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)" style="padding:8px;border-radius:20px;border:none;">
+    <input type="number" id="amount" placeholder="Amount" style="padding:8px;border-radius:20px;border:none;">
     <button onclick="addBalance()">Add Balance</button>
   </div>
 </div>
@@ -53,7 +52,10 @@
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
 
-  // ---------- QR Code scanning ----------
+  // Cache for extracted references (image path → reference)
+  const refCache = {};
+
+  // Extract the reference from a QR code in the image
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -67,14 +69,13 @@
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
         if (qrCode && qrCode.data) {
-          // The QR data is likely a URL like https://transactioninfo.ethiotelecom.et/receipt/DE26GU1TFU
           const data = qrCode.data;
-          // Extract reference from URL path: /receipt/XXXX
+          // URL like https://transactioninfo.ethiotelecom.et/receipt/DE26GU1TFU
           const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
           if (match) {
-            resolve(match[1]); // the reference number
+            resolve(match[1]);
           } else {
-            // Maybe the QR just contains the reference directly
+            // maybe just the reference
             const refMatch = data.match(/^([A-Z0-9]{8,})$/);
             if (refMatch) resolve(refMatch[1]);
             else resolve(null);
@@ -83,37 +84,25 @@
           resolve(null);
         }
       };
-      img.onerror = () => reject('Failed to load image for QR scan');
+      img.onerror = () => reject('Failed to load image');
     });
   }
 
-  // ---------- OCR fallback ----------
-  async function extractRefFromOCR(imageUrl) {
+  // Get reference: from cache, or scan QR if not cached
+  async function getReferenceForProof(imagePath) {
+    if (refCache[imagePath]) {
+      return refCache[imagePath]; // already scanned
+    }
     try {
-      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
-      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      if (match && match[1]) return match[1].trim();
-      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
-      return fallback ? fallback[0] : null;
-    } catch {
+      const ref = await extractRefFromQR(imagePath);
+      refCache[imagePath] = ref; // cache result (even null)
+      return ref;
+    } catch (e) {
+      refCache[imagePath] = null;
       return null;
     }
   }
 
-  // ---------- Unified reference extraction ----------
-  async function getReferenceFromProof(imagePath) {
-    // Try QR first
-    try {
-      const qrRef = await extractRefFromQR(imagePath);
-      if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch (e) { console.warn('QR scan failed, trying OCR', e); }
-    // Fallback to OCR
-    const ocrRef = await extractRefFromOCR(imagePath);
-    if (ocrRef) return { ref: ocrRef, method: 'OCR' };
-    return null;
-  }
-
-  // ---------- UI rendering ----------
   async function fetchAll() {
     await fetchDeposits();
     await fetchWithdrawals();
@@ -136,7 +125,7 @@
 
         const submittedRef = req.reference_number || '';
         const refHtml = submittedRef
-          ? `<p><strong>Submitted Reference:</strong> ${submittedRef}</p>`
+          ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
           : '';
 
         card.innerHTML = `
@@ -149,9 +138,9 @@
             ${refHtml}
             <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
             ${req.proof_path
-              ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" style="cursor:pointer;" onclick="window.open(this.src)">`
+              ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">`
               : '<p>No proof</p>'}
-            <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
+            <div id="verify-${req.id}" class="receipt-box">⏳ Scanning QR...</div>
           </div>
           <div>
             <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
@@ -161,34 +150,41 @@
 
         container.appendChild(card);
 
-        // Verify after card is inserted
+        // Now fill the verification box
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
         if (req.proof_path) {
-          const verifyDiv = document.getElementById(`verify-${req.id}`);
           try {
-            const result = await getReferenceFromProof(req.proof_path);
-            if (result) {
-              const ref = result.ref;
-              const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+            const extractedRef = await getReferenceForProof(req.proof_path);
+            if (extractedRef) {
+              const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(extractedRef)}`;
               let matchHtml = '';
-              if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
-                matchHtml = '<span class="match">✅ Matches submitted reference</span>';
+              if (submittedRef && submittedRef.toUpperCase() === extractedRef.toUpperCase()) {
+                matchHtml = '<span class="match">✅ Matches submitted ref</span>';
               } else if (submittedRef) {
-                matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+                matchHtml = `<span class="mismatch">❌ Mismatch (submitted: ${submittedRef})</span>`;
               }
               verifyDiv.innerHTML = `
-                <strong>🧾 Extracted Ref (${result.method}):</strong> ${ref} ${matchHtml}<br>
+                <strong>🧾 QR Ref:</strong> ${extractedRef} ${matchHtml}<br>
                 <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>
               `;
             } else {
-              verifyDiv.innerHTML = '❌ Could not read reference from image.';
+              // No QR found — fallback to manual
+              if (submittedRef) {
+                const manualUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(submittedRef)}`;
+                verifyDiv.innerHTML = `
+                  ⚠️ No QR found. Using submitted reference.<br>
+                  <a href="${manualUrl}" target="_blank">📄 Open receipt (submitted ref)</a>
+                `;
+              } else {
+                verifyDiv.innerHTML = '❌ No QR code and no submitted reference.';
+              }
             }
           } catch (e) {
-            verifyDiv.innerHTML = '❌ Verification error.';
+            verifyDiv.innerHTML = '❌ Error scanning QR.';
             console.error(e);
           }
         } else {
-          const verifyDiv = document.getElementById(`verify-${req.id}`);
-          if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.';
+          verifyDiv.innerHTML = 'No proof image.';
         }
       }
     } catch (err) {
