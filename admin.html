@@ -18,7 +18,7 @@
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
     .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
-    .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
+    .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; word-break: break-all; }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
     .qr-only-note { color: #aaa; font-size: 0.9rem; }
@@ -31,7 +31,7 @@
 
   <div class="section">
     <h2>📸 Pending Deposit Requests</h2>
-    <p class="qr-only-note">🔍 QR codes are scanned instantly — no slow OCR needed.</p>
+    <p class="qr-only-note">🔍 QR code line is displayed exactly as read from the image.</p>
     <div id="depositList">Loading...</div>
   </div>
 
@@ -52,11 +52,11 @@
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
 
-  // Cache for extracted references (image path → reference)
+  // Cache for extracted data (image path → { rawData, reference })
   const refCache = {};
 
-  // Extract the reference from a QR code in the image
-  function extractRefFromQR(imageSrc) {
+  // Extract the raw QR data and the reference from it
+  function extractFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.src = imageSrc;
@@ -69,17 +69,18 @@
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
         if (qrCode && qrCode.data) {
-          const data = qrCode.data;
-          // URL like https://transactioninfo.ethiotelecom.et/receipt/DE26GU1TFU
-          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) {
-            resolve(match[1]);
+          const rawData = qrCode.data;
+          let reference = null;
+          // Try to extract reference from receipt URL
+          const urlMatch = rawData.match(/\/receipt\/([A-Z0-9]+)/i);
+          if (urlMatch) {
+            reference = urlMatch[1];
           } else {
-            // maybe just the reference
-            const refMatch = data.match(/^([A-Z0-9]{8,})$/);
-            if (refMatch) resolve(refMatch[1]);
-            else resolve(null);
+            // If not a URL, maybe raw reference
+            const refMatch = rawData.match(/^([A-Z0-9]{8,})$/);
+            if (refMatch) reference = refMatch[1];
           }
+          resolve({ rawData, reference });
         } else {
           resolve(null);
         }
@@ -88,15 +89,13 @@
     });
   }
 
-  // Get reference: from cache, or scan QR if not cached
-  async function getReferenceForProof(imagePath) {
-    if (refCache[imagePath]) {
-      return refCache[imagePath]; // already scanned
-    }
+  // Get cached or scan
+  async function getQRDataForProof(imagePath) {
+    if (refCache[imagePath]) return refCache[imagePath];
     try {
-      const ref = await extractRefFromQR(imagePath);
-      refCache[imagePath] = ref; // cache result (even null)
-      return ref;
+      const data = await extractFromQR(imagePath);
+      refCache[imagePath] = data; // cache even if null
+      return data;
     } catch (e) {
       refCache[imagePath] = null;
       return null;
@@ -150,30 +149,35 @@
 
         container.appendChild(card);
 
-        // Now fill the verification box
         const verifyDiv = document.getElementById(`verify-${req.id}`);
         if (req.proof_path) {
           try {
-            const extractedRef = await getReferenceForProof(req.proof_path);
-            if (extractedRef) {
-              const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(extractedRef)}`;
+            const qrResult = await getQRDataForProof(req.proof_path);
+            if (qrResult && qrResult.rawData) {
+              const rawData = qrResult.rawData;
+              const extractedRef = qrResult.reference;
+              let receiptLink = '';
+              if (extractedRef) {
+                receiptLink = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(extractedRef)}`;
+              }
               let matchHtml = '';
-              if (submittedRef && submittedRef.toUpperCase() === extractedRef.toUpperCase()) {
+              if (extractedRef && submittedRef && submittedRef.toUpperCase() === extractedRef.toUpperCase()) {
                 matchHtml = '<span class="match">✅ Matches submitted ref</span>';
-              } else if (submittedRef) {
+              } else if (extractedRef && submittedRef) {
                 matchHtml = `<span class="mismatch">❌ Mismatch (submitted: ${submittedRef})</span>`;
               }
               verifyDiv.innerHTML = `
-                <strong>🧾 QR Ref:</strong> ${extractedRef} ${matchHtml}<br>
-                <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>
+                <strong>📋 Raw QR data:</strong> ${rawData}<br>
+                <strong>🧾 Extracted Ref:</strong> ${extractedRef || 'N/A'} ${matchHtml}<br>
+                ${receiptLink ? `<a href="${receiptLink}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>` : ''}
               `;
             } else {
-              // No QR found — fallback to manual
+              // No QR code found
               if (submittedRef) {
                 const manualUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(submittedRef)}`;
                 verifyDiv.innerHTML = `
                   ⚠️ No QR found. Using submitted reference.<br>
-                  <a href="${manualUrl}" target="_blank">📄 Open receipt (submitted ref)</a>
+                  <a href="${manualUrl}" target="_blank" rel="noopener noreferrer">📄 Open receipt (submitted ref)</a>
                 `;
               } else {
                 verifyDiv.innerHTML = '❌ No QR code and no submitted reference.';
@@ -193,7 +197,7 @@
     }
   }
 
-  // (fetchWithdrawals, processDeposit, processWithdrawal, addBalance – unchanged from your original)
+  // ---------- Withdrawals ----------
   async function fetchWithdrawals() {
     try {
       const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
