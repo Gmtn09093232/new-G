@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🎰 Bingo Admin Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
     .container { max-width: 1400px; margin: auto; }
@@ -17,6 +18,9 @@
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
     .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
+    .ocr-result { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
+    .match { color: #2ecc71; font-weight: bold; }
+    .mismatch { color: #e74c3c; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -51,6 +55,23 @@
     await fetchWithdrawals();
   }
 
+  // OCR helper – reads reference number from image
+  async function extractReferenceFromImage(imageUrl) {
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+      // Look for "Transaction Number:" followed by alphanumeric code
+      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
+      if (match && match[1]) return match[1].trim();
+
+      // Fallback: find any code like DE...
+      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+      return fallback ? fallback[0] : null;
+    } catch (err) {
+      console.error('OCR error:', err);
+      return null;
+    }
+  }
+
   async function fetchDeposits() {
     try {
       const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
@@ -60,22 +81,79 @@
         container.innerHTML = '<p>✅ No pending deposits.</p>';
         return;
       }
-      container.innerHTML = data.requests.map(req => `
-        <div class="request-card">
+
+      // Clear and rebuild
+      container.innerHTML = '';
+      for (const req of data.requests) {
+        const card = document.createElement('div');
+        card.className = 'request-card';
+
+        // Reference number display
+        const submittedRef = req.reference_number || '';
+        let refHtml = '';
+        if (submittedRef) {
+          refHtml = `<p><strong>Submitted Reference:</strong> ${submittedRef}</p>`;
+        }
+
+        // Build card content (without OCR result, which will be added later)
+        card.innerHTML = `
           <div class="request-info">
             <p><strong>ID:</strong> ${req.id}</p>
             <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
             <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
             <p><strong>Amount:</strong> ${req.amount} ETB</p>
+            <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
+            ${refHtml}
             <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
-            ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)" style="cursor:pointer;">` : '<p>No proof</p>'}
+            ${req.proof_path
+              ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" style="cursor:pointer;" onclick="window.open(this.src)">`
+              : '<p>No proof</p>'}
+            <div id="ocr-${req.id}" class="ocr-result">⏳ Loading receipt data...</div>
           </div>
           <div>
             <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
             <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
           </div>
-        </div>
-      `).join('');
+        `;
+
+        container.appendChild(card);
+
+        // ---- OCR processing after the card is in the DOM ----
+        if (req.proof_path) {
+          const img = document.getElementById(`proof-${req.id}`);
+          const ocrDiv = document.getElementById(`ocr-${req.id}`);
+          if (img && ocrDiv) {
+            img.onload = async function() {
+              ocrDiv.innerHTML = '🔍 Analyzing image...';
+              const extractedRef = await extractReferenceFromImage(req.proof_path);
+              if (extractedRef) {
+                const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(extractedRef)}`;
+                let matchHtml = '';
+                if (submittedRef && submittedRef.toUpperCase() === extractedRef.toUpperCase()) {
+                  matchHtml = '<span class="match">✅ Matches submitted reference</span>';
+                } else if (submittedRef) {
+                  matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+                }
+                ocrDiv.innerHTML = `
+                  <strong>🧾 Extracted Ref:</strong> ${extractedRef} ${matchHtml}<br>
+                  <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>
+                `;
+              } else {
+                ocrDiv.innerHTML = '❌ Could not read reference number from image.';
+              }
+            };
+            img.onerror = function() {
+              ocrDiv.innerHTML = '❌ Failed to load proof image.';
+            };
+            // Trigger the onload if image is already cached
+            if (img.complete) img.onload();
+          }
+        } else {
+          // No proof image
+          const ocrDiv = document.getElementById(`ocr-${req.id}`);
+          if (ocrDiv) ocrDiv.innerHTML = 'No proof image to scan.';
+        }
+      }
     } catch (err) {
       console.error(err);
       document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
@@ -98,6 +176,7 @@
             <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
             <p><strong>Phone:</strong> ${req.phone_number}</p>
             <p><strong>Amount:</strong> ${req.amount} ETB</p>
+            <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
             <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
           </div>
           <div>
