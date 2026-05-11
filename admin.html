@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎰 Bingo Admin Panel</title>
+  <title>🎰 Bingo Admin Panel | Auto‑Approve</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
@@ -14,20 +14,25 @@
     .request-card { background: #1e2a36; border-radius: 16px; margin: 12px 0; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
     .request-info { flex: 2; }
     .request-info p { margin: 5px 0; }
-    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; }
-    button { background: #f39c12; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 0 5px; }
+    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; cursor: pointer; }
+    button { background: #f39c12; border: none; padding: 6px 15px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 5px; }
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
+    button.auto { background: #9b59b6; color: #fff; }
     .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
     .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
-    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; }
+    details { margin-top: 8px; }
+    summary { cursor: pointer; color: #f39c12; }
+    input, button { border-radius: 20px; padding: 5px 10px; border: none; margin: 4px; }
+    input { background: #2c3e50; color: white; }
+    hr { margin: 8px 0; border-color: #2c3e50; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🎰 Bingo Admin Panel </h1>
+  <h1>🎰 Bingo Admin Panel (Auto‑Approve)</h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <div class="section">
@@ -42,18 +47,17 @@
 
   <div class="section">
     <h2>➕ Manual Add Balance</h2>
-    <input type="text" id="userId" placeholder="Telegram ID (numeric)" style="padding: 8px; border-radius: 20px; border: none;">
-    <input type="number" id="amount" placeholder="Amount" style="padding: 8px; border-radius: 20px; border: none;">
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)">
+    <input type="number" id="amount" placeholder="Amount">
     <button onclick="addBalance()">Add Balance</button>
   </div>
 </div>
 
 <script>
-  // ⚠️ ONLY the admin secret – never shared with the auditor
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
 
-  // ---------- QR Code scanning ----------
+  // ======================= TELEBIRR HELPERS =======================
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -69,22 +73,17 @@
         if (qrCode && qrCode.data) {
           const data = qrCode.data;
           const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) {
-            resolve(match[1]);
-          } else {
+          if (match) resolve(match[1]);
+          else {
             const refMatch = data.match(/^([A-Z0-9]{8,})$/);
-            if (refMatch) resolve(refMatch[1]);
-            else resolve(null);
+            refMatch ? resolve(refMatch[1]) : resolve(null);
           }
-        } else {
-          resolve(null);
-        }
+        } else resolve(null);
       };
-      img.onerror = () => reject('Failed to load image for QR scan');
+      img.onerror = () => reject('QR image load failed');
     });
   }
 
-  // ---------- OCR fallback ----------
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
@@ -92,23 +91,100 @@
       if (match && match[1]) return match[1].trim();
       const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
       return fallback ? fallback[0] : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
-  // ---------- Unified reference extraction ----------
-  async function getReferenceFromProof(imagePath) {
+  async function getTelebirrReference(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
       if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch (e) { console.warn('QR scan failed, trying OCR', e); }
+    } catch(e) { console.warn('QR failed', e); }
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
   }
 
-  // ---------- UI rendering ----------
+  // Fetch telebirr receipt data (amount, sender) from the public receipt page
+  async function fetchTelebirrReceiptData(txnRef) {
+    try {
+      const url = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
+      const response = await fetch(url);
+      const html = await response.text();
+      // Parse HTML – look for amount and sender phone/name
+      const amountMatch = html.match(/Amount[:\s]*([0-9,]+\.?[0-9]*)\s*ETB/i);
+      const senderMatch = html.match(/Sender[:\s]*([^<]+)/i);
+      const phoneMatch = html.match(/Phone[:\s]*([0-9]+)/i);
+      return {
+        amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g,'')) : null,
+        sender: senderMatch ? senderMatch[1].trim() : null,
+        phone: phoneMatch ? phoneMatch[1].trim() : null
+      };
+    } catch(e) { console.error('Tele receipt fetch error', e); return null; }
+  }
+
+  // ======================= CBE BIRR HELPERS =======================
+  async function extractCBEDetails(imageUrl) {
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+      const txnMatch = text.match(/(?:Txn\s*ID|Transaction\s*ID)\s*([A-Z0-9]{9,12})/i);
+      let phoneMatch = text.match(/PH=\s*0?(\d{10,13})/i);
+      if (!phoneMatch) phoneMatch = text.match(/\b(09[0-9]{8})\b/);
+      if (!phoneMatch) phoneMatch = text.match(/\b251[0-9]{9}\b/);
+      let phone = phoneMatch ? phoneMatch[1] : null;
+      if (phone && phone.length === 10 && phone.startsWith('9')) phone = '0' + phone;
+      const amountMatch = text.match(/(\d+(?:\.\d{2})?)\s*Br/i);
+      return {
+        transactionId: txnMatch ? txnMatch[1] : null,
+        phoneNumber: phone,
+        amount: amountMatch ? parseFloat(amountMatch[1]) : null
+      };
+    } catch(e) { return null; }
+  }
+
+  function generateCBELink(txnId, phone) {
+    if (!txnId || !phone) return null;
+    phone = phone.replace(/\s/g, '');
+    return `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(txnId)}&PH=${encodeURIComponent(phone)}`;
+  }
+
+  // ======================= AUTO-APPROVE LOGIC =======================
+  window.autoApproveTelebirr = async function(requestId, expectedAmount, expectedPhone, txnRef) {
+    const button = document.getElementById(`auto-btn-${requestId}`);
+    if (button) { button.disabled = true; button.innerText = '⏳ Verifying...'; }
+    try {
+      const receipt = await fetchTelebirrReceiptData(txnRef);
+      if (!receipt) throw new Error('Could not fetch receipt data');
+      let amountOk = Math.abs(receipt.amount - expectedAmount) < 0.01;
+      let phoneOk = receipt.phone && receipt.phone.includes(expectedPhone.replace(/\D/g,'').slice(-9));
+      if (amountOk && phoneOk) {
+        await processDeposit(requestId, 'approve');
+        alert(`✅ Auto-approved! Matched amount ${expectedAmount} ETB and phone.`);
+      } else {
+        alert(`❌ Auto-approve failed.\nExpected: ${expectedAmount} ETB / ${expectedPhone}\nGot: ${receipt.amount} ETB / ${receipt.phone}\nPlease check manually.`);
+      }
+    } catch(e) {
+      alert(`Auto-approve error: ${e.message}`);
+    } finally {
+      if (button) { button.disabled = false; button.innerText = '🤖 Auto Verify & Approve'; }
+    }
+  };
+
+  window.autoApproveCBE = async function(requestId, expectedAmount, expectedPhone, extractedAmount, extractedPhone) {
+    if (!extractedAmount || !extractedPhone) {
+      alert('No OCR data available. Please extract CBE details first (refresh or manual).');
+      return;
+    }
+    let amountOk = Math.abs(extractedAmount - expectedAmount) < 0.01;
+    let phoneOk = extractedPhone.replace(/\D/g,'').includes(expectedPhone.replace(/\D/g,'').slice(-9));
+    if (amountOk && phoneOk) {
+      await processDeposit(requestId, 'approve');
+      alert(`✅ Auto-approved! Matched amount ${expectedAmount} ETB and phone.`);
+    } else {
+      alert(`❌ Auto-approve failed.\nExpected: ${expectedAmount} ETB / ${expectedPhone}\nOCR got: ${extractedAmount} ETB / ${extractedPhone}\nPlease check manually.`);
+    }
+  };
+
+  // ======================= FETCH & RENDER =======================
   async function fetchAll() {
     await fetchDeposits();
     await fetchWithdrawals();
@@ -123,17 +199,12 @@
         container.innerHTML = '<p>✅ No pending deposits.</p>';
         return;
       }
-
       container.innerHTML = '';
       for (const req of data.requests) {
         const card = document.createElement('div');
         card.className = 'request-card';
-
         const submittedRef = req.reference_number || '';
-        const refHtml = submittedRef
-          ? `<p><strong>Submitted Reference:</strong> ${submittedRef}</p>`
-          : '';
-
+        const refHtml = submittedRef ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>` : '';
         card.innerHTML = `
           <div class="request-info">
             <p><strong>ID:</strong> ${req.id}</p>
@@ -143,9 +214,7 @@
             <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
             ${refHtml}
             <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
-            ${req.proof_path
-              ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" style="cursor:pointer;" onclick="window.open(this.src)">`
-              : '<p>No proof</p>'}
+            ${req.proof_path ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">` : '<p>No proof</p>'}
             <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
           </div>
           <div>
@@ -153,36 +222,72 @@
             <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
           </div>
         `;
-
         container.appendChild(card);
 
-        if (req.proof_path) {
-          const verifyDiv = document.getElementById(`verify-${req.id}`);
+        if (!req.proof_path) {
+          document.getElementById(`verify-${req.id}`).innerHTML = 'No proof image.';
+          continue;
+        }
+
+        const method = (req.payment_type || '').toLowerCase();
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
+
+        // ----- CBE Birr -----
+        if (method === 'cbe birr' || method === 'cbe') {
           try {
-            const result = await getReferenceFromProof(req.proof_path);
-            if (result) {
-              const ref = result.ref;
-              const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
-              let matchHtml = '';
-              if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
-                matchHtml = '<span class="match">✅ Matches submitted reference</span>';
-              } else if (submittedRef) {
-                matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
-              }
+            const details = await extractCBEDetails(req.proof_path);
+            if (details && details.transactionId && details.phoneNumber) {
+              const url = generateCBELink(details.transactionId, details.phoneNumber);
               verifyDiv.innerHTML = `
-                <strong>🧾 Extracted Ref (${result.method}):</strong> ${ref} ${matchHtml}<br>
-                <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>
+                <strong>🧾 Auto (CBE):</strong> Txn ${details.transactionId} | Phone ${details.phoneNumber} | Amount ${details.amount || '?'} Br<br>
+                <a href="${url}" target="_blank">📄 Download PDF receipt</a><br>
+                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveCBE(${req.id}, ${req.amount}, '${req.phone}', ${details.amount || null}, '${details.phoneNumber}')">🤖 Auto Verify & Approve</button>
+                <hr><details><summary>✏️ Manual override</summary>
+                  <input id="manualTxn-${req.id}" placeholder="Transaction ID" value="${details.transactionId}">
+                  <input id="manualPhone-${req.id}" placeholder="Phone" value="${details.phoneNumber}">
+                  <button onclick="manualVerifyCBE(${req.id})">Use manual</button>
+                </details>
               `;
             } else {
-              verifyDiv.innerHTML = '❌ Could not read reference from image.';
+              verifyDiv.innerHTML = `
+                ❌ Auto-detection failed.<br>
+                <input id="manualTxn-${req.id}" placeholder="Transaction ID">
+                <input id="manualPhone-${req.id}" placeholder="Phone">
+                <button onclick="manualVerifyCBE(${req.id})">Manual Verify</button>
+                <button class="auto" onclick="alert('Cannot auto-approve without OCR data. Use manual first.')">🤖 Auto Approve Unavailable</button>
+              `;
             }
-          } catch (e) {
-            verifyDiv.innerHTML = '❌ Verification error.';
-            console.error(e);
-          }
-        } else {
-          const verifyDiv = document.getElementById(`verify-${req.id}`);
-          if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.';
+          } catch(e) { verifyDiv.innerHTML = '❌ CBE scan error.'; }
+        }
+        // ----- Telebirr -----
+        else {
+          try {
+            const result = await getTelebirrReference(req.proof_path);
+            if (result) {
+              const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(result.ref)}`;
+              let matchHtml = '';
+              if (submittedRef && submittedRef.toUpperCase() === result.ref.toUpperCase())
+                matchHtml = '<span class="match">✅ Matches submitted</span>';
+              else if (submittedRef)
+                matchHtml = `<span class="mismatch">❌ Does NOT match (${submittedRef})</span>`;
+              verifyDiv.innerHTML = `
+                <strong>🧾 Telebirr (${result.method}):</strong> ${result.ref} ${matchHtml}<br>
+                <a href="${receiptUrl}" target="_blank">📄 Open receipt</a><br>
+                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveTelebirr(${req.id}, ${req.amount}, '${req.phone}', '${result.ref}')">🤖 Auto Verify & Approve</button>
+                <hr><details><summary>✏️ Manual override</summary>
+                  <input id="manualTelebirr-${req.id}" placeholder="Transaction number" value="${result.ref}">
+                  <button onclick="manualVerifyTelebirr(${req.id})">Verify</button>
+                </details>
+              `;
+            } else {
+              verifyDiv.innerHTML = `
+                ❌ Could not read Telebirr ref.<br>
+                <input id="manualTelebirr-${req.id}" placeholder="Transaction number">
+                <button onclick="manualVerifyTelebirr(${req.id})">Manual Verify</button>
+                <button class="auto" onclick="alert('Cannot auto-approve without transaction number. Use manual.')">🤖 Auto Approve Unavailable</button>
+              `;
+            }
+          } catch(e) { verifyDiv.innerHTML = '❌ Telebirr error.'; }
         }
       }
     } catch (err) {
@@ -191,6 +296,40 @@
     }
   }
 
+  // ======================= MANUAL OVERRIDES (keep existing) =======================
+  window.manualVerifyTelebirr = function(requestId) {
+    const input = document.getElementById(`manualTelebirr-${requestId}`);
+    const ref = input ? input.value.trim().toUpperCase() : '';
+    if (!ref) { alert('Enter transaction number'); return; }
+    const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+    const verifyDiv = document.getElementById(`verify-${requestId}`);
+    verifyDiv.innerHTML = `
+      🔍 Manual: ${ref}<br>
+      <a href="${receiptUrl}" target="_blank">📄 Open Telebirr receipt</a><br>
+      <button class="auto" onclick="autoApproveTelebirr(${requestId}, ${document.querySelector(`#verify-${requestId}`).closest('.request-card').querySelector('.request-info p:nth-child(5)').innerText.match(/\d+/)[0]}, '${document.querySelector(`#verify-${requestId}`).closest('.request-card').querySelector('.request-info p:nth-child(3)').innerText.split(':')[1].trim()}', '${ref}')">🤖 Auto Approve (use extracted)</button>
+      <button onclick="location.reload()">⟳ Reset</button>
+    `;
+  };
+
+  window.manualVerifyCBE = function(requestId) {
+    const txnInput = document.getElementById(`manualTxn-${requestId}`);
+    const phoneInput = document.getElementById(`manualPhone-${requestId}`);
+    const txn = txnInput ? txnInput.value.trim() : '';
+    let phone = phoneInput ? phoneInput.value.trim() : '';
+    if (!txn || !phone) { alert('Enter both Txn ID and Phone'); return; }
+    if (phone.match(/^9\d{9}$/)) phone = '0' + phone;
+    if (phone.match(/^251\d{9}$/)) phone = '0' + phone.slice(3);
+    const url = generateCBELink(txn, phone);
+    const verifyDiv = document.getElementById(`verify-${requestId}`);
+    verifyDiv.innerHTML = `
+      🔍 Manual: Txn ${txn} | Phone ${phone}<br>
+      <a href="${url}" target="_blank">📄 Download CBE PDF receipt</a><br>
+      <button class="auto" onclick="alert('Auto-approve not available for manually entered CBE details. Use Approve button after verification.')">🤖 Auto Approve Unavailable</button>
+      <button onclick="location.reload()">⟳ Reset</button>
+    `;
+  };
+
+  // ======================= FETCH WITHDRAWALS & OTHER ACTIONS =======================
   async function fetchWithdrawals() {
     try {
       const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
