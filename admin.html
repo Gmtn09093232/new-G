@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🎰 Bingo Admin Panel | Auto‑Approve</title>
+  <title>🎰 Bingo Admin | Auto‑Approve (Telebirr Txn# / CBE TxnID)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
@@ -32,7 +32,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>🎰 Bingo Admin Panel (Auto‑Approve)</h1>
+  <h1>🎰 Bingo Admin Panel (Txn# / TxnID based Auto‑Approve)</h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <div class="section">
@@ -110,7 +110,6 @@
       const url = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
       const response = await fetch(url);
       const html = await response.text();
-      // Parse HTML – look for amount and sender phone/name
       const amountMatch = html.match(/Amount[:\s]*([0-9,]+\.?[0-9]*)\s*ETB/i);
       const senderMatch = html.match(/Sender[:\s]*([^<]+)/i);
       const phoneMatch = html.match(/Phone[:\s]*([0-9]+)/i);
@@ -148,39 +147,58 @@
   }
 
   // ======================= AUTO-APPROVE LOGIC =======================
-  window.autoApproveTelebirr = async function(requestId, expectedAmount, expectedPhone, txnRef) {
+  // For Telebirr: use transaction number + optional amount from receipt page
+  window.autoApproveTelebirr = async function(requestId, expectedAmount, expectedPhone, txnRef, submittedRef) {
     const button = document.getElementById(`auto-btn-${requestId}`);
     if (button) { button.disabled = true; button.innerText = '⏳ Verifying...'; }
     try {
-      const receipt = await fetchTelebirrReceiptData(txnRef);
-      if (!receipt) throw new Error('Could not fetch receipt data');
-      let amountOk = Math.abs(receipt.amount - expectedAmount) < 0.01;
-      let phoneOk = receipt.phone && receipt.phone.includes(expectedPhone.replace(/\D/g,'').slice(-9));
-      if (amountOk && phoneOk) {
-        await processDeposit(requestId, 'approve');
-        alert(`✅ Auto-approved! Matched amount ${expectedAmount} ETB and phone.`);
-      } else {
-        alert(`❌ Auto-approve failed.\nExpected: ${expectedAmount} ETB / ${expectedPhone}\nGot: ${receipt.amount} ETB / ${receipt.phone}\nPlease check manually.`);
+      // 1. Check transaction number matches submitted reference
+      if (submittedRef && submittedRef.toUpperCase() !== txnRef.toUpperCase()) {
+        throw new Error(`Transaction number mismatch: submitted ${submittedRef} vs extracted ${txnRef}`);
       }
+      // 2. Fetch receipt data for amount/phone if possible
+      const receipt = await fetchTelebirrReceiptData(txnRef);
+      let amountOk = true, phoneOk = true;
+      if (receipt && receipt.amount !== null) {
+        amountOk = Math.abs(receipt.amount - expectedAmount) < 0.01;
+        if (!amountOk) throw new Error(`Amount mismatch: expected ${expectedAmount}, got ${receipt.amount}`);
+      }
+      if (receipt && receipt.phone) {
+        phoneOk = receipt.phone.includes(expectedPhone.replace(/\D/g,'').slice(-9));
+        if (!phoneOk) throw new Error(`Phone mismatch: expected ${expectedPhone}, got ${receipt.phone}`);
+      }
+      // If we reach here, all checks passed
+      await processDeposit(requestId, 'approve');
+      alert(`✅ Auto-approved Telebirr! Txn# ${txnRef} verified.`);
     } catch(e) {
-      alert(`Auto-approve error: ${e.message}`);
+      alert(`❌ Auto-approve failed: ${e.message}\nPlease check manually.`);
     } finally {
       if (button) { button.disabled = false; button.innerText = '🤖 Auto Verify & Approve'; }
     }
   };
 
-  window.autoApproveCBE = async function(requestId, expectedAmount, expectedPhone, extractedAmount, extractedPhone) {
-    if (!extractedAmount || !extractedPhone) {
-      alert('No OCR data available. Please extract CBE details first (refresh or manual).');
+  // For CBE Birr: use OCR extracted Txn ID, amount, phone
+  window.autoApproveCBE = async function(requestId, expectedAmount, expectedPhone, extractedTxnId, extractedAmount, extractedPhone) {
+    if (!extractedTxnId) {
+      alert('No Txn ID extracted. Please refresh or enter manually.');
       return;
     }
-    let amountOk = Math.abs(extractedAmount - expectedAmount) < 0.01;
-    let phoneOk = extractedPhone.replace(/\D/g,'').includes(expectedPhone.replace(/\D/g,'').slice(-9));
-    if (amountOk && phoneOk) {
+    try {
+      // Check Txn ID against submitted reference? Optional – we compare amount & phone
+      if (extractedAmount !== null && Math.abs(extractedAmount - expectedAmount) >= 0.01) {
+        throw new Error(`Amount mismatch: expected ${expectedAmount}, OCR got ${extractedAmount}`);
+      }
+      if (extractedPhone) {
+        const normExpected = expectedPhone.replace(/\D/g,'').slice(-9);
+        const normExtracted = extractedPhone.replace(/\D/g,'').slice(-9);
+        if (normExpected !== normExtracted) {
+          throw new Error(`Phone mismatch: expected ${expectedPhone}, OCR got ${extractedPhone}`);
+        }
+      }
       await processDeposit(requestId, 'approve');
-      alert(`✅ Auto-approved! Matched amount ${expectedAmount} ETB and phone.`);
-    } else {
-      alert(`❌ Auto-approve failed.\nExpected: ${expectedAmount} ETB / ${expectedPhone}\nOCR got: ${extractedAmount} ETB / ${extractedPhone}\nPlease check manually.`);
+      alert(`✅ Auto-approved CBE Birr! TxnID ${extractedTxnId} verified.`);
+    } catch(e) {
+      alert(`❌ Auto-approve failed: ${e.message}\nPlease check manually.`);
     }
   };
 
@@ -236,25 +254,24 @@
         if (method === 'cbe birr' || method === 'cbe') {
           try {
             const details = await extractCBEDetails(req.proof_path);
-            if (details && details.transactionId && details.phoneNumber) {
-              const url = generateCBELink(details.transactionId, details.phoneNumber);
+            if (details && details.transactionId) {
+              const url = generateCBELink(details.transactionId, details.phoneNumber || '');
               verifyDiv.innerHTML = `
-                <strong>🧾 Auto (CBE):</strong> Txn ${details.transactionId} | Phone ${details.phoneNumber} | Amount ${details.amount || '?'} Br<br>
+                <strong>🧾 Auto (CBE):</strong> TxnID ${details.transactionId} | Phone ${details.phoneNumber || '?'} | Amount ${details.amount || '?'} Br<br>
                 <a href="${url}" target="_blank">📄 Download PDF receipt</a><br>
-                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveCBE(${req.id}, ${req.amount}, '${req.phone}', ${details.amount || null}, '${details.phoneNumber}')">🤖 Auto Verify & Approve</button>
+                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveCBE(${req.id}, ${req.amount}, '${req.phone}', '${details.transactionId}', ${details.amount || null}, '${details.phoneNumber || ''}')">🤖 Auto Verify & Approve</button>
                 <hr><details><summary>✏️ Manual override</summary>
-                  <input id="manualTxn-${req.id}" placeholder="Transaction ID" value="${details.transactionId}">
-                  <input id="manualPhone-${req.id}" placeholder="Phone" value="${details.phoneNumber}">
+                  <input id="manualTxn-${req.id}" placeholder="Txn ID" value="${details.transactionId}">
+                  <input id="manualPhone-${req.id}" placeholder="Phone" value="${details.phoneNumber || ''}">
                   <button onclick="manualVerifyCBE(${req.id})">Use manual</button>
                 </details>
               `;
             } else {
               verifyDiv.innerHTML = `
-                ❌ Auto-detection failed.<br>
+                ❌ Could not extract CBE TxnID.<br>
                 <input id="manualTxn-${req.id}" placeholder="Transaction ID">
                 <input id="manualPhone-${req.id}" placeholder="Phone">
                 <button onclick="manualVerifyCBE(${req.id})">Manual Verify</button>
-                <button class="auto" onclick="alert('Cannot auto-approve without OCR data. Use manual first.')">🤖 Auto Approve Unavailable</button>
               `;
             }
           } catch(e) { verifyDiv.innerHTML = '❌ CBE scan error.'; }
@@ -273,7 +290,7 @@
               verifyDiv.innerHTML = `
                 <strong>🧾 Telebirr (${result.method}):</strong> ${result.ref} ${matchHtml}<br>
                 <a href="${receiptUrl}" target="_blank">📄 Open receipt</a><br>
-                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveTelebirr(${req.id}, ${req.amount}, '${req.phone}', '${result.ref}')">🤖 Auto Verify & Approve</button>
+                <button class="auto" id="auto-btn-${req.id}" onclick="autoApproveTelebirr(${req.id}, ${req.amount}, '${req.phone}', '${result.ref}', '${submittedRef}')">🤖 Auto Verify & Approve</button>
                 <hr><details><summary>✏️ Manual override</summary>
                   <input id="manualTelebirr-${req.id}" placeholder="Transaction number" value="${result.ref}">
                   <button onclick="manualVerifyTelebirr(${req.id})">Verify</button>
@@ -281,10 +298,9 @@
               `;
             } else {
               verifyDiv.innerHTML = `
-                ❌ Could not read Telebirr ref.<br>
+                ❌ Could not read Telebirr transaction number.<br>
                 <input id="manualTelebirr-${req.id}" placeholder="Transaction number">
                 <button onclick="manualVerifyTelebirr(${req.id})">Manual Verify</button>
-                <button class="auto" onclick="alert('Cannot auto-approve without transaction number. Use manual.')">🤖 Auto Approve Unavailable</button>
               `;
             }
           } catch(e) { verifyDiv.innerHTML = '❌ Telebirr error.'; }
@@ -296,17 +312,22 @@
     }
   }
 
-  // ======================= MANUAL OVERRIDES (keep existing) =======================
+  // ======================= MANUAL OVERRIDES =======================
   window.manualVerifyTelebirr = function(requestId) {
     const input = document.getElementById(`manualTelebirr-${requestId}`);
     const ref = input ? input.value.trim().toUpperCase() : '';
     if (!ref) { alert('Enter transaction number'); return; }
     const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
     const verifyDiv = document.getElementById(`verify-${requestId}`);
+    // Get amount and phone from the request card (hacky but works)
+    const card = verifyDiv.closest('.request-card');
+    const amountText = card.querySelector('.request-info p:nth-child(5)').innerText;
+    const amount = parseFloat(amountText.match(/\d+(?:\.\d+)?/)[0]);
+    const phoneText = card.querySelector('.request-info p:nth-child(3)').innerText.split(':')[1].trim();
     verifyDiv.innerHTML = `
       🔍 Manual: ${ref}<br>
       <a href="${receiptUrl}" target="_blank">📄 Open Telebirr receipt</a><br>
-      <button class="auto" onclick="autoApproveTelebirr(${requestId}, ${document.querySelector(`#verify-${requestId}`).closest('.request-card').querySelector('.request-info p:nth-child(5)').innerText.match(/\d+/)[0]}, '${document.querySelector(`#verify-${requestId}`).closest('.request-card').querySelector('.request-info p:nth-child(3)').innerText.split(':')[1].trim()}', '${ref}')">🤖 Auto Approve (use extracted)</button>
+      <button class="auto" onclick="autoApproveTelebirr(${requestId}, ${amount}, '${phoneText}', '${ref}', '')">🤖 Auto Approve (using this number)</button>
       <button onclick="location.reload()">⟳ Reset</button>
     `;
   };
@@ -316,15 +337,19 @@
     const phoneInput = document.getElementById(`manualPhone-${requestId}`);
     const txn = txnInput ? txnInput.value.trim() : '';
     let phone = phoneInput ? phoneInput.value.trim() : '';
-    if (!txn || !phone) { alert('Enter both Txn ID and Phone'); return; }
-    if (phone.match(/^9\d{9}$/)) phone = '0' + phone;
-    if (phone.match(/^251\d{9}$/)) phone = '0' + phone.slice(3);
+    if (!txn) { alert('Enter Txn ID'); return; }
+    if (phone && phone.match(/^9\d{9}$/)) phone = '0' + phone;
+    if (phone && phone.match(/^251\d{9}$/)) phone = '0' + phone.slice(3);
     const url = generateCBELink(txn, phone);
     const verifyDiv = document.getElementById(`verify-${requestId}`);
+    const card = verifyDiv.closest('.request-card');
+    const amountText = card.querySelector('.request-info p:nth-child(5)').innerText;
+    const amount = parseFloat(amountText.match(/\d+(?:\.\d+)?/)[0]);
+    const phoneText = card.querySelector('.request-info p:nth-child(3)').innerText.split(':')[1].trim();
     verifyDiv.innerHTML = `
       🔍 Manual: Txn ${txn} | Phone ${phone}<br>
-      <a href="${url}" target="_blank">📄 Download CBE PDF receipt</a><br>
-      <button class="auto" onclick="alert('Auto-approve not available for manually entered CBE details. Use Approve button after verification.')">🤖 Auto Approve Unavailable</button>
+      <a href="${url}" target="_blank">📄 Download CBE PDF</a><br>
+      <button class="auto" onclick="autoApproveCBE(${requestId}, ${amount}, '${phoneText}', '${txn}', null, '${phone}')">🤖 Auto Approve (manual data)</button>
       <button onclick="location.reload()">⟳ Reset</button>
     `;
   };
