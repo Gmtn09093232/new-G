@@ -324,6 +324,23 @@ async function startGame() {
       if (socket) socket.emit('balanceUpdate', user.balance);
     }
   }
+for (const p of currentGame.players) {
+  const user = users[p.telegramId];
+  if (user) {
+    user.balance -= currentGame.entryFee;
+    await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
+    const socket = await getSocketByUserId(p.telegramId);
+    if (socket) socket.emit('balanceUpdate', user.balance);
+
+    // ✅ AUDIT: entry fee paid
+    Audit.adminAction('ENTRY_FEE_PAID', 'system', null, {
+      userId: p.telegramId,
+      amount: currentGame.entryFee,
+      currency: 'ETB'
+    });
+  }
+}
+  
   currentGame.prizePool = 0.8 * (currentGame.entryFee * currentGame.players.length);
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
@@ -406,6 +423,15 @@ async function endGame(winnerTelegramId, isLate = false) {
         transactionId: 'game_' + Date.now()
       });
 
+      const totalEntryFees = currentGame.players.length * currentGame.entryFee;
+const houseProfit = totalEntryFees - currentGame.prizePool;
+
+await supabase.from('game_rounds').insert({
+  total_entry_fees: totalEntryFees,
+  prize_pool: currentGame.prizePool,
+  house_profit: houseProfit
+});
+      
       // ✅ SUSPICIOUS ACTIVITY CHECK
       detectRapidWins('global', winnerTelegramId, null);
 
@@ -660,6 +686,46 @@ app.get('/admin/audit', async (req, res) => {
   res.json({ success: true, logs: data, count });
 });
 
+// ---------- AUDIT SUMMARY (auditor only) ----------
+app.get('/admin/audit-summary', async (req, res) => {
+  const { secret } = req.query;
+  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
+
+  try {
+    // Total approved deposits
+    const { data: deposits, error: depErr } = await supabase
+      .from('deposit_requests')
+      .select('amount')
+      .eq('status', 'approved');
+    if (depErr) throw depErr;
+
+    // Total approved withdrawals
+    const { data: withdrawals, error: wdErr } = await supabase
+      .from('withdrawal_requests')
+      .select('amount')
+      .eq('status', 'approved');
+    if (wdErr) throw wdErr;
+
+    // Total house profit (20% of all entry fees)
+    const { data: rounds, error: rdErr } = await supabase
+      .from('game_rounds')
+      .select('house_profit');
+    if (rdErr) throw rdErr;
+
+    const totalDeposits = deposits.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalWithdrawals = withdrawals.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
+
+    res.json({
+      success: true,
+      totalDeposits,
+      totalWithdrawals,
+      totalHouseProfit
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // ---------- Socket.IO ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
