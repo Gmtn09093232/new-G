@@ -167,6 +167,7 @@ app.get('/api/admin-phone', (req, res) => {
   res.json({ phone: process.env.ADMIN_PHONE || '0924839730' });
 });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 // ---------- User cache ----------
