@@ -4,9 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🎰 Bingo Admin Panel</title>
-  <!-- QR code scanner -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <!-- OCR fallback -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
@@ -24,11 +22,12 @@
     .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
+    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🎰 Bingo Admin Panel</h1>
+  <h1>🎰 Bingo Admin Panel <a href="audit.html" class="nav-link" style="font-size:0.8em;">🔍 View Audit Logs</a></h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <div class="section">
@@ -51,7 +50,7 @@
 
 <script>
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
-  const API_BASE = '/api/admin/audit';
+  const API_BASE = '';
 
   // ---------- QR Code scanning ----------
   function extractRefFromQR(imageSrc) {
@@ -67,14 +66,11 @@
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
         if (qrCode && qrCode.data) {
-          // The QR data is likely a URL like https://transactioninfo.ethiotelecom.et/receipt/DE26GU1TFU
           const data = qrCode.data;
-          // Extract reference from URL path: /receipt/XXXX
           const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
           if (match) {
-            resolve(match[1]); // the reference number
+            resolve(match[1]);
           } else {
-            // Maybe the QR just contains the reference directly
             const refMatch = data.match(/^([A-Z0-9]{8,})$/);
             if (refMatch) resolve(refMatch[1]);
             else resolve(null);
@@ -102,12 +98,10 @@
 
   // ---------- Unified reference extraction ----------
   async function getReferenceFromProof(imagePath) {
-    // Try QR first
     try {
       const qrRef = await extractRefFromQR(imagePath);
       if (qrRef) return { ref: qrRef, method: 'QR' };
     } catch (e) { console.warn('QR scan failed, trying OCR', e); }
-    // Fallback to OCR
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
@@ -161,7 +155,6 @@
 
         container.appendChild(card);
 
-        // Verify after card is inserted
         if (req.proof_path) {
           const verifyDiv = document.getElementById(`verify-${req.id}`);
           try {
@@ -197,7 +190,6 @@
     }
   }
 
-  // (fetchWithdrawals, processDeposit, processWithdrawal, addBalance – unchanged from your original)
   async function fetchWithdrawals() {
     try {
       const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
