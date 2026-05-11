@@ -454,13 +454,15 @@ async function endGameWithWinners() {
         });
       }
     });
-
-    io.emit('gameEnded', {
-      winners: currentGame.winners.map(w => w.username),
-      prizeEach,
-      totalPrize: currentGame.prizePool,
-      winnerCount: currentGame.winners.length
-    });
+const winnerNames = currentGame.winners.map(w => w.username);
+io.emit('gameEnded', {
+  winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
+  winners: winnerNames,
+  prizeEach,
+  totalPrize: currentGame.prizePool,
+  winnerCount: currentGame.winners.length
+});
+ 
   } else {
     // No winners (game ended because numbers ran out)
     io.emit('gameEnded', { noWinner: true });
