@@ -3,165 +3,103 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bingo Audit Logs</title>
+  <title>🔍 Audit Logs – Bingo Admin</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #f4f6f9; padding: 20px; }
-    .container { max-width: 1400px; margin: 0 auto; }
-    h1 { margin-bottom: 20px; color: #1a1a2e; }
-    .filters {
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: flex-end;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      margin-bottom: 20px;
-    }
+    body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
+    .container { max-width: 1400px; margin: auto; }
+    h1 { color: #f39c12; }
+    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; }
+    .section { background: #16202a; margin: 20px 0; padding: 20px; border-radius: 24px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; align-items: flex-end; }
     .filter-group { display: flex; flex-direction: column; }
-    .filter-group label { font-size: 0.85rem; margin-bottom: 4px; color: #555; }
+    .filter-group label { font-size: 0.85rem; margin-bottom: 4px; color: #aaa; }
     .filter-group input, .filter-group select {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      min-width: 150px;
+      padding: 8px 12px; border-radius: 8px; border: 1px solid #334; background: #1e2a36; color: #eee;
     }
-    button {
-      padding: 8px 20px;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      height: 38px;
-    }
-    button:hover { background: #0056b3; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; font-size: 0.9rem; }
-    th { background: #f0f2f5; font-weight: 600; color: #333; }
-    tr:hover { background: #f9f9f9; }
-    pre { 
-      background: #f8f9fa; 
-      padding: 4px; 
-      border-radius: 4px; 
-      font-size: 0.8rem; 
-      white-space: pre-wrap; 
-      word-wrap: break-word; 
-      max-width: 400px; 
-    }
-    .pagination { margin-top: 15px; text-align: right; }
-    .error { color: red; margin-top: 10px; }
+    button { background: #f39c12; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; }
+    button:hover { background: #e67e22; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #233; font-size: 0.85rem; }
+    th { background: #1e2a36; color: #f39c12; }
+    tr:hover { background: #1a2530; }
+    pre { background: #0f1a24; padding: 6px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; }
+    .error { color: #e74c3c; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🔍 Bingo Audit Logs</h1>
-  
-  <div class="filters">
-    <div class="filter-group">
-      <label for="filter-room">Room ID</label>
-      <input type="text" id="filter-room" placeholder="e.g. room_123">
-    </div>
-    <div class="filter-group">
-      <label for="filter-user">User ID</label>
-      <input type="text" id="filter-user" placeholder="e.g. user_456">
-    </div>
-    <div class="filter-group">
-      <label for="filter-event">Event Type</label>
-      <select id="filter-event">
-        <option value="">All Events</option>
-        <option value="DEPOSIT_INITIATED">Deposit Initiated</option>
-        <option value="DEPOSIT_COMPLETED">Deposit Completed</option>
-        <option value="DEPOSIT_FAILED">Deposit Failed</option>
-        <option value="WITHDRAWAL_REQUESTED">Withdrawal Requested</option>
-        <option value="WITHDRAWAL_COMPLETED">Withdrawal Completed</option>
-        <option value="WITHDRAWAL_REJECTED">Withdrawal Rejected</option>
-        <option value="BINGO_CALLED">Bingo Called</option>
-        <option value="BINGO_VERIFIED">Bingo Verified</option>
-        <option value="BINGO_REJECTED">Bingo Rejected</option>
-        <option value="WIN_PAID_OUT">Win Paid Out</option>
-        <option value="NUMBER_DRAWN">Number Drawn</option>
-        <option value="CARD_ASSIGNED">Card Assigned</option>
-        <option value="ADMIN_LOGIN">Admin Login</option>
-        <option value="ADMIN_CONFIG_CHANGE">Admin Config Change</option>
-        <option value="ADMIN_BAN_PLAYER">Admin Ban Player</option>
-        <option value="SUSPICIOUS_BEHAVIOR_DETECTED">Suspicious Activity</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label for="filter-from">From</label>
-      <input type="datetime-local" id="filter-from">
-    </div>
-    <div class="filter-group">
-      <label for="filter-to">To</label>
-      <input type="datetime-local" id="filter-to">
-    </div>
-    <button onclick="loadAuditLogs()">Search</button>
-  </div>
+  <h1>🔍 Audit Logs <a href="admin.html" class="nav-link" style="font-size:0.8em;">⬅ Back to Admin Panel</a></h1>
 
-  <table id="audit-table">
-    <thead>
-      <tr>
-        <th>Timestamp</th>
-        <th>Event Type</th>
-        <th>Room ID</th>
-        <th>User ID</th>
-        <th>IP Address</th>
-        <th>Details</th>
-      </tr>
-    </thead>
-    <tbody id="table-body">
-      <tr><td colspan="6" style="text-align:center; color:#999;">No logs loaded yet. Use filters and click Search.</td></tr>
-    </tbody>
-  </table>
-  <div id="error-msg" class="error"></div>
+  <div class="section">
+    <div class="filters">
+      <div class="filter-group">
+        <label for="filter-room">Room ID</label>
+        <input type="text" id="filter-room" placeholder="e.g. room_123">
+      </div>
+      <div class="filter-group">
+        <label for="filter-user">User ID</label>
+        <input type="text" id="filter-user" placeholder="Telegram ID">
+      </div>
+      <div class="filter-group">
+        <label for="filter-event">Event Type</label>
+        <select id="filter-event">
+          <option value="">All Events</option>
+          <option value="DEPOSIT_INITIATED">Deposit Initiated</option>
+          <option value="DEPOSIT_COMPLETED">Deposit Completed</option>
+          <option value="DEPOSIT_FAILED">Deposit Failed</option>
+          <option value="WITHDRAWAL_REQUESTED">Withdrawal Requested</option>
+          <option value="WITHDRAWAL_COMPLETED">Withdrawal Completed</option>
+          <option value="WITHDRAWAL_REJECTED">Withdrawal Rejected</option>
+          <option value="BINGO_CALLED">Bingo Called</option>
+          <option value="BINGO_VERIFIED">Bingo Verified</option>
+          <option value="BINGO_REJECTED">Bingo Rejected</option>
+          <option value="WIN_PAID_OUT">Win Paid Out</option>
+          <option value="NUMBER_DRAWN">Number Drawn</option>
+          <option value="CARD_ASSIGNED">Card Assigned</option>
+          <option value="ADMIN_LOGIN">Admin Login</option>
+          <option value="ADMIN_CONFIG_CHANGE">Admin Config Change</option>
+          <option value="ADMIN_BAN_PLAYER">Admin Ban Player</option>
+          <option value="SUSPICIOUS_BEHAVIOR_DETECTED">Suspicious Activity</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filter-from">From</label>
+        <input type="datetime-local" id="filter-from">
+      </div>
+      <div class="filter-group">
+        <label for="filter-to">To</label>
+        <input type="datetime-local" id="filter-to">
+      </div>
+      <button onclick="loadAuditLogs()">🔎 Search</button>
+    </div>
+
+    <table id="audit-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Event Type</th>
+          <th>Room ID</th>
+          <th>User ID</th>
+          <th>IP Address</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="audit-tbody">
+        <tr><td colspan="6" style="text-align:center; color:#888;">Use filters and click Search</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-  // ---------- CONFIGURE THESE ----------
-  const API_BASE = '/api/admin/audit';            // your audit endpoint
-  const AUTH_TOKEN = localStorage.getItem('adminToken') || ''; // retrieve your stored admin token
+  // Same authentication as admin panel
+  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+  const API_BASE = '';
 
-  // Helper: add auth header to fetch
-  async function fetchWithAuth(url) {
-    const res = await fetch(url, {
-      headers: {
-        'Authorization': 'Bearer ' + AUTH_TOKEN,
-        'Content-Type': 'application/json'
-      }
-    });
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Unauthorized. Please log in as admin.');
-    }
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error('Request failed: ' + text);
-    }
-    return res.json();
-  }
-
-  function formatTimestamp(iso) {
-    return new Date(iso).toLocaleString();
-  }
-
-  function prettyJson(obj) {
-    try {
-      return JSON.stringify(obj, null, 2);
-    } catch {
-      return obj;
-    }
-  }
-
+  // Load audit logs
   async function loadAuditLogs() {
     const params = new URLSearchParams();
+    params.append('secret', ADMIN_SECRET);
     const roomId = document.getElementById('filter-room').value.trim();
     const userId = document.getElementById('filter-user').value.trim();
     const eventType = document.getElementById('filter-event').value;
@@ -173,44 +111,40 @@
     if (eventType) params.append('eventType', eventType);
     if (from) params.append('from', new Date(from).toISOString());
     if (to) params.append('to', new Date(to).toISOString());
-    params.append('limit', '500'); // you can adjust
+    params.append('limit', '500');
 
-    const tbody = document.getElementById('table-body');
-    const errorDiv = document.getElementById('error-msg');
-    errorDiv.textContent = '';
+    const tbody = document.getElementById('audit-tbody');
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Loading...</td></tr>';
-
     try {
-      const data = await fetchWithAuth(`${API_BASE}?${params}`);
+      const res = await fetch(`${API_BASE}/admin/audit?${params}`);
+      const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Unknown error');
-      renderTable(data.logs);
+      renderAuditTable(data.logs);
     } catch (err) {
-      errorDiv.textContent = 'Error: ' + err.message;
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Failed to load logs</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#e74c3c;">Error: ${err.message}</td></tr>`;
     }
   }
 
-  function renderTable(logs) {
-    const tbody = document.getElementById('table-body');
+  function renderAuditTable(logs) {
+    const tbody = document.getElementById('audit-tbody');
     if (!logs || logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No logs found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No matching logs found.</td></tr>';
       return;
     }
     tbody.innerHTML = logs.map(log => `
       <tr>
-        <td>${formatTimestamp(log.timestamp)}</td>
+        <td>${new Date(log.timestamp).toLocaleString()}</td>
         <td><strong>${log.event_type}</strong></td>
         <td>${log.room_id || '-'}</td>
         <td>${log.user_id}</td>
         <td>${log.ip_address || '-'}</td>
-        <td><pre>${prettyJson(log.details)}</pre></td>
+        <td><pre>${JSON.stringify(log.details, null, 2)}</pre></td>
       </tr>
     `).join('');
   }
 
-  // Load on page ready (optional: default to recent 24h)
+  // Default: show last 24 hours
   window.addEventListener('DOMContentLoaded', () => {
-    // Set default "from" to 24 hours ago
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24*60*60*1000);
     document.getElementById('filter-from').value = yesterday.toISOString().slice(0,16);
