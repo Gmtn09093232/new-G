@@ -103,9 +103,6 @@ const Audit = {
   bingoCalled(roomId, userId, ip, data) {
     return logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId, ipAddress: ip, details: data });
   },
-  bingoVerified(roomId, userId, ip, data) {
-    return logAuditEvent({ eventType: 'BINGO_VERIFIED', roomId, userId, ipAddress: ip, details: data });
-  },
   bingoRejected(roomId, userId, ip, data) {
     return logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId, ipAddress: ip, details: data });
   },
@@ -278,17 +275,22 @@ const currentGame = {
   lobbyTimer: null,
   callInterval: null,
   lobbyEndTime: 0,
-  cardSet: Array.from({ length: 100 }, () => generateCard())
+  cardSet: Array.from({ length: 100 }, () => generateCard()),
+  winners: [],                // multiple winners collection
+  bingoGraceTimeout: null     // grace period timer
 };
 
 function resetGame() {
   clearInterval(currentGame.callInterval);
   clearTimeout(currentGame.lobbyTimer);
+  clearTimeout(currentGame.bingoGraceTimeout); // clear grace timer if any
   currentGame.status = 'lobby';
   currentGame.players = [];
   currentGame.takenCardNumbers.clear();
   currentGame.calledNumbers = [];
   currentGame.prizePool = 0;
+  currentGame.winners = [];
+  currentGame.bingoGraceTimeout = null;
   currentGame.lobbyEndTime = Date.now() + 30000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
   io.emit('lobbyState', { startsIn: 30, takenNumbers: [] });
@@ -350,7 +352,11 @@ function startCalling() {
     if (currentGame.status !== 'running') { clearInterval(currentGame.callInterval); return; }
     const allNums = Array.from({ length: 75 }, (_, i) => i + 1);
     const available = allNums.filter(n => !currentGame.calledNumbers.includes(n));
-    if (available.length === 0) { clearInterval(currentGame.callInterval); endGame(null); return; }
+    if (available.length === 0) {
+      clearInterval(currentGame.callInterval);
+      endGameWithWinners();   // Use multiple-winner end even if no one claimed
+      return;
+    }
     const number = available[Math.floor(Math.random() * available.length)];
     currentGame.calledNumbers.push(number);
     io.emit('numberCalled', { number, calledNumbers: currentGame.calledNumbers });
@@ -388,53 +394,82 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-async function endGame(winnerTelegramId, isLate = false) {
+// ---------- NEW: End game with multiple winners ----------
+async function endGameWithWinners() {
   currentGame.status = 'ended';
   clearInterval(currentGame.callInterval);
 
-  if (winnerTelegramId) {
-    const winner = currentGame.players.find(p => p.telegramId === winnerTelegramId);
-    if (winner && users[winner.telegramId]) {
-      users[winner.telegramId].balance += currentGame.prizePool;
-      await supabase.from('users').update({
-        balance: users[winner.telegramId].balance
-      }).eq('telegram_id', winner.telegramId);
+  if (currentGame.winners.length > 0) {
+    // Split prize equally (floor division, remainder stays with house)
+    const prizeEach = Math.floor(currentGame.prizePool / currentGame.winners.length);
 
-      const sockets = await io.fetchSockets();
-      const winnerSocket = sockets.find(s => s.userId === winner.telegramId);
-      if (winnerSocket) winnerSocket.emit('balanceUpdate', users[winner.telegramId].balance);
+    // Pay each winner
+    for (const w of currentGame.winners) {
+      const user = users[w.telegramId];
+      if (user) {
+        user.balance += prizeEach;
+        await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
 
-      // ✅ AUDIT LOG: Win verified & paid out
-      Audit.bingoVerified('global', winnerTelegramId, null, {
-        winType: 'bingo_line', // adjust as needed
-        late: isLate
-      });
-      Audit.winPaidOut('global', winnerTelegramId, null, {
-        amount: currentGame.prizePool,
-        currency: 'ETB',
-        transactionId: 'game_' + Date.now()
-      });
+        const sockets = await io.fetchSockets();
+        const winnerSocket = sockets.find(s => s.userId === w.telegramId);
+        if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
 
-      const totalEntryFees = currentGame.players.length * currentGame.entryFee;
-const houseProfit = totalEntryFees - currentGame.prizePool;
+        // Audit: win paid out
+        Audit.winPaidOut('global', w.telegramId, null, {
+          amount: prizeEach,
+          currency: 'ETB',
+          totalPrizePool: currentGame.prizePool,
+          totalWinners: currentGame.winners.length
+        });
 
-await supabase.from('game_rounds').insert({
-  total_entry_fees: totalEntryFees,
-  prize_pool: currentGame.prizePool,
-  house_profit: houseProfit
-});
-      
-      // ✅ SUSPICIOUS ACTIVITY CHECK
-      detectRapidWins('global', winnerTelegramId, null);
-
-      io.emit('gameEnded', { winner: winner.username, late: isLate });
-    } else {
-      io.emit('gameEnded', { winner: 'Unknown', late: isLate });
+        // Rapid win check
+        detectRapidWins('global', w.telegramId, null);
+      }
     }
+
+    // Record house profit
+    const totalEntryFees = currentGame.players.length * currentGame.entryFee;
+    const houseProfit = totalEntryFees - currentGame.prizePool;
+    await supabase.from('game_rounds').insert({
+      total_entry_fees: totalEntryFees,
+      prize_pool: currentGame.prizePool,
+      house_profit: houseProfit
+    });
+
+    // Suspicious: many winners from same IP? (requires IP stored on player object)
+    const ipCounts = {};
+    currentGame.winners.forEach(w => {
+      const player = currentGame.players.find(p => p.telegramId === w.telegramId);
+      const ip = player ? player.ip : null;
+      if (ip) {
+        ipCounts[ip] = (ipCounts[ip] || 0) + 1;
+      }
+    });
+    Object.entries(ipCounts).forEach(([ip, count]) => {
+      if (count >= 3) {
+        Audit.suspicious('global', 'system', ip, {
+          detectionSource: 'multiple_winners_same_ip',
+          reason: `${count} winners from IP ${ip}`,
+          evidence: { winners: currentGame.winners.map(w => w.telegramId) }
+        });
+      }
+    });
+
+    io.emit('gameEnded', {
+      winners: currentGame.winners.map(w => w.username),
+      prizeEach,
+      totalPrize: currentGame.prizePool,
+      winnerCount: currentGame.winners.length
+    });
   } else {
+    // No winners (game ended because numbers ran out)
     io.emit('gameEnded', { noWinner: true });
   }
 
+  // Reset for next game
+  currentGame.winners = [];
+  clearTimeout(currentGame.bingoGraceTimeout);
+  currentGame.bingoGraceTimeout = null;
   setTimeout(resetGame, 5000);
 }
 
@@ -718,6 +753,7 @@ app.get('/admin/audit-summary', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 // ---------- Socket.IO ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
@@ -760,17 +796,17 @@ io.on('connection', async (socket) => {
       currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
     }
     currentGame.takenCardNumbers.add(num);
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const player = {
       telegramId: socket.userId,
       username: socket.username,
       card: currentGame.cardSet[num - 1],
       markedNumbers: [],
-      cardNumber: num
+      cardNumber: num,
+      ip: ip   // store IP for collusion detection
     };
     currentGame.players.push(player);
 
-    // ✅ AUDIT LOG: Card assigned
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     Audit.cardAssigned('global', socket.userId, ip, {
       cardId: num.toString(),
       grid: player.card
@@ -790,7 +826,10 @@ io.on('connection', async (socket) => {
     }
     const freeNumbers = [];
     for (let i = 1; i <= 100; i++) if (!currentGame.takenCardNumbers.has(i)) freeNumbers.push(i);
-    if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
+    if (freeNumbers.length === 0) {
+      socket.emit('cardSelectionFailed', 'All numbers are taken.');
+      return;
+    }
     const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
     const existing = currentGame.players.find(p => p.telegramId === socket.userId);
     if (existing) {
@@ -798,17 +837,17 @@ io.on('connection', async (socket) => {
       currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
     }
     currentGame.takenCardNumbers.add(randomNum);
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const player = {
       telegramId: socket.userId,
       username: socket.username,
       card: currentGame.cardSet[randomNum - 1],
       markedNumbers: [],
-      cardNumber: randomNum
+      cardNumber: randomNum,
+      ip: ip
     };
     currentGame.players.push(player);
 
-    // ✅ AUDIT LOG: Card assigned (auto)
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     Audit.cardAssigned('global', socket.userId, ip, {
       cardId: randomNum.toString(),
       grid: player.card
@@ -833,6 +872,7 @@ io.on('connection', async (socket) => {
     socket.emit('markedNumbers', player.markedNumbers);
   });
 
+  // ---------- Bingo claim with multiple winners support ----------
   socket.on('claimBingo', () => {
     if (currentGame.status !== 'running') return;
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
@@ -844,26 +884,42 @@ io.on('connection', async (socket) => {
 
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
 
+    // Validate claim
     if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
       socket.emit('invalidBingo');
-
-      // ✅ AUDIT LOG: Bingo rejected
       Audit.bingoRejected('global', socket.userId, ip, {
         reason: 'invalid_bingo_call',
-        lastCalled: lastCalled
+        lastCalled
       });
       return;
     }
 
-    // ✅ AUDIT LOG: Bingo called
+    // Prevent duplicate claims by same player in this round
+    if (currentGame.winners.find(w => w.telegramId === socket.userId)) {
+      return;
+    }
+
+    // Add to winners list
+    currentGame.winners.push({ telegramId: socket.userId, username: socket.username });
+
+    // Audit the successful call
     Audit.bingoCalled('global', socket.userId, ip, {
       cardId: player.cardNumber.toString(),
       cardGrid: player.card,
       calledNumber: lastCalled,
-      winType: 'bingo_line' // simplified
+      winType: 'bingo_line'
     });
 
-    endGame(socket.userId, false);
+    // Notify this player that their claim is valid
+    socket.emit('bingoValid');
+
+    // If this is the first valid claim, start the grace timer
+    if (!currentGame.bingoGraceTimeout && currentGame.winners.length === 1) {
+      io.emit('multipleBingoPossible', { message: 'Bingo claimed! Waiting for other potential winners...' });
+      currentGame.bingoGraceTimeout = setTimeout(() => {
+        endGameWithWinners();
+      }, 3000); // 3 seconds for others to claim
+    }
   });
 
   socket.on('getBalance', async () => {
