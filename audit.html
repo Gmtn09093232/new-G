@@ -30,6 +30,21 @@
 <div class="container">
   <h1>🔍 Audit Logs <a href="admin.html" class="nav-link" style="font-size:0.8em;">⬅ Back to Admin Panel</a></h1>
 
+    <div class="summary-cards" style="display: flex; gap: 20px; margin-bottom: 20px;">
+  <div style="flex:1; background:#1e2a36; padding:15px; border-radius:12px; text-align:center;">
+    <h3 style="margin:0; color:#f39c12;">💰 Total Deposits</h3>
+    <p id="totalDeposits" style="font-size:1.5em; margin:5px 0;">...</p>
+  </div>
+  <div style="flex:1; background:#1e2a36; padding:15px; border-radius:12px; text-align:center;">
+    <h3 style="margin:0; color:#f39c12;">💸 Total Withdrawals</h3>
+    <p id="totalWithdrawals" style="font-size:1.5em; margin:5px 0;">...</p>
+  </div>
+  <div style="flex:1; background:#1e2a36; padding:15px; border-radius:12px; text-align:center;">
+    <h3 style="margin:0; color:#f39c12;">🏠 House Profit (20%)</h3>
+    <p id="totalHouseProfit" style="font-size:1.5em; margin:5px 0;">...</p>
+  </div>
+</div>
+  
   <div class="section">
     <div class="filters">
       <div class="filter-group">
@@ -125,6 +140,28 @@
     }
   }
 
+  async function loadSummary() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/audit-summary?secret=${AUDITOR_SECRET}`);
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('totalDeposits').textContent = data.totalDeposits + ' ETB';
+      document.getElementById('totalWithdrawals').textContent = data.totalWithdrawals + ' ETB';
+      document.getElementById('totalHouseProfit').textContent = data.totalHouseProfit + ' ETB';
+    }
+  } catch (err) {
+    console.error('Summary error:', err);
+  }
+}
+
+// Call it together with initial audit load
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24*60*60*1000);
+  document.getElementById('filter-from').value = yesterday.toISOString().slice(0,16);
+  loadAuditLogs();
+  loadSummary();   // <-- added
+});
   function renderAuditTable(logs) {
     const tbody = document.getElementById('audit-tbody');
     if (!logs || logs.length === 0) {
