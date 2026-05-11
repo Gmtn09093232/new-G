@@ -295,7 +295,7 @@ function resetGame() {
   currentGame.lobbyTimer = setTimeout(() => startGame(), 30000);
 }
 
-}async function startGame() {
+async function startGame() {
   const toRemove = [];
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
