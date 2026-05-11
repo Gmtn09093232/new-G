@@ -295,7 +295,7 @@ function resetGame() {
   currentGame.lobbyTimer = setTimeout(() => startGame(), 30000);
 }
 
-async function startGame() {
+}async function startGame() {
   const toRemove = [];
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
@@ -315,6 +315,7 @@ async function startGame() {
     return;
   }
 
+  // ✅ SINGLE deduction loop with audit log
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
     if (user) {
@@ -322,25 +323,16 @@ async function startGame() {
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
       const socket = await getSocketByUserId(p.telegramId);
       if (socket) socket.emit('balanceUpdate', user.balance);
+
+      // ✅ AUDIT: entry fee paid
+      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, {
+        userId: p.telegramId,
+        amount: currentGame.entryFee,
+        currency: 'ETB'
+      });
     }
   }
-for (const p of currentGame.players) {
-  const user = users[p.telegramId];
-  if (user) {
-    user.balance -= currentGame.entryFee;
-    await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
-    const socket = await getSocketByUserId(p.telegramId);
-    if (socket) socket.emit('balanceUpdate', user.balance);
 
-    // ✅ AUDIT: entry fee paid
-    Audit.adminAction('ENTRY_FEE_PAID', 'system', null, {
-      userId: p.telegramId,
-      amount: currentGame.entryFee,
-      currency: 'ETB'
-    });
-  }
-}
-  
   currentGame.prizePool = 0.8 * (currentGame.entryFee * currentGame.players.length);
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
