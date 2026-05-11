@@ -845,13 +845,24 @@
         if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true);
         else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
       });
-     socket.on('gameEnded', (data) => {
+      socket.on('gameEnded', (data) => {
   if (data.noWinner) {
-    displayMessage('No winner this round.');
+    alert('No winner this round.');
     return;
   }
-  const winnersList = data.winners ? data.winners.join(', ') : 'Unknown';
-  displayMessage(`🏆 Winner(s): ${winnersList} – Prize: ${data.prizeEach} ETB each`);
+
+  let message = '';
+  if (data.winners && data.winners.length > 0) {
+    const winnerList = data.winners.join(', ');
+    message = `🏆 Winner(s): ${winnerList}\nPrize: ${data.prizeEach} ETB each`;
+    if (data.winnerCount > 1) {
+      message += `\n(shared among ${data.winnerCount} players)`;
+    }
+  } else {
+    message = `🏆 Winner: ${data.winner}`;
+  }
+
+  alert(message); // or use your own UI overlay
 });
       socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
       socket.on('depositStatus', data => {
