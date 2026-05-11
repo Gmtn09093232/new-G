@@ -56,6 +56,104 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
+// ---------- Audit Logger (inline) ----------
+async function logAuditEvent({
+  eventType,
+  roomId = null,
+  userId = 'system',
+  ipAddress = null,
+  details = {}
+}) {
+  try {
+    const { error } = await supabase
+      .from('audit_logs')
+      .insert({
+        event_type: eventType,
+        room_id: roomId,
+        user_id: userId,
+        ip_address: ipAddress,
+        details
+      });
+    if (error) throw error;
+  } catch (err) {
+    console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message);
+  }
+}
+
+// Convenience helpers
+const Audit = {
+  depositInitiated(userId, ip, data) {
+    return logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId, ipAddress: ip, details: data });
+  },
+  depositCompleted(userId, ip, data) {
+    return logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId, ipAddress: ip, details: data });
+  },
+  depositFailed(userId, ip, data) {
+    return logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId, ipAddress: ip, details: data });
+  },
+  withdrawalRequested(userId, ip, data) {
+    return logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId, ipAddress: ip, details: data });
+  },
+  withdrawalCompleted(userId, ip, data) {
+    return logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId, ipAddress: ip, details: data });
+  },
+  withdrawalRejected(userId, ip, data) {
+    return logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId, ipAddress: ip, details: data });
+  },
+  bingoCalled(roomId, userId, ip, data) {
+    return logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId, ipAddress: ip, details: data });
+  },
+  bingoVerified(roomId, userId, ip, data) {
+    return logAuditEvent({ eventType: 'BINGO_VERIFIED', roomId, userId, ipAddress: ip, details: data });
+  },
+  bingoRejected(roomId, userId, ip, data) {
+    return logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId, ipAddress: ip, details: data });
+  },
+  winPaidOut(roomId, userId, ip, data) {
+    return logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId, ipAddress: ip, details: data });
+  },
+  numberDrawn(roomId, data) {
+    return logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: data });
+  },
+  cardAssigned(roomId, userId, ip, data) {
+    return logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId, ipAddress: ip, details: data });
+  },
+  adminAction(eventType, adminId, ip, details) {
+    return logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details });
+  },
+  suspicious(roomId, userId, ip, data) {
+    return logAuditEvent({
+      eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED',
+      roomId, userId, ipAddress: ip,
+      details: data
+    });
+  }
+};
+
+// ---------- Suspicious Activity Detector (inline) ----------
+const winTimestamps = new Map();
+const WINDOW_MS = 120_000;   // 2 minutes
+const MAX_WINS_IN_WINDOW = 3;
+
+function detectRapidWins(roomId, userId, ip) {
+  if (!winTimestamps.has(userId)) winTimestamps.set(userId, []);
+  const times = winTimestamps.get(userId);
+  const now = Date.now();
+  times.push(now);
+  const recent = times.filter(t => now - t <= WINDOW_MS);
+  winTimestamps.set(userId, recent);
+
+  if (recent.length > MAX_WINS_IN_WINDOW) {
+    Audit.suspicious(roomId, userId, ip, {
+      detectionSource: 'win_velocity_check',
+      reason: `More than ${MAX_WINS_IN_WINDOW} wins in ${WINDOW_MS/1000}s`,
+      evidence: { recentWinCount: recent.length, windowMs: WINDOW_MS }
+    });
+    return true;
+  }
+  return false;
+}
+
 // ---------- Endpoints ----------
 app.get('/api/deposit-accounts', (req, res) => {
   res.json({
@@ -130,6 +228,14 @@ app.post('/admin/add-balance', async (req, res) => {
   const user = await loadUser(strId, 'unknown');
   user.balance += amt;
   await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
+
+  // ✅ AUDIT LOG: Admin added balance
+  Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, {
+    targetUserId: strId,
+    amount: amt,
+    newBalance: user.balance
+  });
+
   const sockets = await io.fetchSockets();
   const playerSocket = sockets.find(s => s.userId === strId);
   if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
@@ -238,6 +344,13 @@ function startCalling() {
     const number = available[Math.floor(Math.random() * available.length)];
     currentGame.calledNumbers.push(number);
     io.emit('numberCalled', { number, calledNumbers: currentGame.calledNumbers });
+
+    // ✅ AUDIT LOG: Number drawn
+    Audit.numberDrawn('global', {
+      drawnNumber: number,
+      drawIndex: currentGame.calledNumbers.length,
+      timestamp: new Date().toISOString()
+    });
   }, 4000);
 }
 
@@ -280,6 +393,21 @@ async function endGame(winnerTelegramId, isLate = false) {
       const sockets = await io.fetchSockets();
       const winnerSocket = sockets.find(s => s.userId === winner.telegramId);
       if (winnerSocket) winnerSocket.emit('balanceUpdate', users[winner.telegramId].balance);
+
+      // ✅ AUDIT LOG: Win verified & paid out
+      Audit.bingoVerified('global', winnerTelegramId, null, {
+        winType: 'bingo_line', // adjust as needed
+        late: isLate
+      });
+      Audit.winPaidOut('global', winnerTelegramId, null, {
+        amount: currentGame.prizePool,
+        currency: 'ETB',
+        transactionId: 'game_' + Date.now()
+      });
+
+      // ✅ SUSPICIOUS ACTIVITY CHECK
+      detectRapidWins('global', winnerTelegramId, null);
+
       io.emit('gameEnded', { winner: winner.username, late: isLate });
     } else {
       io.emit('gameEnded', { winner: 'Unknown', late: isLate });
@@ -328,6 +456,15 @@ app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
     console.error('Deposit insert error:', error.message);
     return res.status(500).json({ error: 'Internal error' });
   }
+
+  // ✅ AUDIT LOG: Deposit initiated
+  Audit.depositInitiated(userId, req.ip, {
+    transactionId: data.id.toString(),
+    amount: amt,
+    currency: 'ETB',
+    method: payment_type
+  });
+
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
@@ -361,6 +498,15 @@ app.post('/admin/process-deposit', async (req, res) => {
     await supabase
       .from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
 
+    // ✅ AUDIT LOG: Deposit completed
+    Audit.depositCompleted(reqData.telegram_id, req.ip, {
+      transactionId: requestId.toString(),
+      providerRef: reqData.id.toString(),
+      amount: reqData.amount,
+      currency: 'ETB',
+      method: reqData.payment_type || 'unknown'
+    });
+
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) {
@@ -371,6 +517,14 @@ app.post('/admin/process-deposit', async (req, res) => {
   } else {
     await supabase
       .from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
+
+    // ✅ AUDIT LOG: Deposit failed/rejected
+    Audit.depositFailed(reqData.telegram_id, req.ip, {
+      transactionId: requestId.toString(),
+      amount: reqData.amount,
+      reason: 'rejected_by_admin'
+    });
+
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
@@ -411,6 +565,16 @@ app.post('/api/request-withdraw', async (req, res) => {
     .single();
 
   if (error) { console.error('Withdraw insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
+
+  // ✅ AUDIT LOG: Withdrawal requested
+  Audit.withdrawalRequested(userId, req.ip, {
+    transactionId: data.id.toString(),
+    amount: amt,
+    currency: 'ETB',
+    method: withdrawal_type,
+    receiver
+  });
+
   res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.` });
 });
 
@@ -441,6 +605,15 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     await supabase
       .from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
 
+    // ✅ AUDIT LOG: Withdrawal completed
+    Audit.withdrawalCompleted(reqData.telegram_id, req.ip, {
+      transactionId: requestId.toString(),
+      amount: reqData.amount,
+      currency: 'ETB',
+      method: reqData.withdrawal_type || 'N/A',
+      receiver: reqData.phone_number
+    });
+
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) {
@@ -451,11 +624,39 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   } else {
     await supabase
       .from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
+
+    // ✅ AUDIT LOG: Withdrawal rejected
+    Audit.withdrawalRejected(reqData.telegram_id, req.ip, {
+      transactionId: requestId.toString(),
+      amount: reqData.amount,
+      reason: 'rejected_by_admin'
+    });
+
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
     res.json({ success: true });
   }
+});
+
+// ---------- AUDITOR ENDPOINT ----------
+app.get('/admin/audit', async (req, res) => {
+  const { secret } = req.query;
+  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
+
+  const { roomId, userId, eventType, from, to, limit = 200 } = req.query;
+  let query = supabase.from('audit_logs').select('*', { count: 'exact' });
+
+  if (roomId) query = query.eq('room_id', roomId);
+  if (userId) query = query.eq('user_id', userId);
+  if (eventType) query = query.eq('event_type', eventType);
+  if (from) query = query.gte('timestamp', from);
+  if (to) query = query.lte('timestamp', to);
+  query = query.order('timestamp', { ascending: false }).limit(Math.min(parseInt(limit), 1000));
+
+  const { data, error, count } = await query;
+  if (error) return res.status(500).json({ success: false, error: error.message });
+  res.json({ success: true, logs: data, count });
 });
 
 // ---------- Socket.IO ----------
@@ -508,6 +709,14 @@ io.on('connection', async (socket) => {
       cardNumber: num
     };
     currentGame.players.push(player);
+
+    // ✅ AUDIT LOG: Card assigned
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    Audit.cardAssigned('global', socket.userId, ip, {
+      cardId: num.toString(),
+      grid: player.card
+    });
+
     io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
@@ -538,6 +747,14 @@ io.on('connection', async (socket) => {
       cardNumber: randomNum
     };
     currentGame.players.push(player);
+
+    // ✅ AUDIT LOG: Card assigned (auto)
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    Audit.cardAssigned('global', socket.userId, ip, {
+      cardId: randomNum.toString(),
+      grid: player.card
+    });
+
     io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
@@ -566,10 +783,27 @@ io.on('connection', async (socket) => {
       ? currentGame.calledNumbers[currentGame.calledNumbers.length - 1]
       : null;
 
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+
     if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
       socket.emit('invalidBingo');
+
+      // ✅ AUDIT LOG: Bingo rejected
+      Audit.bingoRejected('global', socket.userId, ip, {
+        reason: 'invalid_bingo_call',
+        lastCalled: lastCalled
+      });
       return;
     }
+
+    // ✅ AUDIT LOG: Bingo called
+    Audit.bingoCalled('global', socket.userId, ip, {
+      cardId: player.cardNumber.toString(),
+      cardGrid: player.card,
+      calledNumber: lastCalled,
+      winType: 'bingo_line' // simplified
+    });
+
     endGame(socket.userId, false);
   });
 
