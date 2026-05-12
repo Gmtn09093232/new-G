@@ -283,7 +283,7 @@ const currentGame = {
 function resetGame() {
   clearInterval(currentGame.callInterval);
   clearTimeout(currentGame.lobbyTimer);
-  clearTimeout(currentGame.bingoGraceTimeout); // clear grace timer if any
+  clearTimeout(currentGame.bingoGraceTimeout);
   currentGame.status = 'lobby';
   currentGame.players = [];
   currentGame.takenCardNumbers.clear();
@@ -293,7 +293,7 @@ function resetGame() {
   currentGame.bingoGraceTimeout = null;
   currentGame.lobbyEndTime = Date.now() + 30000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
-  io.emit('lobbyState', { startsIn: 30, takenNumbers: [] });
+  io.emit('lobbyState', { startsIn: 30, takenNumbers: [], playersCount: 0 });
   currentGame.lobbyTimer = setTimeout(() => startGame(), 30000);
 }
 
@@ -338,7 +338,7 @@ async function startGame() {
   currentGame.prizePool = 0.8 * (currentGame.entryFee * currentGame.players.length);
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
-  io.emit('gameStarted');
+  io.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
   startCalling();
 }
 
@@ -354,14 +354,13 @@ function startCalling() {
     const available = allNums.filter(n => !currentGame.calledNumbers.includes(n));
     if (available.length === 0) {
       clearInterval(currentGame.callInterval);
-      endGameWithWinners();   // Use multiple-winner end even if no one claimed
+      endGameWithWinners();
       return;
     }
     const number = available[Math.floor(Math.random() * available.length)];
     currentGame.calledNumbers.push(number);
     io.emit('numberCalled', { number, calledNumbers: currentGame.calledNumbers });
 
-    // ✅ AUDIT LOG: Number drawn
     Audit.numberDrawn('global', {
       drawnNumber: number,
       drawIndex: currentGame.calledNumbers.length,
@@ -400,10 +399,8 @@ async function endGameWithWinners() {
   clearInterval(currentGame.callInterval);
 
   if (currentGame.winners.length > 0) {
-    // Split prize equally (floor division, remainder stays with house)
     const prizeEach = Math.floor(currentGame.prizePool / currentGame.winners.length);
 
-    // Pay each winner
     for (const w of currentGame.winners) {
       const user = users[w.telegramId];
       if (user) {
@@ -414,7 +411,6 @@ async function endGameWithWinners() {
         const winnerSocket = sockets.find(s => s.userId === w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
 
-        // Audit: win paid out
         Audit.winPaidOut('global', w.telegramId, null, {
           amount: prizeEach,
           currency: 'ETB',
@@ -422,12 +418,10 @@ async function endGameWithWinners() {
           totalWinners: currentGame.winners.length
         });
 
-        // Rapid win check
         detectRapidWins('global', w.telegramId, null);
       }
     }
 
-    // Record house profit
     const totalEntryFees = currentGame.players.length * currentGame.entryFee;
     const houseProfit = totalEntryFees - currentGame.prizePool;
     await supabase.from('game_rounds').insert({
@@ -436,7 +430,7 @@ async function endGameWithWinners() {
       house_profit: houseProfit
     });
 
-    // Suspicious: many winners from same IP? (requires IP stored on player object)
+    // Collusion check by IP
     const ipCounts = {};
     currentGame.winners.forEach(w => {
       const player = currentGame.players.find(p => p.telegramId === w.telegramId);
@@ -454,21 +448,19 @@ async function endGameWithWinners() {
         });
       }
     });
-const winnerNames = currentGame.winners.map(w => w.username);
-io.emit('gameEnded', {
-  winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
-  winners: winnerNames,
-  prizeEach,
-  totalPrize: currentGame.prizePool,
-  winnerCount: currentGame.winners.length
-});
- 
+
+    const winnerNames = currentGame.winners.map(w => w.username);
+    io.emit('gameEnded', {
+      winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
+      winners: winnerNames,
+      prizeEach,
+      totalPrize: currentGame.prizePool,
+      winnerCount: currentGame.winners.length
+    });
   } else {
-    // No winners (game ended because numbers ran out)
     io.emit('gameEnded', { noWinner: true });
   }
 
-  // Reset for next game
   currentGame.winners = [];
   clearTimeout(currentGame.bingoGraceTimeout);
   currentGame.bingoGraceTimeout = null;
@@ -513,7 +505,6 @@ app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 
-  // ✅ AUDIT LOG: Deposit initiated
   Audit.depositInitiated(userId, req.ip, {
     transactionId: data.id.toString(),
     amount: amt,
@@ -554,7 +545,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     await supabase
       .from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
 
-    // ✅ AUDIT LOG: Deposit completed
     Audit.depositCompleted(reqData.telegram_id, req.ip, {
       transactionId: requestId.toString(),
       providerRef: reqData.id.toString(),
@@ -574,7 +564,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     await supabase
       .from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
 
-    // ✅ AUDIT LOG: Deposit failed/rejected
     Audit.depositFailed(reqData.telegram_id, req.ip, {
       transactionId: requestId.toString(),
       amount: reqData.amount,
@@ -622,7 +611,6 @@ app.post('/api/request-withdraw', async (req, res) => {
 
   if (error) { console.error('Withdraw insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
 
-  // ✅ AUDIT LOG: Withdrawal requested
   Audit.withdrawalRequested(userId, req.ip, {
     transactionId: data.id.toString(),
     amount: amt,
@@ -661,7 +649,6 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     await supabase
       .from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
 
-    // ✅ AUDIT LOG: Withdrawal completed
     Audit.withdrawalCompleted(reqData.telegram_id, req.ip, {
       transactionId: requestId.toString(),
       amount: reqData.amount,
@@ -681,7 +668,6 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     await supabase
       .from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
 
-    // ✅ AUDIT LOG: Withdrawal rejected
     Audit.withdrawalRejected(reqData.telegram_id, req.ip, {
       transactionId: requestId.toString(),
       amount: reqData.amount,
@@ -721,21 +707,18 @@ app.get('/admin/audit-summary', async (req, res) => {
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
 
   try {
-    // Total approved deposits
     const { data: deposits, error: depErr } = await supabase
       .from('deposit_requests')
       .select('amount')
       .eq('status', 'approved');
     if (depErr) throw depErr;
 
-    // Total approved withdrawals
     const { data: withdrawals, error: wdErr } = await supabase
       .from('withdrawal_requests')
       .select('amount')
       .eq('status', 'approved');
     if (wdErr) throw wdErr;
 
-    // Total house profit (20% of all entry fees)
     const { data: rounds, error: rdErr } = await supabase
       .from('game_rounds')
       .select('house_profit');
@@ -766,11 +749,19 @@ io.use((socket, next) => {
 
 io.on('connection', async (socket) => {
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
+
   if (currentGame.status === 'lobby') {
     const timeLeft = Math.max(0, Math.ceil((currentGame.lobbyEndTime - Date.now()) / 1000));
-    socket.emit('lobbyState', { startsIn: timeLeft, takenNumbers: Array.from(currentGame.takenCardNumbers) });
+    socket.emit('lobbyState', {
+      startsIn: timeLeft,
+      takenNumbers: Array.from(currentGame.takenCardNumbers),
+      playersCount: currentGame.players.length
+    });
   } else if (currentGame.status === 'running') {
-    socket.emit('gameStarted');
+    socket.emit('gameStarted', {
+      prizePool: currentGame.prizePool,
+      playersCount: currentGame.players.length
+    });
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
     if (player) {
       socket.emit('yourCard', player.card);
@@ -779,7 +770,7 @@ io.on('connection', async (socket) => {
     }
   }
 
-  socket.on('selectCardNumber', (cardNumber) => {
+ socket.on('selectCardNumber', (cardNumber) => {
     if (currentGame.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
     if (userBalance < currentGame.entryFee) {
