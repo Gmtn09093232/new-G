@@ -592,7 +592,10 @@ app.post('/api/request-withdraw', async (req, res) => {
   if (!receiver || receiver.length < 10) {
     return res.status(400).json({ error: 'Valid receiver phone/account required' });
   }
-
+const receiverName = (name || '').trim();
+if (!receiverName) {
+  return res.status(400).json({ error: 'Account holder name is required' });
+}
   const user = await loadUser(userId, null);
   if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
 
