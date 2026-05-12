@@ -572,6 +572,7 @@
         <div class="modal-content">
             <h3 id="withdrawDetailsTitle">🏧 Withdraw via </h3>
             <div class="info-row" style="font-size:0.9rem; color:#aaa;">Send to your own account</div>
+            <input type="text" id="withdrawName" placeholder="👤 Account holder full name" required>
             <input type="text" id="withdrawReceiver" placeholder="Your account/phone number" required>
             <input type="number" id="withdrawAmount" placeholder="💰 Amount (ETB)" min="1" step="any">
             <div class="modal-buttons">
@@ -1003,6 +1004,7 @@
             document.getElementById('withdrawReceiver').placeholder = placeholder;
             document.getElementById('withdrawAmount').value = '';
             document.getElementById('withdrawReceiver').value = '';
+            document.getElementById('withdrawName').value = '';
             withdrawDetailsModal.classList.add('active');
             withdrawTypeModal.classList.remove('active');
         }
@@ -1022,6 +1024,11 @@
                 alert('Please enter a valid account/phone number');
                 return;
             }
+            const receiverName = document.getElementById('withdrawName').value.trim();
+if (!receiverName) {
+  alert('Please enter the account holder name.');
+  return;
+}
             const amount = parseFloat(amountStr);
             if (!confirm(`Withdraw ${amount} ETB via ${selectedWithdrawType} to ${receiver}?`)) return;
 
@@ -1029,7 +1036,7 @@
                 const res = await fetch('/api/request-withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount, phone: receiver, withdrawal_type: selectedWithdrawType })
+                   body: JSON.stringify({ amount, phone: receiver, withdrawal_type: selectedWithdrawType, name: receiverName })
                 });
                 const data = await res.json();
                 alert(`💸 ${data.message || data.error || 'Request sent'}`);
