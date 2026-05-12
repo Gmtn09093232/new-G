@@ -617,7 +617,8 @@ app.post('/api/request-withdraw', async (req, res) => {
     amount: amt,
     currency: 'ETB',
     method: withdrawal_type,
-    receiver
+    receiver,
+    name: receiverName
   });
 
   res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.` });
