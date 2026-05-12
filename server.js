@@ -582,7 +582,7 @@ app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { amount, phone, withdrawal_type } = req.body;
+ const { amount, phone, withdrawal_type, name } = req.body;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) {
@@ -604,7 +604,8 @@ app.post('/api/request-withdraw', async (req, res) => {
       amount: amt,
       status: 'pending',
       phone_number: receiver,
-      withdrawal_type
+      withdrawal_type,
+      receiver_name: receiverName
     })
     .select()
     .single();
