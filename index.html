@@ -406,15 +406,12 @@
     </div>
   </div>
 
-  <!-- Deposit Details Modal – now with player phone number -->
+  <!-- Deposit Details Modal -->
   <div id="depositDetailsModal" class="modal">
     <div class="modal-content">
       <h3 id="depositDetailsTitle">📤 Deposit via </h3>
       <div class="account-number" id="depositAccountNumber"></div>
-      
-      <!-- NEW: Player phone number field -->
       <input type="tel" id="depositPlayerPhone" placeholder="📱 Your phone number (09xxxxxxxx)" required>
-      
       <input type="number" id="depositAmount" placeholder="💰 Amount (ETB)" min="1" step="any">
       <label class="file-label" for="depositProofImage">📎 Attach payment proof</label>
       <input type="file" id="depositProofImage" accept="image/*" capture="environment">
@@ -471,7 +468,7 @@
     </div>
   </div>
 
-  <!-- Lobby & Game Pages (unchanged) -->
+  <!-- Lobby & Game Pages -->
   <div id="lobbyPage" class="page">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
       <h2>🎰 NEBULA BINGO</h2>
@@ -523,7 +520,7 @@
     const tg = window.Telegram.WebApp;
     tg.ready(); tg.expand();
     let socket, userCard=[], markedNumbers=[], isGameActive=false, lobbyTimerInterval=null, selectedCardNumber=null;
-    let depositAccounts = {}; // { telebirr, cbebirr, mpesa }
+    let depositAccounts = {};
     let selectedDepositType = null;
     let selectedWithdrawType = null;
 
@@ -546,7 +543,6 @@
     const withdrawDetailsModal = document.getElementById('withdrawDetailsModal');
     const rulesModal = document.getElementById('rulesModal');
 
-    // Helper functions
     function renderCard(card, id, clickable = false) {
       const cont = document.getElementById(id);
       if (!cont) return;
@@ -603,7 +599,7 @@
       lobbyPage.classList.remove('hidden');
       gamePage.classList.add('hidden');
       isGameActive = false;
-      markedNumbers = []; // Clean marks
+      markedNumbers = [];
       if (socket) socket.emit('getBalance');
       startTimer(time || 30);
       if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
@@ -730,7 +726,7 @@
       }
 
       const formData = new FormData();
-      formData.append('phone', playerPhone);   // player's phone number
+      formData.append('phone', playerPhone);
       formData.append('amount', amountStr);
       formData.append('payment_type', selectedDepositType);
       formData.append('proof', file);
@@ -819,10 +815,29 @@
       socket = io();
       socket.on('connect', () => { socket.emit('joinLobby'); });
       socket.on('balanceUpdate', b => { lobbyBalanceEl.textContent = b; gameBalanceEl.textContent = b; });
-      socket.on('lobbyState', state => { showLobby(state.startsIn); if (state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); });
-      socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true); else renderCard(card, 'lobbyCardPreview', false); });
-      socket.on('cardTaken', data => { updateGridWithTakenNumbers(data.takenNumbers); selectedCardNumber = null; selectedNumberEl.textContent = '-'; });
+
+      socket.on('lobbyState', state => {
+        showLobby(state.startsIn);
+        if (state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers);
+        if (state.playersCount !== undefined) {
+          playersCountEl.textContent = state.playersCount;
+        }
+      });
+
+      socket.on('yourCard', card => {
+        userCard = card;
+        if (isGameActive) renderCard(card, 'gameCard', true);
+        else renderCard(card, 'lobbyCardPreview', false);
+      });
+
+      socket.on('cardTaken', data => {
+        updateGridWithTakenNumbers(data.takenNumbers);
+        selectedCardNumber = null;
+        selectedNumberEl.textContent = '-';
+      });
+
       socket.on('cardSelectionFailed', msg => alert(msg));
+
       socket.on('playersCount', c => {
         playersCountEl.textContent = c;
         if (gamePlayersCountEl) gamePlayersCountEl.textContent = c;
@@ -830,40 +845,55 @@
         const prize = Math.floor(c * entryFee * 0.8);
         winningBalanceEl.textContent = prize;
       });
-      socket.on('gameStarted', showGame);
+
+      socket.on('gameStarted', (data) => {
+        // data may contain { prizePool, playersCount } on reconnect
+        if (data) {
+          if (data.prizePool !== undefined) winningBalanceEl.textContent = data.prizePool;
+          if (data.playersCount !== undefined) {
+            playersCountEl.textContent = data.playersCount;
+            if (gamePlayersCountEl) gamePlayersCountEl.textContent = data.playersCount;
+          }
+        }
+        showGame();
+      });
+
       socket.on('numberCalled', data => {
         currentCallEl.textContent = formatCall(data.number);
         const list = (data.calledNumbers || []).map(n => formatCall(n));
         calledListEl.textContent = 'Called: ' + list.join(', ');
       });
+
       socket.on('calledNumbers', called => {
         const list = called.map(n => formatCall(n));
         calledListEl.textContent = 'Called: ' + list.join(', ');
       });
+
       socket.on('markedNumbers', nums => {
         markedNumbers = nums;
         if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true);
         else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
       });
+
       socket.on('gameEnded', (data) => {
-  if (data.noWinner) {
-    alert('No winner this round.');
-    return;
-  }
+        if (data.noWinner) {
+          alert('No winner this round.');
+          return;
+        }
 
-  let message = '';
-  if (data.winners && data.winners.length > 0) {
-    const winnerList = data.winners.join(', ');
-    message = `🏆 Winner(s): ${winnerList}\nPrize: ${data.prizeEach} ETB each`;
-    if (data.winnerCount > 1) {
-      message += `\n(shared among ${data.winnerCount} players)`;
-    }
-  } else {
-    message = `🏆 Winner: ${data.winner}`;
-  }
+        let message = '';
+        if (data.winners && data.winners.length > 0) {
+          const winnerList = data.winners.join(', ');
+          message = `🏆 Winner(s): ${winnerList}\nPrize: ${data.prizeEach} ETB each`;
+          if (data.winnerCount > 1) {
+            message += `\n(shared among ${data.winnerCount} players)`;
+          }
+        } else {
+          message = `🏆 Winner: ${data.winner}`;
+        }
+        alert(message);
+      });
 
-  alert(message); // or use your own UI overlay
-});
       socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
       socket.on('depositStatus', data => {
         if (data.status === 'approved') alert(`✅ Deposit approved! +${data.amount}`);
@@ -881,7 +911,6 @@
     document.getElementById('randomCardBtn').onclick = () => { if (!isGameActive && socket) socket.emit('newCardNumber'); };
     document.getElementById('bingoBtn').onclick = () => { if (socket) socket.emit('claimBingo'); };
 
-    // Deposit type buttons
     document.querySelectorAll('#depositTypeModal .type-btn').forEach(btn => {
       btn.addEventListener('click', () => openDepositDetailsModal(btn.dataset.type));
     });
@@ -894,7 +923,6 @@
     depositTypeModal.onclick = (e) => { if (e.target === depositTypeModal) closeDepositTypeModal(); };
     depositDetailsModal.onclick = (e) => { if (e.target === depositDetailsModal) closeDepositDetailsModal(); };
 
-    // Withdrawal type buttons
     document.querySelectorAll('#withdrawTypeModal .type-btn').forEach(btn => {
       btn.addEventListener('click', () => openWithdrawDetailsModal(btn.dataset.type));
     });
@@ -907,12 +935,10 @@
     withdrawTypeModal.onclick = (e) => { if (e.target === withdrawTypeModal) closeWithdrawTypeModal(); };
     withdrawDetailsModal.onclick = (e) => { if (e.target === withdrawDetailsModal) closeWithdrawDetailsModal(); };
 
-    // Rules
     document.getElementById('rulesBtn').onclick = () => rulesModal.classList.add('active');
     document.getElementById('closeRulesBtn').onclick = () => rulesModal.classList.remove('active');
     rulesModal.onclick = (e) => { if (e.target === rulesModal) rulesModal.classList.remove('active'); };
 
-    // Init
     loadDepositAccounts();
     buildNumberGrid();
     connect();
