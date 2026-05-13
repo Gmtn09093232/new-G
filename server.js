@@ -80,56 +80,25 @@ async function logAuditEvent({
   }
 }
 
-// Convenience helpers
 const Audit = {
-  depositInitiated(userId, ip, data) {
-    return logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId, ipAddress: ip, details: data });
-  },
-  depositCompleted(userId, ip, data) {
-    return logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId, ipAddress: ip, details: data });
-  },
-  depositFailed(userId, ip, data) {
-    return logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId, ipAddress: ip, details: data });
-  },
-  withdrawalRequested(userId, ip, data) {
-    return logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId, ipAddress: ip, details: data });
-  },
-  withdrawalCompleted(userId, ip, data) {
-    return logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId, ipAddress: ip, details: data });
-  },
-  withdrawalRejected(userId, ip, data) {
-    return logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId, ipAddress: ip, details: data });
-  },
-  bingoCalled(roomId, userId, ip, data) {
-    return logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId, ipAddress: ip, details: data });
-  },
-  bingoRejected(roomId, userId, ip, data) {
-    return logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId, ipAddress: ip, details: data });
-  },
-  winPaidOut(roomId, userId, ip, data) {
-    return logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId, ipAddress: ip, details: data });
-  },
-  numberDrawn(roomId, data) {
-    return logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: data });
-  },
-  cardAssigned(roomId, userId, ip, data) {
-    return logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId, ipAddress: ip, details: data });
-  },
-  adminAction(eventType, adminId, ip, details) {
-    return logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details });
-  },
-  suspicious(roomId, userId, ip, data) {
-    return logAuditEvent({
-      eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED',
-      roomId, userId, ipAddress: ip,
-      details: data
-    });
-  }
+  depositInitiated(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId, ipAddress: ip, details: data }); },
+  depositCompleted(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId, ipAddress: ip, details: data }); },
+  depositFailed(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId, ipAddress: ip, details: data }); },
+  withdrawalRequested(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId, ipAddress: ip, details: data }); },
+  withdrawalCompleted(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId, ipAddress: ip, details: data }); },
+  withdrawalRejected(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId, ipAddress: ip, details: data }); },
+  bingoCalled(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId, ipAddress: ip, details: data }); },
+  bingoRejected(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId, ipAddress: ip, details: data }); },
+  winPaidOut(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId, ipAddress: ip, details: data }); },
+  numberDrawn(roomId, data) { return logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: data }); },
+  cardAssigned(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId, ipAddress: ip, details: data }); },
+  adminAction(eventType, adminId, ip, details) { return logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details }); },
+  suspicious(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId, ipAddress: ip, details: data }); }
 };
 
-// ---------- Suspicious Activity Detector (inline) ----------
+// ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
-const WINDOW_MS = 120_000;   // 2 minutes
+const WINDOW_MS = 120_000;
 const MAX_WINS_IN_WINDOW = 3;
 
 function detectRapidWins(roomId, userId, ip) {
@@ -139,7 +108,6 @@ function detectRapidWins(roomId, userId, ip) {
   times.push(now);
   const recent = times.filter(t => now - t <= WINDOW_MS);
   winTimestamps.set(userId, recent);
-
   if (recent.length > MAX_WINS_IN_WINDOW) {
     Audit.suspicious(roomId, userId, ip, {
       detectionSource: 'win_velocity_check',
@@ -160,9 +128,7 @@ app.get('/api/deposit-accounts', (req, res) => {
   });
 });
 
-app.get('/api/admin-phone', (req, res) => {
-  res.json({ phone: process.env.ADMIN_PHONE || '0924839730' });
-});
+app.get('/api/admin-phone', (req, res) => { res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }); });
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -200,12 +166,10 @@ function verifyTelegram(initData) {
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) return res.status(403).json({ success: false });
-
   const params = new URLSearchParams(initData);
   const userData = JSON.parse(params.get('user'));
   const id = String(userData.id);
   const user = await loadUser(id, userData.first_name || userData.username);
-
   req.session.userId = id;
   req.session.save((err) => {
     if (err) {
@@ -226,14 +190,7 @@ app.post('/admin/add-balance', async (req, res) => {
   const user = await loadUser(strId, 'unknown');
   user.balance += amt;
   await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
-
-  // ✅ AUDIT LOG: Admin added balance
-  Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, {
-    targetUserId: strId,
-    amount: amt,
-    newBalance: user.balance
-  });
-
+  Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
   const sockets = await io.fetchSockets();
   const playerSocket = sockets.find(s => s.userId === strId);
   if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
@@ -276,8 +233,9 @@ const currentGame = {
   callInterval: null,
   lobbyEndTime: 0,
   cardSet: Array.from({ length: 100 }, () => generateCard()),
-  winners: [],                // multiple winners collection
-  bingoGraceTimeout: null     // grace period timer
+  winners: [],
+  bingoGraceTimeout: null,
+  winningNumber: null   // 👈 stores the last called number that triggered the win
 };
 
 function resetGame() {
@@ -291,6 +249,7 @@ function resetGame() {
   currentGame.prizePool = 0;
   currentGame.winners = [];
   currentGame.bingoGraceTimeout = null;
+  currentGame.winningNumber = null;   // reset winning number
   currentGame.lobbyEndTime = Date.now() + 30000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
   io.emit('lobbyState', { startsIn: 30, takenNumbers: [], playersCount: 0 });
@@ -317,7 +276,6 @@ async function startGame() {
     return;
   }
 
-  // ✅ SINGLE deduction loop with audit log
   for (const p of currentGame.players) {
     const user = users[p.telegramId];
     if (user) {
@@ -325,19 +283,14 @@ async function startGame() {
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
       const socket = await getSocketByUserId(p.telegramId);
       if (socket) socket.emit('balanceUpdate', user.balance);
-
-      // ✅ AUDIT: entry fee paid
-      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, {
-        userId: p.telegramId,
-        amount: currentGame.entryFee,
-        currency: 'ETB'
-      });
+      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: currentGame.entryFee, currency: 'ETB' });
     }
   }
 
   currentGame.prizePool = 0.8 * (currentGame.entryFee * currentGame.players.length);
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
+  currentGame.winningNumber = null;
   io.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
   startCalling();
 }
@@ -360,16 +313,11 @@ function startCalling() {
     const number = available[Math.floor(Math.random() * available.length)];
     currentGame.calledNumbers.push(number);
     io.emit('numberCalled', { number, calledNumbers: currentGame.calledNumbers });
-
-    Audit.numberDrawn('global', {
-      drawnNumber: number,
-      drawIndex: currentGame.calledNumbers.length,
-      timestamp: new Date().toISOString()
-    });
+    Audit.numberDrawn('global', { drawnNumber: number, drawIndex: currentGame.calledNumbers.length, timestamp: new Date().toISOString() });
   }, 4000);
 }
 
-// ---------- Strict bingo check (late bingo rule) ----------
+// ---------- Strict bingo check ----------
 function getLines(card) {
   const lines = [];
   for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
@@ -393,31 +341,27 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- NEW: End game with multiple winners ----------
+// ---------- End game with multiple winners (sends winningNumber) ----------
 async function endGameWithWinners() {
   currentGame.status = 'ended';
   clearInterval(currentGame.callInterval);
 
   if (currentGame.winners.length > 0) {
     const prizeEach = Math.floor(currentGame.prizePool / currentGame.winners.length);
-
     for (const w of currentGame.winners) {
       const user = users[w.telegramId];
       if (user) {
         user.balance += prizeEach;
         await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
-
         const sockets = await io.fetchSockets();
         const winnerSocket = sockets.find(s => s.userId === w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
-
         Audit.winPaidOut('global', w.telegramId, null, {
           amount: prizeEach,
           currency: 'ETB',
           totalPrizePool: currentGame.prizePool,
           totalWinners: currentGame.winners.length
         });
-
         detectRapidWins('global', w.telegramId, null);
       }
     }
@@ -435,9 +379,7 @@ async function endGameWithWinners() {
     currentGame.winners.forEach(w => {
       const player = currentGame.players.find(p => p.telegramId === w.telegramId);
       const ip = player ? player.ip : null;
-      if (ip) {
-        ipCounts[ip] = (ipCounts[ip] || 0) + 1;
-      }
+      if (ip) ipCounts[ip] = (ipCounts[ip] || 0) + 1;
     });
     Object.entries(ipCounts).forEach(([ip, count]) => {
       if (count >= 3) {
@@ -455,7 +397,8 @@ async function endGameWithWinners() {
       winners: winnerNames,
       prizeEach,
       totalPrize: currentGame.prizePool,
-      winnerCount: currentGame.winners.length
+      winnerCount: currentGame.winners.length,
+      winningNumber: currentGame.winningNumber   // 👈 send the exact winning number
     });
   } else {
     io.emit('gameEnded', { noWinner: true });
@@ -467,62 +410,32 @@ async function endGameWithWinners() {
   setTimeout(resetGame, 5000);
 }
 
-// ---------- DEPOSIT (with payment_type) ----------
+// ---------- DEPOSIT (unchanged) ----------
 app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-
   const { phone, amount, payment_type } = req.body;
   const file = req.file;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!file) return res.status(400).json({ error: 'Proof image required' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) {
-    return res.status(400).json({ error: 'Invalid payment type' });
-  }
-
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   const user = await loadUser(userId, null);
   if (!user) return res.status(404).json({ error: 'User not found' });
-
   const proofPath = `/uploads/${file.filename}`;
-
-  const { data, error } = await supabase
-    .from('deposit_requests')
-    .insert({
-      telegram_id: userId,
-      username: user.username,
-      amount: amt,
-      status: 'pending',
-      phone: phone || null,
-      payment_type,
-      proof_path: proofPath
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Deposit insert error:', error.message);
-    return res.status(500).json({ error: 'Internal error' });
-  }
-
-  Audit.depositInitiated(userId, req.ip, {
-    transactionId: data.id.toString(),
-    amount: amt,
-    currency: 'ETB',
-    method: payment_type
-  });
-
+  const { data, error } = await supabase.from('deposit_requests').insert({
+    telegram_id: userId, username: user.username, amount: amt, status: 'pending',
+    phone: phone || null, payment_type, proof_path: proofPath
+  }).select().single();
+  if (error) { console.error('Deposit insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
+  Audit.depositInitiated(userId, req.ip, { transactionId: data.id.toString(), amount: amt, currency: 'ETB', method: payment_type });
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
 app.get('/admin/deposits', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const { data, error } = await supabase
-    .from('deposit_requests')
-    .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true });
+  const { data, error } = await supabase.from('deposit_requests').select('*').eq('status', 'pending').order('created_at', { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ requests: data });
 });
@@ -531,45 +444,23 @@ app.post('/admin/process-deposit', async (req, res) => {
   const { secret, requestId, action } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-
-  const { data: reqData, error: fetchErr } = await supabase
-    .from('deposit_requests').select('*').eq('id', requestId).single();
+  const { data: reqData, error: fetchErr } = await supabase.from('deposit_requests').select('*').eq('id', requestId).single();
   if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
   if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
-
   if (action === 'approve') {
     const user = await loadUser(reqData.telegram_id, null);
     if (!user) return res.status(404).json({ error: 'User not found' });
     user.balance += reqData.amount;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-    await supabase
-      .from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
-
-    Audit.depositCompleted(reqData.telegram_id, req.ip, {
-      transactionId: requestId.toString(),
-      providerRef: reqData.id.toString(),
-      amount: reqData.amount,
-      currency: 'ETB',
-      method: reqData.payment_type || 'unknown'
-    });
-
+    await supabase.from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
+    Audit.depositCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), providerRef: reqData.id.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.payment_type || 'unknown' });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
-    if (playerSocket) {
-      playerSocket.emit('balanceUpdate', user.balance);
-      playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount });
-    }
+    if (playerSocket) { playerSocket.emit('balanceUpdate', user.balance); playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount }); }
     res.json({ success: true, newBalance: user.balance });
   } else {
-    await supabase
-      .from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
-
-    Audit.depositFailed(reqData.telegram_id, req.ip, {
-      transactionId: requestId.toString(),
-      amount: reqData.amount,
-      reason: 'rejected_by_admin'
-    });
-
+    await supabase.from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
+    Audit.depositFailed(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, reason: 'rejected_by_admin' });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
@@ -577,61 +468,33 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- WITHDRAWAL (with withdrawal_type) ----------
+// ---------- WITHDRAWAL (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-
   const { amount, phone, withdrawal_type, name } = req.body;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) {
-    return res.status(400).json({ error: 'Invalid withdrawal type' });
-  }
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) return res.status(400).json({ error: 'Invalid withdrawal type' });
   const receiver = (phone || '').trim();
-  if (!receiver || receiver.length < 10) {
-    return res.status(400).json({ error: 'Valid receiver phone/account required' });
-  }
-const receiverName = (name || '').trim();
-if (!receiverName) {
-  return res.status(400).json({ error: 'Account holder name is required' });
-}
+  if (!receiver || receiver.length < 10) return res.status(400).json({ error: 'Valid receiver phone/account required' });
+  const receiverName = (name || '').trim();
+  if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
   const user = await loadUser(userId, null);
   if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
-
-  const { data, error } = await supabase
-    .from('withdrawal_requests')
-    .insert({
-      telegram_id: userId,
-      username: user.username,
-      amount: amt,
-      status: 'pending',
-      phone_number: receiver,
-      withdrawal_type,
-      receiver_name: receiverName 
-    })
-    .select()
-    .single();
-
+  const { data, error } = await supabase.from('withdrawal_requests').insert({
+    telegram_id: userId, username: user.username, amount: amt, status: 'pending',
+    phone_number: receiver, withdrawal_type, receiver_name: receiverName
+  }).select().single();
   if (error) { console.error('Withdraw insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
-
-  Audit.withdrawalRequested(userId, req.ip, {
-    transactionId: data.id.toString(),
-    amount: amt,
-    currency: 'ETB',
-    method: withdrawal_type,
-    receiver,
-    name: receiverName
-  });
-
+  Audit.withdrawalRequested(userId, req.ip, { transactionId: data.id.toString(), amount: amt, currency: 'ETB', method: withdrawal_type, receiver, name: receiverName });
   res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.` });
 });
 
 app.get('/admin/withdrawals', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const { data, error } = await supabase
-    .from('withdrawal_requests').select('*').eq('status', 'pending').order('created_at', { ascending: true });
+  const { data, error } = await supabase.from('withdrawal_requests').select('*').eq('status', 'pending').order('created_at', { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ requests: data });
 });
@@ -640,45 +503,23 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   const { secret, requestId, action } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-
-  const { data: reqData, error: fetchErr } = await supabase
-    .from('withdrawal_requests').select('*').eq('id', requestId).single();
+  const { data: reqData, error: fetchErr } = await supabase.from('withdrawal_requests').select('*').eq('id', requestId).single();
   if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
   if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
-
   if (action === 'approve') {
     const user = await loadUser(reqData.telegram_id, null);
     if (!user || user.balance < reqData.amount) return res.status(400).json({ error: 'Insufficient balance now' });
     user.balance -= reqData.amount;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-    await supabase
-      .from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
-
-    Audit.withdrawalCompleted(reqData.telegram_id, req.ip, {
-      transactionId: requestId.toString(),
-      amount: reqData.amount,
-      currency: 'ETB',
-      method: reqData.withdrawal_type || 'N/A',
-      receiver: reqData.phone_number
-    });
-
+    await supabase.from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
+    Audit.withdrawalCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.withdrawal_type || 'N/A', receiver: reqData.phone_number });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
-    if (playerSocket) {
-      playerSocket.emit('balanceUpdate', user.balance);
-      playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number });
-    }
+    if (playerSocket) { playerSocket.emit('balanceUpdate', user.balance); playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number }); }
     res.json({ success: true, newBalance: user.balance });
   } else {
-    await supabase
-      .from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
-
-    Audit.withdrawalRejected(reqData.telegram_id, req.ip, {
-      transactionId: requestId.toString(),
-      amount: reqData.amount,
-      reason: 'rejected_by_admin'
-    });
-
+    await supabase.from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
+    Audit.withdrawalRejected(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, reason: 'rejected_by_admin' });
     const sockets = await io.fetchSockets();
     const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
     if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
@@ -686,62 +527,38 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- AUDITOR ENDPOINT ----------
+// ---------- AUDIT ENDPOINTS (unchanged) ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-
   const { roomId, userId, eventType, from, to, limit = 200 } = req.query;
   let query = supabase.from('audit_logs').select('*', { count: 'exact' });
-
   if (roomId) query = query.eq('room_id', roomId);
   if (userId) query = query.eq('user_id', userId);
   if (eventType) query = query.eq('event_type', eventType);
   if (from) query = query.gte('timestamp', from);
   if (to) query = query.lte('timestamp', to);
   query = query.order('timestamp', { ascending: false }).limit(Math.min(parseInt(limit), 1000));
-
   const { data, error, count } = await query;
   if (error) return res.status(500).json({ success: false, error: error.message });
   res.json({ success: true, logs: data, count });
 });
 
-// ---------- AUDIT SUMMARY (auditor only) ----------
 app.get('/admin/audit-summary', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-
   try {
-    const { data: deposits, error: depErr } = await supabase
-      .from('deposit_requests')
-      .select('amount')
-      .eq('status', 'approved');
+    const { data: deposits, error: depErr } = await supabase.from('deposit_requests').select('amount').eq('status', 'approved');
     if (depErr) throw depErr;
-
-    const { data: withdrawals, error: wdErr } = await supabase
-      .from('withdrawal_requests')
-      .select('amount')
-      .eq('status', 'approved');
+    const { data: withdrawals, error: wdErr } = await supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
     if (wdErr) throw wdErr;
-
-    const { data: rounds, error: rdErr } = await supabase
-      .from('game_rounds')
-      .select('house_profit');
+    const { data: rounds, error: rdErr } = await supabase.from('game_rounds').select('house_profit');
     if (rdErr) throw rdErr;
-
     const totalDeposits = deposits.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalWithdrawals = withdrawals.reduce((sum, r) => sum + Number(r.amount), 0);
     const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
-
-    res.json({
-      success: true,
-      totalDeposits,
-      totalWithdrawals,
-      totalHouseProfit
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+    res.json({ success: true, totalDeposits, totalWithdrawals, totalHouseProfit });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 // ---------- Socket.IO ----------
@@ -754,19 +571,11 @@ io.use((socket, next) => {
 
 io.on('connection', async (socket) => {
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-
   if (currentGame.status === 'lobby') {
     const timeLeft = Math.max(0, Math.ceil((currentGame.lobbyEndTime - Date.now()) / 1000));
-    socket.emit('lobbyState', {
-      startsIn: timeLeft,
-      takenNumbers: Array.from(currentGame.takenCardNumbers),
-      playersCount: currentGame.players.length
-    });
+    socket.emit('lobbyState', { startsIn: timeLeft, takenNumbers: Array.from(currentGame.takenCardNumbers), playersCount: currentGame.players.length });
   } else if (currentGame.status === 'running') {
-    socket.emit('gameStarted', {
-      prizePool: currentGame.prizePool,
-      playersCount: currentGame.players.length
-    });
+    socket.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
     if (player) {
       socket.emit('yourCard', player.card);
@@ -775,7 +584,7 @@ io.on('connection', async (socket) => {
     }
   }
 
- socket.on('selectCardNumber', (cardNumber) => {
+  socket.on('selectCardNumber', (cardNumber) => {
     if (currentGame.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
     if (userBalance < currentGame.entryFee) {
@@ -784,32 +593,14 @@ io.on('connection', async (socket) => {
     }
     const num = Number(cardNumber);
     if (!Number.isInteger(num) || num < 1 || num > 100) return;
-    if (currentGame.takenCardNumbers.has(num)) {
-      socket.emit('cardSelectionFailed', 'This number is already taken.');
-      return;
-    }
+    if (currentGame.takenCardNumbers.has(num)) { socket.emit('cardSelectionFailed', 'This number is already taken.'); return; }
     const existing = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existing) {
-      currentGame.takenCardNumbers.delete(existing.cardNumber);
-      currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
-    }
+    if (existing) { currentGame.takenCardNumbers.delete(existing.cardNumber); currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId); }
     currentGame.takenCardNumbers.add(num);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = {
-      telegramId: socket.userId,
-      username: socket.username,
-      card: currentGame.cardSet[num - 1],
-      markedNumbers: [],
-      cardNumber: num,
-      ip: ip   // store IP for collusion detection
-    };
+    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip: ip };
     currentGame.players.push(player);
-
-    Audit.cardAssigned('global', socket.userId, ip, {
-      cardId: num.toString(),
-      grid: player.card
-    });
-
+    Audit.cardAssigned('global', socket.userId, ip, { cardId: num.toString(), grid: player.card });
     io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
@@ -818,39 +609,17 @@ io.on('connection', async (socket) => {
   socket.on('newCardNumber', () => {
     if (currentGame.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < currentGame.entryFee) {
-      socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${currentGame.entryFee} birr.`);
-      return;
-    }
-    const freeNumbers = [];
-    for (let i = 1; i <= 100; i++) if (!currentGame.takenCardNumbers.has(i)) freeNumbers.push(i);
-    if (freeNumbers.length === 0) {
-      socket.emit('cardSelectionFailed', 'All numbers are taken.');
-      return;
-    }
+    if (userBalance < currentGame.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${currentGame.entryFee} birr.`); return; }
+    const freeNumbers = []; for (let i = 1; i <= 100; i++) if (!currentGame.takenCardNumbers.has(i)) freeNumbers.push(i);
+    if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
     const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
     const existing = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existing) {
-      currentGame.takenCardNumbers.delete(existing.cardNumber);
-      currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId);
-    }
+    if (existing) { currentGame.takenCardNumbers.delete(existing.cardNumber); currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId); }
     currentGame.takenCardNumbers.add(randomNum);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = {
-      telegramId: socket.userId,
-      username: socket.username,
-      card: currentGame.cardSet[randomNum - 1],
-      markedNumbers: [],
-      cardNumber: randomNum,
-      ip: ip
-    };
+    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip: ip };
     currentGame.players.push(player);
-
-    Audit.cardAssigned('global', socket.userId, ip, {
-      cardId: randomNum.toString(),
-      grid: player.card
-    });
-
+    Audit.cardAssigned('global', socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
     io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
@@ -870,70 +639,37 @@ io.on('connection', async (socket) => {
     socket.emit('markedNumbers', player.markedNumbers);
   });
 
-  // ---------- Bingo claim with multiple winners support ----------
+  // ---------- Bingo claim with winning number storage ----------
   socket.on('claimBingo', () => {
     if (currentGame.status !== 'running') return;
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
     if (!player) return;
-
-    const lastCalled = currentGame.calledNumbers.length > 0
-      ? currentGame.calledNumbers[currentGame.calledNumbers.length - 1]
-      : null;
-
+    const lastCalled = currentGame.calledNumbers.length > 0 ? currentGame.calledNumbers[currentGame.calledNumbers.length - 1] : null;
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-
-    // Validate claim
     if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
       socket.emit('invalidBingo');
-      Audit.bingoRejected('global', socket.userId, ip, {
-        reason: 'invalid_bingo_call',
-        lastCalled
-      });
+      Audit.bingoRejected('global', socket.userId, ip, { reason: 'invalid_bingo_call', lastCalled });
       return;
     }
-
-    // Prevent duplicate claims by same player in this round
-    if (currentGame.winners.find(w => w.telegramId === socket.userId)) {
-      return;
+    if (currentGame.winners.find(w => w.telegramId === socket.userId)) return;
+    // 👇 Store the winning number (the last called number) if not already set
+    if (currentGame.winningNumber === null) {
+      currentGame.winningNumber = lastCalled;
     }
-
-    // Add to winners list
     currentGame.winners.push({ telegramId: socket.userId, username: socket.username });
-
-    // Audit the successful call
-    Audit.bingoCalled('global', socket.userId, ip, {
-      cardId: player.cardNumber.toString(),
-      cardGrid: player.card,
-      calledNumber: lastCalled,
-      winType: 'bingo_line'
-    });
-
-    // Notify this player that their claim is valid
+    Audit.bingoCalled('global', socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
     socket.emit('bingoValid');
-
-    // If this is the first valid claim, start the grace timer
     if (!currentGame.bingoGraceTimeout && currentGame.winners.length === 1) {
       io.emit('multipleBingoPossible', { message: 'Bingo claimed! Waiting for other potential winners...' });
-      currentGame.bingoGraceTimeout = setTimeout(() => {
-        endGameWithWinners();
-      }, 3000); // 3 seconds for others to claim
+      currentGame.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(); }, 3000);
     }
   });
 
-  socket.on('getBalance', async () => {
-    const u = await loadUser(socket.userId, socket.username);
-    socket.emit('balanceUpdate', u.balance);
-  });
+  socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- Error handling ----------
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.message);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-});
+app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
 
-// ---------- Start first lobby ----------
 resetGame();
-
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
