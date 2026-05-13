@@ -722,7 +722,12 @@
             socket.on('numberCalled', data => { currentCallEl.innerText = formatCall(data.number); popCall(); const list = (data.calledNumbers || []).map(n=>formatCall(n)); calledListEl.innerText = 'Called: '+list.join(', '); });
             socket.on('calledNumbers', called => { const list = called.map(n=>formatCall(n)); calledListEl.innerText = 'Called: '+list.join(', '); });
             socket.on('markedNumbers', nums => { markedNumbers = nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
-            socket.on('gameEnded', data => { showWinnerOverlay(data); });
+          socket.on('gameEnded', (data) => {
+  if (data.winningNumber) {
+    currentCallEl.innerText = formatCall(data.winningNumber);
+  }
+  showWinnerOverlay(data);
+});
             socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
             socket.on('depositStatus', data => { if(data.status==='approved') alert(`✅ Deposit +${data.amount} ETB approved!`); else alert('❌ Deposit rejected.'); });
             socket.on('withdrawStatus', data => { if(data.status==='approved') alert(`✅ Withdrawal -${data.amount} ETB processed.`); else alert('❌ Withdrawal rejected.'); });
