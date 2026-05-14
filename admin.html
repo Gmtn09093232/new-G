@@ -7,35 +7,131 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    body { font-family: system-ui; background: #0a0f1c; color: #eee; padding: 20px; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0f1c;
+      color: #eee;
+      padding: 16px;
+      margin: 0;
+    }
     .container { max-width: 1400px; margin: auto; }
-    h1 { color: #f39c12; }
-    .section { background: #16202a; margin: 20px 0; padding: 20px; border-radius: 24px; }
-    .request-card { background: #1e2a36; border-radius: 16px; margin: 12px 0; padding: 15px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: space-between; }
-    .request-info { flex: 2; }
-    .request-info p { margin: 5px 0; }
-    .proof-img { max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid #f39c12; }
-    button { background: #f39c12; border: none; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; margin: 0 5px; }
+    h1 { color: #f39c12; font-size: 1.8rem; }
+    .section {
+      background: #16202a;
+      margin: 20px 0;
+      padding: 20px;
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    .request-card {
+      background: #1e2a36;
+      border-radius: 16px;
+      margin: 12px 0;
+      padding: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .request-info { flex: 1 1 65%; min-width: 250px; }
+    .request-info p { margin: 5px 0; word-break: break-word; }
+    .proof-img {
+      max-width: 100%;
+      height: auto;
+      max-height: 120px;
+      border-radius: 8px;
+      border: 1px solid #f39c12;
+      margin-top: 8px;
+    }
+    button {
+      background: #f39c12;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 40px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 5px 0;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
     .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
-    .receipt-box { background: #0f1a24; padding: 10px; border-radius: 12px; margin-top: 10px; font-family: monospace; }
+    .receipt-box {
+      background: #0f1a24;
+      padding: 10px;
+      border-radius: 12px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+    }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
-    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; }
-    select, input { background: #1e2a36; border: 1px solid #334; color: #eee; padding: 8px; border-radius: 8px; margin-right: 10px; }
+    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; font-size: 0.9rem; }
+    select, input {
+      background: #1e2a36;
+      border: 1px solid #334;
+      color: #eee;
+      padding: 10px;
+      border-radius: 8px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    /* Mobile optimisations */
+    @media (max-width: 600px) {
+      body { padding: 8px; }
+      h1 { font-size: 1.4rem; }
+      .section { padding: 12px; border-radius: 16px; }
+      .request-card { flex-direction: column; }
+      .request-info { width: 100%; }
+      .action-buttons { width: 100%; justify-content: flex-start; }
+      button {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        width: auto;
+        flex: 1 1 auto;
+      }
+      .refresh { width: 100%; }
+      #addBalanceSection input {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      #addBalanceSection button {
+        width: 100%;
+      }
+      select, input { width: 100%; margin-right: 0; }
+      .filter-row { flex-direction: column; align-items: flex-start; }
+      .proof-img { max-width: 100%; max-height: 150px; }
+    }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🎰 Bingo Admin Panel <a href="audit.html" class="nav-link" style="font-size:0.8em;"></a></h1>
+  <h1>🎰 Bingo Admin Panel <a href="audit.html" class="nav-link"></a></h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <!-- Deposit Section -->
   <div class="section">
     <h2>📸 Pending Deposit Requests</h2>
-    <div style="margin-bottom:15px;">
-      <label for="depositFilter" style="margin-right:10px;">Filter by method:</label>
+    <div class="filter-row">
+      <label for="depositFilter">Filter by method:</label>
       <select id="depositFilter" onchange="renderDeposits()">
         <option value="all">All</option>
         <option value="telebirr">Telebirr</option>
@@ -49,8 +145,8 @@
   <!-- Withdrawal Section -->
   <div class="section">
     <h2>💰 Pending Withdrawal Requests</h2>
-    <div style="margin-bottom:15px;">
-      <label for="withdrawFilter" style="margin-right:10px;">Filter by method:</label>
+    <div class="filter-row">
+      <label for="withdrawFilter">Filter by method:</label>
       <select id="withdrawFilter" onchange="renderWithdrawals()">
         <option value="all">All</option>
         <option value="telebirr">Telebirr</option>
@@ -61,10 +157,10 @@
     <div id="withdrawList">Loading...</div>
   </div>
 
-  <div class="section">
+  <div class="section" id="addBalanceSection">
     <h2>➕ Manual Add Balance</h2>
-    <input type="text" id="userId" placeholder="Telegram ID (numeric)" style="padding: 8px; border-radius: 20px; border: none;">
-    <input type="number" id="amount" placeholder="Amount" style="padding: 8px; border-radius: 20px; border: none;">
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)">
+    <input type="number" id="amount" placeholder="Amount">
     <button onclick="addBalance()">Add Balance</button>
   </div>
 </div>
@@ -128,6 +224,21 @@
     return null;
   }
 
+  // ---------- Verification link builder ----------
+  function getVerificationLink(paymentType, referenceNumber) {
+    const ref = encodeURIComponent(referenceNumber);
+    switch (paymentType) {
+      case 'telebirr':
+        return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+      case 'cbebirr':
+        return `https://cbebirr.com/verify?txn=${ref}`; // replace with real URL
+      case 'mpesa':
+        return `https://mpesa.ethiotelecom.et/transaction/${ref}`; // replace with real URL
+      default:
+        return null;
+    }
+  }
+
   // ---------- Global data stores ----------
   let depositData = [];
   let withdrawalData = [];
@@ -167,8 +278,17 @@
 
       const submittedRef = req.reference_number || '';
       const refHtml = submittedRef
-        ? `<p><strong>Submitted Reference:</strong> ${submittedRef}</p>`
+        ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
         : '';
+
+      // Verification link from submitted reference
+      let verifyLinkHtml = '';
+      if (submittedRef) {
+        const link = getVerificationLink(req.payment_type, submittedRef);
+        if (link) {
+          verifyLinkHtml = `<p><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>`;
+        }
+      }
 
       card.innerHTML = `
         <div class="request-info">
@@ -178,13 +298,14 @@
           <p><strong>Amount:</strong> ${req.amount} ETB</p>
           <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
           ${refHtml}
+          ${verifyLinkHtml}
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
           ${req.proof_path
-            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" style="cursor:pointer;" onclick="window.open(this.src)">`
+            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">`
             : '<p>No proof</p>'}
           <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
         </div>
-        <div>
+        <div class="action-buttons">
           <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
           <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
         </div>
@@ -201,13 +322,13 @@
             const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
             let matchHtml = '';
             if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
-              matchHtml = '<span class="match">✅ Matches submitted reference</span>';
+              matchHtml = '<span class="match">✅ Matches submitted ref</span>';
             } else if (submittedRef) {
               matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
             }
             verifyDiv.innerHTML = `
-              <strong>🧾 Extracted Ref (${result.method}):</strong> ${ref} ${matchHtml}<br>
-              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Open official receipt</a>
+              <strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br>
+              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt</a>
             `;
           } else {
             verifyDiv.innerHTML = '❌ Could not read reference from image.';
@@ -256,7 +377,7 @@
           <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
         </div>
-        <div>
+        <div class="action-buttons">
           <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
           <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
         </div>
