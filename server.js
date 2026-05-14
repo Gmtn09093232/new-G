@@ -144,7 +144,7 @@ async function loadUser(telegramId, username) {
   } else {
     const newUser = { telegram_id: id, username: username || 'Player', balance: 10 };
     await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 5 };
+    users[id] = { id, username: newUser.username, balance: 10 };
   }
   return users[id];
 }
