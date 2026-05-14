@@ -142,7 +142,7 @@ async function loadUser(telegramId, username) {
   if (data) {
     users[id] = { id, username: data.username, balance: Number(data.balance) };
   } else {
-    const newUser = { telegram_id: id, username: username || 'Player', balance: 5 };
+    const newUser = { telegram_id: id, username: username || 'Player', balance: 10 };
     await supabase.from('users').insert(newUser);
     users[id] = { id, username: newUser.username, balance: 5 };
   }
