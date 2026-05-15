@@ -396,7 +396,7 @@
         .account-label { font-size: 0.65rem; text-transform: uppercase; color: #64748b; }
         .account-number { font-size: 1.1rem; font-weight: 700; font-family: monospace; color: #0f172a; word-break: break-all; }
 
-        /* RED CIRCLE COPY BUTTON ROW - for all methods */
+        /* NEW: Red circle copy button row */
         .copy-phone-row {
             display: flex;
             align-items: center;
@@ -514,7 +514,7 @@
     <!-- MODALS (DEPOSIT/WITHDRAW/RULES) -->
     <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title">Deposit</div><div class="bank-sub">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;">Cancel</button></div></div>
     
-    <!-- DEPOSIT DETAILS MODAL (copy button appears for all methods) -->
+    <!-- DEPOSIT DETAILS MODAL (modified to include red circle copy button for Telebirr) -->
     <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub">Send payment & attach proof</div></div></div><div class="account-card"><div class="account-label">RECIPIENT ACCOUNT</div><div id="recipientAccountRow" class="copy-phone-row"><span id="depositAccountNumberDisplay" class="copy-number-display">0906151003</span><div id="copyRecipientBtn" class="red-copy-pill"><span class="copy-icon">📋</span> Copy</div></div><div class="account-label" style="margin-top:8px;">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label>📞 Your Mobile Number</label><input type="tel" id="depositPlayerPhone" placeholder="" required></div><div class="input-group"><label>💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="input-group"><label>🧾 Transaction ID (optional)</label><input type="text" id="depositRef" placeholder="e.g., TRX123456"></div><div class="input-group"><label class="file-label" for="depositProofImage">📎 Attach Screenshot / Proof</label><input type="file" id="depositProofImage" accept="image/*" capture="environment" style="display:none;"></div><div class="transaction-summary">💡 After sending, submit proof. Funds added after manual verification.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary">✔ Submit Request</button><button id="backDepositBtn" class="btn-secondary">← Back</button></div></div></div>
     
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title">Withdraw Funds</div><div class="bank-sub">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn">Cancel</button></div></div>
@@ -667,7 +667,7 @@
         }
         function showGame() {
             lobbyPage.classList.add('hidden');
-            gamePage.classList.remove('hidden');
+            gamePage.classList.add('hidden');
             isGameActive = true;
             clearInterval(lobbyTimerInterval);
             if(socket) socket.emit('getBalance');
@@ -685,19 +685,11 @@
         }
 
         // ---------- Deposit / Withdraw with phone validation ----------
-        // Define account numbers for all methods
-        const depositNumberMap = {
-            telebirr: "0906151003",
-            cbebirr: "1000123456789",   // example CBE Birr account number
-            mpesa: "0712345678"         // example M-Pesa number
-        };
-        
+        // Hardcode Telebirr number to 0906151003
         async function loadDepositAccounts() {
             try { const res = await fetch('/api/deposit-accounts'); depositAccounts = await res.json(); } catch(e) { depositAccounts = {}; }
-            // Override with our fixed numbers
-            depositAccounts.telebirr = depositNumberMap.telebirr;
-            depositAccounts.cbebirr = depositNumberMap.cbebirr;
-            depositAccounts.mpesa = depositNumberMap.mpesa;
+            // Override Telebirr number to the required 0906151003
+            depositAccounts.telebirr = "0906151003";
         }
         
         function openDepositTypeModal() { document.getElementById('depositTypeModal').classList.add('active'); }
@@ -708,18 +700,26 @@
             let acc = '', title = '', phoneHint = '';
             if(type === 'telebirr') { 
                 title = 'Telebirr'; 
-                acc = depositAccounts.telebirr || depositNumberMap.telebirr;
+                acc = depositAccounts.telebirr || '0906151003'; 
                 phoneHint = '09xxxxxxxx';
+                // Show the red copy row (already visible by default)
+                const copyRow = document.getElementById('recipientAccountRow');
+                if(copyRow) copyRow.style.display = 'flex';
             }
             else if(type === 'cbebirr') { 
                 title = 'CBE Birr'; 
-                acc = depositAccounts.cbebirr || depositNumberMap.cbebirr;
+                acc = depositAccounts.cbebirr || '1000123456789'; 
                 phoneHint = '09xxxxxxxx';
+                // Hide copy row for other methods (optional)
+                const copyRow = document.getElementById('recipientAccountRow');
+                if(copyRow) copyRow.style.display = 'none';
             }
             else { 
                 title = 'M-Pesa'; 
-                acc = depositAccounts.mpesa || depositNumberMap.mpesa;
+                acc = depositAccounts.mpesa || '0712345678'; 
                 phoneHint = '07xxxxxxxx';
+                const copyRow = document.getElementById('recipientAccountRow');
+                if(copyRow) copyRow.style.display = 'none';
             }
             document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
             const accSpan = document.getElementById('depositAccountNumberDisplay');
@@ -734,22 +734,20 @@
             closeDepositTypeModal();
         }
         
-        // Setup copy button (works for any displayed number)
+        // Copy function for red pill
         function setupCopyButton() {
             const copyBtn = document.getElementById('copyRecipientBtn');
             if(copyBtn) {
-                // Remove any existing listeners to avoid duplicates
-                const newBtn = copyBtn.cloneNode(true);
-                copyBtn.parentNode.replaceChild(newBtn, copyBtn);
-                newBtn.addEventListener('click', (e) => {
+                copyBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const phoneNumberElem = document.getElementById('depositAccountNumberDisplay');
                     const numberToCopy = phoneNumberElem ? phoneNumberElem.innerText.trim() : '';
                     if(!numberToCopy) return;
                     navigator.clipboard.writeText(numberToCopy).then(() => {
-                        const originalHTML = newBtn.innerHTML;
-                        newBtn.innerHTML = '✅ Copied!';
-                        setTimeout(() => { newBtn.innerHTML = originalHTML; }, 1500);
+                        // Visual feedback (toast style)
+                        const originalText = copyBtn.innerHTML;
+                        copyBtn.innerHTML = '✅ Copied!';
+                        setTimeout(() => { copyBtn.innerHTML = originalText; }, 1500);
                         if(window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
                     }).catch(() => {
                         alert('Tap to copy manually: ' + numberToCopy);
