@@ -1,625 +1,990 @@
-require('dotenv').config();
-
-const express = require('express');
-const http = require('http');
-const session = require('express-session');
-const crypto = require('crypto');
-const { Server } = require('socket.io');
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
-
-// ---------- Uploads setup ----------
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
-
-// ---------- Supabase ----------
-console.log('Connecting to Supabase...');
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-(async () => {
-  const { error } = await supabase.from('users').select('count', { count: 'exact', head: true });
-  if (error) console.error('❌ Supabase error:', error.message);
-  else console.log('✅ Supabase connected');
-})();
-
-const app = express();
-app.set('trust proxy', 1);
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.json());
-app.use('/uploads', express.static(uploadDir));
-
-const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || 'bingo_mega_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: 'none'
-  }
-});
-app.use(sessionMiddleware);
-io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
-
-// ---------- Audit Logger ----------
-async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
-  try {
-    const { error } = await supabase.from('audit_logs').insert({
-      event_type: eventType,
-      room_id: roomId,
-      user_id: userId,
-      ip_address: ipAddress,
-      details
-    });
-    if (error) throw error;
-  } catch (err) {
-    console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message);
-  }
-}
-
-const Audit = {
-  depositInitiated(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId, ipAddress: ip, details: data }); },
-  depositCompleted(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId, ipAddress: ip, details: data }); },
-  depositFailed(userId, ip, data) { return logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId, ipAddress: ip, details: data }); },
-  withdrawalRequested(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId, ipAddress: ip, details: data }); },
-  withdrawalCompleted(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId, ipAddress: ip, details: data }); },
-  withdrawalRejected(userId, ip, data) { return logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId, ipAddress: ip, details: data }); },
-  bingoCalled(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId, ipAddress: ip, details: data }); },
-  bingoRejected(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId, ipAddress: ip, details: data }); },
-  winPaidOut(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId, ipAddress: ip, details: data }); },
-  numberDrawn(roomId, data) { return logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: data }); },
-  cardAssigned(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId, ipAddress: ip, details: data }); },
-  adminAction(eventType, adminId, ip, details) { return logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details }); },
-  suspicious(roomId, userId, ip, data) { return logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId, ipAddress: ip, details: data }); }
-};
-
-// ---------- Suspicious Activity Detector ----------
-const winTimestamps = new Map();
-const WINDOW_MS = 120_000;
-const MAX_WINS_IN_WINDOW = 3;
-
-function detectRapidWins(roomId, userId, ip) {
-  const key = `${roomId}:${userId}`;
-  if (!winTimestamps.has(key)) winTimestamps.set(key, []);
-  const times = winTimestamps.get(key);
-  const now = Date.now();
-  times.push(now);
-  const recent = times.filter(t => now - t <= WINDOW_MS);
-  winTimestamps.set(key, recent);
-  if (recent.length > MAX_WINS_IN_WINDOW) {
-    Audit.suspicious(roomId, userId, ip, {
-      detectionSource: 'win_velocity_check',
-      reason: `More than ${MAX_WINS_IN_WINDOW} wins in ${WINDOW_MS/1000}s`,
-      evidence: { recentWinCount: recent.length, windowMs: WINDOW_MS }
-    });
-    return true;
-  }
-  return false;
-}
-
-// ---------- Bingo card generator ----------
-function generateCard() {
-  const columns = [
-    [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
-    [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
-    [31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],
-    [46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
-    [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75]
-  ];
-  const card = [];
-  for (let col = 0; col < 5; col++) {
-    const colNumbers = [];
-    const available = [...columns[col]];
-    for (let row = 0; row < 5; row++) {
-      if (col === 2 && row === 2) { colNumbers.push('FREE'); }
-      else { colNumbers.push(available.splice(Math.floor(Math.random() * available.length), 1)[0]); }
-    }
-    card.push(colNumbers);
-  }
-  const transposed = [];
-  for (let r = 0; r < 5; r++) transposed.push([card[0][r], card[1][r], card[2][r], card[3][r], card[4][r]]);
-  return transposed;
-}
-
-// ---------- Game Room Management ----------
-class GameRoom {
-  constructor(stake) {
-    this.stake = stake;
-    this.status = 'lobby';
-    this.players = [];
-    this.takenCardNumbers = new Set();
-    this.calledNumbers = [];
-    this.prizePool = 0;
-    this.lobbyTimer = null;
-    this.callInterval = null;
-    this.lobbyEndTime = 0;
-    this.cardSet = Array.from({ length: 100 }, () => generateCard());
-    this.winners = [];
-    this.bingoGraceTimeout = null;
-    this.winningNumber = null;
-    this.startLobbyTimer();
-  }
-
-  startLobbyTimer() {
-    this.lobbyEndTime = Date.now() + 30000;
-    this.lobbyTimer = setTimeout(() => this.startGame(), 30000);
-  }
-
-  async startGame() {
-    // Remove players with insufficient balance
-    const toRemove = [];
-    for (const p of this.players) {
-      const user = users[p.telegramId];
-      if (!user || user.balance < this.stake) toRemove.push(p);
-    }
-    for (const p of toRemove) {
-      const idx = this.players.findIndex(pl => pl.telegramId === p.telegramId);
-      if (idx !== -1) this.players.splice(idx, 1);
-      if (p.cardNumber) this.takenCardNumbers.delete(p.cardNumber);
-    }
-    this.broadcast('cardTaken', { takenNumbers: Array.from(this.takenCardNumbers) });
-    this.broadcast('playersCount', this.players.length);
-
-    if (this.players.length === 0) {
-      this.status = 'ended';
-      setTimeout(() => resetRoom(this.stake), 3000);
-      return;
-    }
-
-    // Deduct entry fee
-    for (const p of this.players) {
-      const user = users[p.telegramId];
-      if (user) {
-        user.balance -= this.stake;
-        await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
-        const socket = await getSocketByUserId(p.telegramId);
-        if (socket) socket.emit('balanceUpdate', user.balance);
-        Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: this.stake, currency: 'ETB', room: `stake_${this.stake}` });
-      }
-    }
-
-    this.prizePool = 0.8 * (this.stake * this.players.length);
-    this.status = 'running';
-    this.calledNumbers = [];
-    this.winningNumber = null;
-    this.broadcast('gameStarted', { prizePool: this.prizePool, playersCount: this.players.length });
-    this.startCalling();
-  }
-
-  startCalling() {
-    this.callInterval = setInterval(() => {
-      if (this.status !== 'running') { clearInterval(this.callInterval); return; }
-      const allNums = Array.from({ length: 75 }, (_, i) => i + 1);
-      const available = allNums.filter(n => !this.calledNumbers.includes(n));
-      if (available.length === 0) {
-        clearInterval(this.callInterval);
-        this.endGameWithWinners();
-        return;
-      }
-      const number = available[Math.floor(Math.random() * available.length)];
-      this.calledNumbers.push(number);
-      this.broadcast('numberCalled', { number, calledNumbers: this.calledNumbers });
-      Audit.numberDrawn(`stake_${this.stake}`, { drawnNumber: number, drawIndex: this.calledNumbers.length });
-    }, 4000);
-  }
-
-  async endGameWithWinners() {
-    this.status = 'ended';
-    clearInterval(this.callInterval);
-
-    if (this.winners.length > 0) {
-      const prizeEach = Math.floor(this.prizePool / this.winners.length);
-      for (const w of this.winners) {
-        const user = users[w.telegramId];
-        if (user) {
-          user.balance += prizeEach;
-          await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
-          const winnerSocket = await getSocketByUserId(w.telegramId);
-          if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
-          Audit.winPaidOut(`stake_${this.stake}`, w.telegramId, null, {
-            amount: prizeEach,
-            currency: 'ETB',
-            totalPrizePool: this.prizePool,
-            totalWinners: this.winners.length
-          });
-          detectRapidWins(`stake_${this.stake}`, w.telegramId, null);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-      }
 
-      const totalEntryFees = this.players.length * this.stake;
-      const houseProfit = totalEntryFees - this.prizePool;
-      await supabase.from('game_rounds').insert({
-        stake: this.stake,
-        total_entry_fees: totalEntryFees,
-        prize_pool: this.prizePool,
-        house_profit: houseProfit
-      });
+        body {
+            min-height: 100vh;
+            background: #1a2a2f;
+            background-image: radial-gradient(circle at 25% 40%, rgba(40, 70, 55, 0.6) 2%, transparent 2.5%),
+                              radial-gradient(circle at 70% 85%, rgba(30, 60, 45, 0.5) 1.8%, transparent 2%);
+            background-size: 55px 55px, 70px 70px;
+            font-family: 'Courier New', 'Segoe UI', 'Inter', 'Courier', monospace;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-      const winnerNames = this.winners.map(w => w.username);
-      this.broadcast('gameEnded', {
-        winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
-        winners: winnerNames,
-        prizeEach,
-        totalPrize: this.prizePool,
-        winnerCount: this.winners.length,
-        winningNumber: this.winningNumber
-      });
-    } else {
-      this.broadcast('gameEnded', { noWinner: true });
-    }
+        .page {
+            max-width: 650px;
+            width: 100%;
+            margin: 0 auto;
+            background: #fef7e0;
+            background-image: linear-gradient(145deg, #fff6e5 0%, #f8ecd8 100%);
+            border-radius: 32px;
+            padding: 16px 18px 24px;
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.5), inset 0 1px 3px rgba(255, 248, 210, 0.9);
+            border: 1px solid #e0bc7c;
+        }
 
-    this.winners = [];
-    clearTimeout(this.bingoGraceTimeout);
-    this.bingoGraceTimeout = null;
-    setTimeout(() => resetRoom(this.stake), 5000);
-  }
+        .hidden {
+            display: none !important;
+        }
 
-  broadcast(event, data) {
-    io.to(`stake_${this.stake}`).emit(event, data);
-  }
+        /* RETRO BINGO CARD */
+        .card-container {
+            margin: 16px 0 12px;
+            display: flex;
+            justify-content: center;
+            background: #e9dbc8;
+            border-radius: 24px;
+            padding: 12px 6px;
+            box-shadow: inset 0 0 0 2px #f9efdf, 0 10px 18px rgba(0, 0, 0, 0.2);
+            overflow-x: auto;
+        }
 
-  // Helper to get player by socket id
-  getPlayer(socketId) {
-    return this.players.find(p => p.socketId === socketId);
-  }
-}
+        .card-container table {
+            border-collapse: separate;
+            border-spacing: 6px;
+            margin: 0 auto;
+        }
 
-// Store rooms
-const gameRooms = {
-  10: null,
-  20: null
-};
+        .card-container thead tr th {
+            font-family: 'Impact', 'Courier New', monospace;
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: #c2410c;
+            background: linear-gradient(145deg, #b8511a, #9b2e0b);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 2px 2px 0 #fccf7c;
+            padding: 6px 0;
+            text-align: center;
+            width: 60px;
+        }
 
-function getOrCreateRoom(stake) {
-  if (!gameRooms[stake] || gameRooms[stake].status === 'ended') {
-    gameRooms[stake] = new GameRoom(stake);
-  }
-  return gameRooms[stake];
-}
+        .card-container td {
+            width: 58px;
+            height: 58px;
+            background: #fffaf0;
+            border-radius: 16px;
+            text-align: center;
+            vertical-align: middle;
+            font-weight: 800;
+            font-size: 1.3rem;
+            font-family: 'Courier New', monospace;
+            color: #2c1c0c;
+            box-shadow: inset 0 1px 3px rgba(90, 50, 20, 0.2), 0 4px 8px rgba(0, 0, 0, 0.15);
+            border: 2px solid #e0b070;
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
 
-function resetRoom(stake) {
-  gameRooms[stake] = new GameRoom(stake);
-}
+        .card-container td.free {
+            background: #e9d5b5;
+            color: #b34e1a;
+            font-size: 1.6rem;
+            text-shadow: 0 0 2px #ffdd99;
+            border-color: #c2812a;
+        }
 
-// ---------- User cache ----------
-const users = {};
-async function loadUser(telegramId, username) {
-  const id = String(telegramId);
-  if (users[id]) return users[id];
-  const { data } = await supabase.from('users').select('*').eq('telegram_id', id).maybeSingle();
-  if (data) {
-    users[id] = { id, username: data.username, balance: Number(data.balance) };
-  } else {
-    const newUser = { telegram_id: id, username: username || 'Player', balance: 10 };
-    await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 10 };
-  }
-  return users[id];
-}
+        .card-container td.marked {
+            background: radial-gradient(ellipse at 30% 35%, #f3bc5c, #e5952b);
+            color: #2c1500;
+            box-shadow: 0 0 0 2px #ffdfaa, inset 0 0 10px #ffd58c;
+            border-color: #f5b642;
+            transform: scale(0.97);
+            font-weight: 900;
+        }
 
-async function getSocketByUserId(userId) {
-  const sockets = await io.fetchSockets();
-  return sockets.find(s => s.userId === userId);
-}
+        .last-call-area {
+            background: #0b0a07;
+            border-radius: 40px;
+            padding: 12px 16px;
+            margin: 8px 0 12px;
+            text-align: center;
+            box-shadow: inset 0 0 0 2px #6b4e2c, 0 8px 14px rgba(0,0,0,0.4);
+            border: 1px solid #e5b46b;
+        }
+        .last-call-label {
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            font-weight: bold;
+            color: #f7d88c;
+            text-transform: uppercase;
+            background: #2a241b;
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 30px;
+        }
+        .last-call-number {
+            font-size: 2.8rem;
+            font-weight: 800;
+            font-family: monospace;
+            color: #ffdd99;
+            text-shadow: 0 0 6px #ffaa33;
+            letter-spacing: 4px;
+            margin: 6px 0 4px;
+            background: #00000066;
+            border-radius: 50px;
+            padding: 4px;
+        }
+        .called-history {
+            background: #1e1610;
+            padding: 6px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #efcd91;
+            font-weight: bold;
+            overflow-x: auto;
+            white-space: nowrap;
+            font-family: monospace;
+            text-align: center;
+            margin-top: 6px;
+        }
 
-// ---------- Telegram verification & endpoints ----------
-function verifyTelegram(initData) {
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  params.delete('hash');
-  const dataCheckString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('\n');
-  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
-  const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-  return calculatedHash === hash;
-}
+        .balance-top {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: #f0efee;
+            padding: 8px 12px;
+            border-radius: 50px;
+            margin-bottom: 15px;
+        }
 
-app.post('/api/telegram-miniapp-auth', async (req, res) => {
-  const { initData } = req.body;
-  if (!initData || !verifyTelegram(initData)) return res.status(403).json({ success: false });
-  const params = new URLSearchParams(initData);
-  const userData = JSON.parse(params.get('user'));
-  const id = String(userData.id);
-  const user = await loadUser(id, userData.first_name || userData.username);
-  req.session.userId = id;
-  req.session.save((err) => {
-    if (err) {
-      console.error('Session save error:', err);
-      return res.status(500).json({ success: false, error: 'Session save failed' });
-    }
-    res.json({ success: true, userId: id, username: user.username, balance: user.balance });
-  });
-});
+        .players-badge {
+            background: #4f3b26;
+            padding: 4px 12px;
+            border-radius: 30px;
+            color: #ffda99;
+            font-weight: bold;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
 
-app.get('/api/deposit-accounts', (req, res) => {
-  res.json({
-    telebirr: process.env.ADMIN_PHONE || '0924839730',
-    cbebirr: process.env.CBE_ACCOUNT || '1000123456789',
-    mpesa: process.env.MPESA_ACCOUNT || '251912345678'
-  });
-});
+        .timer-badge {
+            font-size: 1.5rem;
+            font-weight: 800;
+            font-family: monospace;
+            color: #fabe4c;
+            background: #171007;
+            padding: 0 16px;
+            border-radius: 50px;
+        }
 
-// Deposit/Withdraw endpoints (unchanged, but with room awareness)
-app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
-  const userId = req.session?.userId;
-  if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  const { phone, amount, payment_type } = req.body;
-  const file = req.file;
-  const amt = Number(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!file) return res.status(400).json({ error: 'Proof image required' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
-  const user = await loadUser(userId, null);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const proofPath = `/uploads/${file.filename}`;
-  const { data, error } = await supabase.from('deposit_requests').insert({
-    telegram_id: userId, username: user.username, amount: amt, status: 'pending',
-    phone: phone || null, payment_type, proof_path: proofPath
-  }).select().single();
-  if (error) { console.error('Deposit insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
-  Audit.depositInitiated(userId, req.ip, { transactionId: data.id.toString(), amount: amt, currency: 'ETB', method: payment_type });
-  res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
-});
+        .grid-100 {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            margin: 12px 0;
+            background: #efe2ce;
+            padding: 8px;
+            border-radius: 28px;
+        }
 
-app.post('/api/request-withdraw', async (req, res) => {
-  const userId = req.session?.userId;
-  if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  const { amount, phone, withdrawal_type, name } = req.body;
-  const amt = Number(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) return res.status(400).json({ error: 'Invalid withdrawal type' });
-  const receiver = (phone || '').trim();
-  if (!receiver || receiver.length < 10) return res.status(400).json({ error: 'Valid receiver phone/account required' });
-  const receiverName = (name || '').trim();
-  if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
-  const user = await loadUser(userId, null);
-  if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
-  const { data, error } = await supabase.from('withdrawal_requests').insert({
-    telegram_id: userId, username: user.username, amount: amt, status: 'pending',
-    phone_number: receiver, withdrawal_type, receiver_name: receiverName
-  }).select().single();
-  if (error) { console.error('Withdraw insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
-  Audit.withdrawalRequested(userId, req.ip, { transactionId: data.id.toString(), amount: amt, currency: 'ETB', method: withdrawal_type, receiver, name: receiverName });
-  res.json({ success: true, requestId: data.id, message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.` });
-});
+        .grid-cell {
+            background: #f6eedb;
+            border-radius: 12px;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.7rem;
+            color: #3c2a1b;
+            border: 2px solid #cb9f66;
+            cursor: pointer;
+            transition: 0.05s linear;
+            font-family: monospace;
+            min-width: 28px;
+        }
 
-// Admin endpoints (unchanged, omitted for brevity – keep your existing ones)
-// ... (admin deposit/withdrawal endpoints remain as in your original server)
+        .grid-cell.taken {
+            background: #aa7e54;
+            color: #1e170f;
+            text-decoration: line-through;
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
 
-// ---------- Socket.IO with rooms ----------
-io.use((socket, next) => {
-  if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
-  socket.userId = socket.request.session.userId;
-  socket.username = users[socket.userId]?.username || 'Player';
-  next();
-});
+        .grid-cell.selected {
+            background: #f3bc5c;
+            border: 3px solid #d96c1c;
+            box-shadow: 0 0 0 2px #ffe1a0;
+        }
 
-io.on('connection', async (socket) => {
-  let currentRoom = null;
-  let currentStake = null;
+        button {
+            min-height: 44px;
+            min-width: 44px;
+        }
 
-  socket.on('joinRoom', async ({ stake }) => {
-    if (stake !== 10 && stake !== 20) return;
-    currentStake = stake;
-    currentRoom = `stake_${stake}`;
-    socket.join(currentRoom);
-    const room = getOrCreateRoom(stake);
-    const userBalance = users[socket.userId]?.balance || 0;
-    socket.emit('balanceUpdate', userBalance);
+        button:active {
+            transform: scale(0.97);
+        }
+
+        .rules-btn {
+            background: #3b2d1f;
+            color: #f7d992;
+            border: 1px solid #e7b153;
+            margin-top: 15px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        /* MODALS */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(6px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 20px;
+            max-width: 92%;
+            width: 380px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: none;
+            font-family: 'Inter', system-ui, sans-serif;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .bank-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        .bank-icon { font-size: 1.8rem; }
+        .bank-title { font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+        .bank-sub { color: #475569; font-size: 0.75rem; }
+        .account-card {
+            background: #f1f5f9;
+            border-radius: 20px;
+            padding: 12px;
+            margin: 12px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        .account-label { font-size: 0.65rem; text-transform: uppercase; color: #64748b; }
+        .account-number { font-size: 1.1rem; font-weight: 700; font-family: monospace; color: #0f172a; word-break: break-all; }
+        .input-group { margin: 12px 0; }
+        .input-group label { display: block; font-size: 0.75rem; font-weight: 600; color: #334155; margin-bottom: 4px; }
+        .input-group input, .input-group .file-label {
+            width: 100%;
+            padding: 12px;
+            border-radius: 50px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            font-size: 0.9rem;
+        }
+        .file-label { display: block; text-align: center; background: #fef3c7; cursor: pointer; font-weight: 600; color: #b45309; }
+        .transaction-summary { background: #eef2ff; border-radius: 20px; padding: 10px; margin: 12px 0; font-size: 0.8rem; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 16px; }
+        .modal-buttons button { flex: 1; padding: 12px; border-radius: 50px; font-weight: 700; border: none; cursor: pointer; font-size: 0.9rem; }
+        .btn-primary { background: #f59e0b; color: #1e293b; }
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .type-btn { background: #f1f5f9; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 50px; margin: 6px 0; font-weight: 600; border: 1px solid #e2e8f0; width: 100%; cursor: pointer; font-size: 0.9rem; }
+
+        /* WINNER OVERLAY */
+        .winner-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            visibility: hidden;
+            opacity: 0;
+        }
+        .winner-modal.active { visibility: visible; opacity: 1; }
+        .winner-card {
+            background: #fffbee;
+            border-radius: 40px;
+            padding: 20px;
+            text-align: center;
+            border: 4px solid #ffb347;
+            width: 85%;
+            max-width: 300px;
+        }
+        .confetti {
+            position: fixed;
+            top:0;
+            left:0;
+            width:100%;
+            height:100%;
+            pointer-events:none;
+            z-index:9999;
+        }
+
+        /* separate pages */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .back-btn {
+            background: #dbbd98;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .history-list, .recent-list {
+            list-style: none;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .history-list li, .recent-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eedbc8;
+            font-size: 0.8rem;
+        }
+        .game-history-card {
+            background: #fcf3e5;
+            border-radius: 24px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+        }
+        .profile-stat {
+            background: #f1e9dc;
+            border-radius: 30px;
+            padding: 15px;
+            text-align: center;
+            margin: 12px 0;
+        }
+        .stake-page-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .stake-option {
+            background: #f2e0cc;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 60px;
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #9b4619;
+            box-shadow: 0 5px 0 #c2884b;
+            cursor: pointer;
+            width: 160px;
+        }
+        .rules-text {
+            background: #fff3e2;
+            border-radius: 28px;
+            padding: 16px;
+            margin-top: 24px;
+            font-size: 0.85rem;
+        }
+        .tab-bar {
+            display: flex;
+            background: #ede0cf;
+            border-radius: 60px;
+            margin-top: 20px;
+            padding: 6px 8px;
+            gap: 6px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 10px 0;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #8c643e;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: #e0853a;
+            color: white;
+        }
+
+        @media (max-width: 550px) {
+            body { padding: 8px; }
+            .page { padding: 12px 14px 20px; }
+            .card-container td { width: 48px; height: 48px; font-size: 1rem; border-radius: 12px; }
+            .card-container thead tr th { font-size: 1.2rem; width: 48px; }
+            .grid-cell { font-size: 0.6rem; }
+            .last-call-number { font-size: 2rem; }
+            .stake-option { padding: 12px 20px; font-size: 1.4rem; width: 130px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MODALS (DEPOSIT/WITHDRAW/RULES) -->
+    <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title">Deposit</div><div class="bank-sub">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;">Cancel</button></div></div>
+    <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub">Send payment & attach proof</div></div></div><div class="account-card"><div class="account-label">RECIPIENT ACCOUNT</div><div class="account-number" id="depositAccountNumber">0924839730</div><div class="account-label" style="margin-top:8px;">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label>📞 Your Mobile Number</label><input type="tel" id="depositPlayerPhone" placeholder="" required></div><div class="input-group"><label>💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="input-group"><label>🧾 Transaction ID (optional)</label><input type="text" id="depositRef" placeholder="e.g., TRX123456"></div><div class="input-group"><label class="file-label" for="depositProofImage">📎 Attach Screenshot / Proof</label><input type="file" id="depositProofImage" accept="image/*" capture="environment" style="display:none;"></div><div class="transaction-summary">💡 After sending, submit proof. Funds added after manual verification.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary">✔ Submit Request</button><button id="backDepositBtn" class="btn-secondary">← Back</button></div></div></div>
+    <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title">Withdraw Funds</div><div class="bank-sub">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn">Cancel</button></div></div>
+    <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub">Your account details</div></div></div><div class="input-group"><label>👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label>📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label>💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary">⏱️ Withdrawals processed within 24h.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary">← Back</button></div></div></div>
     
-    if (room.status === 'lobby') {
-      const timeLeft = Math.max(0, Math.ceil((room.lobbyEndTime - Date.now()) / 1000));
-      socket.emit('lobbyState', { startsIn: timeLeft, takenNumbers: Array.from(room.takenCardNumbers), playersCount: room.players.length });
-    } else if (room.status === 'running') {
-      socket.emit('gameStarted', { prizePool: room.prizePool, playersCount: room.players.length });
-      const player = room.players.find(p => p.telegramId === socket.userId);
-      if (player) {
-        socket.emit('yourCard', player.card);
-        socket.emit('markedNumbers', player.markedNumbers);
-        socket.emit('calledNumbers', room.calledNumbers);
-      }
-    }
-  });
+    <!-- UPDATED RULES MODAL WITH AMHARIC TEXT -->
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title">የቢንጎ ሕጎች</div><div class="bank-sub">75-ኳስ ክላሲክ</div></div></div>
+            <div class="rules-text" style="font-size:0.9rem; line-height:1.5;">
+                <p><strong>💰 የመግቢያ ክፍያ፦</strong> በአንድ ካርድ 10 ብር</p>
+                <p><strong>🏆 የሽልማት ገንዘብ፦</strong> ከጠቅላላ ክፍያ 80% (ለምሳሌ፦ 10 ተጫዋቾች → 80 ብር ሽልማት)</p>
+                <p><strong>🎯 የማሸነፍ ሁኔታዎች፦</strong><br>
+                • ማንኛውንም አግድም ረድፍ፣ ቀጥ ያለ ዓምድ፣ ወይም ዋና ዲያግናል መሙላት<br>
+                • ወይም አራቱንም ማዕዘኖች (ላይ-ግራ፣ ላይ-ቀኝ፣ ታች-ግራ፣ ታች-ቀኝ) ማርክ ማድረግ</p>
+                <p><strong>⏱️ የይገባኛል ጥያቄ ሕግ፦</strong> ንድፍዎን ያጠናቀቀውን ቁጥር ተከትሎ ወዲያው “CLAIM BINGO!” ብለው መጫን አለብዎት።<br>
+                ❌ ዘግይቶ መጠየቅ (ቀጣዩ ቁጥር ከተጠራ በኋላ) የማይሠራ ነው።</p>
+                <p><strong>👥 በርካታ አሸናፊዎች፦</strong> ሽልማቱ በአንድ ቁጥር ላይ ቢንጎ ባገኙ ሁሉ በእኩል ይከፈላል።</p>
+            </div>
+            <button id="closeRulesBtn" class="btn-primary" style="width:100%; margin-top:16px;">ገባኝ</button>
+        </div>
+    </div>
 
-  socket.on('selectCardNumber', async (data) => {
-    if (!currentStake) return;
-    const room = getOrCreateRoom(currentStake);
-    if (room.status !== 'lobby') return;
+    <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="trophy">🏆</div><h2 id="winTitle">BINGO!</h2><div class="winners-list" id="winList"></div><div class="prize" id="winPrize"></div><button onclick="document.getElementById('winnerOverlay').classList.remove('active')" class="btn-primary">🎉 Continue</button></div></div>
 
-    let cardNumber, requestedStake;
-    if (typeof data === 'object') {
-      cardNumber = data.cardNumber;
-      requestedStake = data.stake;
-    } else {
-      cardNumber = data;
-      requestedStake = currentStake;
-    }
-    if (requestedStake !== currentStake) return;
+    <!-- STAKE SELECTION PAGE -->
+    <div id="stakePage" class="page">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h2 style="font-family:'Courier New', monospace; color:#b85c1a; font-size:1.8rem;">🎲 B·I·N·G·O</h2>
+            <div class="players-badge">DOT BINGO</div>
+        </div>
+        <h3 style="text-align:center; margin:20px 0 10px;">Choose Your Stake</h3>
+        <div class="stake-page-buttons">
+            <button id="stake10Btn" class="stake-option">10 ETB</button>
+            <button id="stake20Btn" class="stake-option">20 ETB</button>
+        </div>
+        <div class="rules-text">
+            <h4>🎯 Game Rules</h4>
+            <p><strong>💰 Entry fee:</strong> 10 ETB per card.</p>
+            <p><strong>🏆 Prize pool:</strong> 80% of total entry fees.</p>
+            <p><strong>🎯 Win conditions:</strong><br>
+            • Complete any horizontal row, vertical column, or main diagonal<br>
+            • OR mark all four corners</p>
+            <p><strong>⏱️ Claim rule:</strong> Press “CLAIM BINGO!” immediately after the winning number is called.</p>
+            <p><strong>👥 Multiple winners:</strong> Prize split equally.</p>
+        </div>
+    </div>
 
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < currentStake) {
-      socket.emit('cardSelectionFailed', `Insufficient balance. Need ${currentStake} ETB.`);
-      return;
-    }
+    <!-- LOBBY PAGE -->
+    <div id="lobbyPage" class="page hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h2 style="font-family:'Courier New', monospace; background: #b5571a; -webkit-background-clip: text; background-clip: text; color:#b85c1a; font-size:1.6rem;">🎲 B·I·N·G·O</h2>
+            <div class="players-badge">👥 <span id="playersCount">0</span></div>
+        </div>
+        <div class="balance-top">
+            <div style="font-weight:bold;">💰 BAL <b id="lobbyBalance">0</b> ETB</div>
+            <div style="display:flex; gap:8px;">
+                <button id="depositBtn" style="background:#6b4c2c; font-size:1rem; padding:6px 14px;">+Deposit</button>
+                <button id="withdrawBtn" style="background:#6b4c2c; font-size:1rem; padding:6px 14px;">-Withdraw</button>
+            </div>
+            <div class="timer-badge" id="lobbyTimer">30s</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin:8px 0; flex-wrap:wrap; gap:8px;">
+            <span>🎴 Pick card ID:</span>
+            <span>Selected: <span id="selectedNumber">-</span></span>
+            <button id="randomCardBtn" style="background:#b5642c; padding:6px 14px;">✨ Random Card</button>
+        </div>
+        <div id="numberGrid" class="grid-100"></div>
+        <div style="margin-top:8px;">🎴 Your Bingo Card Preview</div>
+        <div id="lobbyCardPreview" class="card-container"></div>
+        
+        <div class="tab-bar">
+            <button class="tab-btn active" data-page="lobby">🎮 Game</button>
+            <button class="tab-btn" data-page="history">📜 History</button>
+            <button class="tab-btn" data-page="wallet">💰 Wallet</button>
+            <button class="tab-btn" data-page="profile">👤 Profile</button>
+        </div>
+        
+        <button id="rulesBtn" class="rules-btn" style="margin-top:20px;">📜 Game Rules</button>
+    </div>
 
-    const num = Number(cardNumber);
-    if (!Number.isInteger(num) || num < 1 || num > 100) return;
-    if (room.takenCardNumbers.has(num)) {
-      socket.emit('cardSelectionFailed', 'Card number already taken.');
-      return;
-    }
+    <!-- HISTORY PAGE -->
+    <div id="historyPage" class="page hidden">
+        <div class="page-header">
+            <h2>📜 Game History</h2>
+            <button class="back-btn" id="backFromHistoryBtn">← Back to Lobby</button>
+        </div>
+        <div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div>
+        <h4 style="margin:15px 0 10px;">Recent Games</h4>
+        <div id="recentGamesList" class="recent-list"></div>
+    </div>
 
-    // Remove existing player entry
-    const existing = room.players.find(p => p.telegramId === socket.userId);
-    if (existing) {
-      room.takenCardNumbers.delete(existing.cardNumber);
-      room.players = room.players.filter(p => p.telegramId !== socket.userId);
-    }
+    <!-- WALLET PAGE -->
+    <div id="walletPage" class="page hidden">
+        <div class="page-header">
+            <h2>💰 My Wallet</h2>
+            <button class="back-btn" id="backFromWalletBtn">← Back to Lobby</button>
+        </div>
+        <div class="profile-stat">
+            <div>Current Balance</div>
+            <div style="font-size:2rem;" id="walletBalancePage">0</div>
+            <button id="depositFromWalletBtn" class="btn-primary" style="width:100%; margin-top:12px;">+ Deposit</button>
+            <button id="withdrawFromWalletBtn" class="btn-secondary" style="width:100%; margin-top:8px;">- Withdraw</button>
+        </div>
+    </div>
 
-    room.takenCardNumbers.add(num);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = {
-      socketId: socket.id,
-      telegramId: socket.userId,
-      username: socket.username,
-      card: room.cardSet[num - 1],
-      markedNumbers: [],
-      cardNumber: num,
-      ip: ip
-    };
-    room.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), stake: currentStake });
-    io.to(currentRoom).emit('cardTaken', { number: num, takenNumbers: Array.from(room.takenCardNumbers) });
-    io.to(currentRoom).emit('playersCount', room.players.length);
-    socket.emit('yourCard', player.card);
-  });
+    <!-- PROFILE PAGE -->
+    <div id="profilePage" class="page hidden">
+        <div class="page-header">
+            <h2>👤 My Profile</h2>
+            <button class="back-btn" id="backFromProfileBtn">← Back to Lobby</button>
+        </div>
+        <div class="profile-stat">
+            <div>Username</div>
+            <div><strong id="profileUsername">Player</strong></div>
+        </div>
+        <div class="profile-stat">
+            <div>💰 Balance</div>
+            <div style="font-size:1.8rem;" id="profileBalancePage">0</div>
+        </div>
+        <div class="profile-stat">
+            <div>🏆 Total Wins</div>
+            <div style="font-size:1.8rem;" id="profileTotalWins">0</div>
+        </div>
+        <div class="profile-stat">
+            <div>💵 Total Earned</div>
+            <div style="font-size:1.8rem;" id="profileTotalEarned">0</div>
+        </div>
+    </div>
 
-  socket.on('newCardNumber', async () => {
-    if (!currentStake) return;
-    const room = getOrCreateRoom(currentStake);
-    if (room.status !== 'lobby') return;
+    <!-- GAME PAGE -->
+    <div id="gamePage" class="page hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <h2 style="font-size:1.6rem; color:#bb651e;">⚡ BINGO</h2>
+            <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
+        </div>
+        <div style="background:#30251b; border-radius:40px; text-align:center; padding:6px; margin:6px 0;">
+            <span style="color:#eac67e; font-size:0.9rem;">🏆 PRIZE POOL</span>
+            <div id="winningBalance" style="font-size:1.6rem; font-weight:800; color:#f5bc70;">0 ETB</div>
+        </div>
+        <div class="last-call-area">
+            <div class="last-call-label">🎲 LAST CALL</div>
+            <div class="last-call-number" id="currentCall">0 - 75</div>
+            <div class="called-history" id="calledList">Called: —</div>
+        </div>
+        <div id="gameCard" class="card-container"></div>
+        <button id="bingoBtn" class="claim-bingo-btn">🏆 CLAIM BINGO! 🏆</button>
+        <button id="rulesBtnGame" class="rules-btn" style="width:100%; margin-top:8px;">📜 Game Rules</button>
+    </div>
 
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < currentStake) {
-      socket.emit('cardSelectionFailed', `Insufficient balance. Need ${currentStake} ETB.`);
-      return;
-    }
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        let socket, userCard = [], markedNumbers = [], isGameActive = false, lobbyTimerInterval = null, selectedCardNumber = null;
+        let depositAccounts = {}, selectedDepositType = null, selectedWithdrawType = null;
+        let lastWinAmount = 0;
+        let takenNumbers = new Set();
+        let currentBalance = 0;
 
-    const freeNumbers = [];
-    for (let i = 1; i <= 100; i++) if (!room.takenCardNumbers.has(i)) freeNumbers.push(i);
-    if (freeNumbers.length === 0) {
-      socket.emit('cardSelectionFailed', 'All numbers are taken.');
-      return;
-    }
-    const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
+        let totalGames = 0;
+        let totalWins = 0;
+        let totalEarned = 0;
+        let recentGames = [];
+        let currentGameId = null;
 
-    const existing = room.players.find(p => p.telegramId === socket.userId);
-    if (existing) {
-      room.takenCardNumbers.delete(existing.cardNumber);
-      room.players = room.players.filter(p => p.telegramId !== socket.userId);
-    }
+        function loadStats() {
+            try {
+                totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
+                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
+                totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0');
+                recentGames = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
+            } catch(e) {}
+            updateStatsUI();
+        }
+        function saveStats() {
+            localStorage.setItem('dot_bingo_total_games', totalGames);
+            localStorage.setItem('dot_bingo_total_wins', totalWins);
+            localStorage.setItem('dot_bingo_total_earned', totalEarned);
+            localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10)));
+        }
+        function updateStatsUI() {
+            document.getElementById('totalGamesCount').innerText = totalGames;
+            document.getElementById('profileTotalWins').innerText = totalWins;
+            document.getElementById('profileTotalEarned').innerText = totalEarned;
+            const recentDiv = document.getElementById('recentGamesList');
+            if (recentDiv) {
+                if (recentGames.length === 0) recentDiv.innerHTML = '<div class="game-history-card">No recent games</div>';
+                else {
+                    recentDiv.innerHTML = recentGames.map(g => `
+                        <div class="game-history-card">
+                            <div><strong>Game ${g.gameId}</strong> - ${g.date}</div>
+                            <div class="stat-row"><span>Result:</span> <strong style="color:${g.result === 'Win' ? '#2e7d32' : '#c62828'}">${g.result}</strong></div>
+                            <div class="stat-row"><span>Stake:</span> ${g.stake} ETB</div>
+                            <div class="stat-row"><span>Cards:</span> ${g.cards}</div>
+                            <div class="stat-row"><span>Prize:</span> ${g.prize} ETB</div>
+                            <div class="stat-row"><span>Winners:</span> ${g.winners}</div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+        function addGameRecord(win, prize, gameId, cardCount, winnerCount) {
+            totalGames++;
+            if (win) {
+                totalWins++;
+                totalEarned += prize;
+            }
+            recentGames.unshift({
+                gameId: gameId,
+                date: new Date().toLocaleString(),
+                result: win ? 'Win' : 'Lost',
+                stake: 10,
+                cards: cardCount,
+                prize: prize,
+                winners: winnerCount
+            });
+            if (recentGames.length > 10) recentGames.pop();
+            saveStats();
+            updateStatsUI();
+        }
 
-    room.takenCardNumbers.add(randomNum);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = {
-      socketId: socket.id,
-      telegramId: socket.userId,
-      username: socket.username,
-      card: room.cardSet[randomNum - 1],
-      markedNumbers: [],
-      cardNumber: randomNum,
-      ip: ip
-    };
-    room.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), stake: currentStake });
-    io.to(currentRoom).emit('cardTaken', { number: randomNum, takenNumbers: Array.from(room.takenCardNumbers) });
-    io.to(currentRoom).emit('playersCount', room.players.length);
-    socket.emit('yourCard', player.card);
-  });
+        const stakePage = document.getElementById('stakePage');
+        const lobbyPage = document.getElementById('lobbyPage');
+        const gamePage = document.getElementById('gamePage');
+        const historyPage = document.getElementById('historyPage');
+        const walletPage = document.getElementById('walletPage');
+        const profilePage = document.getElementById('profilePage');
+        const lobbyTimerEl = document.getElementById('lobbyTimer'), playersCountEl = document.getElementById('playersCount');
+        const lobbyBalanceEl = document.getElementById('lobbyBalance');
+        const gamePlayersCountEl = document.getElementById('gamePlayersCount'), winningBalanceEl = document.getElementById('winningBalance');
+        const currentCallEl = document.getElementById('currentCall'), calledListEl = document.getElementById('calledList');
+        const selectedNumberEl = document.getElementById('selectedNumber'), numberGrid = document.getElementById('numberGrid');
+        const lobbyCardPreview = document.getElementById('lobbyCardPreview');
 
-  socket.on('markNumber', (number) => {
-    if (!currentStake) return;
-    const room = getOrCreateRoom(currentStake);
-    if (room.status !== 'running') return;
-    const player = room.players.find(p => p.telegramId === socket.userId);
-    if (!player) return;
-    const num = Number(number);
-    if (number !== 'FREE' && (!Number.isInteger(num) || num < 1 || num > 75)) return;
-    const flat = player.card.flat();
-    if (!flat.includes(number)) return;
-    if (!room.calledNumbers.includes(num) && number !== 'FREE') return;
-    if (player.markedNumbers.includes(number)) return;
-    player.markedNumbers.push(number);
-    socket.emit('markedNumbers', player.markedNumbers);
-  });
+        function syncBalance(value) {
+            currentBalance = value;
+            lobbyBalanceEl.innerText = value;
+            if (document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText = value;
+            if (document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText = value;
+        }
 
-  socket.on('claimBingo', () => {
-    if (!currentStake) return;
-    const room = getOrCreateRoom(currentStake);
-    if (room.status !== 'running') return;
-    const player = room.players.find(p => p.telegramId === socket.userId);
-    if (!player) return;
-    const lastCalled = room.calledNumbers.length > 0 ? room.calledNumbers[room.calledNumbers.length - 1] : null;
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
-      socket.emit('invalidBingo');
-      Audit.bingoRejected(`stake_${currentStake}`, socket.userId, ip, { reason: 'invalid_bingo_call', lastCalled });
-      return;
-    }
-    if (room.winners.find(w => w.telegramId === socket.userId)) return;
-    if (room.winningNumber === null) room.winningNumber = lastCalled;
-    room.winners.push({ telegramId: socket.userId, username: socket.username });
-    Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), calledNumber: lastCalled });
-    socket.emit('bingoValid');
-    if (!room.bingoGraceTimeout && room.winners.length === 1) {
-      io.to(currentRoom).emit('multipleBingoPossible', { message: 'Bingo claimed! Waiting for other winners...' });
-      room.bingoGraceTimeout = setTimeout(() => room.endGameWithWinners(), 3000);
-    }
-  });
+        function renderCard(card, containerId, clickable = false) {
+            const cont = document.getElementById(containerId);
+            if(!cont) return;
+            cont.innerHTML = '';
+            const table = document.createElement('table');
+            table.style.borderCollapse = 'separate'; table.style.borderSpacing = '6px';
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            ['B', 'I', 'N', 'G', 'O'].forEach(l => { let th = document.createElement('th'); th.textContent = l; headerRow.appendChild(th); });
+            thead.appendChild(headerRow); table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            for(let r=0;r<5;r++) {
+                const tr = document.createElement('tr');
+                for(let c=0;c<5;c++) {
+                    const val = card[r][c];
+                    const td = document.createElement('td');
+                    td.textContent = val === 'FREE' ? '★' : val;
+                    if(val === 'FREE') td.classList.add('free');
+                    if(markedNumbers.includes(val)) td.classList.add('marked');
+                    if(clickable && val !== 'FREE') { td.style.cursor = 'pointer'; td.onclick = () => { if(isGameActive && socket) socket.emit('markNumber', val); }; }
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody); cont.appendChild(table);
+        }
 
-  socket.on('getBalance', async () => {
-    const u = await loadUser(socket.userId, socket.username);
-    socket.emit('balanceUpdate', u.balance);
-  });
+        function buildNumberGrid() {
+            numberGrid.innerHTML = '';
+            for(let i=1;i<=100;i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.number = i;
+                cell.textContent = i;
+                if(takenNumbers.has(i)) cell.classList.add('taken');
+                else cell.onclick = () => { if(!isGameActive && socket && !takenNumbers.has(i)) socket.emit('selectCardNumber', i); };
+                numberGrid.appendChild(cell);
+            }
+            if(selectedCardNumber) {
+                const sel = numberGrid.querySelector(`[data-number='${selectedCardNumber}']`);
+                if(sel) sel.classList.add('selected');
+            }
+        }
+        function updateGridWithTakenNumbers(nums) { takenNumbers = new Set(nums); buildNumberGrid(); }
+        function getBingoLetter(num) { if(num<=15) return 'B'; if(num<=30) return 'I'; if(num<=45) return 'N'; if(num<=60) return 'G'; return 'O'; }
+        function formatCall(num) { return `${getBingoLetter(num)}-${num}`; }
+        function popCall() { currentCallEl.classList.add('pop'); setTimeout(()=>currentCallEl.classList.remove('pop'),150); }
 
-  socket.on('disconnect', () => {
-    if (currentStake && gameRooms[currentStake]) {
-      const room = gameRooms[currentStake];
-      const idx = room.players.findIndex(p => p.socketId === socket.id);
-      if (idx !== -1) {
-        const removed = room.players[idx];
-        room.takenCardNumbers.delete(removed.cardNumber);
-        room.players.splice(idx, 1);
-        io.to(currentRoom).emit('cardTaken', { takenNumbers: Array.from(room.takenCardNumbers) });
-        io.to(currentRoom).emit('playersCount', room.players.length);
-      }
-    }
-  });
-});
+        function showLobby(timeLeft) {
+            stakePage.classList.add('hidden');
+            lobbyPage.classList.remove('hidden');
+            gamePage.classList.add('hidden');
+            historyPage.classList.add('hidden');
+            walletPage.classList.add('hidden');
+            profilePage.classList.add('hidden');
+            isGameActive = false;
+            markedNumbers = [];
+            if(socket) socket.emit('getBalance');
+            startTimer(timeLeft || 30);
+            if(userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            updateStatsUI();
+        }
+        function showGame() {
+            lobbyPage.classList.add('hidden');
+            gamePage.classList.remove('hidden');
+            isGameActive = true;
+            clearInterval(lobbyTimerInterval);
+            if(socket) socket.emit('getBalance');
+            if(userCard.length) renderCard(userCard, 'gameCard', true);
+        }
+        function startTimer(seconds) {
+            let left = seconds;
+            lobbyTimerEl.textContent = left+'s';
+            clearInterval(lobbyTimerInterval);
+            lobbyTimerInterval = setInterval(() => {
+                left--;
+                if(left <= 0) { clearInterval(lobbyTimerInterval); showGame(); }
+                else lobbyTimerEl.textContent = left+'s';
+            },1000);
+        }
 
-// Bingo helper functions
-function getLines(card) {
-  const lines = [];
-  for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
-  for (let c = 0; c < 5; c++) lines.push([card[0][c], card[1][c], card[2][c], card[3][c], card[4][c]]);
-  lines.push([card[0][0], card[1][1], card[2][2], card[3][3], card[4][4]]);
-  lines.push([card[0][4], card[1][3], card[2][2], card[3][1], card[4][0]]);
-  lines.push([card[0][0], card[0][4], card[4][0], card[4][4]]);
-  return lines;
-}
-function isLineComplete(line, marked) {
-  return line.every(val => val === 'FREE' || marked.includes(val));
-}
-function isBingoValidOnLastCall(card, marked, lastCalled) {
-  if (lastCalled === null) return false;
-  const lines = getLines(card);
-  for (const line of lines) {
-    if (!isLineComplete(line, marked)) continue;
-    if (!line.includes(lastCalled)) continue;
-    return true;
-  }
-  return false;
-}
+        async function loadDepositAccounts() { try { const res = await fetch('/api/deposit-accounts'); depositAccounts = await res.json(); } catch(e) {} }
+        function openDepositTypeModal() { document.getElementById('depositTypeModal').classList.add('active'); }
+        function closeDepositTypeModal() { document.getElementById('depositTypeModal').classList.remove('active'); }
+        function openDepositDetailsModal(type) {
+            selectedDepositType = type;
+            let acc = '', title = '', phoneHint = '';
+            if(type === 'telebirr') { title = 'Telebirr'; acc = depositAccounts.telebirr || '0924839730'; phoneHint = '09xxxxxxxx'; }
+            else if(type === 'cbebirr') { title = 'CBE Birr'; acc = depositAccounts.cbebirr || '1000123456789'; phoneHint = '09xxxxxxxx'; }
+            else { title = 'M-Pesa'; acc = depositAccounts.mpesa || '0712345678'; phoneHint = '07xxxxxxxx'; }
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
+            document.getElementById('depositAccountNumber').innerText = acc;
+            const phoneInput = document.getElementById('depositPlayerPhone');
+            phoneInput.placeholder = phoneHint;
+            phoneInput.value = '';
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositRef').value = '';
+            document.getElementById('depositProofImage').value = '';
+            document.getElementById('depositDetailsModal').classList.add('active');
+            closeDepositTypeModal();
+        }
+        async function submitDepositWithProof() {
+            const phone = document.getElementById('depositPlayerPhone').value.trim();
+            const amount = document.getElementById('depositAmount').value.trim();
+            const file = document.getElementById('depositProofImage').files[0];
+            let phoneValid = false;
+            if(selectedDepositType === 'mpesa') {
+                phoneValid = /^07\d{8}$/.test(phone);
+                if(!phoneValid) return alert('Invalid M-Pesa number. Must start with 07 and have 10 digits');
+            } else if(selectedDepositType === 'telebirr' || selectedDepositType === 'cbebirr') {
+                phoneValid = /^09\d{8}$/.test(phone);
+                if(!phoneValid) return alert(`Invalid ${selectedDepositType} number. Must start with 09 and have 10 digits`);
+            }
+            if(!amount || isNaN(amount) || Number(amount) < 10) return alert('Minimum deposit 10 ETB');
+            if(!file) return alert('Please attach payment proof');
+            const fd = new FormData();
+            fd.append('phone', phone); fd.append('amount', amount); fd.append('payment_type', selectedDepositType); fd.append('proof', file);
+            const res = await fetch('/api/request-deposit', { method: 'POST', body: fd });
+            const data = await res.json();
+            alert(`✅ ${data.message || 'Deposit request submitted!'}`);
+            document.getElementById('depositDetailsModal').classList.remove('active');
+        }
+        function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active'); }
+        function openWithdrawDetailsModal(type) {
+            selectedWithdrawType = type;
+            let title = (type === 'telebirr' ? 'Telebirr' : type === 'cbebirr' ? 'CBE Birr' : 'M-Pesa');
+            let phoneHint = (type === 'mpesa') ? '07xxxxxxxx' : '09xxxxxxxx';
+            document.getElementById('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`;
+            const receiverInput = document.getElementById('withdrawReceiver');
+            receiverInput.placeholder = phoneHint;
+            receiverInput.value = '';
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('withdrawName').value = '';
+            document.getElementById('withdrawDetailsModal').classList.add('active');
+            document.getElementById('withdrawTypeModal').classList.remove('active');
+        }
+        async function submitWithdrawRequest() {
+            const receiver = document.getElementById('withdrawReceiver').value.trim();
+            const amount = document.getElementById('withdrawAmount').value.trim();
+            const name = document.getElementById('withdrawName').value.trim();
+            if(!name) return alert("Full name required");
+            if(!amount || isNaN(amount) || Number(amount) < 20) return alert('Minimum withdrawal 20 ETB');
+            let receiverValid = false;
+            if(selectedWithdrawType === 'mpesa') {
+                receiverValid = /^07\d{8}$/.test(receiver);
+                if(!receiverValid) return alert('Invalid M-Pesa number. Must start with 07 and have 10 digits');
+            } else if(selectedWithdrawType === 'telebirr' || selectedWithdrawType === 'cbebirr') {
+                receiverValid = /^09\d{8}$/.test(receiver);
+                if(!receiverValid) return alert(`Invalid ${selectedWithdrawType} number. Must start with 09 and have 10 digits`);
+            }
+            const res = await fetch('/api/request-withdraw', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount, phone: receiver, withdrawal_type: selectedWithdrawType, name })
+            });
+            const data = await res.json();
+            alert(`💸 ${data.message || 'Withdrawal request submitted!'}`);
+            document.getElementById('withdrawDetailsModal').classList.remove('active');
+        }
 
-// Admin endpoints (keep your existing ones)
-// ... (include all admin endpoints from your original server)
+        function showWinnerOverlay(data) {
+            if(data.noWinner) { alert('No winner this round.'); return; }
+            const prize = data.prizeEach || data.totalPrize || 0;
+            lastWinAmount = prize;
+            document.getElementById('winTitle').innerHTML = (data.winners?.length > 1 ? `${data.winners.length} Winners!` : '🎉 BINGO!');
+            document.getElementById('winList').innerHTML = (data.winners || [data.winner]).join(', ');
+            document.getElementById('winPrize').innerHTML = prize + ' ETB';
+            document.getElementById('winnerOverlay').classList.add('active');
+            const confDiv = document.createElement('div'); confDiv.className = 'confetti';
+            for(let i=0;i<80;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*360},80%,60%)`; confDiv.appendChild(p); }
+            document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),3500);
+            if (currentGameId) {
+                addGameRecord(true, prize, currentGameId, 1, data.winners?.length || 1);
+            }
+        }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
+        async function connect() {
+            const initData = tg.initData;
+            if(!initData){ alert('Open inside Telegram'); return; }
+            try { const res = await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})}); const data = await res.json(); if(!data.success) { alert('Auth failed'); return; } 
+                document.getElementById('profileUsername').innerText = data.username || 'Player';
+            } catch(e) { alert('Network error'); return; }
+            socket = io();
+            socket.on('connect',()=>{ socket.emit('joinLobby'); });
+            socket.on('balanceUpdate', bal => { syncBalance(bal); });
+            socket.on('lobbyState', state => { showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) playersCountEl.innerText = state.playersCount; });
+            socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
+            socket.on('cardTaken', data => { updateGridWithTakenNumbers(data.takenNumbers); selectedCardNumber=null; selectedNumberEl.textContent='-'; });
+            socket.on('cardSelectionFailed', msg => alert(msg));
+            socket.on('playersCount', c => { playersCountEl.innerText=c; if(gamePlayersCountEl) gamePlayersCountEl.innerText=c; const prize=Math.floor(c*10*0.8); winningBalanceEl.innerText=prize; });
+            socket.on('gameStarted', data => { if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); 
+                currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
+            });
+            socket.on('numberCalled', data => { currentCallEl.innerText = formatCall(data.number); popCall(); const list = (data.calledNumbers || []).map(n=>formatCall(n)); calledListEl.innerText = 'Called: '+list.join(', '); });
+            socket.on('calledNumbers', called => { const list = called.map(n=>formatCall(n)); calledListEl.innerText = 'Called: '+list.join(', '); });
+            socket.on('markedNumbers', nums => { markedNumbers = nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
+            socket.on('gameEnded', (data) => {
+                if (data.winningNumber) {
+                    const winningFormatted = formatCall(data.winningNumber);
+                    document.getElementById('currentCall').innerText = winningFormatted;
+                }
+                showWinnerOverlay(data);
+                if (data.noWinner && currentGameId) {
+                    addGameRecord(false, 0, currentGameId, 0, 0);
+                }
+                currentGameId = null;
+            });
+            socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
+            socket.on('depositStatus', data => { if(data.status==='approved') alert(`✅ Deposit +${data.amount} ETB approved!`); else alert('❌ Deposit rejected.'); });
+            socket.on('withdrawStatus', data => { if(data.status==='approved') alert(`✅ Withdrawal -${data.amount} ETB processed.`); else alert('❌ Withdrawal rejected.'); });
+        }
+
+        document.getElementById('stake10Btn')?.addEventListener('click', () => {
+            alert('You selected 10 ETB stake. Game entry is 10 ETB.');
+            loadStats();
+            showLobby(30);
+        });
+        document.getElementById('stake20Btn')?.addEventListener('click', () => {
+            alert('20 ETB stake is coming soon! Currently using 10 ETB entry fee.');
+            loadStats();
+            showLobby(30);
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const pageName = btn.getAttribute('data-page');
+                if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+                if (pageName === 'lobby') {
+                    showLobby(parseInt(lobbyTimerEl.textContent) || 30);
+                } else if (pageName === 'history') {
+                    lobbyPage.classList.add('hidden');
+                    historyPage.classList.remove('hidden');
+                } else if (pageName === 'wallet') {
+                    lobbyPage.classList.add('hidden');
+                    walletPage.classList.remove('hidden');
+                    syncBalance(currentBalance);
+                } else if (pageName === 'profile') {
+                    lobbyPage.classList.add('hidden');
+                    profilePage.classList.remove('hidden');
+                    syncBalance(currentBalance);
+                    updateStatsUI();
+                }
+            });
+        });
+        document.getElementById('backFromHistoryBtn')?.addEventListener('click', () => { showLobby(30); });
+        document.getElementById('backFromWalletBtn')?.addEventListener('click', () => { showLobby(30); });
+        document.getElementById('backFromProfileBtn')?.addEventListener('click', () => { showLobby(30); });
+        document.getElementById('depositFromWalletBtn')?.addEventListener('click', openDepositTypeModal);
+        document.getElementById('withdrawFromWalletBtn')?.addEventListener('click', openWithdrawTypeModal);
+        document.getElementById('depositBtn')?.addEventListener('click', openDepositTypeModal);
+        document.getElementById('withdrawBtn')?.addEventListener('click', openWithdrawTypeModal);
+        document.getElementById('randomCardBtn')?.addEventListener('click', () => { if(!isGameActive && socket) socket.emit('newCardNumber'); });
+        document.getElementById('bingoBtn')?.addEventListener('click', () => { if(socket && isGameActive) socket.emit('claimBingo'); });
+        document.querySelectorAll('#depositTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click',()=>openDepositDetailsModal(btn.dataset.type)));
+        document.getElementById('closeDepositTypeBtn')?.addEventListener('click',closeDepositTypeModal);
+        document.getElementById('backDepositBtn')?.addEventListener('click',()=>{ document.getElementById('depositDetailsModal').classList.remove('active'); openDepositTypeModal(); });
+        document.getElementById('submitDepositBtn')?.addEventListener('click',submitDepositWithProof);
+        document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click',()=>openWithdrawDetailsModal(btn.dataset.type)));
+        document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click',()=>document.getElementById('withdrawTypeModal').classList.remove('active'));
+        document.getElementById('backWithdrawBtn')?.addEventListener('click',()=>{ document.getElementById('withdrawDetailsModal').classList.remove('active'); openWithdrawTypeModal(); });
+        document.getElementById('submitWithdrawBtn')?.addEventListener('click',submitWithdrawRequest);
+        
+        // Rules buttons open the modal
+        const rulesModal = document.getElementById('rulesModal');
+        const closeRulesBtn = document.getElementById('closeRulesBtn');
+        document.getElementById('rulesBtn')?.addEventListener('click',() => rulesModal.classList.add('active'));
+        document.getElementById('rulesBtnGame')?.addEventListener('click',() => rulesModal.classList.add('active'));
+        closeRulesBtn?.addEventListener('click',() => rulesModal.classList.remove('active'));
+        
+        loadDepositAccounts();
+        buildNumberGrid();
+        loadStats();
+        connect();
+        stakePage.classList.remove('hidden');
+        lobbyPage.classList.add('hidden');
+        gamePage.classList.add('hidden');
+        historyPage.classList.add('hidden');
+        walletPage.classList.add('hidden');
+        profilePage.classList.add('hidden');
+    </script>
+</body>
+</html>
