@@ -162,25 +162,25 @@
             flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             background: #ffffffdd;
             backdrop-filter: blur(4px);
-            padding: 6px 14px;
+            padding: 6px 12px;
             border-radius: 60px;
             margin-bottom: 16px;
             border: 1px solid #fed7aa;
             box-shadow: 0 2px 6px rgba(0,0,0,0.02);
         }
         .game-top-bar div:first-child {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 600;
             background: #fef3c7;
-            padding: 4px 10px;
+            padding: 4px 8px;
             border-radius: 40px;
         }
         .game-top-bar button {
             font-size: 0.7rem;
-            padding: 5px 12px;
+            padding: 4px 10px;
         }
 
         .players-badge {
@@ -493,6 +493,14 @@
             to { transform: translateY(100vh) rotate(360deg); opacity: 0; }
         }
 
+        /* mute button style */
+        .mute-btn {
+            background: #334155 !important;
+            font-size: 1rem !important;
+            padding: 4px 10px !important;
+            min-width: 44px;
+        }
+
         /* modals */
         .modal {
             position: fixed;
@@ -630,12 +638,14 @@
             .winner-card { padding: 20px 16px; width: 92%; }
             .winner-title { font-size: 1.6rem; }
             .prize-number { font-size: 1.8rem; }
+            .game-top-bar { gap: 6px; }
+            .mute-btn { padding: 4px 8px !important; font-size: 0.9rem !important; }
         }
     </style>
 </head>
 <body>
 
-    <!-- MODALS (unchanged, Amharic rules preserved) -->
+    <!-- MODALS (unchanged) -->
     <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title">Deposit</div><div class="bank-sub">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;">Cancel</button></div></div>
     <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub">Send payment & attach proof</div></div></div><div class="account-card"><div class="account-label">RECIPIENT ACCOUNT</div><div class="account-number" id="depositAccountNumber">0924839730</div><div class="account-label" style="margin-top:8px;">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label>📞 Your Mobile Number</label><input type="tel" id="depositPlayerPhone" placeholder="" required></div><div class="input-group"><label>💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="input-group"><label>🧾 Transaction ID (optional)</label><input type="text" id="depositRef" placeholder="e.g., TRX123456"></div><div class="input-group"><label class="file-label" for="depositProofImage">📎 Attach Screenshot / Proof</label><input type="file" id="depositProofImage" accept="image/*" capture="environment" style="display:none;"></div><div class="transaction-summary">💡 After sending, submit proof. Funds added after manual verification.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary">✔ Submit Request</button><button id="backDepositBtn" class="btn-secondary">← Back</button></div></div></div>
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title">Withdraw Funds</div><div class="bank-sub">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn">Cancel</button></div></div>
@@ -656,8 +666,8 @@
     <div id="walletPage" class="page hidden"><div class="page-header"><h2>💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn">← Back</button></div><div class="profile-stat"><div>Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" style="margin-top:12px;">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" style="margin-top:8px;">- Withdraw</button></div></div>
     <div id="profilePage" class="page hidden"><div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div><div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div><div class="profile-stat"><div>🏆 Total Wins</div><div id="profileTotalWins">0</div></div><div class="profile-stat"><div>💵 Total Earned</div><div id="profileTotalEarned">0</div></div></div>
 
-    <!-- GAME PAGE (compact) -->
-    <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2 style="font-weight:800; color:#ea580c; font-size:1.4rem;">⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div style="font-weight:600;">💰 <span id="gameBalanceDisplay">0</span> ETB</div><div style="display:flex; gap:6px;"><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white; font-size:0.7rem;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white; font-size:0.7rem;">-Withdraw</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px; font-size:0.7rem;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar" style="margin-top: 20px;"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
+    <!-- GAME PAGE (with mute button) -->
+    <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2 style="font-weight:800; color:#ea580c; font-size:1.4rem;">⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div style="font-weight:600;">💰 <span id="gameBalanceDisplay">0</span> ETB</div><div style="display:flex; gap:6px;"><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white; font-size:0.7rem;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white; font-size:0.7rem;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn" style="background:#334155; border:none; border-radius:40px; color:white;">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px; font-size:0.7rem;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar" style="margin-top: 20px;"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -669,8 +679,34 @@
         let totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
         let currentMainPage = 'lobby';
         let currentUtterance = null;
+        let soundMuted = false;
 
-        // --- Amharic letter mapping and number speech ---
+        // load mute preference
+        try {
+            const savedMute = localStorage.getItem('dot_bingo_sound_muted');
+            if (savedMute === 'true') soundMuted = true;
+        } catch(e) {}
+
+        // update mute button UI
+        function updateMuteButton() {
+            const btn = document.getElementById('muteToggleBtn');
+            if (btn) {
+                btn.textContent = soundMuted ? '🔇' : '🔊';
+                btn.style.background = soundMuted ? '#1e293b' : '#f97316';
+            }
+        }
+
+        function toggleMute() {
+            soundMuted = !soundMuted;
+            localStorage.setItem('dot_bingo_sound_muted', soundMuted);
+            updateMuteButton();
+            if (soundMuted && currentUtterance) {
+                window.speechSynthesis.cancel();
+                currentUtterance = null;
+            }
+        }
+
+        // Amharic letter mapping and number speech
         function getBingoLetterAmharic(num) {
             if (num <= 15) return "ቢ";       // B
             if (num <= 30) return "አይ";      // I
@@ -697,10 +733,11 @@
         }
 
         function speakAmharicNumberWithLetter(number) {
+            if (soundMuted) return;
             if (number < 1 || number > 75) return;
             const letterAmh = getBingoLetterAmharic(number);
             const numberWord = getAmharicNumberWord(number);
-            const fullText = `${letterAmh} ${numberWord}`; // e.g., "አይ ሃያ ሶስት"
+            const fullText = `${letterAmh} ${numberWord}`;
             if (window.speechSynthesis) {
                 if (currentUtterance) {
                     window.speechSynthesis.cancel();
@@ -766,6 +803,7 @@
         document.getElementById('stake10Btn')?.addEventListener('click',()=>{ alert('10 ETB stake selected'); loadStats(); showLobby(30); });
         document.getElementById('randomCardBtn')?.addEventListener('click',()=>{ if(!isGameActive && socket) socket.emit('newCardNumber'); });
         document.getElementById('bingoBtn')?.addEventListener('click',()=>{ if(socket && isGameActive) socket.emit('claimBingo'); });
+        document.getElementById('muteToggleBtn')?.addEventListener('click', toggleMute);
         document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ const page=btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if(page==='lobby'){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); } else{ if(currentMainPage==='lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if(page==='history') historyPage.classList.remove('hidden'); else if(page==='wallet'){ walletPage.classList.remove('hidden'); syncBalance(currentBalance); } else if(page==='profile'){ profilePage.classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); } } }); });
         document.getElementById('backFromHistoryBtn')?.addEventListener('click',goBackToMain);
         document.getElementById('backFromWalletBtn')?.addEventListener('click',goBackToMain);
@@ -787,6 +825,7 @@
         document.getElementById('rulesBtnGame')?.addEventListener('click',()=>rulesModal.classList.add('active'));
         closeRules?.addEventListener('click',()=>rulesModal.classList.remove('active'));
         loadDepositAccounts(); buildNumberGrid(); loadStats(); connect();
+        updateMuteButton();
         stakePage.classList.remove('hidden');
     </script>
 </body>
