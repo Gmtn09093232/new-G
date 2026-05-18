@@ -181,56 +181,19 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 });
 
 // ---------- Admin add balance ----------
-app.post('/admin/add-balance', async (req, res) => {
+  app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-
+  const strId = String(telegramId);
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-
-  let userIdField = 'telegram_id';
-  let userIdentifier = String(telegramId).trim();
-  let actualId = userIdentifier;
-
-  // 👇 NEW: support @username
-  if (userIdentifier.startsWith('@')) {
-    const usernameRaw = userIdentifier.substring(1);
-    // lookup user by username column
-    const { data: userByUsername, error: lookupErr } = await supabase
-      .from('users')
-      .select('telegram_id')
-      .eq('username', usernameRaw)
-      .maybeSingle();
-
-    if (lookupErr || !userByUsername) {
-      return res.status(404).json({ error: `User with username ${userIdentifier} not found` });
-    }
-    actualId = String(userByUsername.telegram_id);
-    userIdField = 'telegram_id';
-  } else if (!/^\d+$/.test(userIdentifier)) {
-    return res.status(400).json({ error: 'Invalid input. Use numeric Telegram ID or @username' });
-  }
-
-  // now load user using the resolved telegram_id
-  const user = await loadUser(actualId, 'unknown');
-  if (!user) {
-    return res.status(404).json({ error: `User ${actualId} not found` });
-  }
-
+  const user = await loadUser(strId, 'unknown');
   user.balance += amt;
-  await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', actualId);
-
-  Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, {
-    targetUserId: actualId,
-    originalInput: telegramId,
-    amount: amt,
-    newBalance: user.balance
-  });
-
+  await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
+  Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
   const sockets = await io.fetchSockets();
-  const playerSocket = sockets.find(s => s.userId === actualId);
+  const playerSocket = sockets.find(s => s.userId === strId);
   if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
-
   res.json({ success: true, newBalance: user.balance });
 });
 
