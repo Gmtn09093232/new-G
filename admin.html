@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>🎰 Bingo Admin Panel | Username Balance Add</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎰 Bingo Admin Panel</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
@@ -16,15 +16,13 @@
       margin: 0;
     }
     .container { max-width: 1400px; margin: auto; }
-    h1 { color: #f39c12; font-size: 1.8rem; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    h1 small { font-size: 0.8rem; background: #1e2a36; padding: 4px 12px; border-radius: 40px; font-weight: normal; }
+    h1 { color: #f39c12; font-size: 1.8rem; }
     .section {
       background: #16202a;
       margin: 20px 0;
       padding: 20px;
       border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
     .request-card {
       background: #1e2a36;
@@ -36,8 +34,6 @@
       gap: 15px;
       align-items: flex-start;
       justify-content: space-between;
-      transition: 0.1s ease;
-      border-left: 4px solid #f39c12;
     }
     .request-info { flex: 1 1 65%; min-width: 250px; }
     .request-info p { margin: 5px 0; word-break: break-word; }
@@ -48,7 +44,6 @@
       border-radius: 8px;
       border: 1px solid #f39c12;
       margin-top: 8px;
-      cursor: pointer;
     }
     button {
       background: #f39c12;
@@ -59,12 +54,11 @@
       cursor: pointer;
       margin: 5px 0;
       font-size: 0.9rem;
-      transition: 0.1s;
+      white-space: nowrap;
     }
-    button:hover { filter: brightness(0.95); transform: scale(0.98); }
     button.approve { background: #2ecc71; color: #000; }
     button.reject { background: #e74c3c; color: #fff; }
-    button.refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
+    .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
     .receipt-box {
       background: #0f1a24;
       padding: 10px;
@@ -100,41 +94,7 @@
       gap: 8px;
       align-items: center;
     }
-    /* Balance add styling - username friendly */
-    .balance-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: flex-end;
-      background: #0f1a24;
-      padding: 16px;
-      border-radius: 20px;
-      margin-top: 8px;
-    }
-    .balance-field {
-      flex: 1 1 200px;
-    }
-    .balance-field label {
-      display: block;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #aaa;
-      margin-bottom: 4px;
-    }
-    .balance-field input {
-      width: 100%;
-      margin: 0;
-    }
-    .info-badge {
-      background: #f39c1222;
-      border-radius: 20px;
-      padding: 6px 12px;
-      font-size: 0.75rem;
-      display: inline-block;
-      color: #ffd966;
-      margin-top: 6px;
-    }
+    /* Mobile optimisations */
     @media (max-width: 600px) {
       body { padding: 8px; }
       h1 { font-size: 1.4rem; }
@@ -142,10 +102,20 @@
       .request-card { flex-direction: column; }
       .request-info { width: 100%; }
       .action-buttons { width: 100%; justify-content: flex-start; }
-      button { padding: 10px 16px; font-size: 0.85rem; width: auto; flex: 1 1 auto; }
+      button {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        width: auto;
+        flex: 1 1 auto;
+      }
       .refresh { width: 100%; }
-      .balance-group { flex-direction: column; align-items: stretch; }
-      .balance-field { width: 100%; }
+      #addBalanceSection input {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      #addBalanceSection button {
+        width: 100%;
+      }
       select, input { width: 100%; margin-right: 0; }
       .filter-row { flex-direction: column; align-items: flex-start; }
       .proof-img { max-width: 100%; max-height: 150px; }
@@ -154,10 +124,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>
-    🎰 Bingo Admin Panel 
-    <small>⚡ manual balance via @username or ID</small>
-  </h1>
+  <h1>🎰 Bingo Admin Panel <a href="audit.html" class="nav-link"></a></h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <!-- Deposit Section -->
@@ -190,31 +157,17 @@
     <div id="withdrawList">Loading...</div>
   </div>
 
-  <!-- MANUAL ADD BALANCE - UPDATED to accept Telegram Username (e.g., @giziemelkamu129) -->
   <div class="section" id="addBalanceSection">
-    <h2>➕ Manual Add Balance (Username or ID)</h2>
-    <div class="balance-group">
-      <div class="balance-field">
-        <label>👤 TELEGRAM USERNAME or ID</label>
-        <input type="text" id="userId" placeholder="@username  or  123456789" value="">
-        <div class="info-badge">✨ Supports @username like @giziemelkamu129  OR numeric ID</div>
-      </div>
-      <div class="balance-field">
-        <label>💰 AMOUNT (ETB)</label>
-        <input type="number" id="amount" placeholder="Amount in Birr" step="1" min="1">
-      </div>
-      <div class="balance-field">
-        <label>&nbsp;</label>
-        <button onclick="addBalance()" style="background:#2ecc71; color:#000; width:100%;">➕ Add Balance</button>
-      </div>
-    </div>
-    <div id="balanceFeedback" style="font-size:0.85rem; margin-top:8px; color:#aaa;"></div>
+    <h2>➕ Manual Add Balance</h2>
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)">
+    <input type="number" id="amount" placeholder="Amount">
+    <button onclick="addBalance()">Add Balance</button>
   </div>
 </div>
 
 <script>
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
-  const API_BASE = '';   // relative URLs, backend endpoints assumed
+  const API_BASE = '';
 
   // ---------- QR Code scanning ----------
   function extractRefFromQR(imageSrc) {
@@ -278,9 +231,9 @@
       case 'telebirr':
         return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
       case 'cbebirr':
-        return `https://cbebirr.com/verify?txn=${ref}`;
+        return `https://cbebirr.com/verify?txn=${ref}`; // replace with real URL
       case 'mpesa':
-        return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+        return `https://mpesa.ethiotelecom.et/transaction/${ref}`; // replace with real URL
       default:
         return null;
     }
@@ -304,7 +257,7 @@
       renderDeposits();
     } catch (err) {
       console.error(err);
-      document.getElementById('depositList').innerHTML = '<p>⚠️ Error loading deposits. Check backend.</p>';
+      document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
     }
   }
 
@@ -328,6 +281,7 @@
         ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
         : '';
 
+      // Verification link from submitted reference
       let verifyLinkHtml = '';
       if (submittedRef) {
         const link = getVerificationLink(req.payment_type, submittedRef);
@@ -339,7 +293,7 @@
       card.innerHTML = `
         <div class="request-info">
           <p><strong>ID:</strong> ${req.id}</p>
-          <p><strong>User:</strong> ${escapeHtml(req.username || 'N/A')} (${req.telegram_id || '?'})</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
           <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
           <p><strong>Amount:</strong> ${req.amount} ETB</p>
           <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
@@ -347,7 +301,7 @@
           ${verifyLinkHtml}
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
           ${req.proof_path
-            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)" alt="proof">`
+            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">`
             : '<p>No proof</p>'}
           <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
         </div>
@@ -374,7 +328,7 @@
             }
             verifyDiv.innerHTML = `
               <strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br>
-              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt link</a>
+              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt</a>
             `;
           } else {
             verifyDiv.innerHTML = '❌ Could not read reference from image.';
@@ -398,7 +352,7 @@
       renderWithdrawals();
     } catch (err) {
       console.error(err);
-      document.getElementById('withdrawList').innerHTML = '<p>⚠️ Error loading withdrawals</p>';
+      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
     }
   }
 
@@ -416,9 +370,9 @@
       <div class="request-card">
         <div class="request-info">
           <p><strong>ID:</strong> ${req.id}</p>
-          <p><strong>User:</strong> ${escapeHtml(req.username || 'N/A')} (${req.telegram_id || '?'})</p>
-          <p><strong>Phone:</strong> ${escapeHtml(req.phone_number || 'N/A')}</p>
-          <p><strong>Name:</strong> ${escapeHtml(req.receiver_name || 'N/A')}</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${req.phone_number}</p>
+          <p><strong>Name:</strong> ${req.receiver_name || 'N/A'}</p>
           <p><strong>Amount:</strong> ${req.amount} ETB</p>
           <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
@@ -459,87 +413,23 @@
     } catch (err) { alert(err.message); }
   }
 
-  // ========== UPDATED addBalance with TELEGRAM USERNAME support ==========
-  // This function now accepts both numeric Telegram ID AND @username format.
-  // The backend endpoint expects 'telegramId' field. Since the requirement 
-  // is to support username like @giziemelkamu129, we send the username as-is.
-  // The backend must be able to resolve username -> ID or handle lookup.
-  // No other changes in frontend logic, fully compatible with original endpoint.
   async function addBalance() {
-    const userInput = document.getElementById('userId').value.trim();
-    const amountRaw = document.getElementById('amount').value.trim();
-    const feedbackDiv = document.getElementById('balanceFeedback');
-    
-    if (!userInput) {
-      alert('❌ Please enter Telegram username (starting with @) or numeric ID');
-      return;
-    }
-    if (!amountRaw) {
-      alert('❌ Please enter amount in ETB');
-      return;
-    }
-    const amountNum = Number(amountRaw);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      alert('❌ Amount must be a positive number');
-      return;
-    }
-
-    // keep exact user input: can be "@giziemelkamu129" or "123456789"
-    const telegramIdentifier = userInput;
-    
-    // Optional UI feedback
-    feedbackDiv.innerHTML = '⏳ Processing balance addition...';
-    
+    const telegramId = document.getElementById('userId').value.trim();
+    const amount = document.getElementById('amount').value.trim();
+    if (!telegramId || !amount) { alert('Fill all fields'); return; }
     try {
       const res = await fetch(`${API_BASE}/admin/add-balance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          secret: ADMIN_SECRET, 
-          telegramId: telegramIdentifier,   // field name remains 'telegramId' but now can be username
-          amount: amountNum 
-        })
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) })
       });
-      
       const data = await res.json();
-      if (data.success) {
-        alert(`✅ Success: Added ${amountNum} ETB to ${telegramIdentifier}. New balance: ${data.newBalance ?? 'updated'}`);
-        feedbackDiv.innerHTML = `✅ Balance added! User: ${escapeHtml(telegramIdentifier)} | Amount: ${amountNum} ETB`;
-        document.getElementById('userId').value = '';
-        document.getElementById('amount').value = '';
-        // Refresh deposits/withdrawals to reflect updated user state (optional)
-        fetchAll();
-      } else {
-        alert(`❌ Failed: ${data.error || 'Unknown error'}`);
-        feedbackDiv.innerHTML = `❌ Error: ${escapeHtml(data.error || 'Could not add balance')}`;
-      }
-    } catch (err) {
-      console.error(err);
-      alert(`Network or server error: ${err.message}`);
-      feedbackDiv.innerHTML = `⚠️ Error: ${err.message}`;
-    } finally {
-      setTimeout(() => {
-        if (feedbackDiv.innerHTML.includes('Processing')) feedbackDiv.innerHTML = '';
-      }, 2000);
-    }
+      alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
+    } catch (err) { alert(err.message); }
   }
 
-  // small helper to prevent XSS
-  function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
-      if (m === '&') return '&amp;';
-      if (m === '<') return '&lt;';
-      if (m === '>') return '&gt;';
-      return m;
-    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-      return c;
-    });
-  }
-
-  // automatic refresh every 12 seconds
   fetchAll();
-  setInterval(fetchAll, 12000);
+  setInterval(fetchAll, 10000);
 </script>
 </body>
 </html>
