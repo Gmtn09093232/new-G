@@ -27,7 +27,7 @@
       width: 100%;
     }
 
-    /* glass header - matches admin */
+    /* glass header */
     .glass-header {
       background: rgba(18, 25, 45, 0.75);
       backdrop-filter: blur(12px);
@@ -86,7 +86,7 @@
       .back-link { justify-content: center; }
     }
 
-    /* summary cards - exactly like admin stat cards */
+    /* summary cards */
     .summary-grid {
       display: flex;
       flex-wrap: wrap;
@@ -121,76 +121,109 @@
       .summary-card { padding: 0.8rem 1.2rem; }
     }
 
-    /* filter panel - same as admin sections */
+    /* filter panel - STACKED for Room ID, User ID, Event Type */
     .filter-panel {
       background: rgba(18, 28, 40, 0.65);
       backdrop-filter: blur(12px);
       border-radius: 2rem;
-      padding: 1.5rem;
+      padding: 1.2rem 1.2rem;
       margin-bottom: 2rem;
       border: 1px solid rgba(243, 156, 18, 0.2);
     }
-    .filters {
+    .filter-title {
       display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 1rem;
+      font-weight: 600;
+      color: #f39c12;
+      font-size: 0.85rem;
     }
+    /* each filter group takes full width */
     .filter-group {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      flex: 1 1 180px;
+      gap: 4px;
+      margin-bottom: 12px;
+      width: 100%;
     }
     .filter-group label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       font-weight: 600;
       color: #f39c12;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
     .filter-group input, .filter-group select {
       background: #0f172ad9;
       border: 1px solid #2d3a4e;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 40px;
       color: #f0f3fa;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       transition: 0.2s;
       outline: none;
       font-family: inherit;
+      width: 100%;
     }
     .filter-group input:focus, .filter-group select:focus {
       border-color: #f39c12;
       box-shadow: 0 0 0 2px rgba(243,156,18,0.3);
     }
-    .search-btn {
-      background: linear-gradient(105deg, #f39c12, #e67e22);
+    /* date row: two fields side by side */
+    .date-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 8px 0 16px 0;
+    }
+    .date-row .filter-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+    .filter-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .search-btn, .reset-btn {
       border: none;
-      padding: 10px 28px;
+      padding: 8px 20px;
       border-radius: 40px;
       font-weight: 700;
-      color: #0a0f1c;
+      font-size: 0.8rem;
       cursor: pointer;
       transition: 0.2s;
-      font-size: 0.85rem;
       display: inline-flex;
       align-items: center;
       gap: 8px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
-    .search-btn:hover {
+    .search-btn {
+      background: linear-gradient(105deg, #f39c12, #e67e22);
+      color: #0a0f1c;
+    }
+    .reset-btn {
+      background: #2c3e66;
+      color: white;
+    }
+    .search-btn:hover, .reset-btn:hover {
       transform: translateY(-2px);
       filter: brightness(1.05);
       box-shadow: 0 8px 20px rgba(243,156,18,0.3);
     }
-    @media (max-width: 780px) {
-      .filters { flex-direction: column; }
-      .filter-group { width: 100%; }
-      .search-btn { justify-content: center; }
+    @media (max-width: 560px) {
+      .date-row { flex-direction: column; gap: 8px; }
+      .filter-actions { justify-content: stretch; }
+      .search-btn, .reset-btn { flex: 1; justify-content: center; }
     }
 
-    /* table wrapper - glass style */
+    /* table wrapper */
     .table-wrapper {
       background: rgba(12, 20, 30, 0.5);
       backdrop-filter: blur(8px);
@@ -219,16 +252,16 @@
     tr:hover td {
       background: rgba(26, 38, 51, 0.5);
     }
-    pre {
+    /* human-readable details */
+    .details-text {
       background: #03060ecc;
-      padding: 8px;
+      padding: 6px 10px;
       border-radius: 12px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      margin: 0;
+      font-size: 0.75rem;
       color: #ccddee;
+      line-height: 1.4;
+      word-break: break-word;
+      white-space: pre-wrap;
     }
     .badge-event {
       background: #2a3a4e;
@@ -258,16 +291,6 @@
       .badge-event { white-space: normal; font-size: 0.65rem; }
       .timestamp-cell { white-space: normal; }
     }
-    a {
-      color: #f39c12;
-      text-decoration: none;
-    }
-    .loader {
-      display: inline-block;
-      padding: 8px 16px;
-      background: #f39c1222;
-      border-radius: 2rem;
-    }
   </style>
 </head>
 <body>
@@ -293,48 +316,61 @@
     </div>
   </div>
 
-  <!-- Filter Panel -->
+  <!-- Filter Panel - STACKED layout: each filter on its own line -->
   <div class="filter-panel">
-    <div class="filters">
+    <div class="filter-title">
+      <span>🔎</span> Filter audit logs
+    </div>
+    
+    <!-- Room ID - separate line -->
+    <div class="filter-group">
+      <label>🏷️ ROOM ID</label>
+      <input type="text" id="filter-room" placeholder="e.g., global / room_123">
+    </div>
+    
+    <!-- User ID - separate line -->
+    <div class="filter-group">
+      <label>👤 USER ID (TELEGRAM)</label>
+      <input type="text" id="filter-user" placeholder="numeric ID">
+    </div>
+    
+    <!-- Event Type - separate line -->
+    <div class="filter-group">
+      <label>⚡ EVENT TYPE</label>
+      <select id="filter-event">
+        <option value="">All Events</option>
+        <option value="DEPOSIT_INITIATED">📥 Deposit Initiated</option>
+        <option value="DEPOSIT_COMPLETED">✅ Deposit Completed</option>
+        <option value="DEPOSIT_FAILED">❌ Deposit Failed</option>
+        <option value="WITHDRAWAL_REQUESTED">📤 Withdrawal Requested</option>
+        <option value="WITHDRAWAL_COMPLETED">💸 Withdrawal Completed</option>
+        <option value="WITHDRAWAL_REJECTED">🚫 Withdrawal Rejected</option>
+        <option value="BINGO_CALLED">🎯 Bingo Called</option>
+        <option value="BINGO_REJECTED">⚠️ Bingo Rejected</option>
+        <option value="WIN_PAID_OUT">🏆 Win Paid Out</option>
+        <option value="NUMBER_DRAWN">🔢 Number Drawn</option>
+        <option value="CARD_ASSIGNED">🃏 Card Assigned</option>
+        <option value="ADMIN_ADD_BALANCE">⚙️ Admin Add Balance</option>
+        <option value="SUSPICIOUS_BEHAVIOR_DETECTED">🚨 Suspicious Activity</option>
+      </select>
+    </div>
+    
+    <!-- Date range row (From / To side by side) -->
+    <div class="date-row">
       <div class="filter-group">
-        <label>🏷️ Room ID</label>
-        <input type="text" id="filter-room" placeholder="e.g., global / room_123">
-      </div>
-      <div class="filter-group">
-        <label>👤 User ID (Telegram)</label>
-        <input type="text" id="filter-user" placeholder="numeric ID">
-      </div>
-      <div class="filter-group">
-        <label>⚡ Event Type</label>
-        <select id="filter-event">
-          <option value="">All Events</option>
-          <option value="DEPOSIT_INITIATED">📥 Deposit Initiated</option>
-          <option value="DEPOSIT_COMPLETED">✅ Deposit Completed</option>
-          <option value="DEPOSIT_FAILED">❌ Deposit Failed</option>
-          <option value="WITHDRAWAL_REQUESTED">📤 Withdrawal Requested</option>
-          <option value="WITHDRAWAL_COMPLETED">💸 Withdrawal Completed</option>
-          <option value="WITHDRAWAL_REJECTED">🚫 Withdrawal Rejected</option>
-          <option value="BINGO_CALLED">🎯 Bingo Called</option>
-          <option value="BINGO_REJECTED">⚠️ Bingo Rejected</option>
-          <option value="WIN_PAID_OUT">🏆 Win Paid Out</option>
-          <option value="NUMBER_DRAWN">🔢 Number Drawn</option>
-          <option value="CARD_ASSIGNED">🃏 Card Assigned</option>
-          <option value="ADMIN_ADD_BALANCE">⚙️ Admin Add Balance</option>
-          <option value="SUSPICIOUS_BEHAVIOR_DETECTED">🚨 Suspicious Activity</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label>📅 From</label>
+        <label>📅 FROM</label>
         <input type="datetime-local" id="filter-from">
       </div>
       <div class="filter-group">
-        <label>📅 To</label>
+        <label>📅 TO</label>
         <input type="datetime-local" id="filter-to">
       </div>
-      <div class="filter-group" style="flex: 0 0 auto;">
-        <label>&nbsp;</label>
-        <button class="search-btn" onclick="loadAuditLogs()">🔎 Search Logs</button>
-      </div>
+    </div>
+    
+    <!-- Action buttons -->
+    <div class="filter-actions">
+      <button class="search-btn" onclick="loadAuditLogs()">🔎 Search Logs</button>
+      <button class="reset-btn" onclick="resetFilters()">⟳ Reset Filters</button>
     </div>
   </div>
 
@@ -348,7 +384,7 @@
           <th>🏷️ Room</th>
           <th>🆔 User ID</th>
           <th>🌐 IP Address</th>
-          <th>📄 Details (JSON)</th>
+          <th>📄 Details</th>
         </tr>
       </thead>
       <tbody id="audit-tbody">
@@ -395,7 +431,7 @@
     params.append('limit', '600');
 
     const tbody = document.getElementById('audit-tbody');
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="loader">⏳ Loading secure logs...</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">⏳ Loading secure logs...</td></tr>`;
 
     try {
       const res = await fetch(`${API_BASE}/admin/audit?${params}`);
@@ -405,6 +441,41 @@
     } catch (err) {
       tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:#e74c3c;">❌ Error: ${escapeHtml(err.message)}</td></tr>`;
     }
+  }
+
+  function resetFilters() {
+    document.getElementById('filter-room').value = '';
+    document.getElementById('filter-user').value = '';
+    document.getElementById('filter-event').value = '';
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    document.getElementById('filter-from').value = yesterday.toISOString().slice(0, 16);
+    document.getElementById('filter-to').value = now.toISOString().slice(0, 16);
+    loadAuditLogs();
+  }
+
+  // Convert JSON details to human-readable summary (no JSON)
+  function formatDetails(details) {
+    if (!details) return '—';
+    let text = '';
+    if (details.amount) text += `💰 Amount: ${details.amount} ETB · `;
+    if (details.payment_type) text += `🏦 Method: ${details.payment_type} · `;
+    if (details.withdrawal_type) text += `🏦 Type: ${details.withdrawal_type} · `;
+    if (details.reference_number) text += `🧾 Ref: ${details.reference_number} · `;
+    if (details.status) text += `📌 Status: ${details.status} · `;
+    if (details.reason) text += `⚠️ Reason: ${details.reason} · `;
+    if (details.room_id) text += `🏷️ Room: ${details.room_id} · `;
+    if (details.card_numbers) text += `🃏 Numbers: ${details.card_numbers} · `;
+    if (details.win_amount) text += `🏆 Win: ${details.win_amount} ETB · `;
+    if (details.balance_before !== undefined) text += `📊 Before: ${details.balance_before} → After: ${details.balance_after} · `;
+    if (details.admin_id) text += `👑 Admin: ${details.admin_id} · `;
+    if (details.ip_address) text += `🌐 IP: ${details.ip_address} · `;
+    if (details.message) text += `💬 ${details.message} · `;
+    if (text === '') {
+      const keys = Object.keys(details).slice(0, 4);
+      text = keys.map(k => `${k}: ${details[k]}`).join(' · ');
+    }
+    return text.replace(/ · $/, '');
   }
 
   function renderAuditTable(logs) {
@@ -420,6 +491,8 @@
       else if (eventTypeClean.includes('REJECT') || eventTypeClean.includes('FAILED')) badgeColor = '#e74c3c';
       else if (eventTypeClean.includes('SUSPICIOUS')) badgeColor = '#e67e22';
       else if (eventTypeClean.includes('WIN_PAID_OUT')) badgeColor = '#ffcc70';
+      
+      const detailsText = formatDetails(log.details);
       return `
         <tr>
           <td class="timestamp-cell">${new Date(log.timestamp).toLocaleString()}</td>
@@ -427,7 +500,7 @@
           <td>${log.room_id ? escapeHtml(log.room_id) : '—'}</td>
           <td style="font-family:monospace;">${log.user_id ? escapeHtml(log.user_id) : '—'}</td>
           <td class="ip-cell">${log.ip_address ? escapeHtml(log.ip_address) : '—'}</td>
-          <td><pre>${escapeJson(log.details)}</pre></td>
+          <td><div class="details-text">${escapeHtml(detailsText)}</div></td>
         </tr>
       `;
     }).join('');
@@ -436,16 +509,6 @@
   function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
-  }
-
-  function escapeJson(obj) {
-    if (!obj) return '{}';
-    try {
-      let str = JSON.stringify(obj, null, 2);
-      return escapeHtml(str);
-    } catch(e) {
-      return escapeHtml(String(obj));
-    }
   }
 
   window.addEventListener('DOMContentLoaded', () => {
