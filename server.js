@@ -250,10 +250,10 @@ function resetGame() {
   currentGame.winners = [];
   currentGame.bingoGraceTimeout = null;
   currentGame.winningNumber = null;   // reset winning number
-  currentGame.lobbyEndTime = Date.now() + 30000;
+  currentGame.lobbyEndTime = Date.now() + 45000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
-  io.emit('lobbyState', { startsIn: 30, takenNumbers: [], playersCount: 0 });
-  currentGame.lobbyTimer = setTimeout(() => startGame(), 30000);
+  io.emit('lobbyState', { startsIn: 45, takenNumbers: [], playersCount: 0 });
+  currentGame.lobbyTimer = setTimeout(() => startGame(), 45000);
 }
 
 async function startGame() {
