@@ -181,7 +181,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 });
 
 // ---------- Admin add balance ----------
-  app.post('/admin/add-balance', async (req, res) => {
+app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   const strId = String(telegramId);
@@ -235,7 +235,7 @@ const currentGame = {
   cardSet: Array.from({ length: 100 }, () => generateCard()),
   winners: [],
   bingoGraceTimeout: null,
-  winningNumber: null   // 👈 stores the last called number that triggered the win
+  winningNumber: null
 };
 
 function resetGame() {
@@ -249,7 +249,8 @@ function resetGame() {
   currentGame.prizePool = 0;
   currentGame.winners = [];
   currentGame.bingoGraceTimeout = null;
-  currentGame.winningNumber = null;   // reset winning number
+  currentGame.winningNumber = null;
+  // LOBBY TIMER IS NOW 45 SECONDS (was 30)
   currentGame.lobbyEndTime = Date.now() + 45000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
   io.emit('lobbyState', { startsIn: 45, takenNumbers: [], playersCount: 0 });
@@ -341,7 +342,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- End game with multiple winners (sends winningNumber) ----------
+// ---------- End game with multiple winners ----------
 async function endGameWithWinners() {
   currentGame.status = 'ended';
   clearInterval(currentGame.callInterval);
@@ -398,7 +399,7 @@ async function endGameWithWinners() {
       prizeEach,
       totalPrize: currentGame.prizePool,
       winnerCount: currentGame.winners.length,
-      winningNumber: currentGame.winningNumber   // 👈 send the exact winning number
+      winningNumber: currentGame.winningNumber
     });
   } else {
     io.emit('gameEnded', { noWinner: true });
@@ -527,7 +528,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- AUDIT ENDPOINTS (unchanged) ----------
+// ---------- AUDIT ENDPOINTS ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -639,7 +640,6 @@ io.on('connection', async (socket) => {
     socket.emit('markedNumbers', player.markedNumbers);
   });
 
-  // ---------- Bingo claim with winning number storage ----------
   socket.on('claimBingo', () => {
     if (currentGame.status !== 'running') return;
     const player = currentGame.players.find(p => p.telegramId === socket.userId);
@@ -652,7 +652,6 @@ io.on('connection', async (socket) => {
       return;
     }
     if (currentGame.winners.find(w => w.telegramId === socket.userId)) return;
-    // 👇 Store the winning number (the last called number) if not already set
     if (currentGame.winningNumber === null) {
       currentGame.winningNumber = lastCalled;
     }
