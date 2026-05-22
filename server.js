@@ -134,7 +134,7 @@ app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html'))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 
-// ---------- NEW: Admin live players page (protected by secret) ----------
+// ---------- Admin live players page (protected by secret) ----------
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) {
@@ -248,7 +248,7 @@ const currentGame = {
   winningNumber: null
 };
 
-// ---------- NEW: Helper to get sanitized player list for admin ----------
+// ---------- Helper to get sanitized player list for admin ----------
 function getPlayersList() {
   return currentGame.players.map(p => ({
     telegramId: p.telegramId,
@@ -257,7 +257,7 @@ function getPlayersList() {
   }));
 }
 
-// ---------- NEW: Broadcast live players & status to all admin clients ----------
+// ---------- Broadcast live players & status to all admin clients ----------
 function notifyAdminClients() {
   const data = {
     players: getPlayersList(),
@@ -283,7 +283,7 @@ function resetGame() {
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
   io.emit('lobbyState', { startsIn: 45, takenNumbers: [], playersCount: 0 });
   currentGame.lobbyTimer = setTimeout(() => startGame(), 45000);
-  // NEW: Notify admin about reset (empty players, lobby status)
+  // Notify admin about reset (empty players, lobby status)
   notifyAdminClients();
 }
 
@@ -300,7 +300,7 @@ async function startGame() {
   }
   io.emit('cardTaken', { takenNumbers: Array.from(currentGame.takenCardNumbers) });
   io.emit('playersCount', currentGame.players.length);
-  // NEW: Notify admin after removing players
+  // Notify admin after removing players
   notifyAdminClients();
 
   if (currentGame.players.length === 0) {
@@ -326,7 +326,7 @@ async function startGame() {
   currentGame.calledNumbers = [];
   currentGame.winningNumber = null;
   io.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
-  // NEW: Notify admin that game is now running
+  // Notify admin that game is now running
   notifyAdminClients();
   startCalling();
 }
@@ -444,7 +444,7 @@ async function endGameWithWinners() {
   clearTimeout(currentGame.bingoGraceTimeout);
   currentGame.bingoGraceTimeout = null;
   setTimeout(resetGame, 5000);
-  // NEW: Notify admin that game ended (status 'ended')
+  // Notify admin that game ended (status 'ended')
   notifyAdminClients();
 }
 
@@ -642,7 +642,7 @@ io.on('connection', async (socket) => {
     io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
-    // NEW: Notify admin about player join
+    // Notify admin about player join
     notifyAdminClients();
   });
 
@@ -663,7 +663,7 @@ io.on('connection', async (socket) => {
     io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
-    // NEW: Notify admin about player join
+    // Notify admin about player join
     notifyAdminClients();
   });
 
@@ -708,7 +708,7 @@ io.on('connection', async (socket) => {
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- NEW: Admin namespace for live players ----------
+// ---------- Admin namespace for live players & registered users ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
@@ -717,6 +717,7 @@ adminNamespace.use((socket, next) => {
   }
   next(new Error('Unauthorized admin access'));
 });
+
 adminNamespace.on('connection', (socket) => {
   console.log('Admin connected to live view');
   // Send initial data
@@ -732,7 +733,7 @@ adminNamespace.on('connection', (socket) => {
     });
   });
 
-  // ---------- ADDED: Fetch all registered players ----------
+  // Fetch all registered players from Supabase
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
@@ -753,8 +754,12 @@ adminNamespace.on('connection', (socket) => {
       socket.emit('admin:allRegisteredPlayers', { users: [] });
     }
   });
-  // ---------------------------------------------------------
 });
+
+// ---------- Periodic admin broadcast (every 2 seconds) ----------
+setInterval(() => {
+  notifyAdminClients();
+}, 2000);
 
 app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
 
