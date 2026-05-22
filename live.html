@@ -5,9 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Admin Panel | Bingo</title>
     <style>
-        /* (keep all your existing CSS exactly as is) */
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-        /* --- Additional styles for the registered table --- */
+        body {
+            background: #1e2a3a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 12px;
+            margin: 0;
+            color: #ecf0f1;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #0f1724;
+            border-radius: 28px;
+            padding: 18px 12px 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin: 0 0 8px 0;
+            text-align: center;
+            border-bottom: 2px solid #f39c12;
+            width: 100%;
+            padding-bottom: 10px;
+        }
+
         .section-title {
             font-size: 1.2rem;
             margin: 28px 0 12px;
@@ -15,24 +43,166 @@
             padding-left: 12px;
         }
 
+        .status-bar {
+            background: #2c3e50;
+            border-radius: 40px;
+            padding: 12px 18px;
+            margin: 16px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .game-status {
+            background: #e67e22;
+            padding: 6px 16px;
+            border-radius: 40px;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .players-table-wrapper {
+            background: #1a2533;
+            border-radius: 24px;
+            padding: 4px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 280px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 8px;
+            background: #0f1724;
+            color: #f39c12;
+            font-weight: bold;
+            border-bottom: 2px solid #f39c12;
+        }
+
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #2c3e50;
+            vertical-align: middle;
+        }
+
+        .player-row:active {
+            background: #2c3e50;
+        }
+
+        .username-link {
+            color: #f39c12;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .username-link:active {
+            opacity: 0.7;
+        }
+
+        .telegram-id {
+            font-family: monospace;
+            font-size: 0.75rem;
+            background: #0f1724;
+            padding: 4px 6px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .card-badge {
+            background: #f39c12;
+            color: #1e2a3a;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 0.75rem;
+            display: inline-block;
+            text-align: center;
+        }
+
         .balance-positive {
             color: #2ecc71;
+            font-weight: bold;
         }
 
         .balance-zero {
             color: #95a5a6;
         }
 
-        .registered-table td, .registered-table th {
-            padding: 10px 8px;
+        .balance-negative {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 48px 20px;
+            color: #95a5a6;
+            font-style: italic;
+        }
+
+        .refresh-info {
+            text-align: center;
+            font-size: 0.7rem;
+            margin-top: 20px;
+            color: #7f8c8d;
+        }
+
+        button {
+            background: #f39c12;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 60px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 18px;
+            width: 100%;
+            transition: 0.1s;
+            color: #1e2a3a;
+        }
+
+        button:active {
+            transform: scale(0.97);
+            background: #e67e22;
+        }
+
+        .footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 0.65rem;
+            color: #5d6d7e;
+        }
+
+        /* small screen adjustments */
+        @media (max-width: 500px) {
+            th, td {
+                padding: 10px 6px;
+            }
+            .telegram-id {
+                font-size: 0.7rem;
+            }
         }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>👥 Admin Bingo Panel</h1>
-    
-    <!-- Live Players (existing) -->
+
+    <!-- ========== LIVE PLAYERS SECTION ========== -->
     <div class="status-bar">
         <span>🎮 Game state:</span>
         <span id="gameState" class="game-status">Loading...</span>
@@ -52,21 +222,21 @@
                 </tr>
             </thead>
             <tbody id="playersTableBody">
-                <tr><td colspan="3" class="empty-message">No players in game.</td></tr>
+                <tr><td colspan="3" class="empty-message">No players yet. Wait for lobby/game.</td></tr>
             </tbody>
         </table>
     </div>
 
-    <button id="refreshBtn">⟳ Refresh now</button>
+    <button id="refreshBtn">⟳ Refresh Live Players</button>
 
-    <!-- NEW: All Registered Players -->
+    <!-- ========== ALL REGISTERED PLAYERS SECTION ========== -->
     <h2 class="section-title">📋 All Registered Players</h2>
     <div class="status-bar">
         <span>👥 Total registered:</span>
         <span id="registeredCount">0</span>
     </div>
 
-    <div class="players-table-wrapper registered-table">
+    <div class="players-table-wrapper">
         <table id="registeredTable">
             <thead>
                 <tr>
@@ -76,7 +246,7 @@
                 </tr>
             </thead>
             <tbody id="registeredTableBody">
-                <tr><td colspan="3" class="empty-message">Loading all users…</td></tr>
+                <tr><td colspan="3" class="empty-message">Loading all registered users…</td></tr>
             </tbody>
         </table>
     </div>
@@ -93,6 +263,7 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+    // ==================== AUTH ====================
     const urlParams = new URLSearchParams(window.location.search);
     const adminSecret = urlParams.get('secret');
     if (!adminSecret) {
@@ -102,28 +273,40 @@
 
     const socket = io('/admin', { query: { secret: adminSecret } });
 
-    // ------------------ Live players ------------------
+    // ==================== SOCKET EVENTS ====================
     socket.on('connect', () => {
-        console.log('Admin socket connected');
+        console.log('✅ Admin socket connected');
+        // Auto-request registered players on connect
+        socket.emit('admin:getAllRegisteredPlayers');
     });
 
     socket.on('connect_error', (err) => {
-        console.error('Socket error:', err.message);
-        document.getElementById('playersTableBody').innerHTML = 
-            '<tr><td colspan="3" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
+        console.error('❌ Socket error:', err.message);
+        const liveTbody = document.getElementById('playersTableBody');
+        if (liveTbody) liveTbody.innerHTML = '<tr><td colspan="3" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.<br>Check server & secret.</td></tr>';
+        const regTbody = document.getElementById('registeredTableBody');
+        if (regTbody) regTbody.innerHTML = '<tr><td colspan="3" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
     });
 
+    // ---------- Live Players ----------
     socket.on('admin:playersList', (data) => {
-        updateLivePlayers(data.players);
+        updateLivePlayersTable(data.players);
         document.getElementById('gameState').innerText = data.gameStatus || 'unknown';
     });
 
-    function updateLivePlayers(players) {
+    // ---------- All Registered Players ----------
+    socket.on('admin:allRegisteredPlayers', (data) => {
+        updateRegisteredTable(data.users);
+    });
+
+    // ==================== LIVE PLAYERS TABLE ====================
+    function updateLivePlayersTable(players) {
         const tbody = document.getElementById('playersTableBody');
-        document.getElementById('playerCount').innerText = players ? players.length : 0;
+        const countSpan = document.getElementById('playerCount');
+        countSpan.innerText = players ? players.length : 0;
 
         if (!players || players.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="empty-message">👻 No players in game.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-message">👻 No players currently in the game.</td></tr>';
             return;
         }
 
@@ -131,72 +314,72 @@
         players.forEach(p => {
             const username = escapeHtml(p.username);
             const telegramId = escapeHtml(p.telegramId);
+            const cardNum = p.cardNumber;
             const tgLink = `tg://user?id=${telegramId}`;
             html += `
                 <tr class="player-row">
-                    <td><a href="${tgLink}" class="username-link" target="_blank" rel="noopener noreferrer">📱 ${username}</a></td>
+                    <td>
+                        <a href="${tgLink}" class="username-link" target="_blank" rel="noopener noreferrer">
+                            📱 ${username}
+                        </a>
+                    </td>
                     <td><span class="telegram-id">${telegramId}</span></td>
-                    <td><span class="card-badge">#${p.cardNumber}</span></td>
+                    <td><span class="card-badge">#${cardNum}</span></td>
                 </tr>
             `;
         });
         tbody.innerHTML = html;
     }
 
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-        socket.emit('admin:requestPlayers');
-        if (navigator.vibrate) navigator.vibrate(50);
-    });
-
-    // ---------------- Registered players (new) ----------------
-    function loadRegisteredPlayers() {
-        document.getElementById('registeredTableBody').innerHTML = 
-            '<tr><td colspan="3" class="empty-message">⏳ Loading…</td></tr>';
-        
-        // Request all registered users via socket
-        socket.emit('admin:getAllRegisteredPlayers');
-    }
-
-    socket.on('admin:allRegisteredPlayers', (data) => {
-        updateRegisteredTable(data.users);
-    });
-
+    // ==================== REGISTERED PLAYERS TABLE ====================
     function updateRegisteredTable(users) {
         const tbody = document.getElementById('registeredTableBody');
-        document.getElementById('registeredCount').innerText = users ? users.length : 0;
+        const countSpan = document.getElementById('registeredCount');
+        countSpan.innerText = users ? users.length : 0;
 
         if (!users || users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="empty-message">No registered users found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-message">📭 No registered users found.</td></tr>';
             return;
         }
 
+        // Sort by balance descending (richest first) — optional
+        const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
+
         let html = '';
-        users.forEach(user => {
+        sorted.forEach(user => {
             const telegramId = escapeHtml(user.telegramId);
-            const username = escapeHtml(user.username) || 'no username';
-            const balance = user.balance || 0;
-            const balanceClass = balance > 0 ? 'balance-positive' : 'balance-zero';
+            const username = escapeHtml(user.username) || '—';
+            const balance = user.balance ?? 0;
+
+            let balanceClass = 'balance-zero';
+            if (balance > 0) balanceClass = 'balance-positive';
+            else if (balance < 0) balanceClass = 'balance-negative';
+
+            const formattedBalance = balance.toLocaleString();
 
             html += `
                 <tr class="player-row">
                     <td><span class="telegram-id">${telegramId}</span></td>
                     <td>${username}</td>
-                    <td><span class="${balanceClass}">${balance.toLocaleString()}</span></td>
+                    <td><span class="${balanceClass}">${formattedBalance}</span></td>
                 </tr>
             `;
         });
         tbody.innerHTML = html;
     }
 
-    document.getElementById('refreshRegisteredBtn').addEventListener('click', () => {
-        loadRegisteredPlayers();
+    // ==================== BUTTON HANDLERS ====================
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        socket.emit('admin:requestPlayers');
         if (navigator.vibrate) navigator.vibrate(50);
     });
 
-    // Load registered list on page start
-    loadRegisteredPlayers();
+    document.getElementById('refreshRegisteredBtn').addEventListener('click', () => {
+        socket.emit('admin:getAllRegisteredPlayers');
+        if (navigator.vibrate) navigator.vibrate(50);
+    });
 
-    // --------------- Helpers ---------------
+    // ==================== HELPERS ====================
     function escapeHtml(str) {
         if (!str) return '';
         return String(str).replace(/[&<>]/g, function(m) {
@@ -207,6 +390,7 @@
         });
     }
 
+    // ==================== TIMESTAMP ====================
     setInterval(() => {
         document.getElementById('timestamp').innerText = new Date().toLocaleString();
     }, 1000);
