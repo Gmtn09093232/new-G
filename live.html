@@ -122,6 +122,11 @@
             display: inline-block;
         }
 
+        .telegram-id a {
+            color: #f39c12;
+            text-decoration: none;
+        }
+
         .card-badge {
             background: #f39c12;
             color: #1e2a3a;
@@ -187,7 +192,6 @@
             color: #5d6d7e;
         }
 
-        /* small screen adjustments */
         @media (max-width: 500px) {
             th, td {
                 padding: 10px 6px;
@@ -276,7 +280,6 @@
     // ==================== SOCKET EVENTS ====================
     socket.on('connect', () => {
         console.log('✅ Admin socket connected');
-        // Auto-request registered players on connect
         socket.emit('admin:getAllRegisteredPlayers');
     });
 
@@ -331,7 +334,7 @@
         tbody.innerHTML = html;
     }
 
-    // ==================== REGISTERED PLAYERS TABLE ====================
+    // ==================== REGISTERED PLAYERS TABLE (with links) ====================
     function updateRegisteredTable(users) {
         const tbody = document.getElementById('registeredTableBody');
         const countSpan = document.getElementById('registeredCount');
@@ -342,7 +345,7 @@
             return;
         }
 
-        // Sort by balance descending (richest first) — optional
+        // Sort by balance descending (richest first)
         const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
 
         let html = '';
@@ -350,6 +353,7 @@
             const telegramId = escapeHtml(user.telegramId);
             const username = escapeHtml(user.username) || '—';
             const balance = user.balance ?? 0;
+            const tgLink = `tg://user?id=${telegramId}`;
 
             let balanceClass = 'balance-zero';
             if (balance > 0) balanceClass = 'balance-positive';
@@ -359,8 +363,8 @@
 
             html += `
                 <tr class="player-row">
-                    <td><span class="telegram-id">${telegramId}</span></td>
-                    <td>${username}</td>
+                    <td><span class="telegram-id"><a href="${tgLink}" target="_blank" rel="noopener noreferrer">${telegramId}</a></span></td>
+                    <td><a href="${tgLink}" class="username-link" target="_blank" rel="noopener noreferrer">📱 ${username}</a></td>
                     <td><span class="${balanceClass}">${formattedBalance}</span></td>
                 </tr>
             `;
