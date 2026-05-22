@@ -56,7 +56,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger (inline) ----------
+// ---------- Audit Logger ----------
 async function logAuditEvent({
   eventType,
   roomId = null,
@@ -134,7 +134,6 @@ app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html'))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 
-// ---------- Admin live players page (protected by secret) ----------
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) {
@@ -143,18 +142,28 @@ app.get('/admin/live-players', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-live-players.html'));
 });
 
-// ---------- User cache ----------
+// ---------- User cache (now includes telegram_handle) ----------
 const users = {};
-async function loadUser(telegramId, username) {
+async function loadUser(telegramId, username, telegramHandle = null) {
   const id = String(telegramId);
   if (users[id]) return users[id];
   const { data } = await supabase.from('users').select('*').eq('telegram_id', id).maybeSingle();
   if (data) {
-    users[id] = { id, username: data.username, balance: Number(data.balance) };
+    users[id] = { 
+      id, 
+      username: data.username, 
+      balance: Number(data.balance),
+      telegram_handle: data.telegram_handle
+    };
   } else {
-    const newUser = { telegram_id: id, username: username || 'Player', balance: 10 };
+    const newUser = { 
+      telegram_id: id, 
+      username: username || 'Player', 
+      telegram_handle: telegramHandle || null,
+      balance: 10 
+    };
     await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 10 };
+    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle };
   }
   return users[id];
 }
@@ -179,14 +188,22 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const params = new URLSearchParams(initData);
   const userData = JSON.parse(params.get('user'));
   const id = String(userData.id);
-  const user = await loadUser(id, userData.first_name || userData.username);
+  const displayName = userData.first_name || userData.username || 'Player';
+  const handle = userData.username || null;   // Telegram @username (without @)
+  const user = await loadUser(id, displayName, handle);
   req.session.userId = id;
   req.session.save((err) => {
     if (err) {
       console.error('Session save error:', err);
       return res.status(500).json({ success: false, error: 'Session save failed' });
     }
-    res.json({ success: true, userId: id, username: user.username, balance: user.balance });
+    res.json({ 
+      success: true, 
+      userId: id, 
+      username: user.username, 
+      balance: user.balance,
+      telegram_handle: user.telegram_handle
+    });
   });
 });
 
@@ -248,7 +265,6 @@ const currentGame = {
   winningNumber: null
 };
 
-// ---------- Helper to get sanitized player list for admin ----------
 function getPlayersList() {
   return currentGame.players.map(p => ({
     telegramId: p.telegramId,
@@ -257,7 +273,6 @@ function getPlayersList() {
   }));
 }
 
-// ---------- Broadcast live players & status to all admin clients ----------
 function notifyAdminClients() {
   const data = {
     players: getPlayersList(),
@@ -278,12 +293,10 @@ function resetGame() {
   currentGame.winners = [];
   currentGame.bingoGraceTimeout = null;
   currentGame.winningNumber = null;
-  // LOBBY TIMER IS NOW 45 SECONDS (was 30)
   currentGame.lobbyEndTime = Date.now() + 45000;
   currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
   io.emit('lobbyState', { startsIn: 45, takenNumbers: [], playersCount: 0 });
   currentGame.lobbyTimer = setTimeout(() => startGame(), 45000);
-  // Notify admin about reset (empty players, lobby status)
   notifyAdminClients();
 }
 
@@ -300,13 +313,12 @@ async function startGame() {
   }
   io.emit('cardTaken', { takenNumbers: Array.from(currentGame.takenCardNumbers) });
   io.emit('playersCount', currentGame.players.length);
-  // Notify admin after removing players
   notifyAdminClients();
 
   if (currentGame.players.length === 0) {
     currentGame.status = 'ended';
     setTimeout(resetGame, 3000);
-    notifyAdminClients(); // Notify status change to 'ended'
+    notifyAdminClients();
     return;
   }
 
@@ -326,7 +338,6 @@ async function startGame() {
   currentGame.calledNumbers = [];
   currentGame.winningNumber = null;
   io.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
-  // Notify admin that game is now running
   notifyAdminClients();
   startCalling();
 }
@@ -353,7 +364,6 @@ function startCalling() {
   }, 4000);
 }
 
-// ---------- Strict bingo check ----------
 function getLines(card) {
   const lines = [];
   for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
@@ -377,7 +387,6 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- End game with multiple winners ----------
 async function endGameWithWinners() {
   currentGame.status = 'ended';
   clearInterval(currentGame.callInterval);
@@ -410,7 +419,6 @@ async function endGameWithWinners() {
       house_profit: houseProfit
     });
 
-    // Collusion check by IP
     const ipCounts = {};
     currentGame.winners.forEach(w => {
       const player = currentGame.players.find(p => p.telegramId === w.telegramId);
@@ -444,11 +452,10 @@ async function endGameWithWinners() {
   clearTimeout(currentGame.bingoGraceTimeout);
   currentGame.bingoGraceTimeout = null;
   setTimeout(resetGame, 5000);
-  // Notify admin that game ended (status 'ended')
   notifyAdminClients();
 }
 
-// ---------- DEPOSIT (unchanged) ----------
+// ---------- DEPOSIT, WITHDRAWAL, AUDIT endpoints (unchanged from previous) ----------
 app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -506,7 +513,6 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- WITHDRAWAL (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -565,7 +571,6 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- AUDIT ENDPOINTS ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -642,7 +647,6 @@ io.on('connection', async (socket) => {
     io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
-    // Notify admin about player join
     notifyAdminClients();
   });
 
@@ -663,7 +667,6 @@ io.on('connection', async (socket) => {
     io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
     io.emit('playersCount', currentGame.players.length);
     socket.emit('yourCard', player.card);
-    // Notify admin about player join
     notifyAdminClients();
   });
 
@@ -708,7 +711,7 @@ io.on('connection', async (socket) => {
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- Admin namespace for live players & registered users ----------
+// ---------- Admin namespace (with handle support) ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
@@ -720,12 +723,10 @@ adminNamespace.use((socket, next) => {
 
 adminNamespace.on('connection', (socket) => {
   console.log('Admin connected to live view');
-  // Send initial data
   socket.emit('admin:playersList', {
     players: getPlayersList(),
     gameStatus: currentGame.status
   });
-  // Listen for manual refresh
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
       players: getPlayersList(),
@@ -733,19 +734,20 @@ adminNamespace.on('connection', (socket) => {
     });
   });
 
-  // Fetch all registered players from Supabase
+  // Fetch all registered players including telegram_handle
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance');
+        .select('telegram_id, username, balance, telegram_handle');
       
       if (error) throw error;
 
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
-        balance: u.balance
+        balance: u.balance,
+        telegram_handle: u.telegram_handle
       }));
 
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
@@ -756,7 +758,6 @@ adminNamespace.on('connection', (socket) => {
   });
 });
 
-// ---------- Periodic admin broadcast (every 2 seconds) ----------
 setInterval(() => {
   notifyAdminClients();
 }, 2000);
