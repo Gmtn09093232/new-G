@@ -731,6 +731,29 @@ adminNamespace.on('connection', (socket) => {
       gameStatus: currentGame.status
     });
   });
+
+  // ---------- ADDED: Fetch all registered players ----------
+  socket.on('admin:getAllRegisteredPlayers', async () => {
+    try {
+      const { data: allUsers, error } = await supabase
+        .from('users')
+        .select('telegram_id, username, balance');
+      
+      if (error) throw error;
+
+      const usersList = (allUsers || []).map(u => ({
+        telegramId: u.telegram_id,
+        username: u.username,
+        balance: u.balance
+      }));
+
+      socket.emit('admin:allRegisteredPlayers', { users: usersList });
+    } catch (err) {
+      console.error('Failed to fetch all registered users:', err);
+      socket.emit('admin:allRegisteredPlayers', { users: [] });
+    }
+  });
+  // ---------------------------------------------------------
 });
 
 app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
