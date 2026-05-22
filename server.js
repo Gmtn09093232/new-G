@@ -265,12 +265,17 @@ const currentGame = {
   winningNumber: null
 };
 
+// Replace the existing getPlayersList() with:
 function getPlayersList() {
-  return currentGame.players.map(p => ({
-    telegramId: p.telegramId,
-    username: p.username,
-    cardNumber: p.cardNumber
-  }));
+  return currentGame.players.map(p => {
+    const user = users[p.telegramId];
+    return {
+      telegramId: p.telegramId,
+      username: p.username,
+      cardNumber: p.cardNumber,
+      telegram_handle: user ? user.telegram_handle : null
+    };
+  });
 }
 
 function notifyAdminClients() {
