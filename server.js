@@ -132,6 +132,7 @@ app.get('/api/admin-phone', (req, res) => { res.json({ phone: process.env.ADMIN_
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.grt('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 
 // ---------- NEW: Admin live players page (protected by secret) ----------
 app.get('/admin/live-players', (req, res) => {
