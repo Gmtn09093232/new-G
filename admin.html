@@ -2,448 +2,460 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>🎰 Multi-Admin Bingo | Dashboard + Control Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>🎰 Bingo Admin | Total Stats + Logs</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
       background: radial-gradient(circle at 10% 20%, #0a0f1c 0%, #050814 100%);
       color: #f0f3fa;
-      padding: 16px;
+      padding: 12px 10px 32px;
       min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.4;
     }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .glass {
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* header - compact */
+    .glass-header {
       background: rgba(18, 25, 45, 0.75);
       backdrop-filter: blur(12px);
       border-radius: 1.5rem;
-      padding: 1.2rem;
-      border: 1px solid rgba(243,156,18,0.3);
-      margin-bottom: 1.5rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid rgba(243, 156, 18, 0.3);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
-    .login-card {
-      max-width: 400px;
-      margin: 80px auto;
-      text-align: center;
+
+    h1 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f39c12, #ffcc70);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
     }
-    input, select, button {
-      background: #0f172ad9;
-      border: 1px solid #334155;
-      color: white;
-      padding: 10px 16px;
+
+    @media (max-width: 560px) {
+      h1 { font-size: 1.1rem; white-space: normal; }
+      .glass-header { flex-direction: column; align-items: stretch; text-align: center; }
+    }
+
+    .refresh-btn {
+      background: linear-gradient(95deg, #2c3e66, #1e2a3e);
+      border: none;
+      padding: 6px 14px;
       border-radius: 40px;
-      font-size: 0.9rem;
-      outline: none;
-    }
-    button {
-      background: #f39c12;
-      color: #0f172a;
-      font-weight: bold;
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: white;
       cursor: pointer;
       transition: 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
     }
-    button.danger { background: #e74c3c; color: white; }
-    button.secondary { background: #2c3e66; color: white; }
-    .stats-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .refresh-btn:active { transform: scale(0.96); }
+
+    /* INLINE STATS ROW - now with total deposit & withdraw */
+    .stats-row {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 1.2rem;
+      justify-content: space-between;
+    }
     .stat-card {
-      background: rgba(22,32,42,0.8);
+      background: rgba(22, 32, 42, 0.8);
+      backdrop-filter: blur(8px);
       border-radius: 1.2rem;
-      padding: 0.6rem 1rem;
+      padding: 0.4rem 0.5rem;
       flex: 1;
+      min-width: 90px;
       text-align: center;
       border-top: 3px solid #f39c12;
+      transition: 0.2s;
     }
-    .stat-card .number { font-size: 1.5rem; font-weight: 800; color: #f39c12; }
+    .stat-card span {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #cbd5e6;
+      display: block;
+    }
+    .stat-card .number {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #f39c12;
+      line-height: 1.2;
+    }
+    /* special accent for totals */
+    .stat-card.total .number { color: #2ecc71; text-shadow: 0 0 2px #2ecc7133; }
+    .stat-card.withdraw-total .number { color: #e67e22; }
+    @media (max-width: 560px) {
+      .stat-card span { font-size: 0.55rem; }
+      .stat-card .number { font-size: 1rem; }
+      .stat-card { padding: 0.3rem 0.2rem; min-width: 75px; }
+    }
+
+    /* sections */
+    .section {
+      background: rgba(18, 28, 40, 0.65);
+      backdrop-filter: blur(12px);
+      border-radius: 1.5rem;
+      padding: 0.8rem;
+      margin-bottom: 1.2rem;
+      border: 1px solid rgba(243, 156, 18, 0.2);
+    }
+    .section h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-left: 4px solid #f39c12;
+      padding-left: 10px;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.5rem 0.8rem;
+      border-radius: 2rem;
+      margin-bottom: 1rem;
+    }
+    .filter-row label { font-size: 0.7rem; }
+    select, input {
+      background: #0f172ad9;
+      border: 1px solid #334155;
+      color: #f0f3fa;
+      padding: 6px 12px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    /* request cards */
     .request-card {
       background: #0f172acc;
       border-radius: 1.2rem;
-      margin: 1rem 0;
-      padding: 1rem;
+      margin: 0.8rem 0;
+      padding: 0.8rem;
       display: flex;
       flex-wrap: wrap;
+      gap: 0.8rem;
+      align-items: flex-start;
       justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
       border: 1px solid #2a3a4e;
     }
-    .action-buttons { display: flex; gap: 10px; }
-    .badge { background: #f39c1222; padding: 4px 10px; border-radius: 30px; font-size: 0.7rem; }
-    .proof-img { max-width: 70px; border-radius: 12px; cursor: pointer; }
-    a { color: #f39c12; }
-    .admin-panel-link { margin-top: 10px; display: inline-block; }
-    hr { border-color: #2a3a4e; margin: 15px 0; }
+    .request-info {
+      flex: 2;
+      min-width: 180px;
+    }
+    .request-info p {
+      margin: 4px 0;
+      font-size: 0.75rem;
+    }
+    .proof-img {
+      max-width: 80px;
+      max-height: 80px;
+      border-radius: 12px;
+      border: 1px solid #f39c12;
+      cursor: pointer;
+    }
+    .receipt-box {
+      background: #03060ecc;
+      padding: 4px 8px;
+      border-radius: 1rem;
+      font-size: 0.7rem;
+      margin-top: 6px;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    button {
+      background: #f39c12;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 40px;
+      font-weight: 600;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    button.approve { background: #2ecc71; color: #001e0f; }
+    button.reject { background: #e74c3c; color: white; }
+    .match { color: #2ecc71; }
+    .mismatch { color: #e74c3c; }
+
+    /* balance card inline on desktop, stacked on mobile but compact */
+    .balance-card {
+      background: linear-gradient(125deg, #0e1a24, #050f18);
+      border-radius: 1.5rem;
+      padding: 0.8rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      align-items: flex-end;
+    }
+    .balance-field {
+      flex: 1;
+      min-width: 120px;
+    }
+    .balance-field label {
+      font-size: 0.65rem;
+      margin-bottom: 4px;
+      color: #f39c12;
+    }
+    .balance-field input {
+      width: 100%;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+    .add-btn {
+      background: #f39c12;
+      color: #0f172a;
+      font-weight: 800;
+      padding: 6px 16px;
+      width: 100%;
+      justify-content: center;
+    }
+    @media (min-width: 540px) {
+      .balance-card { flex-wrap: nowrap; }
+      .add-btn { width: auto; }
+    }
+    .info-note { font-size: 0.6rem; margin-top: 4px; }
+    #balanceFeedback { font-size: 0.7rem; margin-top: 8px; }
+    a { color: #f39c12; word-break: break-all; }
   </style>
 </head>
 <body>
-<div id="app"></div>
+<div class="container">
+  <div class="glass-header">
+    <h1>🎲 BINGO ADMIN</h1>
+    <button class="refresh-btn" onclick="fetchAll()">⟳ Refresh</button>
+  </div>
+
+  <!-- inline stats row with TOTAL DEPOSIT & TOTAL WITHDRAW (including manual) -->
+  <div class="stats-row" id="statsPanel">
+    <div class="stat-card"><span>📥 pending deposits</span><div class="number" id="pendingDepositCount">0</div></div>
+    <div class="stat-card"><span>💸 pending withdrawals</span><div class="number" id="pendingWithdrawCount">0</div></div>
+    <div class="stat-card total"><span>💰 TOTAL DEPOSIT</span><div class="number" id="totalDepositSum">0</div></div>
+    <div class="stat-card withdraw-total"><span>💸 TOTAL WITHDRAW</span><div class="number" id="totalWithdrawSum">0</div></div>
+    <div class="stat-card"><span>🕒 last refresh</span><div class="number" id="lastRefresh">--:--:--</div></div>
+  </div>
+
+  <!-- Deposit Section -->
+  <div class="section">
+    <h2>📸 Deposit verifications</h2>
+    <div class="filter-row">
+      <label>🔍 Filter:</label>
+      <select id="depositFilter" onchange="renderDeposits()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="depositList">Loading deposits...</div>
+  </div>
+
+  <!-- Withdrawal Section -->
+  <div class="section">
+    <h2>💰 Withdrawal requests</h2>
+    <div class="filter-row">
+      <label>🔍 Filter:</label>
+      <select id="withdrawFilter" onchange="renderWithdrawals()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="withdrawList">Loading withdrawals...</div>
+  </div>
+
+  <!-- Manual Add Balance -->
+  <div class="section">
+    <h2>⚡ Manual balance (adds to TOTAL DEPOSIT)</h2>
+    <div class="balance-card">
+      <div class="balance-field">
+        <label>🆔 Telegram ID (numeric)</label>
+        <input type="text" id="userId" placeholder="123456789" inputmode="numeric">
+      </div>
+      <div class="balance-field">
+        <label>💰 Amount (ETB)</label>
+        <input type="number" id="amount" placeholder="Amount" step="1" min="1">
+      </div>
+      <div class="balance-field">
+        <label>&nbsp;</label>
+        <button class="add-btn" onclick="addBalance()">➕ Add & record</button>
+      </div>
+    </div>
+    <div id="balanceFeedback"></div>
+  </div>
+</div>
 
 <script>
-  // ---------- STORAGE KEYS ----------
-  const STORAGE = {
-    ADMINS: 'multi_admin_admins',
-    PENDING_DEPOSITS: 'multi_admin_deposits',
-    PENDING_WITHDRAWALS: 'multi_admin_withdrawals',
-    ACTION_LOGS: 'multi_admin_action_logs',
-    DEPOSIT_TOTAL_LOG: 'multi_admin_deposit_total_log',
-    WITHDRAW_TOTAL_LOG: 'multi_admin_withdraw_total_log',
-    MANUAL_DEPOSITS_LOG: 'multi_admin_manual_deposits_log',
-    SESSION: 'multi_admin_session'
+  const ADMIN_SECRET = prompt("🔐 Enter admin secret:") || "your_secret_here";
+  const API_BASE = '';
+
+  let depositData = [], withdrawalData = [];
+
+  // ---------- PERSISTENT TOTALS (including manual deposits & approved withdrawals) ----------
+  // Keys for localStorage
+  const STORAGE_KEYS = {
+    APPROVED_DEPOSITS: 'bingo_total_deposits_log',   // array of { id, amount, timestamp }
+    APPROVED_WITHDRAWALS: 'bingo_total_withdrawals_log',
+    MANUAL_DEPOSITS: 'bingo_manual_deposits_log'      // array of { id, amount, note, timestamp }
   };
 
-  // ---------- DEFAULT SUPER ADMIN ----------
-  function initStorage() {
-    if (!localStorage.getItem(STORAGE.ADMINS)) {
-      const defaultAdmins = [
-        { id: 1, username: "superadmin", password: "admin123", role: "super", fullName: "Super Admin" }
-      ];
-      localStorage.setItem(STORAGE.ADMINS, JSON.stringify(defaultAdmins));
-    }
-    if (!localStorage.getItem(STORAGE.PENDING_DEPOSITS)) {
-      const sampleDeposits = [
-        { id: 101, username: "alemu23", telegram_id: "112233445", phone: "0912345678", amount: 450, payment_type: "telebirr", reference_number: "TXNTEL123", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/104/200/150", status: "pending" },
-        { id: 102, username: "birtukan", telegram_id: "998877665", phone: "0922334455", amount: 1200, payment_type: "cbebirr", reference_number: "CBE987XYZ", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/26/200/150", status: "pending" }
-      ];
-      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(sampleDeposits));
-    }
-    if (!localStorage.getItem(STORAGE.PENDING_WITHDRAWALS)) {
-      const sampleWithdrawals = [
-        { id: 201, username: "dawit_t", telegram_id: "445566778", phone_number: "0944556677", receiver_name: "Dawit T.", amount: 2500, withdrawal_type: "telebirr", created_at: new Date().toISOString(), status: "pending" }
-      ];
-      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(sampleWithdrawals));
-    }
-    if (!localStorage.getItem(STORAGE.ACTION_LOGS)) localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify([]));
-    if (!localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG)) localStorage.setItem(STORAGE.DEPOSIT_TOTAL_LOG, JSON.stringify([]));
-    if (!localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG)) localStorage.setItem(STORAGE.WITHDRAW_TOTAL_LOG, JSON.stringify([]));
-    if (!localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG)) localStorage.setItem(STORAGE.MANUAL_DEPOSITS_LOG, JSON.stringify([]));
+  // Helper: load logs
+  function loadApprovedDeposits() {
+    const stored = localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS);
+    return stored ? JSON.parse(stored) : [];
+  }
+  function loadApprovedWithdrawals() {
+    const stored = localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS);
+    return stored ? JSON.parse(stored) : [];
+  }
+  function loadManualDeposits() {
+    const stored = localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS);
+    return stored ? JSON.parse(stored) : [];
   }
 
-  // ---------- HELPER: get current admin session ----------
-  function getCurrentAdmin() {
-    const session = localStorage.getItem(STORAGE.SESSION);
-    if (!session) return null;
-    try {
-      return JSON.parse(session);
-    } catch(e) { return null; }
+  function saveApprovedDeposits(log) {
+    localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, JSON.stringify(log));
+  }
+  function saveApprovedWithdrawals(log) {
+    localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, JSON.stringify(log));
+  }
+  function saveManualDeposits(log) {
+    localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, JSON.stringify(log));
   }
 
-  function setCurrentAdmin(admin) {
-    if (admin) localStorage.setItem(STORAGE.SESSION, JSON.stringify(admin));
-    else localStorage.removeItem(STORAGE.SESSION);
-  }
-
-  // ---------- LOG ACTION ----------
-  function addLogEntry(action, details, requestId = null) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
-    const admin = getCurrentAdmin();
-    logs.unshift({
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      admin: admin ? admin.username : "unknown",
-      adminRole: admin ? admin.role : "unknown",
-      action,
-      details,
-      requestId
-    });
-    localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify(logs.slice(0, 500)));
-  }
-
-  // ----- TOTALS (deposit & withdraw including manual) -----
-  function recordApprovedDeposit(depositId, amount, metadata = {}) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG) || "[]");
-    if (logs.some(l => l.id === depositId)) return false;
-    logs.push({ id: depositId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
-    localStorage.setItem(STORAGE.DEPOSIT_TOTAL_LOG, JSON.stringify(logs));
-    return true;
-  }
-  function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG) || "[]");
-    if (logs.some(l => l.id === withdrawalId)) return false;
-    logs.push({ id: withdrawalId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
-    localStorage.setItem(STORAGE.WITHDRAW_TOTAL_LOG, JSON.stringify(logs));
-    return true;
-  }
-  function recordManualDeposit(amount, telegramId, adminName) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG) || "[]");
-    logs.push({ id: 'man_' + Date.now(), amount: Number(amount), telegramId, admin: adminName, timestamp: new Date().toISOString() });
-    localStorage.setItem(STORAGE.MANUAL_DEPOSITS_LOG, JSON.stringify(logs));
-  }
+  // Compute total deposit = sum(approved deposits) + sum(manual deposits)
   function computeTotalDeposit() {
-    const approved = JSON.parse(localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG) || "[]");
-    const manual = JSON.parse(localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG) || "[]");
-    const sumApproved = approved.reduce((s, e) => s + (e.amount || 0), 0);
-    const sumManual = manual.reduce((s, e) => s + (e.amount || 0), 0);
+    const approved = loadApprovedDeposits();
+    const manual = loadManualDeposits();
+    const sumApproved = approved.reduce((acc, entry) => acc + (entry.amount || 0), 0);
+    const sumManual = manual.reduce((acc, entry) => acc + (entry.amount || 0), 0);
     return sumApproved + sumManual;
   }
+
+  // Compute total withdrawal = sum(approved withdrawals)
   function computeTotalWithdraw() {
-    const withdrawals = JSON.parse(localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG) || "[]");
-    return withdrawals.reduce((s, e) => s + (e.amount || 0), 0);
+    const withdrawals = loadApprovedWithdrawals();
+    return withdrawals.reduce((acc, entry) => acc + (entry.amount || 0), 0);
   }
 
-  // ---------- AUTH ----------
-  function login(username, password) {
-    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
-    const admin = admins.find(a => a.username === username && a.password === password);
-    if (admin) {
-      setCurrentAdmin({ id: admin.id, username: admin.username, role: admin.role, fullName: admin.fullName });
-      return true;
-    }
-    return false;
-  }
-  function logout() { setCurrentAdmin(null); renderApp(); }
-
-  // ---------- RENDER LOGIN ----------
-  function renderLogin() {
-    return `
-      <div class="login-card glass">
-        <h2>🔐 Multi-Admin Access</h2>
-        <p style="margin-bottom: 20px;">Super admin: superadmin / admin123</p>
-        <input type="text" id="loginUsername" placeholder="Username" style="width:100%; margin-bottom:12px;"><br>
-        <input type="password" id="loginPassword" placeholder="Password" style="width:100%; margin-bottom:20px;"><br>
-        <button id="doLoginBtn" style="width:100%;">Login →</button>
-      </div>
-    `;
-  }
-
-  // ---------- MAIN DASHBOARD (deposits/withdrawals approvals) ----------
-  async function renderDashboard() {
-    const admin = getCurrentAdmin();
-    if (!admin) return renderLogin();
-
-    // load pending data
-    let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
-    let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
-
+  // Update the UI stats for totals
+  function updateTotalsUI() {
     const totalDeposit = computeTotalDeposit();
     const totalWithdraw = computeTotalWithdraw();
-
-    // helper functions for processing
-    const processDeposit = async (depId, action) => {
-      if (!confirm(`${action.toUpperCase()} deposit #${depId}?`)) return;
-      const deposit = deposits.find(d => d.id === depId);
-      if (!deposit) { alert("Not found"); return; }
-      if (action === 'approve') {
-        recordApprovedDeposit(deposit.id, deposit.amount, { username: deposit.username, payment_type: deposit.payment_type });
-        addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${depId} | ${deposit.amount} ETB by ${deposit.username}`, depId);
-      } else {
-        addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${depId} | ${deposit.amount} ETB`, depId);
-      }
-      const newDeposits = deposits.filter(d => d.id !== depId);
-      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
-      alert(`✅ Deposit ${action}d`);
-      renderApp();
-    };
-
-    const processWithdrawal = async (wdId, action) => {
-      if (!confirm(`${action.toUpperCase()} withdrawal #${wdId}?`)) return;
-      const wd = withdrawals.find(w => w.id === wdId);
-      if (!wd) { alert("Not found"); return; }
-      if (action === 'approve') {
-        recordApprovedWithdrawal(wd.id, wd.amount, { username: wd.username, withdrawal_type: wd.withdrawal_type });
-        addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${wdId} | ${wd.amount} ETB to ${wd.username}`, wdId);
-      } else {
-        addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${wdId} | ${wd.amount} ETB`, wdId);
-      }
-      const newWithdrawals = withdrawals.filter(w => w.id !== wdId);
-      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
-      alert(`✅ Withdrawal ${action}d`);
-      renderApp();
-    };
-
-    const addManualBalance = async () => {
-      const telegramId = document.getElementById('manualUserId')?.value.trim();
-      const amount = document.getElementById('manualAmount')?.value.trim();
-      const feedbackDiv = document.getElementById('balanceFeedback');
-      if (!telegramId || !amount) { alert("Enter ID and amount"); return; }
-      if (!/^\d+$/.test(telegramId)) { alert("Numeric ID required"); return; }
-      const amountNum = Number(amount);
-      if (isNaN(amountNum) || amountNum <= 0) { alert("Positive amount"); return; }
-      recordManualDeposit(amountNum, telegramId, admin.username);
-      addLogEntry("MANUAL_DEPOSIT", `Manual deposit +${amountNum} ETB to user ${telegramId} by ${admin.username}`, null);
-      alert(`✅ +${amountNum} ETB added to ${telegramId} (recorded in total deposit)`);
-      if(feedbackDiv) feedbackDiv.innerHTML = `✔️ +${amountNum} ETB logged.`;
-      document.getElementById('manualUserId').value = '';
-      document.getElementById('manualAmount').value = '';
-      renderApp(); // refresh totals
-    };
-
-    // Render deposit list with QR/OCR scanning (original style)
-    const renderDepositList = () => {
-      if (deposits.length === 0) return '<div class="badge">✅ No pending deposits</div>';
-      let html = '';
-      for (let req of deposits) {
-        const submittedRef = req.reference_number || '';
-        const verifyLink = submittedRef ? `<a href="#" onclick="window.open('${getVerificationLink(req.payment_type, submittedRef)}','_blank')">🔗 Verify</a>` : '';
-        html += `
-          <div class="request-card">
-            <div>
-              <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-              <p>💵 ${req.amount} ETB | 🏦 ${req.payment_type} | 📞 ${req.phone || 'N/A'}</p>
-              <p>🧾 Ref: ${escapeHtml(submittedRef)} ${verifyLink}</p>
-              <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
-              ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : ''}
-              <div id="verify-${req.id}" class="badge" style="margin-top:8px;">🔍 Scanning QR/OCR...</div>
-            </div>
-            <div class="action-buttons">
-              <button class="approve" onclick="window.processDepositFn(${req.id},'approve')">✅ Approve</button>
-              <button class="reject" onclick="window.processDepositFn(${req.id},'reject')">❌ Reject</button>
-            </div>
-          </div>
-        `;
-      }
-      setTimeout(async () => {
-        for (let req of deposits) {
-          const div = document.getElementById(`verify-${req.id}`);
-          if (req.proof_path && div) {
-            try {
-              const result = await getReferenceFromProof(req.proof_path);
-              if (result) {
-                const matchHtml = (submittedRef && submittedRef.toUpperCase() === result.ref.toUpperCase()) ? '<span style="color:#2ecc71">✅ Matches</span>' : '<span style="color:#e74c3c">⚠️ mismatch</span>';
-                div.innerHTML = `🧪 Extracted (${result.method}): ${escapeHtml(result.ref)} ${matchHtml} <br><a href="https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(result.ref)}" target="_blank">📄 Receipt</a>`;
-              } else div.innerHTML = '❌ Could not read reference';
-            } catch(e) { div.innerHTML = '❌ Scan error'; }
-          }
-        }
-      }, 100);
-      return html;
-    };
-
-    const renderWithdrawalList = () => {
-      if (withdrawals.length === 0) return '<div class="badge">✅ No pending withdrawals</div>';
-      return withdrawals.map(req => `
-        <div class="request-card">
-          <div>
-            <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-            <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 📞 ${escapeHtml(req.phone_number)}</p>
-            <p>👤 Receiver: ${escapeHtml(req.receiver_name || 'N/A')} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
-          </div>
-          <div class="action-buttons">
-            <button class="approve" onclick="window.processWithdrawalFn(${req.id},'approve')">✅ Approve</button>
-            <button class="reject" onclick="window.processWithdrawalFn(${req.id},'reject')">❌ Reject</button>
-          </div>
-        </div>
-      `).join('');
-    };
-
-    return `
-      <div class="container">
-        <div class="glass" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-          <h2>🎲 Multi-Admin Bingo · Welcome ${admin.username} (${admin.role})</h2>
-          <button onclick="window.logoutFn()" class="danger">🚪 Logout</button>
-        </div>
-
-        <div class="stats-row">
-          <div class="stat-card"><span>📥 Pending deposits</span><div class="number">${deposits.length}</div></div>
-          <div class="stat-card"><span>💸 Pending withdrawals</span><div class="number">${withdrawals.length}</div></div>
-          <div class="stat-card"><span>💰 TOTAL DEPOSIT (incl. manual)</span><div class="number">${totalDeposit.toLocaleString()} ETB</div></div>
-          <div class="stat-card"><span>💸 TOTAL WITHDRAW</span><div class="number">${totalWithdraw.toLocaleString()} ETB</div></div>
-        </div>
-
-        <div class="glass">
-          <h3>📸 Deposit verifications</h3>
-          <div id="depositList">${renderDepositList()}</div>
-        </div>
-
-        <div class="glass">
-          <h3>💰 Withdrawal requests</h3>
-          <div id="withdrawList">${renderWithdrawalList()}</div>
-        </div>
-
-        <div class="glass">
-          <h3>⚡ Manual balance (adds to TOTAL DEPOSIT)</h3>
-          <div style="display:flex; flex-wrap:wrap; gap:12px;">
-            <input type="text" id="manualUserId" placeholder="Telegram ID" style="flex:1;">
-            <input type="number" id="manualAmount" placeholder="Amount ETB" style="flex:1;">
-            <button id="manualAddBtn">➕ Add & record</button>
-          </div>
-          <div id="balanceFeedback" style="margin-top:8px;"></div>
-        </div>
-
-        <div style="text-align:center; margin-top:20px;">
-          <button id="openControlPanelBtn" class="secondary" style="background:#f39c12;">⚙️ ADMIN CONTROL PANEL (Manage Admins & Logs)</button>
-        </div>
-      </div>
-    `;
+    document.getElementById('totalDepositSum').innerText = totalDeposit.toLocaleString() + ' ETB';
+    document.getElementById('totalWithdrawSum').innerText = totalWithdraw.toLocaleString() + ' ETB';
   }
 
-  // ---------- CONTROL PANEL PAGE (opens in new window) ----------
-  function openControlPanel() {
-    const admin = getCurrentAdmin();
-    if (!admin || admin.role !== 'super') {
-      alert("❌ Only super admin can access the control panel.");
-      return;
-    }
-    const panelHtml = generateControlPanelHTML();
-    const blob = new Blob([panelHtml], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 500);
+  // Record a new approved deposit (after backend success)
+  function recordApprovedDeposit(depositId, amount, metadata = {}) {
+    const logs = loadApprovedDeposits();
+    // Avoid duplicate by id
+    const alreadyExists = logs.some(entry => entry.id === depositId);
+    if (alreadyExists) return false;
+    logs.push({
+      id: depositId,
+      amount: Number(amount),
+      timestamp: new Date().toISOString(),
+      ...metadata
+    });
+    saveApprovedDeposits(logs);
+    updateTotalsUI();
+    return true;
   }
 
-  function generateControlPanelHTML() {
-    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
-    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
-    return `<!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>👥 Admin Control Panel</title><style>
-      *{margin:0;padding:0;box-sizing:border-box;} body{background:#0a0f1c;font-family:'Inter',sans-serif;padding:24px;color:#eef2ff;} .container{max-width:1200px;margin:0 auto;} .card{background:#0f172acc;border-radius:1.5rem;padding:1.5rem;margin-bottom:1.5rem;border:1px solid #f39c12;} h1{color:#f39c12;} table{width:100%;border-collapse:collapse;} th,td{padding:8px;text-align:left;border-bottom:1px solid #334155;} button{background:#f39c12;border:none;padding:6px 12px;border-radius:40px;cursor:pointer;margin:4px;} .danger{background:#e74c3c;color:white;} input{background:#1e2a3e;border:1px solid #f39c12;padding:8px;border-radius:30px;color:white;}
-    </style></head>
-    <body><div class="container">
-      <h1>⚙️ Admin Control Panel (Super Admin)</h1>
-      <div class="card">
-        <h3>➕ Add New Admin</h3>
-        <input type="text" id="newUsername" placeholder="Username"> 
-        <input type="password" id="newPassword" placeholder="Password">
-        <select id="newRole"><option value="admin">Admin</option><option value="super">Super Admin</option></select>
-        <button id="addAdminBtn">Create Admin</button>
-      </div>
-      <div class="card">
-        <h3>📋 Existing Admins</h3>
-        <table id="adminsTable"><thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Action</th></tr></thead><tbody>${admins.map(adm => `<tr><td>${adm.id}</td><td>${adm.username}</td><td>${adm.role}</td><td>${adm.role !== 'super' ? `<button class="danger" onclick="deleteAdmin(${adm.id})">Delete</button>` : '—'}</td></tr>`).join('')}</tbody></table>
-      </div>
-      <div class="card">
-        <h3>📜 Full Action Logs (Approvals/Rejections/Manual)</h3>
-        <div style="max-height:400px; overflow-y:auto;"><table><thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Details</th></tr></thead><tbody>${logs.map(l => `<tr><td>${new Date(l.timestamp).toLocaleString()}</td><td>${l.admin} (${l.adminRole})</td><td>${l.action}</td><td>${l.details}</td></tr>`).join('')}</tbody></table></div>
-      </div>
-      <div><button onclick="window.close()">Close Panel</button></div>
-    </div>
-    <script>
-      function deleteAdmin(id) {
-        if(!confirm("Delete admin?")) return;
-        const admins = JSON.parse(localStorage.getItem("multi_admin_admins") || "[]");
-        const newAdmins = admins.filter(a => a.id !== id);
-        localStorage.setItem("multi_admin_admins", JSON.stringify(newAdmins));
-        alert("Admin deleted. Refresh panel.");
-        location.reload();
-      }
-      document.getElementById('addAdminBtn')?.addEventListener('click', () => {
-        const username = document.getElementById('newUsername').value.trim();
-        const password = document.getElementById('newPassword').value.trim();
-        const role = document.getElementById('newRole').value;
-        if(!username || !password) { alert("Username/password required"); return; }
-        const admins = JSON.parse(localStorage.getItem("multi_admin_admins") || "[]");
-        if(admins.find(a => a.username === username)) { alert("Username exists"); return; }
-        const newId = Date.now();
-        admins.push({ id: newId, username, password, role, fullName: username });
-        localStorage.setItem("multi_admin_admins", JSON.stringify(admins));
-        alert("Admin added");
-        location.reload();
-      });
-      window.deleteAdmin = deleteAdmin;
-    <\/script>
-    </body></html>`;
+  // Record a new approved withdrawal
+  function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
+    const logs = loadApprovedWithdrawals();
+    const alreadyExists = logs.some(entry => entry.id === withdrawalId);
+    if (alreadyExists) return false;
+    logs.push({
+      id: withdrawalId,
+      amount: Number(amount),
+      timestamp: new Date().toISOString(),
+      ...metadata
+    });
+    saveApprovedWithdrawals(logs);
+    updateTotalsUI();
+    return true;
   }
 
-  // ----- QR/OCR helpers (copied from original) -----
-  async function extractRefFromQR(imageSrc) {
-    return new Promise((resolve) => {
+  // Record manual deposit (admin add balance)
+  function recordManualDeposit(amount, telegramId, reference = 'manual') {
+    const logs = loadManualDeposits();
+    const manualId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    logs.push({
+      id: manualId,
+      amount: Number(amount),
+      telegramId: telegramId,
+      note: reference,
+      timestamp: new Date().toISOString()
+    });
+    saveManualDeposits(logs);
+    updateTotalsUI();
+    return true;
+  }
+
+  // original stats (pending) + update totals
+  function updateStats() {
+    document.getElementById('pendingDepositCount').innerText = depositData.length;
+    document.getElementById('pendingWithdrawCount').innerText = withdrawalData.length;
+    document.getElementById('lastRefresh').innerText = new Date().toLocaleTimeString();
+    updateTotalsUI();  // refresh total cards
+  }
+
+  async function fetchAll() {
+    await Promise.all([fetchDeposits(), fetchWithdrawals()]);
+    updateStats();
+  }
+
+  // QR & OCR functions (unchanged - exactly same as original)
+  function extractRefFromQR(imageSrc) {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = imageSrc;
-      img.onload = () => {
+      img.onload = function() {
         try {
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
@@ -453,106 +465,260 @@
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
           if (qrCode && qrCode.data) {
-            const match = qrCode.data.match(/\/receipt\/([A-Z0-9]+)/i);
+            const data = qrCode.data;
+            const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
             if (match) resolve(match[1]);
-            else resolve(qrCode.data.match(/^([A-Z0-9]{8,})$/)?.[1] || null);
+            else {
+              const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+              resolve(refMatch ? refMatch[1] : null);
+            }
           } else resolve(null);
-        } catch(e) { resolve(null); }
+        } catch(e) { reject(e); }
       };
-      img.onerror = () => resolve(null);
+      img.onerror = () => reject('QR load failed');
     });
   }
+
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
       const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      return match ? match[1] : (text.match(/\bDE[A-Z0-9]{8,}\b/i)?.[0] || null);
+      if (match && match[1]) return match[1].trim();
+      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+      return fallback ? fallback[0] : null;
     } catch { return null; }
   }
+
   async function getReferenceFromProof(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
       if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch(e) {}
+    } catch(e) { console.warn(e); }
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
   }
+
   function getVerificationLink(paymentType, referenceNumber) {
     const ref = encodeURIComponent(referenceNumber);
-    if(paymentType === 'telebirr') return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
-    if(paymentType === 'cbebirr') return `https://cbebirr.com/verify?txn=${ref}`;
-    if(paymentType === 'mpesa') return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
-    return null;
-  }
-  function escapeHtml(str) { return String(str || '').replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
-
-  // ---------- GLOBAL RENDER & EVENT BINDING ----------
-  let currentRenderFn = null;
-  async function renderApp() {
-    const admin = getCurrentAdmin();
-    let html;
-    if (!admin) html = renderLogin();
-    else html = await renderDashboard();
-    document.getElementById('app').innerHTML = html;
-    if (!admin) {
-      document.getElementById('doLoginBtn')?.addEventListener('click', () => {
-        const user = document.getElementById('loginUsername').value;
-        const pwd = document.getElementById('loginPassword').value;
-        if (login(user, pwd)) renderApp();
-        else alert("Invalid credentials");
-      });
-    } else {
-      // bind buttons after rendering
-      document.getElementById('manualAddBtn')?.addEventListener('click', async () => {
-        const telegramId = document.getElementById('manualUserId')?.value;
-        const amount = document.getElementById('manualAmount')?.value;
-        const amountNum = Number(amount);
-        if (!telegramId || !amountNum) { alert("Enter all fields"); return; }
-        recordManualDeposit(amountNum, telegramId, admin.username);
-        addLogEntry("MANUAL_DEPOSIT", `Manual deposit +${amountNum} ETB to ${telegramId}`, null);
-        alert(`✅ +${amountNum} ETB logged to totals`);
-        document.getElementById('manualUserId').value = '';
-        document.getElementById('manualAmount').value = '';
-        renderApp();
-      });
-      document.getElementById('openControlPanelBtn')?.addEventListener('click', openControlPanel);
-      window.processDepositFn = async (id, action) => {
-        let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
-        const deposit = deposits.find(d => d.id === id);
-        if (!deposit) return;
-        if (action === 'approve') {
-          recordApprovedDeposit(id, deposit.amount, { username: deposit.username });
-          addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${id} | ${deposit.amount} ETB`, id);
-        } else {
-          addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${id} | ${deposit.amount} ETB`, id);
-        }
-        const newDeposits = deposits.filter(d => d.id !== id);
-        localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
-        alert(`✅ Deposit ${action}d`);
-        renderApp();
-      };
-      window.processWithdrawalFn = async (id, action) => {
-        let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
-        const wd = withdrawals.find(w => w.id === id);
-        if (!wd) return;
-        if (action === 'approve') {
-          recordApprovedWithdrawal(id, wd.amount, { username: wd.username });
-          addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${id} | ${wd.amount} ETB`, id);
-        } else {
-          addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${id} | ${wd.amount} ETB`, id);
-        }
-        const newWithdrawals = withdrawals.filter(w => w.id !== id);
-        localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
-        alert(`✅ Withdrawal ${action}d`);
-        renderApp();
-      };
-      window.logoutFn = () => { logout(); };
+    switch(paymentType) {
+      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+      case 'cbebirr': return `https://cbebirr.com/verify?txn=${ref}`;
+      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+      default: return null;
     }
   }
 
-  initStorage();
-  renderApp();
+  async function fetchDeposits() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      depositData = data.requests || [];
+      renderDeposits();
+    } catch(err) {
+      document.getElementById('depositList').innerHTML = '<p>⚠️ Error loading deposits</p>';
+      depositData = [];
+    }
+  }
+
+  async function renderDeposits() {
+    const filter = document.getElementById('depositFilter').value;
+    const container = document.getElementById('depositList');
+    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
+    if (filtered.length === 0) {
+      container.innerHTML = '<div style="padding:12px; text-align:center;">✅ No pending deposits.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const req of filtered) {
+      const card = document.createElement('div');
+      card.className = 'request-card';
+      const submittedRef = req.reference_number || '';
+      const refHtml = submittedRef ? `<p><strong>🧾 Ref:</strong> ${escapeHtml(submittedRef)}</p>` : '';
+      let verifyLinkHtml = '';
+      if (submittedRef) {
+        const link = getVerificationLink(req.payment_type, submittedRef);
+        if (link) verifyLinkHtml = `<p><a href="${link}" target="_blank">🔗 Verify</a></p>`;
+      }
+      card.innerHTML = `
+        <div class="request-info">
+          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p>📞 ${req.phone || 'N/A'} | 💵 ${req.amount} ETB | 🏦 ${req.payment_type}</p>
+          ${refHtml}
+          ${verifyLinkHtml}
+          <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
+          ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>📎 No proof</p>'}
+          <div id="verify-${req.id}" class="receipt-box">🔍 Scanning...</div>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      `;
+      container.appendChild(card);
+      const verifyDiv = document.getElementById(`verify-${req.id}`);
+      if (req.proof_path && verifyDiv) {
+        try {
+          const result = await getReferenceFromProof(req.proof_path);
+          if (result) {
+            const ref = result.ref;
+            const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+            let matchHtml = '';
+            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches</span>';
+            else if (submittedRef) matchHtml = `<span class="mismatch">❌ mismatch</span>`;
+            verifyDiv.innerHTML = `🧪 Extracted (${result.method}): <strong>${escapeHtml(ref)}</strong> ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Receipt link</a>`;
+          } else verifyDiv.innerHTML = '❌ Reference not readable';
+        } catch(e) { verifyDiv.innerHTML = '❌ Verification error'; }
+      } else if (verifyDiv) verifyDiv.innerHTML = 'No proof';
+    }
+  }
+
+  async function fetchWithdrawals() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      withdrawalData = data.requests || [];
+      renderWithdrawals();
+    } catch(err) {
+      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
+      withdrawalData = [];
+    }
+  }
+
+  function renderWithdrawals() {
+    const filter = document.getElementById('withdrawFilter').value;
+    const container = document.getElementById('withdrawList');
+    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
+    if (filtered.length === 0) {
+      container.innerHTML = '<div style="padding:12px; text-align:center;">✅ No pending withdrawals.</div>';
+      return;
+    }
+    container.innerHTML = filtered.map(req => `
+      <div class="request-card">
+        <div class="request-info">
+          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p>📞 ${escapeHtml(req.phone_number)} | 👤 ${escapeHtml(req.receiver_name || 'N/A')}</p>
+          <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // MODIFIED: processDeposit now records total deposit on approve (no duplicate)
+  async function processDeposit(requestId, action) {
+    if (!confirm(`Confirm ${action} deposit #${requestId}?`)) return;
+    // find deposit data locally
+    const depositItem = depositData.find(d => d.id === requestId);
+    if (!depositItem && action === 'approve') {
+      alert('Deposit data missing, please refresh');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Deposit ${action}d`);
+        if (action === 'approve' && depositItem) {
+          // record to total deposit (approved deposit)
+          recordApprovedDeposit(depositItem.id, depositItem.amount, {
+            username: depositItem.username,
+            payment_type: depositItem.payment_type
+          });
+        }
+        await fetchDeposits();
+        updateStats();  // updates pending + totals
+      } else {
+        alert(data.error || 'Error processing deposit');
+      }
+    } catch(err) { alert(err.message); }
+  }
+
+  // MODIFIED: processWithdrawal records total withdrawal on approve
+  async function processWithdrawal(requestId, action) {
+    if (!confirm(`Confirm ${action} withdrawal #${requestId}?`)) return;
+    const withdrawalItem = withdrawalData.find(w => w.id === requestId);
+    if (!withdrawalItem && action === 'approve') {
+      alert('Withdrawal data missing, refresh');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Withdrawal ${action}d`);
+        if (action === 'approve' && withdrawalItem) {
+          recordApprovedWithdrawal(withdrawalItem.id, withdrawalItem.amount, {
+            username: withdrawalItem.username,
+            withdrawal_type: withdrawalItem.withdrawal_type
+          });
+        }
+        await fetchWithdrawals();
+        updateStats();
+      } else {
+        alert(data.error || 'Error processing withdrawal');
+      }
+    } catch(err) { alert(err.message); }
+  }
+
+  // MODIFIED: addBalance (manual deposit) also contributes to TOTAL DEPOSIT
+  async function addBalance() {
+    const telegramId = document.getElementById('userId').value.trim();
+    const amount = document.getElementById('amount').value.trim();
+    const feedbackDiv = document.getElementById('balanceFeedback');
+    if (!telegramId || !amount) { alert('❌ Enter Telegram ID and amount'); return; }
+    if (!/^\d+$/.test(telegramId)) { alert('❌ Telegram ID must be numeric'); return; }
+    const amountNum = Number(amount);
+    if (isNaN(amountNum) || amountNum <= 0) { alert('❌ Positive amount'); return; }
+    feedbackDiv.innerHTML = '⏳ Processing...';
+    try {
+      const res = await fetch(`${API_BASE}/admin/add-balance`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: amountNum })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Added ${amountNum} ETB to ${telegramId}. New balance: ${data.newBalance}`);
+        // ✅ Record manual deposit to TOTAL DEPOSIT (including manual)
+        recordManualDeposit(amountNum, telegramId, 'admin_manual_add');
+        feedbackDiv.innerHTML = `✔️ Success: +${amountNum} ETB (recorded in total deposit), new balance ${data.newBalance}`;
+        document.getElementById('userId').value = '';
+        document.getElementById('amount').value = '';
+        await fetchAll();    // refresh pending counts
+        updateTotalsUI();    // extra refresh totals
+      } else {
+        alert(`❌ Error: ${data.error}`);
+        feedbackDiv.innerHTML = `⚠️ ${data.error}`;
+      }
+    } catch(err) { alert(err.message); feedbackDiv.innerHTML = '❌ Network error'; }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+  }
+
+  // initial load totals from existing storage, set UI
+  function initTotals() {
+    // ensure storage arrays exist
+    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS)) saveApprovedDeposits([]);
+    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS)) saveApprovedWithdrawals([]);
+    if (!localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS)) saveManualDeposits([]);
+    updateTotalsUI();
+  }
+
+  initTotals();
+  fetchAll();
+  setInterval(() => { fetchAll(); }, 14000);
 </script>
 </body>
 </html>
