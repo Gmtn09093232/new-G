@@ -2,510 +2,617 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>🎰 Bingo Admin | Supabase Totals</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎰 Bingo Admin Panel | Supabase Totals</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { box-sizing: border-box; }
     body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: radial-gradient(circle at 10% 20%, #0a0f1c 0%, #050814 100%);
-      color: #f0f3fa;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0f1c;
+      color: #eee;
       padding: 16px;
-      min-height: 100vh;
+      margin: 0;
     }
-    .container { max-width: 1100px; margin: 0 auto; }
-    .glass {
-      background: rgba(18, 25, 45, 0.75);
-      backdrop-filter: blur(12px);
-      border-radius: 1.5rem;
-      padding: 1.2rem;
-      border: 1px solid rgba(243,156,18,0.3);
-      margin-bottom: 1.5rem;
+    .container { max-width: 1400px; margin: auto; }
+    h1 { color: #f39c12; font-size: 1.8rem; }
+    .section {
+      background: #16202a;
+      margin: 20px 0;
+      padding: 20px;
+      border-radius: 24px;
+      overflow: hidden;
     }
     .stats-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 15px;
       margin-bottom: 20px;
     }
     .stat-card {
-      background: rgba(22,32,42,0.8);
-      border-radius: 1.2rem;
-      padding: 0.6rem 1rem;
-      flex: 1;
+      background: #1e2a36;
+      border-radius: 20px;
+      padding: 15px 20px;
+      flex: 1 1 200px;
       text-align: center;
       border-top: 3px solid #f39c12;
     }
+    .stat-card h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #ccc;
+      margin-bottom: 8px;
+    }
     .stat-card .number {
-      font-size: 1.5rem;
+      font-size: 1.8rem;
       font-weight: 800;
       color: #f39c12;
     }
     .request-card {
-      background: #0f172acc;
-      border-radius: 1.2rem;
-      margin: 1rem 0;
-      padding: 1rem;
+      background: #1e2a36;
+      border-radius: 16px;
+      margin: 12px 0;
+      padding: 15px;
       display: flex;
       flex-wrap: wrap;
+      gap: 15px;
+      align-items: flex-start;
       justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      border: 1px solid #2a3a4e;
     }
-    .action-buttons { display: flex; gap: 10px; }
+    .request-info { flex: 1 1 65%; min-width: 250px; }
+    .request-info p { margin: 5px 0; word-break: break-word; }
+    .proof-img {
+      max-width: 100%;
+      height: auto;
+      max-height: 120px;
+      border-radius: 8px;
+      border: 1px solid #f39c12;
+      margin-top: 8px;
+    }
     button {
       background: #f39c12;
       border: none;
-      padding: 8px 16px;
+      padding: 10px 20px;
       border-radius: 40px;
       font-weight: bold;
       cursor: pointer;
+      margin: 5px 0;
+      font-size: 0.9rem;
+      white-space: nowrap;
     }
-    button.approve { background: #2ecc71; color: #001e0f; }
-    button.reject { background: #e74c3c; color: white; }
-    input, select {
-      background: #0f172ad9;
-      border: 1px solid #334155;
-      color: white;
-      padding: 8px 12px;
-      border-radius: 40px;
+    button.approve { background: #2ecc71; color: #000; }
+    button.reject { background: #e74c3c; color: #fff; }
+    .refresh { background: #3498db; color: #fff; margin-bottom: 20px; }
+    .receipt-box {
+      background: #0f1a24;
+      padding: 10px;
+      border-radius: 12px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
     }
-    .proof-img { max-width: 70px; border-radius: 12px; cursor: pointer; }
-    a { color: #f39c12; }
+    .match { color: #2ecc71; font-weight: bold; }
+    .mismatch { color: #e74c3c; font-weight: bold; }
+    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; font-size: 0.9rem; }
+    select, input {
+      background: #1e2a36;
+      border: 1px solid #334;
+      color: #eee;
+      padding: 10px;
+      border-radius: 8px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    /* Mobile optimisations */
+    @media (max-width: 600px) {
+      body { padding: 8px; }
+      h1 { font-size: 1.4rem; }
+      .section { padding: 12px; border-radius: 16px; }
+      .request-card { flex-direction: column; }
+      .request-info { width: 100%; }
+      .action-buttons { width: 100%; justify-content: flex-start; }
+      button {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        width: auto;
+        flex: 1 1 auto;
+      }
+      .refresh { width: 100%; }
+      #addBalanceSection input {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      #addBalanceSection button {
+        width: 100%;
+      }
+      select, input { width: 100%; margin-right: 0; }
+      .filter-row { flex-direction: column; align-items: flex-start; }
+      .proof-img { max-width: 100%; max-height: 150px; }
+      .stat-card .number { font-size: 1.4rem; }
+    }
   </style>
 </head>
 <body>
-<div id="app"></div>
+<div class="container">
+  <h1>🎰 Bingo Admin Panel</h1>
+  <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
+
+  <!-- Stats Row with totals from Supabase -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <h3>💰 TOTAL DEPOSIT (approved + manual)</h3>
+      <div class="number" id="totalDepositDisplay">0 ETB</div>
+    </div>
+    <div class="stat-card">
+      <h3>💸 TOTAL WITHDRAWAL (approved)</h3>
+      <div class="number" id="totalWithdrawDisplay">0 ETB</div>
+    </div>
+  </div>
+
+  <!-- Deposit Section -->
+  <div class="section">
+    <h2>📸 Pending Deposit Requests</h2>
+    <div class="filter-row">
+      <label for="depositFilter">Filter by method:</label>
+      <select id="depositFilter" onchange="renderDeposits()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="depositList">Loading...</div>
+  </div>
+
+  <!-- Withdrawal Section -->
+  <div class="section">
+    <h2>💰 Pending Withdrawal Requests</h2>
+    <div class="filter-row">
+      <label for="withdrawFilter">Filter by method:</label>
+      <select id="withdrawFilter" onchange="renderWithdrawals()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="withdrawList">Loading...</div>
+  </div>
+
+  <div class="section" id="addBalanceSection">
+    <h2>➕ Manual Add Balance</h2>
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)">
+    <input type="number" id="amount" placeholder="Amount">
+    <button onclick="addBalance()">Add Balance</button>
+  </div>
+</div>
 
 <script>
-  // ======================== SUPABASE CONFIG ========================
-  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";     // <-- REPLACE
-  const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";                  // <-- REPLACE
-  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // ======================== SUPABASE CONFIGURATION ========================
+  // 👇 REPLACE WITH YOUR ACTUAL SUPABASE CREDENTIALS
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";      // <-- CHANGE
+  const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";           // <-- CHANGE
 
-  // ======================== LOCAL STORAGE KEYS (pending requests) ========================
-  const STORAGE = {
-    PENDING_DEPOSITS: 'multi_admin_deposits',
-    PENDING_WITHDRAWALS: 'multi_admin_withdrawals',
-    ADMINS: 'multi_admin_admins',
-    SESSION: 'multi_admin_session',
-    ACTION_LOGS: 'multi_admin_action_logs'
-  };
+  let supabaseClient = null;
+  let supabaseReady = false;
 
-  // ======================== HELPER: Fetch totals from Supabase ========================
-  async function fetchTotalDepositFromSupabase() {
-    const { data, error } = await supabase
+  try {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      supabaseReady = true;
+      console.log("Supabase connected");
+    } else {
+      console.warn("Supabase JS not loaded");
+    }
+  } catch(e) {
+    console.warn("Supabase init error:", e);
+  }
+
+  // ======================== FETCH TOTALS FROM SUPABASE ========================
+  async function fetchTotalDeposit() {
+    if (!supabaseReady || !supabaseClient) return 0;
+    const { data, error } = await supabaseClient
       .from('approved_deposits')
       .select('amount');
     if (error) {
-      console.error('Supabase deposit sum error:', error);
+      console.error("Supabase deposit sum error:", error);
       return 0;
     }
-    const sum = data.reduce((acc, row) => acc + (row.amount || 0), 0);
-    return sum;
+    return data.reduce((sum, row) => sum + (row.amount || 0), 0);
   }
 
-  async function fetchTotalWithdrawFromSupabase() {
-    const { data, error } = await supabase
+  async function fetchTotalWithdraw() {
+    if (!supabaseReady || !supabaseClient) return 0;
+    const { data, error } = await supabaseClient
       .from('approved_withdrawals')
       .select('amount');
     if (error) {
-      console.error('Supabase withdrawal sum error:', error);
+      console.error("Supabase withdrawal sum error:", error);
       return 0;
     }
-    const sum = data.reduce((acc, row) => acc + (row.amount || 0), 0);
-    return sum;
+    return data.reduce((sum, row) => sum + (row.amount || 0), 0);
   }
 
-  // Insert approved deposit into Supabase
-  async function insertApprovedDepositToSupabase(depositId, amount, metadata) {
-    const { error } = await supabase
+  async function updateTotalsUI() {
+    const totalDeposit = await fetchTotalDeposit();
+    const totalWithdraw = await fetchTotalWithdraw();
+    document.getElementById('totalDepositDisplay').innerText = totalDeposit.toLocaleString() + ' ETB';
+    document.getElementById('totalWithdrawDisplay').innerText = totalWithdraw.toLocaleString() + ' ETB';
+  }
+
+  // ======================== INSERT INTO SUPABASE ========================
+  async function insertApprovedDeposit(id, amount, metadata) {
+    if (!supabaseReady) return false;
+    const { error } = await supabaseClient
       .from('approved_deposits')
       .insert([{
-        id: String(depositId),
+        id: String(id),
         amount: Number(amount),
         created_at: new Date().toISOString(),
         user_id: metadata.telegram_id || null,
         payment_type: metadata.payment_type || null,
-        username: metadata.username || null
+        username: metadata.username || null,
+        is_manual: false
       }]);
-    if (error) console.error('Insert deposit error:', error);
+    if (error) console.error("Insert deposit error:", error);
     return !error;
   }
 
-  // Insert approved withdrawal into Supabase
-  async function insertApprovedWithdrawalToSupabase(withdrawalId, amount, metadata) {
-    const { error } = await supabase
+  async function insertApprovedWithdrawal(id, amount, metadata) {
+    if (!supabaseReady) return false;
+    const { error } = await supabaseClient
       .from('approved_withdrawals')
       .insert([{
-        id: String(withdrawalId),
+        id: String(id),
         amount: Number(amount),
         created_at: new Date().toISOString(),
         user_id: metadata.telegram_id || null,
         withdrawal_type: metadata.withdrawal_type || null,
         username: metadata.username || null
       }]);
-    if (error) console.error('Insert withdrawal error:', error);
+    if (error) console.error("Insert withdrawal error:", error);
     return !error;
   }
 
-  // Insert manual deposit (also into approved_deposits, with a flag if you want)
-  async function insertManualDepositToSupabase(amount, telegramId, adminName) {
-    const { error } = await supabase
+  async function insertManualDeposit(amount, telegramId) {
+    if (!supabaseReady) return false;
+    const { error } = await supabaseClient
       .from('approved_deposits')
       .insert([{
-        id: `manual_${Date.now()}`,
+        id: `manual_${Date.now()}_${Math.floor(Math.random()*10000)}`,
         amount: Number(amount),
         created_at: new Date().toISOString(),
         user_id: telegramId,
         payment_type: 'manual',
-        username: `manual_by_${adminName}`
+        username: 'admin_manual',
+        is_manual: true
       }]);
+    if (error) console.error("Insert manual deposit error:", error);
     return !error;
   }
 
-  // ======================== AUTH & LOCAL PENDING LOGIC (unchanged) ========================
-  function initStorage() {
-    if (!localStorage.getItem(STORAGE.ADMINS)) {
-      localStorage.setItem(STORAGE.ADMINS, JSON.stringify([
-        { id: 1, username: "superadmin", password: "admin123", role: "super", fullName: "Super Admin" }
-      ]));
-    }
-    if (!localStorage.getItem(STORAGE.PENDING_DEPOSITS)) {
-      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify([
-        { id: 101, username: "alemu23", telegram_id: "112233445", phone: "0912345678", amount: 450, payment_type: "telebirr", reference_number: "TXNTEL123", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/104/200/150", status: "pending" }
-      ]));
-    }
-    if (!localStorage.getItem(STORAGE.PENDING_WITHDRAWALS)) {
-      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify([
-        { id: 201, username: "dawit_t", telegram_id: "445566778", phone_number: "0944556677", receiver_name: "Dawit T.", amount: 2500, withdrawal_type: "telebirr", created_at: new Date().toISOString(), status: "pending" }
-      ]));
-    }
-    if (!localStorage.getItem(STORAGE.ACTION_LOGS)) localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify([]));
-  }
+  // ---------- Original code (QR, OCR, pending requests) - unchanged except totals ----------
+  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+  const API_BASE = '';
 
-  function getCurrentAdmin() {
-    const session = localStorage.getItem(STORAGE.SESSION);
-    return session ? JSON.parse(session) : null;
-  }
-  function setCurrentAdmin(admin) {
-    if (admin) localStorage.setItem(STORAGE.SESSION, JSON.stringify(admin));
-    else localStorage.removeItem(STORAGE.SESSION);
-  }
-  function login(username, password) {
-    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
-    const admin = admins.find(a => a.username === username && a.password === password);
-    if (admin) { setCurrentAdmin(admin); return true; }
-    return false;
-  }
-  function logout() { setCurrentAdmin(null); renderApp(); }
-
-  // ======================== RENDER DASHBOARD ========================
-  async function renderDashboard() {
-    const admin = getCurrentAdmin();
-    if (!admin) return renderLogin();
-
-    // Get pending data from localStorage
-    let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
-    let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
-
-    // Fetch totals from Supabase
-    const totalDeposit = await fetchTotalDepositFromSupabase();
-    const totalWithdraw = await fetchTotalWithdrawFromSupabase();
-
-    // Helper: process deposit approval/rejection
-    const processDeposit = async (depId, action) => {
-      if (!confirm(`${action.toUpperCase()} deposit #${depId}?`)) return;
-      const deposit = deposits.find(d => d.id === depId);
-      if (!deposit) { alert("Not found"); return; }
-      if (action === 'approve') {
-        const success = await insertApprovedDepositToSupabase(deposit.id, deposit.amount, {
-          telegram_id: deposit.telegram_id,
-          payment_type: deposit.payment_type,
-          username: deposit.username
-        });
-        if (!success) { alert("Failed to save to Supabase"); return; }
-        addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${depId} | ${deposit.amount} ETB`, depId);
-      } else {
-        addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${depId}`, depId);
-      }
-      const newDeposits = deposits.filter(d => d.id !== depId);
-      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
-      alert(`✅ Deposit ${action}d (totals updated from Supabase)`);
-      renderApp();
-    };
-
-    const processWithdrawal = async (wdId, action) => {
-      if (!confirm(`${action.toUpperCase()} withdrawal #${wdId}?`)) return;
-      const wd = withdrawals.find(w => w.id === wdId);
-      if (!wd) { alert("Not found"); return; }
-      if (action === 'approve') {
-        const success = await insertApprovedWithdrawalToSupabase(wd.id, wd.amount, {
-          telegram_id: wd.telegram_id,
-          withdrawal_type: wd.withdrawal_type,
-          username: wd.username
-        });
-        if (!success) { alert("Failed to save to Supabase"); return; }
-        addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${wdId} | ${wd.amount} ETB`, wdId);
-      } else {
-        addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${wdId}`, wdId);
-      }
-      const newWithdrawals = withdrawals.filter(w => w.id !== wdId);
-      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
-      alert(`✅ Withdrawal ${action}d (totals updated from Supabase)`);
-      renderApp();
-    };
-
-    const addManualBalance = async () => {
-      const telegramId = document.getElementById('manualUserId')?.value.trim();
-      const amount = document.getElementById('manualAmount')?.value.trim();
-      if (!telegramId || !amount) { alert("Enter ID and amount"); return; }
-      const amountNum = Number(amount);
-      if (isNaN(amountNum) || amountNum <= 0) { alert("Positive amount"); return; }
-      const ok = await insertManualDepositToSupabase(amountNum, telegramId, admin.username);
-      if (!ok) { alert("Supabase insert failed"); return; }
-      addLogEntry("MANUAL_DEPOSIT", `Manual +${amountNum} ETB to ${telegramId}`, null);
-      alert(`✅ +${amountNum} ETB added to Supabase totals`);
-      document.getElementById('manualUserId').value = '';
-      document.getElementById('manualAmount').value = '';
-      renderApp();
-    };
-
-    // Render deposit list (with QR/OCR scanning)
-    const depositListHtml = deposits.length === 0 ? '<div>✅ No pending deposits</div>' : deposits.map(req => `
-      <div class="request-card">
-        <div>
-          <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-          <p>💵 ${req.amount} ETB | 🏦 ${req.payment_type} | 📞 ${req.phone || 'N/A'}</p>
-          <p>🧾 Ref: ${escapeHtml(req.reference_number || '')}</p>
-          <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
-          ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : ''}
-          <div id="verify-${req.id}" class="badge" style="margin-top:8px;">🔍 Scanning...</div>
-        </div>
-        <div class="action-buttons">
-          <button class="approve" onclick="window.processDepositFn(${req.id},'approve')">✅ Approve</button>
-          <button class="reject" onclick="window.processDepositFn(${req.id},'reject')">❌ Reject</button>
-        </div>
-      </div>
-    `).join('');
-
-    const withdrawListHtml = withdrawals.length === 0 ? '<div>✅ No pending withdrawals</div>' : withdrawals.map(req => `
-      <div class="request-card">
-        <div>
-          <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-          <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 📞 ${escapeHtml(req.phone_number)}</p>
-          <p>👤 Receiver: ${escapeHtml(req.receiver_name || 'N/A')} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
-        </div>
-        <div class="action-buttons">
-          <button class="approve" onclick="window.processWithdrawalFn(${req.id},'approve')">✅ Approve</button>
-          <button class="reject" onclick="window.processWithdrawalFn(${req.id},'reject')">❌ Reject</button>
-        </div>
-      </div>
-    `).join('');
-
-    // After rendering, attach scanning (QR/OCR)
-    setTimeout(() => {
-      deposits.forEach(async (req) => {
-        const div = document.getElementById(`verify-${req.id}`);
-        if (req.proof_path && div) {
-          const result = await getReferenceFromProof(req.proof_path);
-          if (result) {
-            const matchHtml = (req.reference_number && req.reference_number.toUpperCase() === result.ref.toUpperCase()) ? '<span style="color:#2ecc71">✅ Matches</span>' : '<span style="color:#e74c3c">⚠️ mismatch</span>';
-            div.innerHTML = `🧪 Extracted (${result.method}): ${escapeHtml(result.ref)} ${matchHtml}`;
-          } else div.innerHTML = '❌ Could not read reference';
-        }
-      });
-    }, 100);
-
-    return `
-      <div class="container">
-        <div class="glass" style="display:flex; justify-content:space-between; flex-wrap:wrap;">
-          <h2>🎲 Bingo Admin · ${admin.username} (${admin.role})</h2>
-          <button onclick="window.logoutFn()" style="background:#e74c3c;">🚪 Logout</button>
-        </div>
-
-        <div class="stats-row">
-          <div class="stat-card"><span>📥 Pending deposits</span><div class="number">${deposits.length}</div></div>
-          <div class="stat-card"><span>💸 Pending withdrawals</span><div class="number">${withdrawals.length}</div></div>
-          <div class="stat-card"><span>💰 TOTAL DEPOSIT (Supabase)</span><div class="number">${totalDeposit.toLocaleString()} ETB</div></div>
-          <div class="stat-card"><span>💸 TOTAL WITHDRAW (Supabase)</span><div class="number">${totalWithdraw.toLocaleString()} ETB</div></div>
-        </div>
-
-        <div class="glass">
-          <h3>📸 Deposit verifications</h3>
-          ${depositListHtml}
-        </div>
-
-        <div class="glass">
-          <h3>💰 Withdrawal requests</h3>
-          ${withdrawListHtml}
-        </div>
-
-        <div class="glass">
-          <h3>⚡ Manual balance (adds to Supabase TOTAL DEPOSIT)</h3>
-          <div style="display:flex; flex-wrap:wrap; gap:12px;">
-            <input type="text" id="manualUserId" placeholder="Telegram ID" style="flex:1;">
-            <input type="number" id="manualAmount" placeholder="Amount ETB" style="flex:1;">
-            <button id="manualAddBtn">➕ Add & record</button>
-          </div>
-          <div id="balanceFeedback" style="margin-top:8px;"></div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderLogin() {
-    return `
-      <div class="glass" style="max-width:400px; margin:80px auto; text-align:center;">
-        <h2>🔐 Multi-Admin Login</h2>
-        <p>Super admin: superadmin / admin123</p>
-        <input type="text" id="loginUsername" placeholder="Username" style="width:100%; margin:10px 0;"><br>
-        <input type="password" id="loginPassword" placeholder="Password" style="width:100%; margin:10px 0;"><br>
-        <button id="doLoginBtn" style="width:100%;">Login →</button>
-      </div>
-    `;
-  }
-
-  // Helper: add log entry to localStorage
-  function addLogEntry(action, details, requestId) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
-    const admin = getCurrentAdmin();
-    logs.unshift({
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      admin: admin ? admin.username : "unknown",
-      action,
-      details,
-      requestId
-    });
-    localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify(logs.slice(0, 500)));
-  }
-
-  // QR/OCR functions (original)
-  async function extractRefFromQR(imageSrc) {
-    return new Promise((resolve) => {
+  // ---------- QR Code scanning ----------
+  function extractRefFromQR(imageSrc) {
+    return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = "Anonymous";
       img.src = imageSrc;
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-          if (qrCode && qrCode.data) {
-            const match = qrCode.data.match(/\/receipt\/([A-Z0-9]+)/i);
-            if (match) resolve(match[1]);
-            else resolve(qrCode.data.match(/^([A-Z0-9]{8,})$/)?.[1] || null);
-          } else resolve(null);
-        } catch(e) { resolve(null); }
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+        if (qrCode && qrCode.data) {
+          const data = qrCode.data;
+          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
+          if (match) {
+            resolve(match[1]);
+          } else {
+            const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+            if (refMatch) resolve(refMatch[1]);
+            else resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
       };
-      img.onerror = () => resolve(null);
+      img.onerror = () => reject('Failed to load image for QR scan');
     });
   }
+
+  // ---------- OCR fallback ----------
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
       const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      return match ? match[1] : (text.match(/\bDE[A-Z0-9]{8,}\b/i)?.[0] || null);
-    } catch { return null; }
+      if (match && match[1]) return match[1].trim();
+      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+      return fallback ? fallback[0] : null;
+    } catch {
+      return null;
+    }
   }
+
+  // ---------- Unified reference extraction ----------
   async function getReferenceFromProof(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
       if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch(e) {}
+    } catch (e) { console.warn('QR scan failed, trying OCR', e); }
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
   }
-  function escapeHtml(str) { return String(str || '').replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
 
-  // Global render and event binding
-  async function renderApp() {
-    const admin = getCurrentAdmin();
-    let html;
-    if (!admin) html = renderLogin();
-    else html = await renderDashboard();
-    document.getElementById('app').innerHTML = html;
-    if (!admin) {
-      document.getElementById('doLoginBtn')?.addEventListener('click', () => {
-        const user = document.getElementById('loginUsername').value;
-        const pwd = document.getElementById('loginPassword').value;
-        if (login(user, pwd)) renderApp();
-        else alert("Invalid credentials");
-      });
-    } else {
-      document.getElementById('manualAddBtn')?.addEventListener('click', async () => {
-        const telegramId = document.getElementById('manualUserId')?.value;
-        const amount = document.getElementById('manualAmount')?.value;
-        if (!telegramId || !amount) { alert("Enter all fields"); return; }
-        const amountNum = Number(amount);
-        if (isNaN(amountNum) || amountNum <= 0) return alert("Invalid amount");
-        const ok = await insertManualDepositToSupabase(amountNum, telegramId, admin.username);
-        if (ok) {
-          addLogEntry("MANUAL_DEPOSIT", `Manual +${amountNum} ETB to ${telegramId}`, null);
-          alert(`✅ +${amountNum} ETB added to Supabase totals`);
-          document.getElementById('manualUserId').value = '';
-          document.getElementById('manualAmount').value = '';
-          renderApp();
-        } else alert("Supabase insert failed");
-      });
-      window.processDepositFn = async (id, action) => {
-        let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
-        const deposit = deposits.find(d => d.id === id);
-        if (!deposit) return;
-        if (action === 'approve') {
-          const ok = await insertApprovedDepositToSupabase(id, deposit.amount, {
-            telegram_id: deposit.telegram_id,
-            payment_type: deposit.payment_type,
-            username: deposit.username
-          });
-          if (!ok) { alert("Supabase save failed"); return; }
-          addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${id} | ${deposit.amount} ETB`, id);
-        } else {
-          addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${id}`, id);
-        }
-        const newDeposits = deposits.filter(d => d.id !== id);
-        localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
-        alert(`✅ Deposit ${action}d`);
-        renderApp();
-      };
-      window.processWithdrawalFn = async (id, action) => {
-        let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
-        const wd = withdrawals.find(w => w.id === id);
-        if (!wd) return;
-        if (action === 'approve') {
-          const ok = await insertApprovedWithdrawalToSupabase(id, wd.amount, {
-            telegram_id: wd.telegram_id,
-            withdrawal_type: wd.withdrawal_type,
-            username: wd.username
-          });
-          if (!ok) { alert("Supabase save failed"); return; }
-          addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${id} | ${wd.amount} ETB`, id);
-        } else {
-          addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${id}`, id);
-        }
-        const newWithdrawals = withdrawals.filter(w => w.id !== id);
-        localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
-        alert(`✅ Withdrawal ${action}d`);
-        renderApp();
-      };
-      window.logoutFn = () => { logout(); };
+  // ---------- Verification link builder ----------
+  function getVerificationLink(paymentType, referenceNumber) {
+    const ref = encodeURIComponent(referenceNumber);
+    switch (paymentType) {
+      case 'telebirr':
+        return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+      case 'cbebirr':
+        return `https://cbebirr.com/verify?txn=${ref}`;
+      case 'mpesa':
+        return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+      default:
+        return null;
     }
   }
 
-  initStorage();
-  renderApp();
+  // ---------- Global data stores ----------
+  let depositData = [];
+  let withdrawalData = [];
+
+  // ---------- UI rendering ----------
+  async function fetchAll() {
+    await fetchDeposits();
+    await fetchWithdrawals();
+    await updateTotalsUI();
+  }
+
+  async function fetchDeposits() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      depositData = data.requests || [];
+      renderDeposits();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
+    }
+  }
+
+  function renderDeposits() {
+    const filter = document.getElementById('depositFilter').value;
+    const container = document.getElementById('depositList');
+    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<p>✅ No pending deposits.</p>';
+      return;
+    }
+
+    container.innerHTML = '';
+    filtered.forEach(async (req) => {
+      const card = document.createElement('div');
+      card.className = 'request-card';
+
+      const submittedRef = req.reference_number || '';
+      const refHtml = submittedRef
+        ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
+        : '';
+
+      let verifyLinkHtml = '';
+      if (submittedRef) {
+        const link = getVerificationLink(req.payment_type, submittedRef);
+        if (link) {
+          verifyLinkHtml = `<p><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>`;
+        }
+      }
+
+      card.innerHTML = `
+        <div class="request-info">
+          <p><strong>ID:</strong> ${req.id}</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
+          <p><strong>Amount:</strong> ${req.amount} ETB</p>
+          <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
+          ${refHtml}
+          ${verifyLinkHtml}
+          <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+          ${req.proof_path
+            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">`
+            : '<p>No proof</p>'}
+          <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      if (req.proof_path) {
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
+        try {
+          const result = await getReferenceFromProof(req.proof_path);
+          if (result) {
+            const ref = result.ref;
+            const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+            let matchHtml = '';
+            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
+              matchHtml = '<span class="match">✅ Matches submitted ref</span>';
+            } else if (submittedRef) {
+              matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+            }
+            verifyDiv.innerHTML = `
+              <strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br>
+              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt</a>
+            `;
+          } else {
+            verifyDiv.innerHTML = '❌ Could not read reference from image.';
+          }
+        } catch (e) {
+          verifyDiv.innerHTML = '❌ Verification error.';
+          console.error(e);
+        }
+      } else {
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
+        if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.';
+      }
+    });
+  }
+
+  async function fetchWithdrawals() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      withdrawalData = data.requests || [];
+      renderWithdrawals();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
+    }
+  }
+
+  function renderWithdrawals() {
+    const filter = document.getElementById('withdrawFilter').value;
+    const container = document.getElementById('withdrawList');
+    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<p>✅ No pending withdrawals.</p>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(req => `
+      <div class="request-card">
+        <div class="request-info">
+          <p><strong>ID:</strong> ${req.id}</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${req.phone_number}</p>
+          <p><strong>Name:</strong> ${req.receiver_name || 'N/A'}</p>
+          <p><strong>Amount:</strong> ${req.amount} ETB</p>
+          <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
+          <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function processDeposit(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this deposit?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Deposit ${action}d successfully!`);
+        if (action === 'approve') {
+          const deposit = depositData.find(d => d.id === requestId);
+          if (deposit) {
+            await insertApprovedDeposit(deposit.id, deposit.amount, {
+              telegram_id: deposit.telegram_id,
+              payment_type: deposit.payment_type,
+              username: deposit.username
+            });
+          }
+        }
+        await fetchDeposits();
+        await updateTotalsUI();
+      } else {
+        alert(data.error || 'Error');
+      }
+    } catch (err) { alert(err.message); }
+  }
+
+  async function processWithdrawal(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Withdrawal ${action}d successfully!`);
+        if (action === 'approve') {
+          const withdrawal = withdrawalData.find(w => w.id === requestId);
+          if (withdrawal) {
+            await insertApprovedWithdrawal(withdrawal.id, withdrawal.amount, {
+              telegram_id: withdrawal.telegram_id,
+              withdrawal_type: withdrawal.withdrawal_type,
+              username: withdrawal.username
+            });
+          }
+        }
+        await fetchWithdrawals();
+        await updateTotalsUI();
+      } else {
+        alert(data.error || 'Error');
+      }
+    } catch (err) { alert(err.message); }
+  }
+
+  async function addBalance() {
+    const telegramId = document.getElementById('userId').value.trim();
+    const amount = document.getElementById('amount').value.trim();
+    if (!telegramId || !amount) { alert('Fill all fields'); return; }
+    const amountNum = Number(amount);
+    if (isNaN(amountNum) || amountNum <= 0) { alert('Amount must be positive number'); return; }
+    try {
+      const res = await fetch(`${API_BASE}/admin/add-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: amountNum })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Added ${amount} to user. New balance: ${data.newBalance}`);
+        await insertManualDeposit(amountNum, telegramId);
+        await updateTotalsUI();
+      } else {
+        alert(data.error || 'Error');
+      }
+    } catch (err) { alert(err.message); }
+  }
+
+  // Initial load
+  fetchAll();
+  setInterval(fetchAll, 10000);
 </script>
 </body>
 </html>
