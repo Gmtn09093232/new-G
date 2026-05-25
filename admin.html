@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Bingo Admin | Total Stats + Logs</title>
+  <title>🎰 Bingo Admin | Persistent Totals + Logs</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -31,7 +31,6 @@
       width: 100%;
     }
 
-    /* header - compact */
     .glass-header {
       background: rgba(18, 25, 45, 0.75);
       backdrop-filter: blur(12px);
@@ -81,7 +80,6 @@
     }
     .refresh-btn:active { transform: scale(0.96); }
 
-    /* INLINE STATS ROW - now with total deposit & withdraw */
     .stats-row {
       display: flex;
       flex-direction: row;
@@ -114,8 +112,7 @@
       color: #f39c12;
       line-height: 1.2;
     }
-    /* special accent for totals */
-    .stat-card.total .number { color: #2ecc71; text-shadow: 0 0 2px #2ecc7133; }
+    .stat-card.total .number { color: #2ecc71; }
     .stat-card.withdraw-total .number { color: #e67e22; }
     @media (max-width: 560px) {
       .stat-card span { font-size: 0.55rem; }
@@ -123,7 +120,6 @@
       .stat-card { padding: 0.3rem 0.2rem; min-width: 75px; }
     }
 
-    /* sections */
     .section {
       background: rgba(18, 28, 40, 0.65);
       backdrop-filter: blur(12px);
@@ -164,7 +160,6 @@
       outline: none;
     }
 
-    /* request cards */
     .request-card {
       background: #0f172acc;
       border-radius: 1.2rem;
@@ -218,7 +213,6 @@
     .match { color: #2ecc71; }
     .mismatch { color: #e74c3c; }
 
-    /* balance card inline on desktop, stacked on mobile but compact */
     .balance-card {
       background: linear-gradient(125deg, #0e1a24, #050f18);
       border-radius: 1.5rem;
@@ -257,16 +251,16 @@
     .info-note { font-size: 0.6rem; margin-top: 4px; }
     #balanceFeedback { font-size: 0.7rem; margin-top: 8px; }
     a { color: #f39c12; word-break: break-all; }
+    button.small { padding: 4px 8px; font-size: 0.7rem; background: #2c3e66; }
   </style>
 </head>
 <body>
 <div class="container">
   <div class="glass-header">
-    <h1>🎲 BINGO ADMIN</h1>
+    <h1>🎲 BINGO ADMIN (Persistent Totals)</h1>
     <button class="refresh-btn" onclick="fetchAll()">⟳ Refresh</button>
   </div>
 
-  <!-- inline stats row with TOTAL DEPOSIT & TOTAL WITHDRAW (including manual) -->
   <div class="stats-row" id="statsPanel">
     <div class="stat-card"><span>📥 pending deposits</span><div class="number" id="pendingDepositCount">0</div></div>
     <div class="stat-card"><span>💸 pending withdrawals</span><div class="number" id="pendingWithdrawCount">0</div></div>
@@ -275,7 +269,6 @@
     <div class="stat-card"><span>🕒 last refresh</span><div class="number" id="lastRefresh">--:--:--</div></div>
   </div>
 
-  <!-- Deposit Section -->
   <div class="section">
     <h2>📸 Deposit verifications</h2>
     <div class="filter-row">
@@ -290,7 +283,6 @@
     <div id="depositList">Loading deposits...</div>
   </div>
 
-  <!-- Withdrawal Section -->
   <div class="section">
     <h2>💰 Withdrawal requests</h2>
     <div class="filter-row">
@@ -305,7 +297,6 @@
     <div id="withdrawList">Loading withdrawals...</div>
   </div>
 
-  <!-- Manual Add Balance -->
   <div class="section">
     <h2>⚡ Manual balance (adds to TOTAL DEPOSIT)</h2>
     <div class="balance-card">
@@ -323,6 +314,7 @@
       </div>
     </div>
     <div id="balanceFeedback"></div>
+    <div class="info-note">✅ All approvals, rejections & manual adds are stored permanently. Totals never reset.</div>
   </div>
 </div>
 
@@ -332,97 +324,88 @@
 
   let depositData = [], withdrawalData = [];
 
-  // ---------- PERSISTENT TOTALS (including manual deposits & approved withdrawals) ----------
-  // Keys for localStorage
+  // ---------- PERSISTENT STORAGE WITH SUMMARY (NEVER RESETS) ----------
   const STORAGE_KEYS = {
-    APPROVED_DEPOSITS: 'bingo_total_deposits_log',   // array of { id, amount, timestamp }
-    APPROVED_WITHDRAWALS: 'bingo_total_withdrawals_log',
-    MANUAL_DEPOSITS: 'bingo_manual_deposits_log'      // array of { id, amount, note, timestamp }
+    APPROVED_DEPOSITS: 'bingo_total_deposits_log_v2',
+    APPROVED_WITHDRAWALS: 'bingo_total_withdrawals_log_v2',
+    MANUAL_DEPOSITS: 'bingo_manual_deposits_log_v2',
+    TOTALS_SUMMARY: 'bingo_totals_summary_v2'   // stores { totalDeposit, totalWithdraw }
   };
 
-  // Helper: load logs
-  function loadApprovedDeposits() {
-    const stored = localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS);
-    return stored ? JSON.parse(stored) : [];
+  // Helper: load/save summary
+  function loadSummary() {
+    const stored = localStorage.getItem(STORAGE_KEYS.TOTALS_SUMMARY);
+    if (stored) return JSON.parse(stored);
+    return { totalDeposit: 0, totalWithdraw: 0 };
   }
-  function loadApprovedWithdrawals() {
-    const stored = localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS);
-    return stored ? JSON.parse(stored) : [];
-  }
-  function loadManualDeposits() {
-    const stored = localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS);
-    return stored ? JSON.parse(stored) : [];
+  function saveSummary(summary) {
+    localStorage.setItem(STORAGE_KEYS.TOTALS_SUMMARY, JSON.stringify(summary));
   }
 
-  function saveApprovedDeposits(log) {
-    localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, JSON.stringify(log));
-  }
-  function saveApprovedWithdrawals(log) {
-    localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, JSON.stringify(log));
-  }
-  function saveManualDeposits(log) {
-    localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, JSON.stringify(log));
-  }
-
-  // Compute total deposit = sum(approved deposits) + sum(manual deposits)
-  function computeTotalDeposit() {
-    const approved = loadApprovedDeposits();
-    const manual = loadManualDeposits();
-    const sumApproved = approved.reduce((acc, entry) => acc + (entry.amount || 0), 0);
-    const sumManual = manual.reduce((acc, entry) => acc + (entry.amount || 0), 0);
-    return sumApproved + sumManual;
+  // Recompute totals from logs (fallback if summary gets out of sync)
+  function recomputeTotalsFromLogs() {
+    const approvedDeposits = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS) || "[]");
+    const manualDeposits = JSON.parse(localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS) || "[]");
+    const approvedWithdrawals = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS) || "[]");
+    const totalDeposit = approvedDeposits.reduce((s, e) => s + (e.amount || 0), 0) + manualDeposits.reduce((s, e) => s + (e.amount || 0), 0);
+    const totalWithdraw = approvedWithdrawals.reduce((s, e) => s + (e.amount || 0), 0);
+    return { totalDeposit, totalWithdraw };
   }
 
-  // Compute total withdrawal = sum(approved withdrawals)
-  function computeTotalWithdraw() {
-    const withdrawals = loadApprovedWithdrawals();
-    return withdrawals.reduce((acc, entry) => acc + (entry.amount || 0), 0);
-  }
-
-  // Update the UI stats for totals
+  // Update UI and ensure summary consistency
   function updateTotalsUI() {
-    const totalDeposit = computeTotalDeposit();
-    const totalWithdraw = computeTotalWithdraw();
-    document.getElementById('totalDepositSum').innerText = totalDeposit.toLocaleString() + ' ETB';
-    document.getElementById('totalWithdrawSum').innerText = totalWithdraw.toLocaleString() + ' ETB';
+    let summary = loadSummary();
+    const computed = recomputeTotalsFromLogs();
+    // If summary mismatch (e.g., due to external tampering), fix it
+    if (summary.totalDeposit !== computed.totalDeposit || summary.totalWithdraw !== computed.totalWithdraw) {
+      console.warn("Summary mismatch, fixing from logs");
+      summary = computed;
+      saveSummary(summary);
+    }
+    document.getElementById('totalDepositSum').innerText = summary.totalDeposit.toLocaleString() + ' ETB';
+    document.getElementById('totalWithdrawSum').innerText = summary.totalWithdraw.toLocaleString() + ' ETB';
   }
 
-  // Record a new approved deposit (after backend success)
+  // Record a new approved deposit (called after backend success)
   function recordApprovedDeposit(depositId, amount, metadata = {}) {
-    const logs = loadApprovedDeposits();
-    // Avoid duplicate by id
-    const alreadyExists = logs.some(entry => entry.id === depositId);
-    if (alreadyExists) return false;
+    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS) || "[]");
+    if (logs.some(entry => entry.id === depositId)) return false;
     logs.push({
       id: depositId,
       amount: Number(amount),
       timestamp: new Date().toISOString(),
       ...metadata
     });
-    saveApprovedDeposits(logs);
+    localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, JSON.stringify(logs));
+    // Update summary
+    const summary = loadSummary();
+    summary.totalDeposit += Number(amount);
+    saveSummary(summary);
     updateTotalsUI();
     return true;
   }
 
   // Record a new approved withdrawal
   function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
-    const logs = loadApprovedWithdrawals();
-    const alreadyExists = logs.some(entry => entry.id === withdrawalId);
-    if (alreadyExists) return false;
+    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS) || "[]");
+    if (logs.some(entry => entry.id === withdrawalId)) return false;
     logs.push({
       id: withdrawalId,
       amount: Number(amount),
       timestamp: new Date().toISOString(),
       ...metadata
     });
-    saveApprovedWithdrawals(logs);
+    localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, JSON.stringify(logs));
+    const summary = loadSummary();
+    summary.totalWithdraw += Number(amount);
+    saveSummary(summary);
     updateTotalsUI();
     return true;
   }
 
-  // Record manual deposit (admin add balance)
+  // Record manual deposit
   function recordManualDeposit(amount, telegramId, reference = 'manual') {
-    const logs = loadManualDeposits();
+    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS) || "[]");
     const manualId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
     logs.push({
       id: manualId,
@@ -431,7 +414,10 @@
       note: reference,
       timestamp: new Date().toISOString()
     });
-    saveManualDeposits(logs);
+    localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, JSON.stringify(logs));
+    const summary = loadSummary();
+    summary.totalDeposit += Number(amount);
+    saveSummary(summary);
     updateTotalsUI();
     return true;
   }
@@ -449,7 +435,7 @@
     updateStats();
   }
 
-  // QR & OCR functions (unchanged - exactly same as original)
+  // QR & OCR functions (identical to original)
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -516,8 +502,9 @@
       depositData = data.requests || [];
       renderDeposits();
     } catch(err) {
-      document.getElementById('depositList').innerHTML = '<p>⚠️ Error loading deposits</p>';
+      document.getElementById('depositList').innerHTML = '<p>⚠️ Error loading deposits (using local mock?)</p>';
       depositData = [];
+      renderDeposits();
     }
   }
 
@@ -582,6 +569,7 @@
     } catch(err) {
       document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
       withdrawalData = [];
+      renderWithdrawals();
     }
   }
 
@@ -608,10 +596,8 @@
     `).join('');
   }
 
-  // MODIFIED: processDeposit now records total deposit on approve (no duplicate)
   async function processDeposit(requestId, action) {
     if (!confirm(`Confirm ${action} deposit #${requestId}?`)) return;
-    // find deposit data locally
     const depositItem = depositData.find(d => d.id === requestId);
     if (!depositItem && action === 'approve') {
       alert('Deposit data missing, please refresh');
@@ -626,21 +612,19 @@
       if (data.success) {
         alert(`✅ Deposit ${action}d`);
         if (action === 'approve' && depositItem) {
-          // record to total deposit (approved deposit)
           recordApprovedDeposit(depositItem.id, depositItem.amount, {
             username: depositItem.username,
             payment_type: depositItem.payment_type
           });
         }
         await fetchDeposits();
-        updateStats();  // updates pending + totals
+        updateStats();
       } else {
         alert(data.error || 'Error processing deposit');
       }
     } catch(err) { alert(err.message); }
   }
 
-  // MODIFIED: processWithdrawal records total withdrawal on approve
   async function processWithdrawal(requestId, action) {
     if (!confirm(`Confirm ${action} withdrawal #${requestId}?`)) return;
     const withdrawalItem = withdrawalData.find(w => w.id === requestId);
@@ -670,7 +654,6 @@
     } catch(err) { alert(err.message); }
   }
 
-  // MODIFIED: addBalance (manual deposit) also contributes to TOTAL DEPOSIT
   async function addBalance() {
     const telegramId = document.getElementById('userId').value.trim();
     const amount = document.getElementById('amount').value.trim();
@@ -688,13 +671,12 @@
       const data = await res.json();
       if (data.success) {
         alert(`✅ Added ${amountNum} ETB to ${telegramId}. New balance: ${data.newBalance}`);
-        // ✅ Record manual deposit to TOTAL DEPOSIT (including manual)
         recordManualDeposit(amountNum, telegramId, 'admin_manual_add');
         feedbackDiv.innerHTML = `✔️ Success: +${amountNum} ETB (recorded in total deposit), new balance ${data.newBalance}`;
         document.getElementById('userId').value = '';
         document.getElementById('amount').value = '';
-        await fetchAll();    // refresh pending counts
-        updateTotalsUI();    // extra refresh totals
+        await fetchAll();
+        updateTotalsUI();
       } else {
         alert(`❌ Error: ${data.error}`);
         feedbackDiv.innerHTML = `⚠️ ${data.error}`;
@@ -707,16 +689,26 @@
     return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
   }
 
-  // initial load totals from existing storage, set UI
-  function initTotals() {
-    // ensure storage arrays exist
-    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS)) saveApprovedDeposits([]);
-    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS)) saveApprovedWithdrawals([]);
-    if (!localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS)) saveManualDeposits([]);
+  // Initialize storage with empty arrays if not exist, and build summary if missing
+  function initStorage() {
+    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS)) localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, "[]");
+    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS)) localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, "[]");
+    if (!localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS)) localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, "[]");
+    if (!localStorage.getItem(STORAGE_KEYS.TOTALS_SUMMARY)) {
+      const computed = recomputeTotalsFromLogs();
+      saveSummary(computed);
+    } else {
+      // ensure summary is correct
+      const summary = loadSummary();
+      const computed = recomputeTotalsFromLogs();
+      if (summary.totalDeposit !== computed.totalDeposit || summary.totalWithdraw !== computed.totalWithdraw) {
+        saveSummary(computed);
+      }
+    }
     updateTotalsUI();
   }
 
-  initTotals();
+  initStorage();
   fetchAll();
   setInterval(() => { fetchAll(); }, 14000);
 </script>
