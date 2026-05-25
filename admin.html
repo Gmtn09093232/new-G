@@ -97,7 +97,6 @@
     }
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
-    .nav-link { color: #f39c12; font-weight: bold; margin-left: 20px; font-size: 0.9rem; }
     select, input {
       background: #1e2a36;
       border: 1px solid #334;
@@ -121,7 +120,6 @@
       gap: 8px;
       align-items: center;
     }
-    /* Mobile optimisations */
     @media (max-width: 600px) {
       body { padding: 8px; }
       h1 { font-size: 1.4rem; }
@@ -148,6 +146,13 @@
       .proof-img { max-width: 100%; max-height: 150px; }
       .stat-card .number { font-size: 1.4rem; }
     }
+    .error-banner {
+      background: #e74c3c33;
+      border-left: 4px solid #e74c3c;
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -155,7 +160,6 @@
   <h1>🎰 Bingo Admin Panel</h1>
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
-  <!-- Stats Row with totals from Supabase -->
   <div class="stats-row">
     <div class="stat-card">
       <h3>💰 TOTAL DEPOSIT (approved + manual)</h3>
@@ -167,7 +171,6 @@
     </div>
   </div>
 
-  <!-- Deposit Section -->
   <div class="section">
     <h2>📸 Pending Deposit Requests</h2>
     <div class="filter-row">
@@ -182,7 +185,6 @@
     <div id="depositList">Loading...</div>
   </div>
 
-  <!-- Withdrawal Section -->
   <div class="section">
     <h2>💰 Pending Withdrawal Requests</h2>
     <div class="filter-row">
@@ -218,7 +220,7 @@
     if (typeof supabase !== 'undefined' && supabase.createClient) {
       supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       supabaseReady = true;
-      console.log("Supabase connected");
+      console.log("✅ Supabase connected");
     } else {
       console.warn("Supabase JS not loaded");
     }
@@ -260,7 +262,10 @@
 
   // ======================== INSERT INTO SUPABASE ========================
   async function insertApprovedDeposit(id, amount, metadata) {
-    if (!supabaseReady) return false;
+    if (!supabaseReady) {
+      alert("❌ Supabase not configured. Cannot record deposit.");
+      return false;
+    }
     const { error } = await supabaseClient
       .from('approved_deposits')
       .insert([{
@@ -272,12 +277,19 @@
         username: metadata.username || null,
         is_manual: false
       }]);
-    if (error) console.error("Insert deposit error:", error);
-    return !error;
+    if (error) {
+      console.error("Insert deposit error:", error);
+      alert("❌ Failed to record deposit in Supabase: " + error.message);
+      return false;
+    }
+    return true;
   }
 
   async function insertApprovedWithdrawal(id, amount, metadata) {
-    if (!supabaseReady) return false;
+    if (!supabaseReady) {
+      alert("❌ Supabase not configured. Cannot record withdrawal.");
+      return false;
+    }
     const { error } = await supabaseClient
       .from('approved_withdrawals')
       .insert([{
@@ -288,12 +300,19 @@
         withdrawal_type: metadata.withdrawal_type || null,
         username: metadata.username || null
       }]);
-    if (error) console.error("Insert withdrawal error:", error);
-    return !error;
+    if (error) {
+      console.error("Insert withdrawal error:", error);
+      alert("❌ Failed to record withdrawal in Supabase: " + error.message);
+      return false;
+    }
+    return true;
   }
 
   async function insertManualDeposit(amount, telegramId) {
-    if (!supabaseReady) return false;
+    if (!supabaseReady) {
+      alert("❌ Supabase not configured. Cannot record manual deposit.");
+      return false;
+    }
     const { error } = await supabaseClient
       .from('approved_deposits')
       .insert([{
@@ -305,15 +324,18 @@
         username: 'admin_manual',
         is_manual: true
       }]);
-    if (error) console.error("Insert manual deposit error:", error);
-    return !error;
+    if (error) {
+      console.error("Insert manual deposit error:", error);
+      alert("❌ Failed to record manual deposit: " + error.message);
+      return false;
+    }
+    return true;
   }
 
-  // ---------- Original code (QR, OCR, pending requests) - unchanged except totals ----------
+  // ---------- Original code (QR, OCR, pending requests) ----------
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
 
-  // ---------- QR Code scanning ----------
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -329,22 +351,18 @@
         if (qrCode && qrCode.data) {
           const data = qrCode.data;
           const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) {
-            resolve(match[1]);
-          } else {
+          if (match) resolve(match[1]);
+          else {
             const refMatch = data.match(/^([A-Z0-9]{8,})$/);
             if (refMatch) resolve(refMatch[1]);
             else resolve(null);
           }
-        } else {
-          resolve(null);
-        }
+        } else resolve(null);
       };
       img.onerror = () => reject('Failed to load image for QR scan');
     });
   }
 
-  // ---------- OCR fallback ----------
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
@@ -352,12 +370,9 @@
       if (match && match[1]) return match[1].trim();
       const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
       return fallback ? fallback[0] : null;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
-  // ---------- Unified reference extraction ----------
   async function getReferenceFromProof(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
@@ -368,26 +383,19 @@
     return null;
   }
 
-  // ---------- Verification link builder ----------
   function getVerificationLink(paymentType, referenceNumber) {
     const ref = encodeURIComponent(referenceNumber);
     switch (paymentType) {
-      case 'telebirr':
-        return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
-      case 'cbebirr':
-        return `https://cbebirr.com/verify?txn=${ref}`;
-      case 'mpesa':
-        return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
-      default:
-        return null;
+      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+      case 'cbebirr': return `https://cbebirr.com/verify?txn=${ref}`;
+      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+      default: return null;
     }
   }
 
-  // ---------- Global data stores ----------
   let depositData = [];
   let withdrawalData = [];
 
-  // ---------- UI rendering ----------
   async function fetchAll() {
     await fetchDeposits();
     await fetchWithdrawals();
@@ -410,30 +418,21 @@
     const filter = document.getElementById('depositFilter').value;
     const container = document.getElementById('depositList');
     const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
-
     if (filtered.length === 0) {
       container.innerHTML = '<p>✅ No pending deposits.</p>';
       return;
     }
-
     container.innerHTML = '';
     filtered.forEach(async (req) => {
       const card = document.createElement('div');
       card.className = 'request-card';
-
       const submittedRef = req.reference_number || '';
-      const refHtml = submittedRef
-        ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
-        : '';
-
+      const refHtml = submittedRef ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>` : '';
       let verifyLinkHtml = '';
       if (submittedRef) {
         const link = getVerificationLink(req.payment_type, submittedRef);
-        if (link) {
-          verifyLinkHtml = `<p><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>`;
-        }
+        if (link) verifyLinkHtml = `<p><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>`;
       }
-
       card.innerHTML = `
         <div class="request-info">
           <p><strong>ID:</strong> ${req.id}</p>
@@ -444,9 +443,7 @@
           ${refHtml}
           ${verifyLinkHtml}
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
-          ${req.proof_path
-            ? `<img src="${req.proof_path}" id="proof-${req.id}" class="proof-img" onclick="window.open(this.src)">`
-            : '<p>No proof</p>'}
+          ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>No proof</p>'}
           <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
         </div>
         <div class="action-buttons">
@@ -454,9 +451,7 @@
           <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
         </div>
       `;
-
       container.appendChild(card);
-
       if (req.proof_path) {
         const verifyDiv = document.getElementById(`verify-${req.id}`);
         try {
@@ -465,25 +460,11 @@
             const ref = result.ref;
             const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
             let matchHtml = '';
-            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
-              matchHtml = '<span class="match">✅ Matches submitted ref</span>';
-            } else if (submittedRef) {
-              matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
-            }
-            verifyDiv.innerHTML = `
-              <strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br>
-              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt</a>
-            `;
-          } else {
-            verifyDiv.innerHTML = '❌ Could not read reference from image.';
-          }
-        } catch (e) {
-          verifyDiv.innerHTML = '❌ Verification error.';
-          console.error(e);
-        }
-      } else {
-        const verifyDiv = document.getElementById(`verify-${req.id}`);
-        if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.';
+            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches submitted ref</span>';
+            else if (submittedRef) matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+            verifyDiv.innerHTML = `<strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
+          } else verifyDiv.innerHTML = '❌ Could not read reference from image.';
+        } catch (e) { verifyDiv.innerHTML = '❌ Verification error.'; }
       }
     });
   }
@@ -504,12 +485,10 @@
     const filter = document.getElementById('withdrawFilter').value;
     const container = document.getElementById('withdrawList');
     const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
-
     if (filtered.length === 0) {
       container.innerHTML = '<p>✅ No pending withdrawals.</p>';
       return;
     }
-
     container.innerHTML = filtered.map(req => `
       <div class="request-card">
         <div class="request-info">
@@ -539,17 +518,21 @@
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Deposit ${action}d successfully!`);
         if (action === 'approve') {
           const deposit = depositData.find(d => d.id === requestId);
           if (deposit) {
-            await insertApprovedDeposit(deposit.id, deposit.amount, {
+            const ok = await insertApprovedDeposit(deposit.id, deposit.amount, {
               telegram_id: deposit.telegram_id,
               payment_type: deposit.payment_type,
               username: deposit.username
             });
+            if (!ok) {
+              alert("⚠️ Deposit approved in backend but failed to record in Supabase.");
+              return;
+            }
           }
         }
+        alert(`Deposit ${action}d successfully!`);
         await fetchDeposits();
         await updateTotalsUI();
       } else {
@@ -568,17 +551,21 @@
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Withdrawal ${action}d successfully!`);
         if (action === 'approve') {
           const withdrawal = withdrawalData.find(w => w.id === requestId);
           if (withdrawal) {
-            await insertApprovedWithdrawal(withdrawal.id, withdrawal.amount, {
+            const ok = await insertApprovedWithdrawal(withdrawal.id, withdrawal.amount, {
               telegram_id: withdrawal.telegram_id,
               withdrawal_type: withdrawal.withdrawal_type,
               username: withdrawal.username
             });
+            if (!ok) {
+              alert("⚠️ Withdrawal approved but failed to record in Supabase.");
+              return;
+            }
           }
         }
+        alert(`Withdrawal ${action}d successfully!`);
         await fetchWithdrawals();
         await updateTotalsUI();
       } else {
@@ -601,8 +588,12 @@
       });
       const data = await res.json();
       if (data.success) {
+        const ok = await insertManualDeposit(amountNum, telegramId);
+        if (!ok) {
+          alert("⚠️ Balance added but failed to record in Supabase.");
+          return;
+        }
         alert(`Added ${amount} to user. New balance: ${data.newBalance}`);
-        await insertManualDeposit(amountNum, telegramId);
         await updateTotalsUI();
       } else {
         alert(data.error || 'Error');
@@ -610,7 +601,14 @@
     } catch (err) { alert(err.message); }
   }
 
-  // Initial load
+  // Show warning if Supabase not ready
+  if (!supabaseReady) {
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'error-banner';
+    warningDiv.innerHTML = '⚠️ Supabase not configured. Totals will not be saved. Please set SUPABASE_URL and SUPABASE_ANON_KEY in the code.';
+    document.querySelector('.container').prepend(warningDiv);
+  }
+
   fetchAll();
   setInterval(fetchAll, 10000);
 </script>
