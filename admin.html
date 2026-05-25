@@ -2,446 +2,398 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Bingo Admin | Persistent Totals + Logs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>🎰 Bingo Admin | Supabase Totals</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
       background: radial-gradient(circle at 10% 20%, #0a0f1c 0%, #050814 100%);
       color: #f0f3fa;
-      padding: 12px 10px 32px;
+      padding: 16px;
       min-height: 100vh;
-      font-size: 14px;
-      line-height: 1.4;
     }
-
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .glass-header {
+    .container { max-width: 1100px; margin: 0 auto; }
+    .glass {
       background: rgba(18, 25, 45, 0.75);
       backdrop-filter: blur(12px);
       border-radius: 1.5rem;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-      border: 1px solid rgba(243, 156, 18, 0.3);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      padding: 1.2rem;
+      border: 1px solid rgba(243,156,18,0.3);
+      margin-bottom: 1.5rem;
     }
-
-    h1 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f39c12, #ffcc70);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
-    }
-
-    @media (max-width: 560px) {
-      h1 { font-size: 1.1rem; white-space: normal; }
-      .glass-header { flex-direction: column; align-items: stretch; text-align: center; }
-    }
-
-    .refresh-btn {
-      background: linear-gradient(95deg, #2c3e66, #1e2a3e);
-      border: none;
-      padding: 6px 14px;
-      border-radius: 40px;
-      font-weight: 600;
-      font-size: 0.75rem;
-      color: white;
-      cursor: pointer;
-      transition: 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
-    }
-    .refresh-btn:active { transform: scale(0.96); }
-
     .stats-row {
       display: flex;
-      flex-direction: row;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 1.2rem;
-      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
     }
     .stat-card {
-      background: rgba(22, 32, 42, 0.8);
-      backdrop-filter: blur(8px);
+      background: rgba(22,32,42,0.8);
       border-radius: 1.2rem;
-      padding: 0.4rem 0.5rem;
+      padding: 0.6rem 1rem;
       flex: 1;
-      min-width: 90px;
       text-align: center;
       border-top: 3px solid #f39c12;
-      transition: 0.2s;
-    }
-    .stat-card span {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #cbd5e6;
-      display: block;
     }
     .stat-card .number {
-      font-size: 1.3rem;
+      font-size: 1.5rem;
       font-weight: 800;
       color: #f39c12;
-      line-height: 1.2;
     }
-    .stat-card.total .number { color: #2ecc71; }
-    .stat-card.withdraw-total .number { color: #e67e22; }
-    @media (max-width: 560px) {
-      .stat-card span { font-size: 0.55rem; }
-      .stat-card .number { font-size: 1rem; }
-      .stat-card { padding: 0.3rem 0.2rem; min-width: 75px; }
-    }
-
-    .section {
-      background: rgba(18, 28, 40, 0.65);
-      backdrop-filter: blur(12px);
-      border-radius: 1.5rem;
-      padding: 0.8rem;
-      margin-bottom: 1.2rem;
-      border: 1px solid rgba(243, 156, 18, 0.2);
-    }
-    .section h2 {
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 0.8rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      border-left: 4px solid #f39c12;
-      padding-left: 10px;
-    }
-
-    .filter-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0, 0, 0, 0.25);
-      padding: 0.5rem 0.8rem;
-      border-radius: 2rem;
-      margin-bottom: 1rem;
-    }
-    .filter-row label { font-size: 0.7rem; }
-    select, input {
-      background: #0f172ad9;
-      border: 1px solid #334155;
-      color: #f0f3fa;
-      padding: 6px 12px;
-      border-radius: 40px;
-      font-size: 0.8rem;
-      outline: none;
-    }
-
     .request-card {
       background: #0f172acc;
       border-radius: 1.2rem;
-      margin: 0.8rem 0;
-      padding: 0.8rem;
+      margin: 1rem 0;
+      padding: 1rem;
       display: flex;
       flex-wrap: wrap;
-      gap: 0.8rem;
-      align-items: flex-start;
       justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
       border: 1px solid #2a3a4e;
     }
-    .request-info {
-      flex: 2;
-      min-width: 180px;
-    }
-    .request-info p {
-      margin: 4px 0;
-      font-size: 0.75rem;
-    }
-    .proof-img {
-      max-width: 80px;
-      max-height: 80px;
-      border-radius: 12px;
-      border: 1px solid #f39c12;
-      cursor: pointer;
-    }
-    .receipt-box {
-      background: #03060ecc;
-      padding: 4px 8px;
-      border-radius: 1rem;
-      font-size: 0.7rem;
-      margin-top: 6px;
-    }
-    .action-buttons {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
+    .action-buttons { display: flex; gap: 10px; }
     button {
       background: #f39c12;
       border: none;
-      padding: 6px 14px;
+      padding: 8px 16px;
       border-radius: 40px;
-      font-weight: 600;
-      font-size: 0.75rem;
+      font-weight: bold;
       cursor: pointer;
     }
     button.approve { background: #2ecc71; color: #001e0f; }
     button.reject { background: #e74c3c; color: white; }
-    .match { color: #2ecc71; }
-    .mismatch { color: #e74c3c; }
-
-    .balance-card {
-      background: linear-gradient(125deg, #0e1a24, #050f18);
-      border-radius: 1.5rem;
-      padding: 0.8rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.8rem;
-      align-items: flex-end;
+    input, select {
+      background: #0f172ad9;
+      border: 1px solid #334155;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 40px;
     }
-    .balance-field {
-      flex: 1;
-      min-width: 120px;
-    }
-    .balance-field label {
-      font-size: 0.65rem;
-      margin-bottom: 4px;
-      color: #f39c12;
-    }
-    .balance-field input {
-      width: 100%;
-      padding: 6px 10px;
-      font-size: 0.8rem;
-    }
-    .add-btn {
-      background: #f39c12;
-      color: #0f172a;
-      font-weight: 800;
-      padding: 6px 16px;
-      width: 100%;
-      justify-content: center;
-    }
-    @media (min-width: 540px) {
-      .balance-card { flex-wrap: nowrap; }
-      .add-btn { width: auto; }
-    }
-    .info-note { font-size: 0.6rem; margin-top: 4px; }
-    #balanceFeedback { font-size: 0.7rem; margin-top: 8px; }
-    a { color: #f39c12; word-break: break-all; }
-    button.small { padding: 4px 8px; font-size: 0.7rem; background: #2c3e66; }
+    .proof-img { max-width: 70px; border-radius: 12px; cursor: pointer; }
+    a { color: #f39c12; }
   </style>
 </head>
 <body>
-<div class="container">
-  <div class="glass-header">
-    <h1>🎲 BINGO ADMIN (Persistent Totals)</h1>
-    <button class="refresh-btn" onclick="fetchAll()">⟳ Refresh</button>
-  </div>
-
-  <div class="stats-row" id="statsPanel">
-    <div class="stat-card"><span>📥 pending deposits</span><div class="number" id="pendingDepositCount">0</div></div>
-    <div class="stat-card"><span>💸 pending withdrawals</span><div class="number" id="pendingWithdrawCount">0</div></div>
-    <div class="stat-card total"><span>💰 TOTAL DEPOSIT</span><div class="number" id="totalDepositSum">0</div></div>
-    <div class="stat-card withdraw-total"><span>💸 TOTAL WITHDRAW</span><div class="number" id="totalWithdrawSum">0</div></div>
-    <div class="stat-card"><span>🕒 last refresh</span><div class="number" id="lastRefresh">--:--:--</div></div>
-  </div>
-
-  <div class="section">
-    <h2>📸 Deposit verifications</h2>
-    <div class="filter-row">
-      <label>🔍 Filter:</label>
-      <select id="depositFilter" onchange="renderDeposits()">
-        <option value="all">All</option>
-        <option value="telebirr">Telebirr</option>
-        <option value="cbebirr">CBE Birr</option>
-        <option value="mpesa">M‑Pesa</option>
-      </select>
-    </div>
-    <div id="depositList">Loading deposits...</div>
-  </div>
-
-  <div class="section">
-    <h2>💰 Withdrawal requests</h2>
-    <div class="filter-row">
-      <label>🔍 Filter:</label>
-      <select id="withdrawFilter" onchange="renderWithdrawals()">
-        <option value="all">All</option>
-        <option value="telebirr">Telebirr</option>
-        <option value="cbebirr">CBE Birr</option>
-        <option value="mpesa">M‑Pesa</option>
-      </select>
-    </div>
-    <div id="withdrawList">Loading withdrawals...</div>
-  </div>
-
-  <div class="section">
-    <h2>⚡ Manual balance (adds to TOTAL DEPOSIT)</h2>
-    <div class="balance-card">
-      <div class="balance-field">
-        <label>🆔 Telegram ID (numeric)</label>
-        <input type="text" id="userId" placeholder="123456789" inputmode="numeric">
-      </div>
-      <div class="balance-field">
-        <label>💰 Amount (ETB)</label>
-        <input type="number" id="amount" placeholder="Amount" step="1" min="1">
-      </div>
-      <div class="balance-field">
-        <label>&nbsp;</label>
-        <button class="add-btn" onclick="addBalance()">➕ Add & record</button>
-      </div>
-    </div>
-    <div id="balanceFeedback"></div>
-    <div class="info-note">✅ All approvals, rejections & manual adds are stored permanently. Totals never reset.</div>
-  </div>
-</div>
+<div id="app"></div>
 
 <script>
-  const ADMIN_SECRET = prompt("🔐 Enter admin secret:") || "your_secret_here";
-  const API_BASE = '';
+  // ======================== SUPABASE CONFIG ========================
+  const SUPABASE_URL = "https://YOUR_PROJECT.supabase.co";     // <-- REPLACE
+  const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";                  // <-- REPLACE
+  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  let depositData = [], withdrawalData = [];
-
-  // ---------- PERSISTENT STORAGE WITH SUMMARY (NEVER RESETS) ----------
-  const STORAGE_KEYS = {
-    APPROVED_DEPOSITS: 'bingo_total_deposits_log_v2',
-    APPROVED_WITHDRAWALS: 'bingo_total_withdrawals_log_v2',
-    MANUAL_DEPOSITS: 'bingo_manual_deposits_log_v2',
-    TOTALS_SUMMARY: 'bingo_totals_summary_v2'   // stores { totalDeposit, totalWithdraw }
+  // ======================== LOCAL STORAGE KEYS (pending requests) ========================
+  const STORAGE = {
+    PENDING_DEPOSITS: 'multi_admin_deposits',
+    PENDING_WITHDRAWALS: 'multi_admin_withdrawals',
+    ADMINS: 'multi_admin_admins',
+    SESSION: 'multi_admin_session',
+    ACTION_LOGS: 'multi_admin_action_logs'
   };
 
-  // Helper: load/save summary
-  function loadSummary() {
-    const stored = localStorage.getItem(STORAGE_KEYS.TOTALS_SUMMARY);
-    if (stored) return JSON.parse(stored);
-    return { totalDeposit: 0, totalWithdraw: 0 };
-  }
-  function saveSummary(summary) {
-    localStorage.setItem(STORAGE_KEYS.TOTALS_SUMMARY, JSON.stringify(summary));
-  }
-
-  // Recompute totals from logs (fallback if summary gets out of sync)
-  function recomputeTotalsFromLogs() {
-    const approvedDeposits = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS) || "[]");
-    const manualDeposits = JSON.parse(localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS) || "[]");
-    const approvedWithdrawals = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS) || "[]");
-    const totalDeposit = approvedDeposits.reduce((s, e) => s + (e.amount || 0), 0) + manualDeposits.reduce((s, e) => s + (e.amount || 0), 0);
-    const totalWithdraw = approvedWithdrawals.reduce((s, e) => s + (e.amount || 0), 0);
-    return { totalDeposit, totalWithdraw };
-  }
-
-  // Update UI and ensure summary consistency
-  function updateTotalsUI() {
-    let summary = loadSummary();
-    const computed = recomputeTotalsFromLogs();
-    // If summary mismatch (e.g., due to external tampering), fix it
-    if (summary.totalDeposit !== computed.totalDeposit || summary.totalWithdraw !== computed.totalWithdraw) {
-      console.warn("Summary mismatch, fixing from logs");
-      summary = computed;
-      saveSummary(summary);
+  // ======================== HELPER: Fetch totals from Supabase ========================
+  async function fetchTotalDepositFromSupabase() {
+    const { data, error } = await supabase
+      .from('approved_deposits')
+      .select('amount');
+    if (error) {
+      console.error('Supabase deposit sum error:', error);
+      return 0;
     }
-    document.getElementById('totalDepositSum').innerText = summary.totalDeposit.toLocaleString() + ' ETB';
-    document.getElementById('totalWithdrawSum').innerText = summary.totalWithdraw.toLocaleString() + ' ETB';
+    const sum = data.reduce((acc, row) => acc + (row.amount || 0), 0);
+    return sum;
   }
 
-  // Record a new approved deposit (called after backend success)
-  function recordApprovedDeposit(depositId, amount, metadata = {}) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS) || "[]");
-    if (logs.some(entry => entry.id === depositId)) return false;
-    logs.push({
-      id: depositId,
-      amount: Number(amount),
+  async function fetchTotalWithdrawFromSupabase() {
+    const { data, error } = await supabase
+      .from('approved_withdrawals')
+      .select('amount');
+    if (error) {
+      console.error('Supabase withdrawal sum error:', error);
+      return 0;
+    }
+    const sum = data.reduce((acc, row) => acc + (row.amount || 0), 0);
+    return sum;
+  }
+
+  // Insert approved deposit into Supabase
+  async function insertApprovedDepositToSupabase(depositId, amount, metadata) {
+    const { error } = await supabase
+      .from('approved_deposits')
+      .insert([{
+        id: String(depositId),
+        amount: Number(amount),
+        created_at: new Date().toISOString(),
+        user_id: metadata.telegram_id || null,
+        payment_type: metadata.payment_type || null,
+        username: metadata.username || null
+      }]);
+    if (error) console.error('Insert deposit error:', error);
+    return !error;
+  }
+
+  // Insert approved withdrawal into Supabase
+  async function insertApprovedWithdrawalToSupabase(withdrawalId, amount, metadata) {
+    const { error } = await supabase
+      .from('approved_withdrawals')
+      .insert([{
+        id: String(withdrawalId),
+        amount: Number(amount),
+        created_at: new Date().toISOString(),
+        user_id: metadata.telegram_id || null,
+        withdrawal_type: metadata.withdrawal_type || null,
+        username: metadata.username || null
+      }]);
+    if (error) console.error('Insert withdrawal error:', error);
+    return !error;
+  }
+
+  // Insert manual deposit (also into approved_deposits, with a flag if you want)
+  async function insertManualDepositToSupabase(amount, telegramId, adminName) {
+    const { error } = await supabase
+      .from('approved_deposits')
+      .insert([{
+        id: `manual_${Date.now()}`,
+        amount: Number(amount),
+        created_at: new Date().toISOString(),
+        user_id: telegramId,
+        payment_type: 'manual',
+        username: `manual_by_${adminName}`
+      }]);
+    return !error;
+  }
+
+  // ======================== AUTH & LOCAL PENDING LOGIC (unchanged) ========================
+  function initStorage() {
+    if (!localStorage.getItem(STORAGE.ADMINS)) {
+      localStorage.setItem(STORAGE.ADMINS, JSON.stringify([
+        { id: 1, username: "superadmin", password: "admin123", role: "super", fullName: "Super Admin" }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE.PENDING_DEPOSITS)) {
+      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify([
+        { id: 101, username: "alemu23", telegram_id: "112233445", phone: "0912345678", amount: 450, payment_type: "telebirr", reference_number: "TXNTEL123", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/104/200/150", status: "pending" }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE.PENDING_WITHDRAWALS)) {
+      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify([
+        { id: 201, username: "dawit_t", telegram_id: "445566778", phone_number: "0944556677", receiver_name: "Dawit T.", amount: 2500, withdrawal_type: "telebirr", created_at: new Date().toISOString(), status: "pending" }
+      ]));
+    }
+    if (!localStorage.getItem(STORAGE.ACTION_LOGS)) localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify([]));
+  }
+
+  function getCurrentAdmin() {
+    const session = localStorage.getItem(STORAGE.SESSION);
+    return session ? JSON.parse(session) : null;
+  }
+  function setCurrentAdmin(admin) {
+    if (admin) localStorage.setItem(STORAGE.SESSION, JSON.stringify(admin));
+    else localStorage.removeItem(STORAGE.SESSION);
+  }
+  function login(username, password) {
+    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
+    const admin = admins.find(a => a.username === username && a.password === password);
+    if (admin) { setCurrentAdmin(admin); return true; }
+    return false;
+  }
+  function logout() { setCurrentAdmin(null); renderApp(); }
+
+  // ======================== RENDER DASHBOARD ========================
+  async function renderDashboard() {
+    const admin = getCurrentAdmin();
+    if (!admin) return renderLogin();
+
+    // Get pending data from localStorage
+    let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
+    let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
+
+    // Fetch totals from Supabase
+    const totalDeposit = await fetchTotalDepositFromSupabase();
+    const totalWithdraw = await fetchTotalWithdrawFromSupabase();
+
+    // Helper: process deposit approval/rejection
+    const processDeposit = async (depId, action) => {
+      if (!confirm(`${action.toUpperCase()} deposit #${depId}?`)) return;
+      const deposit = deposits.find(d => d.id === depId);
+      if (!deposit) { alert("Not found"); return; }
+      if (action === 'approve') {
+        const success = await insertApprovedDepositToSupabase(deposit.id, deposit.amount, {
+          telegram_id: deposit.telegram_id,
+          payment_type: deposit.payment_type,
+          username: deposit.username
+        });
+        if (!success) { alert("Failed to save to Supabase"); return; }
+        addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${depId} | ${deposit.amount} ETB`, depId);
+      } else {
+        addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${depId}`, depId);
+      }
+      const newDeposits = deposits.filter(d => d.id !== depId);
+      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
+      alert(`✅ Deposit ${action}d (totals updated from Supabase)`);
+      renderApp();
+    };
+
+    const processWithdrawal = async (wdId, action) => {
+      if (!confirm(`${action.toUpperCase()} withdrawal #${wdId}?`)) return;
+      const wd = withdrawals.find(w => w.id === wdId);
+      if (!wd) { alert("Not found"); return; }
+      if (action === 'approve') {
+        const success = await insertApprovedWithdrawalToSupabase(wd.id, wd.amount, {
+          telegram_id: wd.telegram_id,
+          withdrawal_type: wd.withdrawal_type,
+          username: wd.username
+        });
+        if (!success) { alert("Failed to save to Supabase"); return; }
+        addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${wdId} | ${wd.amount} ETB`, wdId);
+      } else {
+        addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${wdId}`, wdId);
+      }
+      const newWithdrawals = withdrawals.filter(w => w.id !== wdId);
+      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
+      alert(`✅ Withdrawal ${action}d (totals updated from Supabase)`);
+      renderApp();
+    };
+
+    const addManualBalance = async () => {
+      const telegramId = document.getElementById('manualUserId')?.value.trim();
+      const amount = document.getElementById('manualAmount')?.value.trim();
+      if (!telegramId || !amount) { alert("Enter ID and amount"); return; }
+      const amountNum = Number(amount);
+      if (isNaN(amountNum) || amountNum <= 0) { alert("Positive amount"); return; }
+      const ok = await insertManualDepositToSupabase(amountNum, telegramId, admin.username);
+      if (!ok) { alert("Supabase insert failed"); return; }
+      addLogEntry("MANUAL_DEPOSIT", `Manual +${amountNum} ETB to ${telegramId}`, null);
+      alert(`✅ +${amountNum} ETB added to Supabase totals`);
+      document.getElementById('manualUserId').value = '';
+      document.getElementById('manualAmount').value = '';
+      renderApp();
+    };
+
+    // Render deposit list (with QR/OCR scanning)
+    const depositListHtml = deposits.length === 0 ? '<div>✅ No pending deposits</div>' : deposits.map(req => `
+      <div class="request-card">
+        <div>
+          <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p>💵 ${req.amount} ETB | 🏦 ${req.payment_type} | 📞 ${req.phone || 'N/A'}</p>
+          <p>🧾 Ref: ${escapeHtml(req.reference_number || '')}</p>
+          <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
+          ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : ''}
+          <div id="verify-${req.id}" class="badge" style="margin-top:8px;">🔍 Scanning...</div>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="window.processDepositFn(${req.id},'approve')">✅ Approve</button>
+          <button class="reject" onclick="window.processDepositFn(${req.id},'reject')">❌ Reject</button>
+        </div>
+      </div>
+    `).join('');
+
+    const withdrawListHtml = withdrawals.length === 0 ? '<div>✅ No pending withdrawals</div>' : withdrawals.map(req => `
+      <div class="request-card">
+        <div>
+          <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 📞 ${escapeHtml(req.phone_number)}</p>
+          <p>👤 Receiver: ${escapeHtml(req.receiver_name || 'N/A')} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="window.processWithdrawalFn(${req.id},'approve')">✅ Approve</button>
+          <button class="reject" onclick="window.processWithdrawalFn(${req.id},'reject')">❌ Reject</button>
+        </div>
+      </div>
+    `).join('');
+
+    // After rendering, attach scanning (QR/OCR)
+    setTimeout(() => {
+      deposits.forEach(async (req) => {
+        const div = document.getElementById(`verify-${req.id}`);
+        if (req.proof_path && div) {
+          const result = await getReferenceFromProof(req.proof_path);
+          if (result) {
+            const matchHtml = (req.reference_number && req.reference_number.toUpperCase() === result.ref.toUpperCase()) ? '<span style="color:#2ecc71">✅ Matches</span>' : '<span style="color:#e74c3c">⚠️ mismatch</span>';
+            div.innerHTML = `🧪 Extracted (${result.method}): ${escapeHtml(result.ref)} ${matchHtml}`;
+          } else div.innerHTML = '❌ Could not read reference';
+        }
+      });
+    }, 100);
+
+    return `
+      <div class="container">
+        <div class="glass" style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+          <h2>🎲 Bingo Admin · ${admin.username} (${admin.role})</h2>
+          <button onclick="window.logoutFn()" style="background:#e74c3c;">🚪 Logout</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card"><span>📥 Pending deposits</span><div class="number">${deposits.length}</div></div>
+          <div class="stat-card"><span>💸 Pending withdrawals</span><div class="number">${withdrawals.length}</div></div>
+          <div class="stat-card"><span>💰 TOTAL DEPOSIT (Supabase)</span><div class="number">${totalDeposit.toLocaleString()} ETB</div></div>
+          <div class="stat-card"><span>💸 TOTAL WITHDRAW (Supabase)</span><div class="number">${totalWithdraw.toLocaleString()} ETB</div></div>
+        </div>
+
+        <div class="glass">
+          <h3>📸 Deposit verifications</h3>
+          ${depositListHtml}
+        </div>
+
+        <div class="glass">
+          <h3>💰 Withdrawal requests</h3>
+          ${withdrawListHtml}
+        </div>
+
+        <div class="glass">
+          <h3>⚡ Manual balance (adds to Supabase TOTAL DEPOSIT)</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:12px;">
+            <input type="text" id="manualUserId" placeholder="Telegram ID" style="flex:1;">
+            <input type="number" id="manualAmount" placeholder="Amount ETB" style="flex:1;">
+            <button id="manualAddBtn">➕ Add & record</button>
+          </div>
+          <div id="balanceFeedback" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLogin() {
+    return `
+      <div class="glass" style="max-width:400px; margin:80px auto; text-align:center;">
+        <h2>🔐 Multi-Admin Login</h2>
+        <p>Super admin: superadmin / admin123</p>
+        <input type="text" id="loginUsername" placeholder="Username" style="width:100%; margin:10px 0;"><br>
+        <input type="password" id="loginPassword" placeholder="Password" style="width:100%; margin:10px 0;"><br>
+        <button id="doLoginBtn" style="width:100%;">Login →</button>
+      </div>
+    `;
+  }
+
+  // Helper: add log entry to localStorage
+  function addLogEntry(action, details, requestId) {
+    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
+    const admin = getCurrentAdmin();
+    logs.unshift({
+      id: Date.now(),
       timestamp: new Date().toISOString(),
-      ...metadata
+      admin: admin ? admin.username : "unknown",
+      action,
+      details,
+      requestId
     });
-    localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, JSON.stringify(logs));
-    // Update summary
-    const summary = loadSummary();
-    summary.totalDeposit += Number(amount);
-    saveSummary(summary);
-    updateTotalsUI();
-    return true;
+    localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify(logs.slice(0, 500)));
   }
 
-  // Record a new approved withdrawal
-  function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
-    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS) || "[]");
-    if (logs.some(entry => entry.id === withdrawalId)) return false;
-    logs.push({
-      id: withdrawalId,
-      amount: Number(amount),
-      timestamp: new Date().toISOString(),
-      ...metadata
-    });
-    localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, JSON.stringify(logs));
-    const summary = loadSummary();
-    summary.totalWithdraw += Number(amount);
-    saveSummary(summary);
-    updateTotalsUI();
-    return true;
-  }
-
-  // Record manual deposit
-  function recordManualDeposit(amount, telegramId, reference = 'manual') {
-    const logs = JSON.parse(localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS) || "[]");
-    const manualId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    logs.push({
-      id: manualId,
-      amount: Number(amount),
-      telegramId: telegramId,
-      note: reference,
-      timestamp: new Date().toISOString()
-    });
-    localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, JSON.stringify(logs));
-    const summary = loadSummary();
-    summary.totalDeposit += Number(amount);
-    saveSummary(summary);
-    updateTotalsUI();
-    return true;
-  }
-
-  // original stats (pending) + update totals
-  function updateStats() {
-    document.getElementById('pendingDepositCount').innerText = depositData.length;
-    document.getElementById('pendingWithdrawCount').innerText = withdrawalData.length;
-    document.getElementById('lastRefresh').innerText = new Date().toLocaleTimeString();
-    updateTotalsUI();  // refresh total cards
-  }
-
-  async function fetchAll() {
-    await Promise.all([fetchDeposits(), fetchWithdrawals()]);
-    updateStats();
-  }
-
-  // QR & OCR functions (identical to original)
-  function extractRefFromQR(imageSrc) {
-    return new Promise((resolve, reject) => {
+  // QR/OCR functions (original)
+  async function extractRefFromQR(imageSrc) {
+    return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
       img.src = imageSrc;
-      img.onload = function() {
+      img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
           canvas.width = img.width;
@@ -451,266 +403,109 @@
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
           if (qrCode && qrCode.data) {
-            const data = qrCode.data;
-            const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
+            const match = qrCode.data.match(/\/receipt\/([A-Z0-9]+)/i);
             if (match) resolve(match[1]);
-            else {
-              const refMatch = data.match(/^([A-Z0-9]{8,})$/);
-              resolve(refMatch ? refMatch[1] : null);
-            }
+            else resolve(qrCode.data.match(/^([A-Z0-9]{8,})$/)?.[1] || null);
           } else resolve(null);
-        } catch(e) { reject(e); }
+        } catch(e) { resolve(null); }
       };
-      img.onerror = () => reject('QR load failed');
+      img.onerror = () => resolve(null);
     });
   }
-
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
       const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      if (match && match[1]) return match[1].trim();
-      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
-      return fallback ? fallback[0] : null;
+      return match ? match[1] : (text.match(/\bDE[A-Z0-9]{8,}\b/i)?.[0] || null);
     } catch { return null; }
   }
-
   async function getReferenceFromProof(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
       if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch(e) { console.warn(e); }
+    } catch(e) {}
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
   }
+  function escapeHtml(str) { return String(str || '').replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
 
-  function getVerificationLink(paymentType, referenceNumber) {
-    const ref = encodeURIComponent(referenceNumber);
-    switch(paymentType) {
-      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
-      case 'cbebirr': return `https://cbebirr.com/verify?txn=${ref}`;
-      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
-      default: return null;
-    }
-  }
-
-  async function fetchDeposits() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      depositData = data.requests || [];
-      renderDeposits();
-    } catch(err) {
-      document.getElementById('depositList').innerHTML = '<p>⚠️ Error loading deposits (using local mock?)</p>';
-      depositData = [];
-      renderDeposits();
-    }
-  }
-
-  async function renderDeposits() {
-    const filter = document.getElementById('depositFilter').value;
-    const container = document.getElementById('depositList');
-    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
-    if (filtered.length === 0) {
-      container.innerHTML = '<div style="padding:12px; text-align:center;">✅ No pending deposits.</div>';
-      return;
-    }
-    container.innerHTML = '';
-    for (const req of filtered) {
-      const card = document.createElement('div');
-      card.className = 'request-card';
-      const submittedRef = req.reference_number || '';
-      const refHtml = submittedRef ? `<p><strong>🧾 Ref:</strong> ${escapeHtml(submittedRef)}</p>` : '';
-      let verifyLinkHtml = '';
-      if (submittedRef) {
-        const link = getVerificationLink(req.payment_type, submittedRef);
-        if (link) verifyLinkHtml = `<p><a href="${link}" target="_blank">🔗 Verify</a></p>`;
-      }
-      card.innerHTML = `
-        <div class="request-info">
-          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-          <p>📞 ${req.phone || 'N/A'} | 💵 ${req.amount} ETB | 🏦 ${req.payment_type}</p>
-          ${refHtml}
-          ${verifyLinkHtml}
-          <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
-          ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>📎 No proof</p>'}
-          <div id="verify-${req.id}" class="receipt-box">🔍 Scanning...</div>
-        </div>
-        <div class="action-buttons">
-          <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
-          <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
-        </div>
-      `;
-      container.appendChild(card);
-      const verifyDiv = document.getElementById(`verify-${req.id}`);
-      if (req.proof_path && verifyDiv) {
-        try {
-          const result = await getReferenceFromProof(req.proof_path);
-          if (result) {
-            const ref = result.ref;
-            const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
-            let matchHtml = '';
-            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches</span>';
-            else if (submittedRef) matchHtml = `<span class="mismatch">❌ mismatch</span>`;
-            verifyDiv.innerHTML = `🧪 Extracted (${result.method}): <strong>${escapeHtml(ref)}</strong> ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Receipt link</a>`;
-          } else verifyDiv.innerHTML = '❌ Reference not readable';
-        } catch(e) { verifyDiv.innerHTML = '❌ Verification error'; }
-      } else if (verifyDiv) verifyDiv.innerHTML = 'No proof';
-    }
-  }
-
-  async function fetchWithdrawals() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      withdrawalData = data.requests || [];
-      renderWithdrawals();
-    } catch(err) {
-      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
-      withdrawalData = [];
-      renderWithdrawals();
-    }
-  }
-
-  function renderWithdrawals() {
-    const filter = document.getElementById('withdrawFilter').value;
-    const container = document.getElementById('withdrawList');
-    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
-    if (filtered.length === 0) {
-      container.innerHTML = '<div style="padding:12px; text-align:center;">✅ No pending withdrawals.</div>';
-      return;
-    }
-    container.innerHTML = filtered.map(req => `
-      <div class="request-card">
-        <div class="request-info">
-          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
-          <p>📞 ${escapeHtml(req.phone_number)} | 👤 ${escapeHtml(req.receiver_name || 'N/A')}</p>
-          <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
-        </div>
-        <div class="action-buttons">
-          <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
-          <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  async function processDeposit(requestId, action) {
-    if (!confirm(`Confirm ${action} deposit #${requestId}?`)) return;
-    const depositItem = depositData.find(d => d.id === requestId);
-    if (!depositItem && action === 'approve') {
-      alert('Deposit data missing, please refresh');
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+  // Global render and event binding
+  async function renderApp() {
+    const admin = getCurrentAdmin();
+    let html;
+    if (!admin) html = renderLogin();
+    else html = await renderDashboard();
+    document.getElementById('app').innerHTML = html;
+    if (!admin) {
+      document.getElementById('doLoginBtn')?.addEventListener('click', () => {
+        const user = document.getElementById('loginUsername').value;
+        const pwd = document.getElementById('loginPassword').value;
+        if (login(user, pwd)) renderApp();
+        else alert("Invalid credentials");
       });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Deposit ${action}d`);
-        if (action === 'approve' && depositItem) {
-          recordApprovedDeposit(depositItem.id, depositItem.amount, {
-            username: depositItem.username,
-            payment_type: depositItem.payment_type
-          });
-        }
-        await fetchDeposits();
-        updateStats();
-      } else {
-        alert(data.error || 'Error processing deposit');
-      }
-    } catch(err) { alert(err.message); }
-  }
-
-  async function processWithdrawal(requestId, action) {
-    if (!confirm(`Confirm ${action} withdrawal #${requestId}?`)) return;
-    const withdrawalItem = withdrawalData.find(w => w.id === requestId);
-    if (!withdrawalItem && action === 'approve') {
-      alert('Withdrawal data missing, refresh');
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Withdrawal ${action}d`);
-        if (action === 'approve' && withdrawalItem) {
-          recordApprovedWithdrawal(withdrawalItem.id, withdrawalItem.amount, {
-            username: withdrawalItem.username,
-            withdrawal_type: withdrawalItem.withdrawal_type
-          });
-        }
-        await fetchWithdrawals();
-        updateStats();
-      } else {
-        alert(data.error || 'Error processing withdrawal');
-      }
-    } catch(err) { alert(err.message); }
-  }
-
-  async function addBalance() {
-    const telegramId = document.getElementById('userId').value.trim();
-    const amount = document.getElementById('amount').value.trim();
-    const feedbackDiv = document.getElementById('balanceFeedback');
-    if (!telegramId || !amount) { alert('❌ Enter Telegram ID and amount'); return; }
-    if (!/^\d+$/.test(telegramId)) { alert('❌ Telegram ID must be numeric'); return; }
-    const amountNum = Number(amount);
-    if (isNaN(amountNum) || amountNum <= 0) { alert('❌ Positive amount'); return; }
-    feedbackDiv.innerHTML = '⏳ Processing...';
-    try {
-      const res = await fetch(`${API_BASE}/admin/add-balance`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: amountNum })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Added ${amountNum} ETB to ${telegramId}. New balance: ${data.newBalance}`);
-        recordManualDeposit(amountNum, telegramId, 'admin_manual_add');
-        feedbackDiv.innerHTML = `✔️ Success: +${amountNum} ETB (recorded in total deposit), new balance ${data.newBalance}`;
-        document.getElementById('userId').value = '';
-        document.getElementById('amount').value = '';
-        await fetchAll();
-        updateTotalsUI();
-      } else {
-        alert(`❌ Error: ${data.error}`);
-        feedbackDiv.innerHTML = `⚠️ ${data.error}`;
-      }
-    } catch(err) { alert(err.message); feedbackDiv.innerHTML = '❌ Network error'; }
-  }
-
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
-  }
-
-  // Initialize storage with empty arrays if not exist, and build summary if missing
-  function initStorage() {
-    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_DEPOSITS)) localStorage.setItem(STORAGE_KEYS.APPROVED_DEPOSITS, "[]");
-    if (!localStorage.getItem(STORAGE_KEYS.APPROVED_WITHDRAWALS)) localStorage.setItem(STORAGE_KEYS.APPROVED_WITHDRAWALS, "[]");
-    if (!localStorage.getItem(STORAGE_KEYS.MANUAL_DEPOSITS)) localStorage.setItem(STORAGE_KEYS.MANUAL_DEPOSITS, "[]");
-    if (!localStorage.getItem(STORAGE_KEYS.TOTALS_SUMMARY)) {
-      const computed = recomputeTotalsFromLogs();
-      saveSummary(computed);
     } else {
-      // ensure summary is correct
-      const summary = loadSummary();
-      const computed = recomputeTotalsFromLogs();
-      if (summary.totalDeposit !== computed.totalDeposit || summary.totalWithdraw !== computed.totalWithdraw) {
-        saveSummary(computed);
-      }
+      document.getElementById('manualAddBtn')?.addEventListener('click', async () => {
+        const telegramId = document.getElementById('manualUserId')?.value;
+        const amount = document.getElementById('manualAmount')?.value;
+        if (!telegramId || !amount) { alert("Enter all fields"); return; }
+        const amountNum = Number(amount);
+        if (isNaN(amountNum) || amountNum <= 0) return alert("Invalid amount");
+        const ok = await insertManualDepositToSupabase(amountNum, telegramId, admin.username);
+        if (ok) {
+          addLogEntry("MANUAL_DEPOSIT", `Manual +${amountNum} ETB to ${telegramId}`, null);
+          alert(`✅ +${amountNum} ETB added to Supabase totals`);
+          document.getElementById('manualUserId').value = '';
+          document.getElementById('manualAmount').value = '';
+          renderApp();
+        } else alert("Supabase insert failed");
+      });
+      window.processDepositFn = async (id, action) => {
+        let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
+        const deposit = deposits.find(d => d.id === id);
+        if (!deposit) return;
+        if (action === 'approve') {
+          const ok = await insertApprovedDepositToSupabase(id, deposit.amount, {
+            telegram_id: deposit.telegram_id,
+            payment_type: deposit.payment_type,
+            username: deposit.username
+          });
+          if (!ok) { alert("Supabase save failed"); return; }
+          addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${id} | ${deposit.amount} ETB`, id);
+        } else {
+          addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${id}`, id);
+        }
+        const newDeposits = deposits.filter(d => d.id !== id);
+        localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
+        alert(`✅ Deposit ${action}d`);
+        renderApp();
+      };
+      window.processWithdrawalFn = async (id, action) => {
+        let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
+        const wd = withdrawals.find(w => w.id === id);
+        if (!wd) return;
+        if (action === 'approve') {
+          const ok = await insertApprovedWithdrawalToSupabase(id, wd.amount, {
+            telegram_id: wd.telegram_id,
+            withdrawal_type: wd.withdrawal_type,
+            username: wd.username
+          });
+          if (!ok) { alert("Supabase save failed"); return; }
+          addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${id} | ${wd.amount} ETB`, id);
+        } else {
+          addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${id}`, id);
+        }
+        const newWithdrawals = withdrawals.filter(w => w.id !== id);
+        localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
+        alert(`✅ Withdrawal ${action}d`);
+        renderApp();
+      };
+      window.logoutFn = () => { logout(); };
     }
-    updateTotalsUI();
   }
 
   initStorage();
-  fetchAll();
-  setInterval(() => { fetchAll(); }, 14000);
+  renderApp();
 </script>
 </body>
 </html>
