@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>🎰 Multi-Admin Bingo | Dashboard + Control Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, #0a0f1c 0%, #050814 100%);
+      color: #f0f3fa;
+      padding: 16px;
+      min-height: 100vh;
+    }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .glass {
+      background: rgba(18, 25, 45, 0.75);
+      backdrop-filter: blur(12px);
+      border-radius: 1.5rem;
+      padding: 1.2rem;
+      border: 1px solid rgba(243,156,18,0.3);
+      margin-bottom: 1.5rem;
+    }
+    .login-card {
+      max-width: 400px;
+      margin: 80px auto;
+      text-align: center;
+    }
+    input, select, button {
+      background: #0f172ad9;
+      border: 1px solid #334155;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 40px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    button {
+      background: #f39c12;
+      color: #0f172a;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button.danger { background: #e74c3c; color: white; }
+    button.secondary { background: #2c3e66; color: white; }
+    .stats-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .stat-card {
+      background: rgba(22,32,42,0.8);
+      border-radius: 1.2rem;
+      padding: 0.6rem 1rem;
+      flex: 1;
+      text-align: center;
+      border-top: 3px solid #f39c12;
+    }
+    .stat-card .number { font-size: 1.5rem; font-weight: 800; color: #f39c12; }
+    .request-card {
+      background: #0f172acc;
+      border-radius: 1.2rem;
+      margin: 1rem 0;
+      padding: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      border: 1px solid #2a3a4e;
+    }
+    .action-buttons { display: flex; gap: 10px; }
+    .badge { background: #f39c1222; padding: 4px 10px; border-radius: 30px; font-size: 0.7rem; }
+    .proof-img { max-width: 70px; border-radius: 12px; cursor: pointer; }
+    a { color: #f39c12; }
+    .admin-panel-link { margin-top: 10px; display: inline-block; }
+    hr { border-color: #2a3a4e; margin: 15px 0; }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+  // ---------- STORAGE KEYS ----------
+  const STORAGE = {
+    ADMINS: 'multi_admin_admins',
+    PENDING_DEPOSITS: 'multi_admin_deposits',
+    PENDING_WITHDRAWALS: 'multi_admin_withdrawals',
+    ACTION_LOGS: 'multi_admin_action_logs',
+    DEPOSIT_TOTAL_LOG: 'multi_admin_deposit_total_log',
+    WITHDRAW_TOTAL_LOG: 'multi_admin_withdraw_total_log',
+    MANUAL_DEPOSITS_LOG: 'multi_admin_manual_deposits_log',
+    SESSION: 'multi_admin_session'
+  };
+
+  // ---------- DEFAULT SUPER ADMIN ----------
+  function initStorage() {
+    if (!localStorage.getItem(STORAGE.ADMINS)) {
+      const defaultAdmins = [
+        { id: 1, username: "superadmin", password: "admin123", role: "super", fullName: "Super Admin" }
+      ];
+      localStorage.setItem(STORAGE.ADMINS, JSON.stringify(defaultAdmins));
+    }
+    if (!localStorage.getItem(STORAGE.PENDING_DEPOSITS)) {
+      const sampleDeposits = [
+        { id: 101, username: "alemu23", telegram_id: "112233445", phone: "0912345678", amount: 450, payment_type: "telebirr", reference_number: "TXNTEL123", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/104/200/150", status: "pending" },
+        { id: 102, username: "birtukan", telegram_id: "998877665", phone: "0922334455", amount: 1200, payment_type: "cbebirr", reference_number: "CBE987XYZ", created_at: new Date().toISOString(), proof_path: "https://picsum.photos/id/26/200/150", status: "pending" }
+      ];
+      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(sampleDeposits));
+    }
+    if (!localStorage.getItem(STORAGE.PENDING_WITHDRAWALS)) {
+      const sampleWithdrawals = [
+        { id: 201, username: "dawit_t", telegram_id: "445566778", phone_number: "0944556677", receiver_name: "Dawit T.", amount: 2500, withdrawal_type: "telebirr", created_at: new Date().toISOString(), status: "pending" }
+      ];
+      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(sampleWithdrawals));
+    }
+    if (!localStorage.getItem(STORAGE.ACTION_LOGS)) localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify([]));
+    if (!localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG)) localStorage.setItem(STORAGE.DEPOSIT_TOTAL_LOG, JSON.stringify([]));
+    if (!localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG)) localStorage.setItem(STORAGE.WITHDRAW_TOTAL_LOG, JSON.stringify([]));
+    if (!localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG)) localStorage.setItem(STORAGE.MANUAL_DEPOSITS_LOG, JSON.stringify([]));
+  }
+
+  // ---------- HELPER: get current admin session ----------
+  function getCurrentAdmin() {
+    const session = localStorage.getItem(STORAGE.SESSION);
+    if (!session) return null;
+    try {
+      return JSON.parse(session);
+    } catch(e) { return null; }
+  }
+
+  function setCurrentAdmin(admin) {
+    if (admin) localStorage.setItem(STORAGE.SESSION, JSON.stringify(admin));
+    else localStorage.removeItem(STORAGE.SESSION);
+  }
+
+  // ---------- LOG ACTION ----------
+  function addLogEntry(action, details, requestId = null) {
+    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
+    const admin = getCurrentAdmin();
+    logs.unshift({
+      id: Date.now(),
+      timestamp: new Date().toISOString(),
+      admin: admin ? admin.username : "unknown",
+      adminRole: admin ? admin.role : "unknown",
+      action,
+      details,
+      requestId
+    });
+    localStorage.setItem(STORAGE.ACTION_LOGS, JSON.stringify(logs.slice(0, 500)));
+  }
+
+  // ----- TOTALS (deposit & withdraw including manual) -----
+  function recordApprovedDeposit(depositId, amount, metadata = {}) {
+    const logs = JSON.parse(localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG) || "[]");
+    if (logs.some(l => l.id === depositId)) return false;
+    logs.push({ id: depositId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
+    localStorage.setItem(STORAGE.DEPOSIT_TOTAL_LOG, JSON.stringify(logs));
+    return true;
+  }
+  function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
+    const logs = JSON.parse(localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG) || "[]");
+    if (logs.some(l => l.id === withdrawalId)) return false;
+    logs.push({ id: withdrawalId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
+    localStorage.setItem(STORAGE.WITHDRAW_TOTAL_LOG, JSON.stringify(logs));
+    return true;
+  }
+  function recordManualDeposit(amount, telegramId, adminName) {
+    const logs = JSON.parse(localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG) || "[]");
+    logs.push({ id: 'man_' + Date.now(), amount: Number(amount), telegramId, admin: adminName, timestamp: new Date().toISOString() });
+    localStorage.setItem(STORAGE.MANUAL_DEPOSITS_LOG, JSON.stringify(logs));
+  }
+  function computeTotalDeposit() {
+    const approved = JSON.parse(localStorage.getItem(STORAGE.DEPOSIT_TOTAL_LOG) || "[]");
+    const manual = JSON.parse(localStorage.getItem(STORAGE.MANUAL_DEPOSITS_LOG) || "[]");
+    const sumApproved = approved.reduce((s, e) => s + (e.amount || 0), 0);
+    const sumManual = manual.reduce((s, e) => s + (e.amount || 0), 0);
+    return sumApproved + sumManual;
+  }
+  function computeTotalWithdraw() {
+    const withdrawals = JSON.parse(localStorage.getItem(STORAGE.WITHDRAW_TOTAL_LOG) || "[]");
+    return withdrawals.reduce((s, e) => s + (e.amount || 0), 0);
+  }
+
+  // ---------- AUTH ----------
+  function login(username, password) {
+    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
+    const admin = admins.find(a => a.username === username && a.password === password);
+    if (admin) {
+      setCurrentAdmin({ id: admin.id, username: admin.username, role: admin.role, fullName: admin.fullName });
+      return true;
+    }
+    return false;
+  }
+  function logout() { setCurrentAdmin(null); renderApp(); }
+
+  // ---------- RENDER LOGIN ----------
+  function renderLogin() {
+    return `
+      <div class="login-card glass">
+        <h2>🔐 Multi-Admin Access</h2>
+        <p style="margin-bottom: 20px;">Super admin: superadmin / admin123</p>
+        <input type="text" id="loginUsername" placeholder="Username" style="width:100%; margin-bottom:12px;"><br>
+        <input type="password" id="loginPassword" placeholder="Password" style="width:100%; margin-bottom:20px;"><br>
+        <button id="doLoginBtn" style="width:100%;">Login →</button>
+      </div>
+    `;
+  }
+
+  // ---------- MAIN DASHBOARD (deposits/withdrawals approvals) ----------
+  async function renderDashboard() {
+    const admin = getCurrentAdmin();
+    if (!admin) return renderLogin();
+
+    // load pending data
+    let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
+    let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
+
+    const totalDeposit = computeTotalDeposit();
+    const totalWithdraw = computeTotalWithdraw();
+
+    // helper functions for processing
+    const processDeposit = async (depId, action) => {
+      if (!confirm(`${action.toUpperCase()} deposit #${depId}?`)) return;
+      const deposit = deposits.find(d => d.id === depId);
+      if (!deposit) { alert("Not found"); return; }
+      if (action === 'approve') {
+        recordApprovedDeposit(deposit.id, deposit.amount, { username: deposit.username, payment_type: deposit.payment_type });
+        addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${depId} | ${deposit.amount} ETB by ${deposit.username}`, depId);
+      } else {
+        addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${depId} | ${deposit.amount} ETB`, depId);
+      }
+      const newDeposits = deposits.filter(d => d.id !== depId);
+      localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
+      alert(`✅ Deposit ${action}d`);
+      renderApp();
+    };
+
+    const processWithdrawal = async (wdId, action) => {
+      if (!confirm(`${action.toUpperCase()} withdrawal #${wdId}?`)) return;
+      const wd = withdrawals.find(w => w.id === wdId);
+      if (!wd) { alert("Not found"); return; }
+      if (action === 'approve') {
+        recordApprovedWithdrawal(wd.id, wd.amount, { username: wd.username, withdrawal_type: wd.withdrawal_type });
+        addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${wdId} | ${wd.amount} ETB to ${wd.username}`, wdId);
+      } else {
+        addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${wdId} | ${wd.amount} ETB`, wdId);
+      }
+      const newWithdrawals = withdrawals.filter(w => w.id !== wdId);
+      localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
+      alert(`✅ Withdrawal ${action}d`);
+      renderApp();
+    };
+
+    const addManualBalance = async () => {
+      const telegramId = document.getElementById('manualUserId')?.value.trim();
+      const amount = document.getElementById('manualAmount')?.value.trim();
+      const feedbackDiv = document.getElementById('balanceFeedback');
+      if (!telegramId || !amount) { alert("Enter ID and amount"); return; }
+      if (!/^\d+$/.test(telegramId)) { alert("Numeric ID required"); return; }
+      const amountNum = Number(amount);
+      if (isNaN(amountNum) || amountNum <= 0) { alert("Positive amount"); return; }
+      recordManualDeposit(amountNum, telegramId, admin.username);
+      addLogEntry("MANUAL_DEPOSIT", `Manual deposit +${amountNum} ETB to user ${telegramId} by ${admin.username}`, null);
+      alert(`✅ +${amountNum} ETB added to ${telegramId} (recorded in total deposit)`);
+      if(feedbackDiv) feedbackDiv.innerHTML = `✔️ +${amountNum} ETB logged.`;
+      document.getElementById('manualUserId').value = '';
+      document.getElementById('manualAmount').value = '';
+      renderApp(); // refresh totals
+    };
+
+    // Render deposit list with QR/OCR scanning (original style)
+    const renderDepositList = () => {
+      if (deposits.length === 0) return '<div class="badge">✅ No pending deposits</div>';
+      let html = '';
+      for (let req of deposits) {
+        const submittedRef = req.reference_number || '';
+        const verifyLink = submittedRef ? `<a href="#" onclick="window.open('${getVerificationLink(req.payment_type, submittedRef)}','_blank')">🔗 Verify</a>` : '';
+        html += `
+          <div class="request-card">
+            <div>
+              <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+              <p>💵 ${req.amount} ETB | 🏦 ${req.payment_type} | 📞 ${req.phone || 'N/A'}</p>
+              <p>🧾 Ref: ${escapeHtml(submittedRef)} ${verifyLink}</p>
+              <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
+              ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : ''}
+              <div id="verify-${req.id}" class="badge" style="margin-top:8px;">🔍 Scanning QR/OCR...</div>
+            </div>
+            <div class="action-buttons">
+              <button class="approve" onclick="window.processDepositFn(${req.id},'approve')">✅ Approve</button>
+              <button class="reject" onclick="window.processDepositFn(${req.id},'reject')">❌ Reject</button>
+            </div>
+          </div>
+        `;
+      }
+      setTimeout(async () => {
+        for (let req of deposits) {
+          const div = document.getElementById(`verify-${req.id}`);
+          if (req.proof_path && div) {
+            try {
+              const result = await getReferenceFromProof(req.proof_path);
+              if (result) {
+                const matchHtml = (submittedRef && submittedRef.toUpperCase() === result.ref.toUpperCase()) ? '<span style="color:#2ecc71">✅ Matches</span>' : '<span style="color:#e74c3c">⚠️ mismatch</span>';
+                div.innerHTML = `🧪 Extracted (${result.method}): ${escapeHtml(result.ref)} ${matchHtml} <br><a href="https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(result.ref)}" target="_blank">📄 Receipt</a>`;
+              } else div.innerHTML = '❌ Could not read reference';
+            } catch(e) { div.innerHTML = '❌ Scan error'; }
+          }
+        }
+      }, 100);
+      return html;
+    };
+
+    const renderWithdrawalList = () => {
+      if (withdrawals.length === 0) return '<div class="badge">✅ No pending withdrawals</div>';
+      return withdrawals.map(req => `
+        <div class="request-card">
+          <div>
+            <p><strong>ID ${req.id}</strong> | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+            <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 📞 ${escapeHtml(req.phone_number)}</p>
+            <p>👤 Receiver: ${escapeHtml(req.receiver_name || 'N/A')} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
+          </div>
+          <div class="action-buttons">
+            <button class="approve" onclick="window.processWithdrawalFn(${req.id},'approve')">✅ Approve</button>
+            <button class="reject" onclick="window.processWithdrawalFn(${req.id},'reject')">❌ Reject</button>
+          </div>
+        </div>
+      `).join('');
+    };
+
+    return `
+      <div class="container">
+        <div class="glass" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+          <h2>🎲 Multi-Admin Bingo · Welcome ${admin.username} (${admin.role})</h2>
+          <button onclick="window.logoutFn()" class="danger">🚪 Logout</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-card"><span>📥 Pending deposits</span><div class="number">${deposits.length}</div></div>
+          <div class="stat-card"><span>💸 Pending withdrawals</span><div class="number">${withdrawals.length}</div></div>
+          <div class="stat-card"><span>💰 TOTAL DEPOSIT (incl. manual)</span><div class="number">${totalDeposit.toLocaleString()} ETB</div></div>
+          <div class="stat-card"><span>💸 TOTAL WITHDRAW</span><div class="number">${totalWithdraw.toLocaleString()} ETB</div></div>
+        </div>
+
+        <div class="glass">
+          <h3>📸 Deposit verifications</h3>
+          <div id="depositList">${renderDepositList()}</div>
+        </div>
+
+        <div class="glass">
+          <h3>💰 Withdrawal requests</h3>
+          <div id="withdrawList">${renderWithdrawalList()}</div>
+        </div>
+
+        <div class="glass">
+          <h3>⚡ Manual balance (adds to TOTAL DEPOSIT)</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:12px;">
+            <input type="text" id="manualUserId" placeholder="Telegram ID" style="flex:1;">
+            <input type="number" id="manualAmount" placeholder="Amount ETB" style="flex:1;">
+            <button id="manualAddBtn">➕ Add & record</button>
+          </div>
+          <div id="balanceFeedback" style="margin-top:8px;"></div>
+        </div>
+
+        <div style="text-align:center; margin-top:20px;">
+          <button id="openControlPanelBtn" class="secondary" style="background:#f39c12;">⚙️ ADMIN CONTROL PANEL (Manage Admins & Logs)</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------- CONTROL PANEL PAGE (opens in new window) ----------
+  function openControlPanel() {
+    const admin = getCurrentAdmin();
+    if (!admin || admin.role !== 'super') {
+      alert("❌ Only super admin can access the control panel.");
+      return;
+    }
+    const panelHtml = generateControlPanelHTML();
+    const blob = new Blob([panelHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function generateControlPanelHTML() {
+    const admins = JSON.parse(localStorage.getItem(STORAGE.ADMINS) || "[]");
+    const logs = JSON.parse(localStorage.getItem(STORAGE.ACTION_LOGS) || "[]");
+    return `<!DOCTYPE html>
+    <html>
+    <head><meta charset="UTF-8"><title>👥 Admin Control Panel</title><style>
+      *{margin:0;padding:0;box-sizing:border-box;} body{background:#0a0f1c;font-family:'Inter',sans-serif;padding:24px;color:#eef2ff;} .container{max-width:1200px;margin:0 auto;} .card{background:#0f172acc;border-radius:1.5rem;padding:1.5rem;margin-bottom:1.5rem;border:1px solid #f39c12;} h1{color:#f39c12;} table{width:100%;border-collapse:collapse;} th,td{padding:8px;text-align:left;border-bottom:1px solid #334155;} button{background:#f39c12;border:none;padding:6px 12px;border-radius:40px;cursor:pointer;margin:4px;} .danger{background:#e74c3c;color:white;} input{background:#1e2a3e;border:1px solid #f39c12;padding:8px;border-radius:30px;color:white;}
+    </style></head>
+    <body><div class="container">
+      <h1>⚙️ Admin Control Panel (Super Admin)</h1>
+      <div class="card">
+        <h3>➕ Add New Admin</h3>
+        <input type="text" id="newUsername" placeholder="Username"> 
+        <input type="password" id="newPassword" placeholder="Password">
+        <select id="newRole"><option value="admin">Admin</option><option value="super">Super Admin</option></select>
+        <button id="addAdminBtn">Create Admin</button>
+      </div>
+      <div class="card">
+        <h3>📋 Existing Admins</h3>
+        <table id="adminsTable"><thead><tr><th>ID</th><th>Username</th><th>Role</th><th>Action</th></tr></thead><tbody>${admins.map(adm => `<tr><td>${adm.id}</td><td>${adm.username}</td><td>${adm.role}</td><td>${adm.role !== 'super' ? `<button class="danger" onclick="deleteAdmin(${adm.id})">Delete</button>` : '—'}</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div class="card">
+        <h3>📜 Full Action Logs (Approvals/Rejections/Manual)</h3>
+        <div style="max-height:400px; overflow-y:auto;"><table><thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Details</th></tr></thead><tbody>${logs.map(l => `<tr><td>${new Date(l.timestamp).toLocaleString()}</td><td>${l.admin} (${l.adminRole})</td><td>${l.action}</td><td>${l.details}</td></tr>`).join('')}</tbody></table></div>
+      </div>
+      <div><button onclick="window.close()">Close Panel</button></div>
+    </div>
+    <script>
+      function deleteAdmin(id) {
+        if(!confirm("Delete admin?")) return;
+        const admins = JSON.parse(localStorage.getItem("multi_admin_admins") || "[]");
+        const newAdmins = admins.filter(a => a.id !== id);
+        localStorage.setItem("multi_admin_admins", JSON.stringify(newAdmins));
+        alert("Admin deleted. Refresh panel.");
+        location.reload();
+      }
+      document.getElementById('addAdminBtn')?.addEventListener('click', () => {
+        const username = document.getElementById('newUsername').value.trim();
+        const password = document.getElementById('newPassword').value.trim();
+        const role = document.getElementById('newRole').value;
+        if(!username || !password) { alert("Username/password required"); return; }
+        const admins = JSON.parse(localStorage.getItem("multi_admin_admins") || "[]");
+        if(admins.find(a => a.username === username)) { alert("Username exists"); return; }
+        const newId = Date.now();
+        admins.push({ id: newId, username, password, role, fullName: username });
+        localStorage.setItem("multi_admin_admins", JSON.stringify(admins));
+        alert("Admin added");
+        location.reload();
+      });
+      window.deleteAdmin = deleteAdmin;
+    <\/script>
+    </body></html>`;
+  }
+
+  // ----- QR/OCR helpers (copied from original) -----
+  async function extractRefFromQR(imageSrc) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.src = imageSrc;
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+          if (qrCode && qrCode.data) {
+            const match = qrCode.data.match(/\/receipt\/([A-Z0-9]+)/i);
+            if (match) resolve(match[1]);
+            else resolve(qrCode.data.match(/^([A-Z0-9]{8,})$/)?.[1] || null);
+          } else resolve(null);
+        } catch(e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+    });
+  }
+  async function extractRefFromOCR(imageUrl) {
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
+      return match ? match[1] : (text.match(/\bDE[A-Z0-9]{8,}\b/i)?.[0] || null);
+    } catch { return null; }
+  }
+  async function getReferenceFromProof(imagePath) {
+    try {
+      const qrRef = await extractRefFromQR(imagePath);
+      if (qrRef) return { ref: qrRef, method: 'QR' };
+    } catch(e) {}
+    const ocrRef = await extractRefFromOCR(imagePath);
+    if (ocrRef) return { ref: ocrRef, method: 'OCR' };
+    return null;
+  }
+  function getVerificationLink(paymentType, referenceNumber) {
+    const ref = encodeURIComponent(referenceNumber);
+    if(paymentType === 'telebirr') return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+    if(paymentType === 'cbebirr') return `https://cbebirr.com/verify?txn=${ref}`;
+    if(paymentType === 'mpesa') return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+    return null;
+  }
+  function escapeHtml(str) { return String(str || '').replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
+
+  // ---------- GLOBAL RENDER & EVENT BINDING ----------
+  let currentRenderFn = null;
+  async function renderApp() {
+    const admin = getCurrentAdmin();
+    let html;
+    if (!admin) html = renderLogin();
+    else html = await renderDashboard();
+    document.getElementById('app').innerHTML = html;
+    if (!admin) {
+      document.getElementById('doLoginBtn')?.addEventListener('click', () => {
+        const user = document.getElementById('loginUsername').value;
+        const pwd = document.getElementById('loginPassword').value;
+        if (login(user, pwd)) renderApp();
+        else alert("Invalid credentials");
+      });
+    } else {
+      // bind buttons after rendering
+      document.getElementById('manualAddBtn')?.addEventListener('click', async () => {
+        const telegramId = document.getElementById('manualUserId')?.value;
+        const amount = document.getElementById('manualAmount')?.value;
+        const amountNum = Number(amount);
+        if (!telegramId || !amountNum) { alert("Enter all fields"); return; }
+        recordManualDeposit(amountNum, telegramId, admin.username);
+        addLogEntry("MANUAL_DEPOSIT", `Manual deposit +${amountNum} ETB to ${telegramId}`, null);
+        alert(`✅ +${amountNum} ETB logged to totals`);
+        document.getElementById('manualUserId').value = '';
+        document.getElementById('manualAmount').value = '';
+        renderApp();
+      });
+      document.getElementById('openControlPanelBtn')?.addEventListener('click', openControlPanel);
+      window.processDepositFn = async (id, action) => {
+        let deposits = JSON.parse(localStorage.getItem(STORAGE.PENDING_DEPOSITS) || "[]");
+        const deposit = deposits.find(d => d.id === id);
+        if (!deposit) return;
+        if (action === 'approve') {
+          recordApprovedDeposit(id, deposit.amount, { username: deposit.username });
+          addLogEntry("DEPOSIT_APPROVED", `Approved deposit #${id} | ${deposit.amount} ETB`, id);
+        } else {
+          addLogEntry("DEPOSIT_REJECTED", `Rejected deposit #${id} | ${deposit.amount} ETB`, id);
+        }
+        const newDeposits = deposits.filter(d => d.id !== id);
+        localStorage.setItem(STORAGE.PENDING_DEPOSITS, JSON.stringify(newDeposits));
+        alert(`✅ Deposit ${action}d`);
+        renderApp();
+      };
+      window.processWithdrawalFn = async (id, action) => {
+        let withdrawals = JSON.parse(localStorage.getItem(STORAGE.PENDING_WITHDRAWALS) || "[]");
+        const wd = withdrawals.find(w => w.id === id);
+        if (!wd) return;
+        if (action === 'approve') {
+          recordApprovedWithdrawal(id, wd.amount, { username: wd.username });
+          addLogEntry("WITHDRAWAL_APPROVED", `Approved withdrawal #${id} | ${wd.amount} ETB`, id);
+        } else {
+          addLogEntry("WITHDRAWAL_REJECTED", `Rejected withdrawal #${id} | ${wd.amount} ETB`, id);
+        }
+        const newWithdrawals = withdrawals.filter(w => w.id !== id);
+        localStorage.setItem(STORAGE.PENDING_WITHDRAWALS, JSON.stringify(newWithdrawals));
+        alert(`✅ Withdrawal ${action}d`);
+        renderApp();
+      };
+      window.logoutFn = () => { logout(); };
+    }
+  }
+
+  initStorage();
+  renderApp();
+</script>
+</body>
+</html>
