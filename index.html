@@ -654,8 +654,8 @@
     
     <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')">🎉 Amazing! 🎉</button></div></div>
 
-    <!-- STAKE PAGE -->
-    <div id="stakePage" class="page"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;"><h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2><div class="players-badge">DOT BINGO</div></div><h3 style="text-align:center; margin:20px 0 10px;">Choose Your Stake</h3><div class="stake-page-buttons"><button id="stake10Btn" class="stake-option">10 ETB</button><button id="stake20Btn" class="stake-option">soon</button></div><div class="rules-text"><p><strong>💰 የመግቢያ ክፍያ፦</strong> በአንድ ካርድ 10 ብር</p><p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80%</p><p><strong>🎯 ማሸነፍ፦</strong> ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</p><p><strong>⏱️ ይገባኛል ጥያቄ፦</strong> ወዲያው “CLAIM BINGO!”</p></div></div>
+    <!-- STAKE PAGE (only 10 ETB option) -->
+    <div id="stakePage" class="page"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;"><h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2><div class="players-badge">DOT BINGO</div></div><h3 style="text-align:center; margin:20px 0 10px;">Choose Your Stake</h3><div class="stake-page-buttons"><button id="stake10Btn" class="stake-option">10 ETB</button></div><div class="rules-text"><p><strong>💰 የመግቢያ ክፍያ፦</strong> በአንድ ካርድ 10 ብር</p><p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80%</p><p><strong>🎯 ማሸነፍ፦</strong> ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</p><p><strong>⏱️ ይገባኛል ጥያቄ፦</strong> ወዲያው “CLAIM BINGO!”</p></div></div>
 
     <!-- LOBBY PAGE -->
     <div id="lobbyPage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><h2 style="font-weight:800; color:#ea580c;">🎲 DOT BINGO</h2><div class="players-badge">👥 <span id="playersCount">0</span></div></div><div class="balance-top"><div style="font-weight:700;">💰 BAL <span id="lobbyBalance">0</span> ETB</div><div style="display:flex; gap:8px;"><button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;">+Deposit</button><button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;">-Withdraw</button></div><div class="timer-badge" id="lobbyTimer">30s</div></div><div style="display:flex; justify-content:space-between; margin:12px 0;"><span>🎴 Pick card ID:</span><span>Selected: <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c; border:none; border-radius:40px; padding:6px 16px; color:white;">✨ Random Card</button></div><div id="numberGrid" class="grid-100"></div><div style="margin-top:8px;">🎴 Your Bingo Card Preview</div><div id="lobbyCardPreview" class="card-container"></div><div class="tab-bar"><button class="tab-btn active" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div><button id="rulesBtn" class="rules-btn" style="width:100%; background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa;">📜 Game Rules</button><div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div></div>
@@ -700,7 +700,6 @@
         function unlockSpeech() {
             if (speechUnlocked) return;
             speechUnlocked = true;
-            // speak a dummy silent word to unlock (some browsers need this)
             if (window.speechSynthesis) {
                 const dummy = new SpeechSynthesisUtterance(' ');
                 dummy.volume = 0;
@@ -717,7 +716,6 @@
                 window.speechSynthesis.cancel();
                 currentUtterance = null;
             }
-            // also unlock speech on first click
             unlockSpeech();
         }
 
@@ -750,10 +748,8 @@
         function speakAmharicNumberWithLetter(number) {
             if (soundMuted) return;
             if (number < 1 || number > 75) return;
-            // ensure speech is unlocked
             if (!speechUnlocked) {
                 unlockSpeech();
-                // small delay to allow unlock, then retry once
                 setTimeout(() => speakAmharicNumberWithLetter(number), 100);
                 return;
             }
@@ -769,7 +765,6 @@
                 utterance.rate = 0.85;
                 utterance.pitch = 1.0;
                 utterance.volume = 0.9;
-                // try to pick an Amharic voice if available
                 const voices = window.speechSynthesis.getVoices();
                 const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am'));
                 if (amharicVoice) utterance.voice = amharicVoice;
@@ -853,7 +848,6 @@
         closeRules?.addEventListener('click',()=>rulesModal.classList.remove('active'));
         loadDepositAccounts(); buildNumberGrid(); loadStats(); connect();
         updateMuteButton();
-        // Preload voices
         window.speechSynthesis.getVoices();
         stakePage.classList.remove('hidden');
     </script>
