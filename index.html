@@ -108,6 +108,7 @@
         let currentBalance = 0, totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
         let currentMainPage = 'lobby', currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
+        let previousCardNumber = null; // track previous to free it optimistically
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
@@ -124,6 +125,7 @@
         const lobbyTimerEl=document.getElementById('lobbyTimer'), playersCountEl=document.getElementById('playersCount'), lobbyBalanceEl=document.getElementById('lobbyBalance'), gamePlayersCountEl=document.getElementById('gamePlayersCount'), winningBalanceEl=document.getElementById('winningBalance'), currentCallEl=document.getElementById('currentCall'), calledListEl=document.getElementById('calledList'), selectedNumberEl=document.getElementById('selectedNumber'), numberGrid=document.getElementById('numberGrid'), lobbyCardPreview=document.getElementById('lobbyCardPreview');
         function syncBalance(v){ currentBalance=v; lobbyBalanceEl.innerText=v; if(document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText=v; if(document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText=v; if(document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText=v; }
         function renderCard(card, containerId, clickable){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; const table=document.createElement('table'); table.style.borderCollapse='separate'; table.style.borderSpacing='10px'; const thead=document.createElement('thead'); const hr=document.createElement('tr'); ['B','I','N','G','O'].forEach(l=>{let th=document.createElement('th'); th.textContent=l; hr.appendChild(th);}); thead.appendChild(hr); table.appendChild(thead); const tbody=document.createElement('tbody'); for(let r=0;r<5;r++){ const tr=document.createElement('tr'); for(let c=0;c<5;c++){ const val=card[r][c]; const td=document.createElement('td'); td.textContent=val==='FREE'?'★':val; if(val==='FREE') td.classList.add('free'); if(markedNumbers.includes(val)) td.classList.add('marked'); if(clickable && val!=='FREE'){ td.style.cursor='pointer'; td.onclick=()=>{ if(isGameActive && socket) socket.emit('markNumber', val); };} tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
+        
         function buildNumberGrid() {
             numberGrid.innerHTML='';
             for(let i=1;i<=100;i++){
@@ -142,9 +144,11 @@
                 } else {
                     cell.onclick=()=>{
                         if(!isGameActive && socket && !takenNumbers.has(i)){
-                            // Optimistically remove previous own card from local takenNumbers
+                            // Optimistic update: free the previous card if any
                             if(selectedCardNumber !== null && selectedCardNumber !== i){
+                                // Remove previous from local takenNumbers (if it was there)
                                 takenNumbers.delete(selectedCardNumber);
+                                previousCardNumber = selectedCardNumber;
                             }
                             pendingSelection = i;
                             selectedCardNumber = i;
@@ -157,14 +161,17 @@
                 numberGrid.appendChild(cell);
             }
         }
+        
         function updateGridWithTakenNumbers(nums){
             const newSet = new Set(nums);
+            // Ensure our selected card is not marked as taken by others
             if(selectedCardNumber !== null){
                 newSet.delete(selectedCardNumber);
             }
             takenNumbers = newSet;
             buildNumberGrid();
         }
+        
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
         function showLobby(sec){ 
             currentMainPage='lobby'; 
@@ -178,6 +185,7 @@
             markedNumbers=[];
             // Reset selected card number for fresh lobby
             selectedCardNumber = null;
+            previousCardNumber = null;
             selectedNumberEl.textContent = '-';
             pendingSelection = null;
             pendingRandom = false;
@@ -211,8 +219,9 @@
         let isSubmittingWithdraw=false;
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error. Please try again.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function showWinnerOverlay(data){ if(data.noWinner){ alert('No winner this round.'); return; } const prize=data.prizeEach||data.totalPrize||0; const winnersArray=data.winners||[data.winner]; const title=winnersArray.length>1?`${winnersArray.length} WINNERS!`:'🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersArray.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=prize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true,prize,currentGameId,1,winnersArray.length); unlockSpeech(); }
-        async function connect(){ const initData=tg.initData; if(!initData){ alert('Open inside Telegram'); return; } try{ const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})}); const data=await res.json(); if(!data.success){ alert('Auth failed'); return; } document.getElementById('profileUsername').innerText=data.username||'Player'; }catch(e){ alert('Network error'); return; } socket=io(); socket.on('connect',()=>{ socket.emit('joinLobby'); }); socket.on('balanceUpdate',syncBalance); socket.on('lobbyState',state=>{ // Reset selected card number when lobby state is received (fresh lobby)
+        async function connect(){ const initData=tg.initData; if(!initData){ alert('Open inside Telegram'); return; } try{ const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})}); const data=await res.json(); if(!data.success){ alert('Auth failed'); return; } document.getElementById('profileUsername').innerText=data.username||'Player'; }catch(e){ alert('Network error'); return; } socket=io(); socket.on('connect',()=>{ socket.emit('joinLobby'); }); socket.on('balanceUpdate',syncBalance); socket.on('lobbyState',state=>{ // Reset selection for new lobby
             selectedCardNumber = null;
+            previousCardNumber = null;
             selectedNumberEl.textContent = '-';
             pendingSelection = null;
             pendingRandom = false;
@@ -241,7 +250,15 @@
                 buildNumberGrid();
             }
         }); 
-        socket.on('cardSelectionFailed',msg=>{ alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber=null; selectedNumberEl.textContent='-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
+        socket.on('cardSelectionFailed',msg=>{ alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ // revert optimistic? but server failed, so reset
+                    selectedCardNumber = null;
+                    selectedNumberEl.textContent = '-';
+                    // Also restore previous card number if we optimistically removed it? Not needed, server will send correct state
+                    buildNumberGrid();
+                }
+            } 
+            if(pendingRandom) pendingRandom=false;
+        });
         socket.on('playersCount',c=>{ playersCountEl.innerText=c; if(gamePlayersCountEl) gamePlayersCountEl.innerText=c; winningBalanceEl.innerText=Math.floor(c*10*0.8); });
         socket.on('gameStarted',data=>{ if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
         socket.on('numberCalled',data=>{ const num=data.number; currentCallEl.innerText=formatCall(num); calledListEl.innerText='Called: '+(data.calledNumbers||[]).map(n=>formatCall(n)).join(', '); speakAmharicNumberWithLetter(num); });
