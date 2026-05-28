@@ -29,7 +29,10 @@
         button { background: #f39c12; border: none; padding: 14px 20px; border-radius: 60px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 18px; width: 100%; transition: 0.1s; color: #1e2a3a; }
         button:active { transform: scale(0.97); background: #e67e22; }
         .footer { margin-top: 24px; text-align: center; font-size: 0.65rem; color: #5d6d7e; }
-        @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } }
+        .total-balance-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
+        .total-balance-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; font-weight: bold; }
+        .total-balance-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; line-height: 1; }
+        @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-balance-value { font-size: 1.4rem; } }
     </style>
 </head>
 <body>
@@ -53,6 +56,10 @@
 
     <!-- ALL REGISTERED PLAYERS SECTION -->
     <h2 class="section-title">📋 All Registered Players</h2>
+    <div class="total-balance-card">
+        <span class="total-balance-label">💰 TOTAL BALANCE (All users)</span>
+        <span class="total-balance-value" id="totalBalanceSum">0</span>
+    </div>
     <div class="status-bar"><span>👥 Total registered:</span><span id="registeredCount">0</span></div>
     <div class="players-table-wrapper">
         <table id="registeredTable">
@@ -135,6 +142,12 @@
         const tbody = document.getElementById('registeredTableBody');
         const countSpan = document.getElementById('registeredCount');
         countSpan.innerText = users ? users.length : 0;
+
+        let totalBalance = 0;
+        if (users && users.length > 0) {
+            totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
+        }
+        document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
 
         if (!users || users.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="empty-message">📭 No registered users found.</td></tr>';
