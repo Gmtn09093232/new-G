@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Bingo Admin | Pending + Approved History</title>
+  <title>🎰 Bingo Admin | Pending + Approved History (Telegram ID)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
@@ -31,7 +31,6 @@
       width: 100%;
     }
 
-    /* header */
     .glass-header {
       background: rgba(18, 25, 45, 0.75);
       backdrop-filter: blur(12px);
@@ -71,7 +70,6 @@
     }
     .refresh-btn:active { transform: scale(0.96); }
 
-    /* stats row */
     .stats-row {
       display: flex;
       flex-wrap: wrap;
@@ -103,7 +101,6 @@
     .stat-card.total .number { color: #2ecc71; }
     .stat-card.withdraw-total .number { color: #e67e22; }
 
-    /* tabs */
     .tab-bar {
       display: flex;
       gap: 8px;
@@ -132,7 +129,6 @@
       box-shadow: 0 2px 8px rgba(243,156,18,0.3);
     }
 
-    /* sections */
     .section {
       background: rgba(18, 28, 40, 0.65);
       backdrop-filter: blur(12px);
@@ -250,7 +246,7 @@
     <button class="tab-btn" data-tab="approved">✅ Approved History & Summary</button>
   </div>
 
-  <!-- PENDING SECTION (Deposits + Withdrawals + Manual add) -->
+  <!-- PENDING SECTION -->
   <div id="pendingSection" class="tab-content active">
     <div class="section">
       <h2>📸 Deposit verifications (pending)</h2>
@@ -291,13 +287,13 @@
     </div>
   </div>
 
-  <!-- APPROVED HISTORY SECTION (all approved deposits + withdrawals + player summary) -->
+  <!-- APPROVED HISTORY SECTION (Telegram ID instead of request ID) -->
   <div id="approvedSection" class="tab-content" style="display:none;">
     <div class="section">
       <h2>📜 Approved Deposits Log</h2>
       <div class="history-table-wrapper">
         <table id="approvedDepositsTable">
-          <thead><tr><th>ID</th><th>Username</th><th>Amount (ETB)</th><th>Payment Type</th><th>Approved Date</th></tr></thead>
+          <thead><tr><th>📱 Telegram ID</th><th>Username</th><th>Amount (ETB)</th><th>Payment Type</th><th>Approved Date</th></tr></thead>
           <tbody><tr><td colspan="5">Loading...</td></tr></tbody>
         </table>
       </div>
@@ -306,7 +302,7 @@
       <h2>💸 Approved Withdrawals Log</h2>
       <div class="history-table-wrapper">
         <table id="approvedWithdrawalsTable">
-          <thead><tr><th>ID</th><th>Username</th><th>Amount (ETB)</th><th>Method</th><th>Approved Date</th></tr></thead>
+          <thead><tr><th>📱 Telegram ID</th><th>Username</th><th>Amount (ETB)</th><th>Method</th><th>Approved Date</th></tr></thead>
           <tbody><tr><td colspan="5">Loading...</td></tr></tbody>
         </table>
       </div>
@@ -315,7 +311,7 @@
       <h2>👥 Player Summary (net balance from approved transactions)</h2>
       <div class="history-table-wrapper">
         <table id="playerSummaryTable" class="player-summary-table">
-          <thead><tr><th>Username / ID</th><th>Total Deposits</th><th>Total Withdrawals</th><th>Net Balance</th><th>Last Deposit Date</th><th>Last Withdrawal Date</th></tr></thead>
+          <thead><tr><th>Telegram ID / Username</th><th>Total Deposits</th><th>Total Withdrawals</th><th>Net Balance</th><th>Last Deposit Date</th><th>Last Withdrawal Date</th></tr></thead>
           <tbody><tr><td colspan="6">Loading...</td></tr></tbody>
         </table>
       </div>
@@ -355,66 +351,90 @@
     document.getElementById('totalWithdrawSum').innerText = computeTotalWithdraw().toLocaleString() + ' ETB';
   }
 
+  // Record functions: now we store telegram_id properly
   function recordApprovedDeposit(depositId, amount, metadata = {}) {
     const logs = loadApprovedDeposits();
     if (logs.some(entry => entry.id === depositId)) return false;
-    logs.push({ id: depositId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
+    logs.push({ 
+      id: depositId, 
+      telegram_id: metadata.telegram_id || metadata.telegramId || 'unknown',
+      username: metadata.username || '?',
+      amount: Number(amount), 
+      payment_type: metadata.payment_type || 'unknown',
+      timestamp: new Date().toISOString()
+    });
     saveApprovedDeposits(logs);
     updateTotalsUI();
     renderApprovedHistory();
     return true;
   }
+
   function recordApprovedWithdrawal(withdrawalId, amount, metadata = {}) {
     const logs = loadApprovedWithdrawals();
     if (logs.some(entry => entry.id === withdrawalId)) return false;
-    logs.push({ id: withdrawalId, amount: Number(amount), timestamp: new Date().toISOString(), ...metadata });
+    logs.push({ 
+      id: withdrawalId,
+      telegram_id: metadata.telegram_id || metadata.telegramId || 'unknown',
+      username: metadata.username || '?',
+      amount: Number(amount), 
+      withdrawal_type: metadata.withdrawal_type || 'unknown',
+      timestamp: new Date().toISOString()
+    });
     saveApprovedWithdrawals(logs);
     updateTotalsUI();
     renderApprovedHistory();
     return true;
   }
+
   function recordManualDeposit(amount, telegramId, reference = 'manual') {
     const logs = loadManualDeposits();
     const manualId = 'manual_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-    logs.push({ id: manualId, amount: Number(amount), telegramId, note: reference, timestamp: new Date().toISOString() });
+    logs.push({ 
+      id: manualId, 
+      telegram_id: telegramId,
+      username: `Manual (${telegramId})`,
+      amount: Number(amount), 
+      payment_type: 'manual',
+      timestamp: new Date().toISOString()
+    });
     saveManualDeposits(logs);
     updateTotalsUI();
     renderApprovedHistory();
     return true;
   }
 
-  // Render approved tables + player summary
+  // Render approved tables showing Telegram ID instead of request ID
   function renderApprovedHistory() {
     const approvedDeposits = loadApprovedDeposits();
     const approvedWithdrawals = loadApprovedWithdrawals();
     const manualDeposits = loadManualDeposits();
 
-    // merge manual deposits into deposit list for display (with note instead of username)
-    const allDeposits = [...approvedDeposits, ...manualDeposits.map(m => ({ ...m, username: `📌 Manual (ID:${m.telegramId})`, payment_type: 'manual' }))];
+    // merge manual deposits into deposit list for display
+    const allDeposits = [...approvedDeposits, ...manualDeposits];
 
-    // deposits table
+    // deposits table: show Telegram ID
     const depTbody = document.querySelector('#approvedDepositsTable tbody');
     if (allDeposits.length === 0) depTbody.innerHTML = '<tr><td colspan="5">No approved deposits yet</td></tr>';
     else {
       depTbody.innerHTML = allDeposits.map(d => `
         <tr>
-          <td>${escapeHtml(d.id)}</td>
-          <td>${escapeHtml(d.username || d.telegramId || '?')}</td>
+          <td>${escapeHtml(d.telegram_id || '?')}</td>
+          <td>${escapeHtml(d.username || '?')}</td>
           <td>${d.amount.toLocaleString()}</td>
-          <td>${escapeHtml(d.payment_type || d.withdrawal_type || 'manual')}</td>
+          <td>${escapeHtml(d.payment_type || 'N/A')}</td>
           <td>${new Date(d.timestamp).toLocaleString()}</td>
         </tr>
       `).join('');
     }
 
-    // withdrawals table
+    // withdrawals table: show Telegram ID
     const wdTbody = document.querySelector('#approvedWithdrawalsTable tbody');
     if (approvedWithdrawals.length === 0) wdTbody.innerHTML = '<tr><td colspan="5">No approved withdrawals yet</td></tr>';
     else {
       wdTbody.innerHTML = approvedWithdrawals.map(w => `
         <tr>
-          <td>${escapeHtml(w.id)}</td>
-          <td>${escapeHtml(w.username || w.telegramId || '?')}</td>
+          <td>${escapeHtml(w.telegram_id || '?')}</td>
+          <td>${escapeHtml(w.username || '?')}</td>
           <td>${w.amount.toLocaleString()}</td>
           <td>${escapeHtml(w.withdrawal_type || 'N/A')}</td>
           <td>${new Date(w.timestamp).toLocaleString()}</td>
@@ -422,44 +442,42 @@
       `).join('');
     }
 
-    // Player summary: group by username/telegramId
-    const playerMap = new Map(); // key: username or id string
-    const addDepositToPlayer = (playerKey, displayName, amount, date) => {
-      if (!playerMap.has(playerKey)) playerMap.set(playerKey, { name: displayName, totalDeposit: 0, totalWithdraw: 0, lastDeposit: null, lastWithdraw: null });
-      const p = playerMap.get(playerKey);
+    // Player summary: group by telegram_id
+    const playerMap = new Map(); // key: telegram_id
+    const addDepositToPlayer = (telegramId, displayName, amount, date) => {
+      const key = String(telegramId);
+      if (!playerMap.has(key)) playerMap.set(key, { name: displayName, totalDeposit: 0, totalWithdraw: 0, lastDeposit: null, lastWithdraw: null });
+      const p = playerMap.get(key);
       p.totalDeposit += amount;
       if (!p.lastDeposit || new Date(date) > new Date(p.lastDeposit)) p.lastDeposit = date;
     };
-    const addWithdrawToPlayer = (playerKey, displayName, amount, date) => {
-      if (!playerMap.has(playerKey)) playerMap.set(playerKey, { name: displayName, totalDeposit: 0, totalWithdraw: 0, lastDeposit: null, lastWithdraw: null });
-      const p = playerMap.get(playerKey);
+    const addWithdrawToPlayer = (telegramId, displayName, amount, date) => {
+      const key = String(telegramId);
+      if (!playerMap.has(key)) playerMap.set(key, { name: displayName, totalDeposit: 0, totalWithdraw: 0, lastDeposit: null, lastWithdraw: null });
+      const p = playerMap.get(key);
       p.totalWithdraw += amount;
       if (!p.lastWithdraw || new Date(date) > new Date(p.lastWithdraw)) p.lastWithdraw = date;
     };
 
-    // process deposits (approved + manual)
     approvedDeposits.forEach(d => {
-      const key = d.username || d.telegramId || `id_${d.id}`;
-      addDepositToPlayer(key, d.username || d.telegramId || 'Unknown', d.amount, d.timestamp);
+      addDepositToPlayer(d.telegram_id, d.username || d.telegram_id, d.amount, d.timestamp);
     });
     manualDeposits.forEach(m => {
-      const key = `manual_${m.telegramId}`;
-      addDepositToPlayer(key, `Manual (${m.telegramId})`, m.amount, m.timestamp);
+      addDepositToPlayer(m.telegram_id, m.username || `Manual ${m.telegram_id}`, m.amount, m.timestamp);
     });
     approvedWithdrawals.forEach(w => {
-      const key = w.username || w.telegramId || `wd_${w.id}`;
-      addWithdrawToPlayer(key, w.username || w.telegramId || 'Unknown', w.amount, w.timestamp);
+      addWithdrawToPlayer(w.telegram_id, w.username || w.telegram_id, w.amount, w.timestamp);
     });
 
     const summaryTbody = document.querySelector('#playerSummaryTable tbody');
     if (playerMap.size === 0) summaryTbody.innerHTML = '<tr><td colspan="6">No transaction history</td></tr>';
     else {
       const rows = [];
-      for (const [key, p] of playerMap.entries()) {
+      for (const [telegramId, p] of playerMap.entries()) {
         const net = p.totalDeposit - p.totalWithdraw;
         rows.push(`
           <tr>
-            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(telegramId)}<br><small>${escapeHtml(p.name)}</small></td>
             <td>${p.totalDeposit.toLocaleString()}</td>
             <td>${p.totalWithdraw.toLocaleString()}</td>
             <td class="${net>=0?'match':'mismatch'}">${net.toLocaleString()}</td>
@@ -472,7 +490,7 @@
     }
   }
 
-  // ---------- pending functions (unchanged except small hooks) ----------
+  // ---------- pending functions (unchanged except storing telegram_id on approval) ----------
   async function fetchDeposits() {
     try {
       const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
@@ -497,8 +515,8 @@
     updateTotalsUI();
   }
 
-  // QR/OCR functions (preserved from original)
-  async function extractRefFromQR(imageSrc) { /* ... same as original ... */ 
+  // QR/OCR functions (preserved)
+  async function extractRefFromQR(imageSrc) {
     return new Promise((resolve) => {
       const img = new Image(); img.crossOrigin = "Anonymous"; img.src = imageSrc;
       img.onload = () => {
@@ -545,7 +563,7 @@
       if (submittedRef) { const link = getVerificationLink(req.payment_type, submittedRef); if (link) verifyLinkHtml = `<p><a href="${link}" target="_blank">🔗 Verify</a></p>`; }
       card.innerHTML = `
         <div class="request-info">
-          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p><strong>📌 Request ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (<strong>${escapeHtml(req.telegram_id)}</strong>)</p>
           <p>📞 ${req.phone || 'N/A'} | 💵 ${req.amount} ETB | 🏦 ${req.payment_type}</p>
           <p>🕒 ${new Date(req.created_at).toLocaleString()}</p>
           ${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>📎 No proof</p>'}
@@ -578,7 +596,7 @@
     container.innerHTML = filtered.map(req => `
       <div class="request-card">
         <div class="request-info">
-          <p><strong>📌 ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p><strong>📌 Request ID:</strong> ${req.id} | 👤 ${escapeHtml(req.username)} (<strong>${escapeHtml(req.telegram_id)}</strong>)</p>
           <p>📞 ${escapeHtml(req.phone_number)} | 👤 ${escapeHtml(req.receiver_name || 'N/A')}</p>
           <p>💰 ${req.amount} ETB | 🏦 ${req.withdrawal_type} | 🕒 ${new Date(req.created_at).toLocaleString()}</p>
         </div>
@@ -598,7 +616,13 @@
       const data = await res.json();
       if (data.success) {
         alert(`✅ Deposit ${action}d`);
-        if (action === 'approve' && depositItem) recordApprovedDeposit(depositItem.id, depositItem.amount, { username: depositItem.username, payment_type: depositItem.payment_type });
+        if (action === 'approve' && depositItem) {
+          recordApprovedDeposit(depositItem.id, depositItem.amount, {
+            telegram_id: depositItem.telegram_id,
+            username: depositItem.username,
+            payment_type: depositItem.payment_type
+          });
+        }
         await fetchDeposits(); updateStats();
       } else alert(data.error || 'Error');
     } catch(err) { alert(err.message); }
@@ -612,7 +636,13 @@
       const data = await res.json();
       if (data.success) {
         alert(`✅ Withdrawal ${action}d`);
-        if (action === 'approve' && withdrawalItem) recordApprovedWithdrawal(withdrawalItem.id, withdrawalItem.amount, { username: withdrawalItem.username, withdrawal_type: withdrawalItem.withdrawal_type });
+        if (action === 'approve' && withdrawalItem) {
+          recordApprovedWithdrawal(withdrawalItem.id, withdrawalItem.amount, {
+            telegram_id: withdrawalItem.telegram_id,
+            username: withdrawalItem.username,
+            withdrawal_type: withdrawalItem.withdrawal_type
+          });
+        }
         await fetchWithdrawals(); updateStats();
       } else alert(data.error || 'Error');
     } catch(err) { alert(err.message); }
