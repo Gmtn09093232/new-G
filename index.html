@@ -124,8 +124,6 @@
         const lobbyTimerEl=document.getElementById('lobbyTimer'), playersCountEl=document.getElementById('playersCount'), lobbyBalanceEl=document.getElementById('lobbyBalance'), gamePlayersCountEl=document.getElementById('gamePlayersCount'), winningBalanceEl=document.getElementById('winningBalance'), currentCallEl=document.getElementById('currentCall'), calledListEl=document.getElementById('calledList'), selectedNumberEl=document.getElementById('selectedNumber'), numberGrid=document.getElementById('numberGrid'), lobbyCardPreview=document.getElementById('lobbyCardPreview');
         function syncBalance(v){ currentBalance=v; lobbyBalanceEl.innerText=v; if(document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText=v; if(document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText=v; if(document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText=v; }
         function renderCard(card, containerId, clickable){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; const table=document.createElement('table'); table.style.borderCollapse='separate'; table.style.borderSpacing='10px'; const thead=document.createElement('thead'); const hr=document.createElement('tr'); ['B','I','N','G','O'].forEach(l=>{let th=document.createElement('th'); th.textContent=l; hr.appendChild(th);}); thead.appendChild(hr); table.appendChild(thead); const tbody=document.createElement('tbody'); for(let r=0;r<5;r++){ const tr=document.createElement('tr'); for(let c=0;c<5;c++){ const val=card[r][c]; const td=document.createElement('td'); td.textContent=val==='FREE'?'★':val; if(val==='FREE') td.classList.add('free'); if(markedNumbers.includes(val)) td.classList.add('marked'); if(clickable && val!=='FREE'){ td.style.cursor='pointer'; td.onclick=()=>{ if(isGameActive && socket) socket.emit('markNumber', val); };} tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
-        // Optimistic update: immediately remove old selected number from takenNumbers when switching
-        let previousSelectedCard = null;
         function buildNumberGrid() {
             numberGrid.innerHTML='';
             for(let i=1;i<=100;i++){
@@ -133,7 +131,6 @@
                 cell.className='grid-cell';
                 cell.dataset.number=i;
                 cell.textContent=i;
-                // Determine if number is taken by others OR is own card
                 const isTaken = takenNumbers.has(i);
                 const isOwn = (selectedCardNumber === i);
                 if(isTaken && !isOwn){
@@ -145,14 +142,11 @@
                 } else {
                     cell.onclick=()=>{
                         if(!isGameActive && socket && !takenNumbers.has(i)){
-                            // Optimistically remove previous own card from takenNumbers set
+                            // Optimistically remove previous own card from local takenNumbers
                             if(selectedCardNumber !== null && selectedCardNumber !== i){
-                                // Remove previous from local takenNumbers set (optimistic)
                                 takenNumbers.delete(selectedCardNumber);
-                                // Also remove from server's set later, but UI shows free immediately
                             }
                             pendingSelection = i;
-                            previousSelectedCard = selectedCardNumber;
                             selectedCardNumber = i;
                             selectedNumberEl.textContent = i;
                             buildNumberGrid();
@@ -162,14 +156,9 @@
                 }
                 numberGrid.appendChild(cell);
             }
-            // Also highlight if selected but not yet taken (already red from own-card class)
         }
         function updateGridWithTakenNumbers(nums){
-            // When server sends updated takenNumbers, we replace the local set
-            // But we need to ensure our own selected card is not marked as taken if server hasn't removed it yet
-            // Actually server should have removed it. But for safety, we keep our own selection as not taken.
             const newSet = new Set(nums);
-            // Ensure our own selected card is NOT in takenNumbers (if we have one)
             if(selectedCardNumber !== null){
                 newSet.delete(selectedCardNumber);
             }
@@ -177,8 +166,38 @@
             buildNumberGrid();
         }
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
-        function showLobby(sec){ currentMainPage='lobby'; stakePage.classList.add('hidden'); lobbyPage.classList.remove('hidden'); gamePage.classList.add('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=false; markedNumbers=[]; if(socket) socket.emit('getBalance'); startTimer(sec||30); if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); updateStatsUI(); }
-        function showGame(){ currentMainPage='game'; lobbyPage.classList.add('hidden'); gamePage.classList.remove('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=true; clearInterval(lobbyTimerInterval); if(socket) socket.emit('getBalance'); if(userCard.length) renderCard(userCard,'gameCard',true); }
+        function showLobby(sec){ 
+            currentMainPage='lobby'; 
+            stakePage.classList.add('hidden'); 
+            lobbyPage.classList.remove('hidden'); 
+            gamePage.classList.add('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=false; 
+            markedNumbers=[];
+            // Reset selected card number for fresh lobby
+            selectedCardNumber = null;
+            selectedNumberEl.textContent = '-';
+            pendingSelection = null;
+            pendingRandom = false;
+            if(socket) socket.emit('getBalance'); 
+            startTimer(sec||30); 
+            if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
+            updateStatsUI(); 
+        }
+        function showGame(){ 
+            currentMainPage='game'; 
+            lobbyPage.classList.add('hidden'); 
+            gamePage.classList.remove('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=true; 
+            clearInterval(lobbyTimerInterval); 
+            if(socket) socket.emit('getBalance'); 
+            if(userCard.length) renderCard(userCard,'gameCard',true); 
+        }
         function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
         function goBackToMain(){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); }
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
@@ -192,7 +211,17 @@
         let isSubmittingWithdraw=false;
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error. Please try again.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function showWinnerOverlay(data){ if(data.noWinner){ alert('No winner this round.'); return; } const prize=data.prizeEach||data.totalPrize||0; const winnersArray=data.winners||[data.winner]; const title=winnersArray.length>1?`${winnersArray.length} WINNERS!`:'🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersArray.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=prize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true,prize,currentGameId,1,winnersArray.length); unlockSpeech(); }
-        async function connect(){ const initData=tg.initData; if(!initData){ alert('Open inside Telegram'); return; } try{ const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})}); const data=await res.json(); if(!data.success){ alert('Auth failed'); return; } document.getElementById('profileUsername').innerText=data.username||'Player'; }catch(e){ alert('Network error'); return; } socket=io(); socket.on('connect',()=>{ socket.emit('joinLobby'); }); socket.on('balanceUpdate',syncBalance); socket.on('lobbyState',state=>{ showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) playersCountEl.innerText=state.playersCount; }); socket.on('yourCard',card=>{ userCard=card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); }); socket.on('cardTaken',data=>{ // Update taken numbers from server, but preserve our own selection as not taken
+        async function connect(){ const initData=tg.initData; if(!initData){ alert('Open inside Telegram'); return; } try{ const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})}); const data=await res.json(); if(!data.success){ alert('Auth failed'); return; } document.getElementById('profileUsername').innerText=data.username||'Player'; }catch(e){ alert('Network error'); return; } socket=io(); socket.on('connect',()=>{ socket.emit('joinLobby'); }); socket.on('balanceUpdate',syncBalance); socket.on('lobbyState',state=>{ // Reset selected card number when lobby state is received (fresh lobby)
+            selectedCardNumber = null;
+            selectedNumberEl.textContent = '-';
+            pendingSelection = null;
+            pendingRandom = false;
+            showLobby(state.startsIn); 
+            if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); 
+            if(state.playersCount) playersCountEl.innerText=state.playersCount; 
+        }); 
+        socket.on('yourCard',card=>{ userCard=card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); }); 
+        socket.on('cardTaken',data=>{ 
             const newTaken = new Set(data.takenNumbers);
             if(selectedCardNumber !== null){
                 newTaken.delete(selectedCardNumber);
@@ -203,7 +232,6 @@
                 selectedCardNumber = data.number;
                 selectedNumberEl.textContent = data.number;
                 pendingSelection = null;
-                // Ensure our own number is not in takenNumbers (already removed above)
                 buildNumberGrid();
             }
             if(pendingRandom && data.number){
