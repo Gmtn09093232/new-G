@@ -338,7 +338,17 @@ async function startGame() {
     }
   }
 
-  currentGame.prizePool = 0.8 * (currentGame.entryFee * currentGame.players.length);
+  // --- MODIFIED PRIZE POOL LOGIC ---
+  const totalEntryFees = currentGame.entryFee * currentGame.players.length;
+  if (currentGame.players.length === 1) {
+    // Single player: winner takes 100% of entry fee (no house cut)
+    currentGame.prizePool = totalEntryFees;
+  } else {
+    // 2 or more players: winner takes 80% of total entry fees
+    currentGame.prizePool = 0.8 * totalEntryFees;
+  }
+  // ---------------------------------
+
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
   currentGame.winningNumber = null;
