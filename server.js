@@ -217,6 +217,19 @@ app.post('/admin/add-balance', async (req, res) => {
   const user = await loadUser(strId, 'unknown');
   user.balance += amt;
   await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
+  
+  // ✅ NEW: Insert manual deposit record for audit/stats
+  await supabase.from('deposit_requests').insert({
+    telegram_id: strId,
+    username: user.username,
+    amount: amt,
+    status: 'approved',
+    phone: null,
+    payment_type: 'manual',
+    proof_path: null,
+    processed_at: new Date().toISOString()
+  });
+  
   Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
   const sockets = await io.fetchSockets();
   const playerSocket = sockets.find(s => s.userId === strId);
