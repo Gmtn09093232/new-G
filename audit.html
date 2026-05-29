@@ -1,524 +1,458 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🔍 Audit Vault | Bingo Auditor</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
-      background: radial-gradient(circle at 10% 20%, #0a0f1c 0%, #050814 100%);
-      color: #f0f3fa;
-      padding: 20px 16px 40px;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1600px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    /* glass header */
-    .glass-header {
-      background: rgba(18, 25, 45, 0.75);
-      backdrop-filter: blur(12px);
-      border-radius: 2rem;
-      padding: 1rem 1.8rem;
-      margin-bottom: 2rem;
-      border: 1px solid rgba(243, 156, 18, 0.3);
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    h1 {
-      font-size: 1.7rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f39c12, #ffcc70);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      letter-spacing: -0.3px;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .back-link {
-      background: linear-gradient(95deg, #2c3e66, #1e2a3e);
-      border: none;
-      padding: 10px 24px;
-      border-radius: 40px;
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: white;
-      cursor: pointer;
-      transition: 0.2s;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(4px);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    .back-link:hover {
-      background: linear-gradient(95deg, #3a4e7a, #2a3a50);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(243,156,18,0.2);
-      color: white;
-    }
-
-    @media (max-width: 680px) {
-      .glass-header { flex-direction: column; align-items: stretch; text-align: center; }
-      h1 { font-size: 1.3rem; justify-content: center; }
-      .back-link { justify-content: center; }
-    }
-
-    /* summary cards */
-    .summary-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin-bottom: 2rem;
-    }
-    .summary-card {
-      background: rgba(22, 32, 42, 0.7);
-      backdrop-filter: blur(8px);
-      border-radius: 1.5rem;
-      padding: 1rem 1.8rem;
-      flex: 1;
-      min-width: 180px;
-      border-left: 4px solid #f39c12;
-      transition: 0.2s;
-    }
-    .summary-card h3 {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #adb7c9;
-      margin-bottom: 6px;
-    }
-    .summary-card .value {
-      font-size: 2rem;
-      font-weight: 800;
-      color: #f39c12;
-      line-height: 1.2;
-    }
-    @media (max-width: 640px) {
-      .summary-card .value { font-size: 1.5rem; }
-      .summary-card { padding: 0.8rem 1.2rem; }
-    }
-
-    /* filter panel - STACKED for Room ID, User ID, Event Type */
-    .filter-panel {
-      background: rgba(18, 28, 40, 0.65);
-      backdrop-filter: blur(12px);
-      border-radius: 2rem;
-      padding: 1.2rem 1.2rem;
-      margin-bottom: 2rem;
-      border: 1px solid rgba(243, 156, 18, 0.2);
-    }
-    .filter-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 1rem;
-      font-weight: 600;
-      color: #f39c12;
-      font-size: 0.85rem;
-    }
-    /* each filter group takes full width */
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      margin-bottom: 12px;
-      width: 100%;
-    }
-    .filter-group label {
-      font-size: 0.65rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-      color: #f39c12;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .filter-group input, .filter-group select {
-      background: #0f172ad9;
-      border: 1px solid #2d3a4e;
-      padding: 8px 12px;
-      border-radius: 40px;
-      color: #f0f3fa;
-      font-size: 0.8rem;
-      transition: 0.2s;
-      outline: none;
-      font-family: inherit;
-      width: 100%;
-    }
-    .filter-group input:focus, .filter-group select:focus {
-      border-color: #f39c12;
-      box-shadow: 0 0 0 2px rgba(243,156,18,0.3);
-    }
-    /* date row: two fields side by side */
-    .date-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin: 8px 0 16px 0;
-    }
-    .date-row .filter-group {
-      flex: 1;
-      margin-bottom: 0;
-    }
-    .filter-actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-    .search-btn, .reset-btn {
-      border: none;
-      padding: 8px 20px;
-      border-radius: 40px;
-      font-weight: 700;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: 0.2s;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    .search-btn {
-      background: linear-gradient(105deg, #f39c12, #e67e22);
-      color: #0a0f1c;
-    }
-    .reset-btn {
-      background: #2c3e66;
-      color: white;
-    }
-    .search-btn:hover, .reset-btn:hover {
-      transform: translateY(-2px);
-      filter: brightness(1.05);
-      box-shadow: 0 8px 20px rgba(243,156,18,0.3);
-    }
-    @media (max-width: 560px) {
-      .date-row { flex-direction: column; gap: 8px; }
-      .filter-actions { justify-content: stretch; }
-      .search-btn, .reset-btn { flex: 1; justify-content: center; }
-    }
-
-    /* table wrapper */
-    .table-wrapper {
-      background: rgba(12, 20, 30, 0.5);
-      backdrop-filter: blur(8px);
-      border-radius: 1.8rem;
-      overflow-x: auto;
-      border: 1px solid rgba(243, 156, 18, 0.2);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-    th {
-      text-align: left;
-      padding: 1rem 1rem;
-      background: rgba(15, 23, 42, 0.8);
-      color: #f39c12;
-      font-weight: 600;
-      border-bottom: 1px solid #2d3a4e;
-    }
-    td {
-      padding: 0.9rem 1rem;
-      border-bottom: 1px solid #1e2a36;
-      vertical-align: top;
-    }
-    tr:hover td {
-      background: rgba(26, 38, 51, 0.5);
-    }
-    /* human-readable details */
-    .details-text {
-      background: #03060ecc;
-      padding: 6px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      color: #ccddee;
-      line-height: 1.4;
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
-    .badge-event {
-      background: #2a3a4e;
-      padding: 4px 12px;
-      border-radius: 40px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      display: inline-block;
-      white-space: nowrap;
-    }
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: #8a99b0;
-      font-size: 0.9rem;
-    }
-    .timestamp-cell {
-      font-family: monospace;
-      white-space: nowrap;
-    }
-    .ip-cell {
-      font-family: monospace;
-      font-size: 0.75rem;
-    }
-    @media (max-width: 780px) {
-      th, td { padding: 0.6rem; font-size: 0.75rem; }
-      .badge-event { white-space: normal; font-size: 0.65rem; }
-      .timestamp-cell { white-space: normal; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>🎯 Bingo Audit & Control Panel</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background: #0b1120;
+            font-family: 'Segoe UI', Roboto, 'Inter', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px 16px;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        h1 small {
+            font-size: 0.8rem;
+            font-weight: normal;
+            background: #1e293b;
+            padding: 5px 12px;
+            border-radius: 40px;
+        }
+        .summary-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin: 24px 0;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 28px;
+            padding: 16px 20px;
+            flex: 1;
+            min-width: 150px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            border-left: 6px solid #f97316;
+        }
+        .card .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #94a3b8;
+        }
+        .card .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #facc15;
+        }
+        .filters {
+            background: #0f172a;
+            border-radius: 32px;
+            padding: 18px 20px;
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: flex-end;
+            border: 1px solid #334155;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 140px;
+        }
+        .filter-group label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #cbd5e6;
+        }
+        select, input, button {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 8px 12px;
+            border-radius: 40px;
+            color: #f1f5f9;
+            font-size: 0.8rem;
+            outline: none;
+        }
+        button {
+            background: #f97316;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+            color: #0f172a;
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        .action-btn {
+            background: #2c3e66;
+            color: white;
+        }
+        .logs-table {
+            overflow-x: auto;
+            background: #0f172a;
+            border-radius: 28px;
+            padding: 6px;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px 8px;
+            border-bottom: 1px solid #2d3a4e;
+        }
+        th {
+            color: #facc15;
+            font-weight: 600;
+        }
+        .event-badge {
+            background: #f9731622;
+            color: #facc15;
+            padding: 3px 8px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .refresh-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0 8px;
+        }
+        .control-section {
+            background: #0f172a;
+            border-radius: 32px;
+            padding: 18px 20px;
+            margin: 20px 0;
+            border: 1px solid #334155;
+        }
+        .control-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .danger-btn {
+            background: #b91c1c;
+            color: white;
+        }
+        @media (max-width: 640px) {
+            .filter-group { width: 100%; }
+            .card .value { font-size: 1.3rem; }
+        }
+    </style>
 </head>
 <body>
 <div class="container">
-  <div class="glass-header">
-    <h1>🔍 AUDIT VAULT · IMMUTABLE LEDGER</h1>
-    <a href="admin.html" class="back-link">⬅ Back to Admin Panel</a>
-  </div>
+    <h1>🔍 Bingo Audit & Control <small>Admin dashboard</small></h1>
 
-  <!-- Summary Cards -->
-  <div class="summary-grid">
-    <div class="summary-card">
-      <h3>💰 Total Deposits (approved)</h3>
-      <div class="value" id="totalDeposits">— ETB</div>
+    <!-- Summary Cards -->
+    <div class="summary-cards" id="summaryArea">
+        <div class="card"><div class="label">💰 Total Deposits</div><div class="value" id="totalDeposits">—</div></div>
+        <div class="card"><div class="label">💸 Total Withdrawals</div><div class="value" id="totalWithdrawals">—</div></div>
+        <div class="card"><div class="label">🏦 House Profit</div><div class="value" id="houseProfit">—</div></div>
+        <div class="card"><div class="label">📊 Net Float</div><div class="value" id="netFloat">—</div></div>
     </div>
-    <div class="summary-card">
-      <h3>💸 Total Withdrawals (approved)</h3>
-      <div class="value" id="totalWithdrawals">— ETB</div>
-    </div>
-    <div class="summary-card">
-      <h3>🏠 House Profit (20% model)</h3>
-      <div class="value" id="totalHouseProfit">— ETB</div>
-    </div>
-  </div>
 
-  <!-- Filter Panel - STACKED layout: each filter on its own line -->
-  <div class="filter-panel">
-    <div class="filter-title">
-      <span>🔎</span> Filter audit logs
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-group">
+            <label>📌 Event Type</label>
+            <select id="eventTypeFilter">
+                <option value="">All events</option>
+                <option value="DEPOSIT_INITIATED">Deposit Initiated</option>
+                <option value="DEPOSIT_COMPLETED">Deposit Completed</option>
+                <option value="DEPOSIT_FAILED">Deposit Failed</option>
+                <option value="WITHDRAWAL_REQUESTED">Withdrawal Requested</option>
+                <option value="WITHDRAWAL_COMPLETED">Withdrawal Completed</option>
+                <option value="WITHDRAWAL_REJECTED">Withdrawal Rejected</option>
+                <option value="BINGO_CALLED">Bingo Called</option>
+                <option value="BINGO_REJECTED">Bingo Rejected</option>
+                <option value="WIN_PAID_OUT">Win Paid Out</option>
+                <option value="NUMBER_DRAWN">Number Drawn</option>
+                <option value="CARD_ASSIGNED">Card Assigned</option>
+                <option value="ADMIN_ADD_BALANCE">Admin Add Balance</option>
+                <option value="ENTRY_FEE_PAID">Entry Fee Paid</option>
+                <option value="SUSPICIOUS_BEHAVIOR_DETECTED">⚠️ Suspicious</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>🆔 User ID (Telegram)</label>
+            <input type="text" id="userIdFilter" placeholder="e.g., 123456789">
+        </div>
+        <div class="filter-group">
+            <label>📅 From date</label>
+            <input type="datetime-local" id="fromDate">
+        </div>
+        <div class="filter-group">
+            <label>📅 To date</label>
+            <input type="datetime-local" id="toDate">
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button id="applyFiltersBtn">🔍 Apply Filters</button>
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button id="resetFiltersBtn" class="action-btn">⟳ Reset</button>
+        </div>
     </div>
-    
-    <!-- Room ID - separate line -->
-    <div class="filter-group">
-      <label>🏷️ ROOM ID</label>
-      <input type="text" id="filter-room" placeholder="e.g., global / room_123">
-    </div>
-    
-    <!-- User ID - separate line -->
-    <div class="filter-group">
-      <label>👤 USER ID (TELEGRAM)</label>
-      <input type="text" id="filter-user" placeholder="numeric ID">
-    </div>
-    
-    <!-- Event Type - separate line -->
-    <div class="filter-group">
-      <label>⚡ EVENT TYPE</label>
-      <select id="filter-event">
-        <option value="">All Events</option>
-        <option value="DEPOSIT_INITIATED">📥 Deposit Initiated</option>
-        <option value="DEPOSIT_COMPLETED">✅ Deposit Completed</option>
-        <option value="DEPOSIT_FAILED">❌ Deposit Failed</option>
-        <option value="WITHDRAWAL_REQUESTED">📤 Withdrawal Requested</option>
-        <option value="WITHDRAWAL_COMPLETED">💸 Withdrawal Completed</option>
-        <option value="WITHDRAWAL_REJECTED">🚫 Withdrawal Rejected</option>
-        <option value="BINGO_CALLED">🎯 Bingo Called</option>
-        <option value="BINGO_REJECTED">⚠️ Bingo Rejected</option>
-        <option value="WIN_PAID_OUT">🏆 Win Paid Out</option>
-        <option value="NUMBER_DRAWN">🔢 Number Drawn</option>
-        <option value="CARD_ASSIGNED">🃏 Card Assigned</option>
-        <option value="ADMIN_ADD_BALANCE">⚙️ Admin Add Balance</option>
-        <option value="SUSPICIOUS_BEHAVIOR_DETECTED">🚨 Suspicious Activity</option>
-      </select>
-    </div>
-    
-    <!-- Date range row (From / To side by side) -->
-    <div class="date-row">
-      <div class="filter-group">
-        <label>📅 FROM</label>
-        <input type="datetime-local" id="filter-from">
-      </div>
-      <div class="filter-group">
-        <label>📅 TO</label>
-        <input type="datetime-local" id="filter-to">
-      </div>
-    </div>
-    
-    <!-- Action buttons -->
-    <div class="filter-actions">
-      <button class="search-btn" onclick="loadAuditLogs()">🔎 Search Logs</button>
-      <button class="reset-btn" onclick="resetFilters()">⟳ Reset Filters</button>
-    </div>
-  </div>
 
-  <!-- Audit Table -->
-  <div class="table-wrapper">
-    <table id="audit-table">
-      <thead>
-        <tr>
-          <th>⏱️ Timestamp</th>
-          <th>📌 Event</th>
-          <th>🏷️ Room</th>
-          <th>🆔 User ID</th>
-          <th>🌐 IP Address</th>
-          <th>📄 Details</th>
-        </tr>
-      </thead>
-      <tbody id="audit-tbody">
-        <tr><td colspan="6" class="empty-state">🔐 Use filters and click "Search Logs"</td></tr>
-      </tbody>
-    </table>
-  </div>
+    <!-- Control section (manual actions) -->
+    <div class="control-section">
+        <div style="font-weight:bold; margin-bottom:6px;">🎮 Game Control (optional)</div>
+        <div class="control-buttons">
+            <button id="forceResetGame" class="danger-btn">⚠️ Force Reset Game (admin)</button>
+            <button id="checkGameState" class="action-btn">🔄 Check Game State</button>
+            <button id="reloadLogsBtn" class="action-btn">📜 Reload Audit Logs</button>
+        </div>
+        <div id="gameStateMessage" style="margin-top:12px; font-size:0.75rem; color:#94a3b8;"></div>
+    </div>
+
+    <!-- Logs table -->
+    <div class="refresh-row">
+        <span><strong>📋 Audit Logs</strong> <span id="logCount"></span></span>
+        <span style="font-size:0.7rem;">Last refresh: <span id="lastRefresh">—</span></span>
+    </div>
+    <div class="logs-table">
+        <table id="auditTable">
+            <thead>
+                <tr><th>Timestamp</th><th>Event</th><th>User ID</th><th>Room</th><th>IP Address</th><th>Details</th></tr>
+            </thead>
+            <tbody id="auditTableBody">
+                <tr><td colspan="6" style="text-align:center;">Loading logs... (enter admin secret)</td></tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <script>
-  const AUDITOR_SECRET = prompt("🔐 Enter AUDITOR SECRET:") || "auditor_secret_here";
-  const API_BASE = '';
-
-  async function loadSummary() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/audit-summary?secret=${AUDITOR_SECRET}`);
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('totalDeposits').innerText = `${Number(data.totalDeposits).toLocaleString()} ETB`;
-        document.getElementById('totalWithdrawals').innerText = `${Number(data.totalWithdrawals).toLocaleString()} ETB`;
-        document.getElementById('totalHouseProfit').innerText = `${Number(data.totalHouseProfit).toLocaleString()} ETB`;
-      } else {
-        document.getElementById('totalDeposits').innerText = '⚠️ error';
-      }
-    } catch (err) {
-      document.getElementById('totalDeposits').innerText = '⚠️ offline';
+    // --- Get admin secret from URL or prompt ---
+    const urlParams = new URLSearchParams(window.location.search);
+    let ADMIN_SECRET = urlParams.get('secret');
+    if (!ADMIN_SECRET) {
+        ADMIN_SECRET = prompt("🔐 Enter admin secret for audit panel:");
+        if (!ADMIN_SECRET) {
+            document.body.innerHTML = '<div style="color:red; text-align:center; margin-top:50px;">Access denied: missing secret.<br>Use /audit?secret=YOUR_SECRET</div>';
+            throw new Error('No secret');
+        }
     }
-  }
 
-  async function loadAuditLogs() {
-    const params = new URLSearchParams();
-    params.append('secret', AUDITOR_SECRET);
-    const roomId = document.getElementById('filter-room').value.trim();
-    const userId = document.getElementById('filter-user').value.trim();
-    const eventType = document.getElementById('filter-event').value;
-    const from = document.getElementById('filter-from').value;
-    const to = document.getElementById('filter-to').value;
+    const API_BASE = '';  // relative to current origin
 
-    if (roomId) params.append('roomId', roomId);
-    if (userId) params.append('userId', userId);
-    if (eventType) params.append('eventType', eventType);
-    if (from) params.append('from', new Date(from).toISOString());
-    if (to) params.append('to', new Date(to).toISOString());
-    params.append('limit', '600');
+    // DOM elements
+    const tbody = document.getElementById('auditTableBody');
+    const totalDepositsSpan = document.getElementById('totalDeposits');
+    const totalWithdrawalsSpan = document.getElementById('totalWithdrawals');
+    const houseProfitSpan = document.getElementById('houseProfit');
+    const netFloatSpan = document.getElementById('netFloat');
+    const logCountSpan = document.getElementById('logCount');
+    const lastRefreshSpan = document.getElementById('lastRefresh');
+    const gameStateMsg = document.getElementById('gameStateMessage');
 
-    const tbody = document.getElementById('audit-tbody');
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">⏳ Loading secure logs...</td></tr>`;
+    // Filter inputs
+    const eventTypeFilter = document.getElementById('eventTypeFilter');
+    const userIdFilter = document.getElementById('userIdFilter');
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    const applyBtn = document.getElementById('applyFiltersBtn');
+    const resetBtn = document.getElementById('resetFiltersBtn');
+    const reloadLogsBtn = document.getElementById('reloadLogsBtn');
+    const forceResetBtn = document.getElementById('forceResetGame');
+    const checkStateBtn = document.getElementById('checkGameState');
 
-    try {
-      const res = await fetch(`${API_BASE}/admin/audit?${params}`);
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed');
-      renderAuditTable(data.logs);
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" class="empty-state" style="color:#e74c3c;">❌ Error: ${escapeHtml(err.message)}</td></tr>`;
+    let currentLogs = [];   // store raw logs
+
+    // Helper: format date for API (ISO string without ms)
+    function formatDateForAPI(dateInput) {
+        if (!dateInput) return null;
+        const d = new Date(dateInput);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString();
     }
-  }
 
-  function resetFilters() {
-    document.getElementById('filter-room').value = '';
-    document.getElementById('filter-user').value = '';
-    document.getElementById('filter-event').value = '';
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    document.getElementById('filter-from').value = yesterday.toISOString().slice(0, 16);
-    document.getElementById('filter-to').value = now.toISOString().slice(0, 16);
-    loadAuditLogs();
-  }
-
-  // Convert JSON details to human-readable summary (no JSON)
-  function formatDetails(details) {
-    if (!details) return '—';
-    let text = '';
-    if (details.amount) text += `💰 Amount: ${details.amount} ETB · `;
-    if (details.payment_type) text += `🏦 Method: ${details.payment_type} · `;
-    if (details.withdrawal_type) text += `🏦 Type: ${details.withdrawal_type} · `;
-    if (details.reference_number) text += `🧾 Ref: ${details.reference_number} · `;
-    if (details.status) text += `📌 Status: ${details.status} · `;
-    if (details.reason) text += `⚠️ Reason: ${details.reason} · `;
-    if (details.room_id) text += `🏷️ Room: ${details.room_id} · `;
-    if (details.card_numbers) text += `🃏 Numbers: ${details.card_numbers} · `;
-    if (details.win_amount) text += `🏆 Win: ${details.win_amount} ETB · `;
-    if (details.balance_before !== undefined) text += `📊 Before: ${details.balance_before} → After: ${details.balance_after} · `;
-    if (details.admin_id) text += `👑 Admin: ${details.admin_id} · `;
-    if (details.ip_address) text += `🌐 IP: ${details.ip_address} · `;
-    if (details.message) text += `💬 ${details.message} · `;
-    if (text === '') {
-      const keys = Object.keys(details).slice(0, 4);
-      text = keys.map(k => `${k}: ${details[k]}`).join(' · ');
+    // Fetch audit summary
+    async function fetchSummary() {
+        try {
+            const res = await fetch(`${API_BASE}/admin/audit-summary?secret=${ADMIN_SECRET}`);
+            if (!res.ok) throw new Error('Summary fetch failed');
+            const data = await res.json();
+            if (data.success) {
+                totalDepositsSpan.innerText = (data.totalDeposits || 0).toLocaleString() + ' ETB';
+                totalWithdrawalsSpan.innerText = (data.totalWithdrawals || 0).toLocaleString() + ' ETB';
+                houseProfitSpan.innerText = (data.totalHouseProfit || 0).toLocaleString() + ' ETB';
+                const net = (data.totalDeposits || 0) - (data.totalWithdrawals || 0);
+                netFloatSpan.innerText = net.toLocaleString() + ' ETB';
+            } else {
+                throw new Error(data.error || 'Unknown');
+            }
+        } catch (err) {
+            console.warn('Summary error:', err);
+            totalDepositsSpan.innerText = '⚠️';
+            totalWithdrawalsSpan.innerText = '⚠️';
+            houseProfitSpan.innerText = '⚠️';
+            netFloatSpan.innerText = '⚠️';
+        }
     }
-    return text.replace(/ · $/, '');
-  }
 
-  function renderAuditTable(logs) {
-    const tbody = document.getElementById('audit-tbody');
-    if (!logs || logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">📭 No audit logs match the current filters.</td></tr>';
-      return;
+    // Fetch audit logs with filters
+    async function fetchLogs() {
+        const params = new URLSearchParams();
+        params.append('secret', ADMIN_SECRET);
+        params.append('limit', '500');   // show up to 500 recent logs
+        const event = eventTypeFilter.value;
+        if (event) params.append('eventType', event);
+        const userId = userIdFilter.value.trim();
+        if (userId) params.append('userId', userId);
+        const from = formatDateForAPI(fromDate.value);
+        if (from) params.append('from', from);
+        const to = formatDateForAPI(toDate.value);
+        if (to) params.append('to', to);
+
+        try {
+            const res = await fetch(`${API_BASE}/admin/audit?${params.toString()}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.success) {
+                currentLogs = data.logs || [];
+                renderLogs(currentLogs);
+                logCountSpan.innerText = `(${currentLogs.length} entries)`;
+                lastRefreshSpan.innerText = new Date().toLocaleTimeString();
+            } else {
+                throw new Error(data.error || 'Failed');
+            }
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#f87171;">❌ Error loading logs: ${err.message}</td></tr>`;
+            logCountSpan.innerText = '(error)';
+        }
     }
-    tbody.innerHTML = logs.map(log => {
-      let eventTypeClean = log.event_type || 'UNKNOWN';
-      let badgeColor = '#f39c12';
-      if (eventTypeClean.includes('DEPOSIT_COMPLETED')) badgeColor = '#2ecc71';
-      else if (eventTypeClean.includes('REJECT') || eventTypeClean.includes('FAILED')) badgeColor = '#e74c3c';
-      else if (eventTypeClean.includes('SUSPICIOUS')) badgeColor = '#e67e22';
-      else if (eventTypeClean.includes('WIN_PAID_OUT')) badgeColor = '#ffcc70';
-      
-      const detailsText = formatDetails(log.details);
-      return `
-        <tr>
-          <td class="timestamp-cell">${new Date(log.timestamp).toLocaleString()}</td>
-          <td><span class="badge-event" style="background: ${badgeColor}20; color: ${badgeColor}; border:1px solid ${badgeColor}40;">${escapeHtml(eventTypeClean)}</span></td>
-          <td>${log.room_id ? escapeHtml(log.room_id) : '—'}</td>
-          <td style="font-family:monospace;">${log.user_id ? escapeHtml(log.user_id) : '—'}</td>
-          <td class="ip-cell">${log.ip_address ? escapeHtml(log.ip_address) : '—'}</td>
-          <td><div class="details-text">${escapeHtml(detailsText)}</div></td>
-        </tr>
-      `;
-    }).join('');
-  }
 
-  function escapeHtml(str) {
-    if (!str) return '';
-    return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
-  }
+    // Render logs table
+    function renderLogs(logs) {
+        if (!logs.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No audit logs found.</td></tr>';
+            return;
+        }
+        let html = '';
+        for (const log of logs) {
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            const eventType = log.event_type || '—';
+            const userId = log.user_id || '—';
+            const roomId = log.room_id || '—';
+            const ip = log.ip_address || '—';
+            let details = '';
+            try {
+                details = JSON.stringify(log.details || {}).slice(0, 100);
+                if (JSON.stringify(log.details || {}).length > 100) details += '…';
+            } catch(e) { details = '—'; }
+            html += `
+                <tr>
+                    <td style="white-space: nowrap;">${escapeHtml(timestamp)}</td>
+                    <td><span class="event-badge">${escapeHtml(eventType)}</span></td>
+                    <td>${escapeHtml(userId)}</td>
+                    <td>${escapeHtml(roomId)}</td>
+                    <td>${escapeHtml(ip)}</td>
+                    <td style="max-width:300px; word-break:break-all;">${escapeHtml(details)}</td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
 
-  window.addEventListener('DOMContentLoaded', () => {
-    const now = new Date();
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    document.getElementById('filter-from').value = yesterday.toISOString().slice(0, 16);
-    document.getElementById('filter-to').value = now.toISOString().slice(0, 16);
-    loadSummary();
-    loadAuditLogs();
-  });
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+    }
+
+    // --- Game Control (requires additional endpoints if you want real control) ---
+    // These are placeholder admin actions; they call your existing /admin/ endpoints if you implement them.
+    // For force reset, you might need a POST endpoint on your server: /admin/reset-game
+    async function forceResetGame() {
+        if (!confirm("⚠️ Force reset the game lobby? This will end current game and clear players.")) return;
+        gameStateMsg.innerText = "Sending reset command...";
+        try {
+            // You may implement a custom endpoint on server: /admin/reset-game
+            // For now we simulate by emitting via socket? Not possible from HTTP, but we can call a custom endpoint
+            // If your server has an endpoint like /admin/reset-game?secret=... we can use it.
+            // As fallback, we inform user.
+            const res = await fetch(`${API_BASE}/admin/reset-game?secret=${ADMIN_SECRET}`, { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                gameStateMsg.innerText = `✅ Reset command sent: ${data.message || 'Game reset'}`;
+            } else {
+                throw new Error(`HTTP ${res.status}`);
+            }
+        } catch (err) {
+            gameStateMsg.innerText = `❌ Reset endpoint not available on server. (${err.message}) - Implement /admin/reset-game if needed.`;
+            console.warn(err);
+        }
+    }
+
+    async function checkGameState() {
+        gameStateMsg.innerText = "Fetching game state...";
+        try {
+            const res = await fetch(`${API_BASE}/admin/game-state?secret=${ADMIN_SECRET}`);
+            if (res.ok) {
+                const state = await res.json();
+                gameStateMsg.innerText = `Status: ${state.status || 'unknown'} | Players: ${state.playersCount || 0} | Prize: ${state.prizePool || 0} ETB`;
+            } else {
+                throw new Error('No endpoint');
+            }
+        } catch (err) {
+            gameStateMsg.innerText = `Game state endpoint not implemented. (Add /admin/game-state to server for live info)`;
+        }
+    }
+
+    // --- Initial load and event listeners ---
+    async function refreshAll() {
+        await Promise.all([fetchSummary(), fetchLogs()]);
+    }
+
+    applyBtn.addEventListener('click', () => {
+        fetchLogs();
+    });
+    resetBtn.addEventListener('click', () => {
+        eventTypeFilter.value = '';
+        userIdFilter.value = '';
+        fromDate.value = '';
+        toDate.value = '';
+        fetchLogs();
+    });
+    reloadLogsBtn.addEventListener('click', fetchLogs);
+    if (forceResetBtn) forceResetBtn.addEventListener('click', forceResetGame);
+    if (checkStateBtn) checkStateBtn.addEventListener('click', checkGameState);
+
+    // Optionally auto-refresh every 30 sec
+    let interval = setInterval(() => {
+        if (document.hasFocus()) fetchLogs();
+    }, 30000);
+
+    refreshAll();
 </script>
 </body>
 </html>
