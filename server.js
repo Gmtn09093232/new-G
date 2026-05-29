@@ -586,6 +586,62 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
+// ---------- Statistics: total user balance + deposits/withdrawals per method ----------
+app.get('/admin/stats-summary', async (req, res) => {
+  const { secret } = req.query;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  
+  try {
+    // 1. Total balance of all users
+    const { data: users, error: userErr } = await supabase.from('users').select('balance');
+    if (userErr) throw userErr;
+    const totalUserBalance = users.reduce((sum, u) => sum + (Number(u.balance) || 0), 0);
+    
+    // 2. Deposits grouped by payment_type (from approved deposit_requests)
+    const { data: deposits, error: depErr } = await supabase
+      .from('deposit_requests')
+      .select('amount, payment_type')
+      .eq('status', 'approved');
+    if (depErr) throw depErr;
+    
+    const depositsByMethod = {
+      telebirr: 0,
+      cbebirr: 0,
+      mpesa: 0,
+      manual: 0
+    };
+    deposits.forEach(d => {
+      const type = d.payment_type;
+      if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
+      else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
+      else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
+      else if (type === 'manual') depositsByMethod.manual += Number(d.amount);
+      else {
+        // fallback: if unknown, add to manual? treat as manual
+        depositsByMethod.manual += Number(d.amount);
+      }
+    });
+    
+    // 3. Total withdrawals (sum of approved withdrawals)
+    const { data: withdrawals, error: wdErr } = await supabase
+      .from('withdrawal_requests')
+      .select('amount')
+      .eq('status', 'approved');
+    if (wdErr) throw wdErr;
+    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
+    
+    res.json({
+      success: true,
+      totalUserBalance,
+      depositsByMethod,
+      totalWithdrawals
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
