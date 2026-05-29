@@ -600,7 +600,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
 });
 
 // ---------- Statistics: total user balance + deposits/withdrawals per method ----------
-app.get('/admin/stats-summary', async (req, res) => {
+app.get('/admin/stats', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   
