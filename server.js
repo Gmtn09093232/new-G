@@ -599,8 +599,13 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics: total user balance + deposits/withdrawals per method ----------
-app.get('/admin/stats', async (req, res) => {
+// ---------- Serve statistics page ----------
+app.get('/stats', (req, res) => {
+  res.sendFile(path.join(__dirname, 'stats.html'));
+});
+
+// ---------- Statistics API: total balance + deposits/withdrawals per method ----------
+app.get('/admin/stats-summary', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   
@@ -610,7 +615,7 @@ app.get('/admin/stats', async (req, res) => {
     if (userErr) throw userErr;
     const totalUserBalance = users.reduce((sum, u) => sum + (Number(u.balance) || 0), 0);
     
-    // 2. Deposits grouped by payment_type (from approved deposit_requests)
+    // 2. Deposits grouped by payment_type (approved only)
     const { data: deposits, error: depErr } = await supabase
       .from('deposit_requests')
       .select('amount, payment_type')
@@ -628,14 +633,10 @@ app.get('/admin/stats', async (req, res) => {
       if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
       else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
       else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
-      else if (type === 'manual') depositsByMethod.manual += Number(d.amount);
-      else {
-        // fallback: if unknown, add to manual? treat as manual
-        depositsByMethod.manual += Number(d.amount);
-      }
+      else depositsByMethod.manual += Number(d.amount); // 'manual' or any other type
     });
     
-    // 3. Total withdrawals (sum of approved withdrawals)
+    // 3. Total approved withdrawals
     const { data: withdrawals, error: wdErr } = await supabase
       .from('withdrawal_requests')
       .select('amount')
@@ -654,6 +655,7 @@ app.get('/admin/stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
