@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>🎯 Bingo Audit & Control Panel</title>
+    <title>🎯 Bingo Audit & Control | Restricted Events</title>
     <style>
         * {
             box-sizing: border-box;
@@ -77,7 +77,7 @@
             display: flex;
             flex-direction: column;
             gap: 6px;
-            min-width: 140px;
+            min-width: 160px;
         }
         .filter-group label {
             font-size: 0.7rem;
@@ -106,6 +106,10 @@
         }
         .action-btn {
             background: #2c3e66;
+            color: white;
+        }
+        .danger-btn {
+            background: #b91c1c;
             color: white;
         }
         .logs-table {
@@ -156,10 +160,6 @@
             gap: 12px;
             margin-top: 12px;
         }
-        .danger-btn {
-            background: #b91c1c;
-            color: white;
-        }
         @media (max-width: 640px) {
             .filter-group { width: 100%; }
             .card .value { font-size: 1.3rem; }
@@ -178,26 +178,16 @@
         <div class="card"><div class="label">📊 Net Float</div><div class="value" id="netFloat">—</div></div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters (only 4 event types) -->
     <div class="filters">
         <div class="filter-group">
             <label>📌 Event Type</label>
             <select id="eventTypeFilter">
-                <option value="">All events</option>
-                <option value="DEPOSIT_INITIATED">Deposit Initiated</option>
-                <option value="DEPOSIT_COMPLETED">Deposit Completed</option>
-                <option value="DEPOSIT_FAILED">Deposit Failed</option>
-                <option value="WITHDRAWAL_REQUESTED">Withdrawal Requested</option>
-                <option value="WITHDRAWAL_COMPLETED">Withdrawal Completed</option>
-                <option value="WITHDRAWAL_REJECTED">Withdrawal Rejected</option>
-                <option value="BINGO_CALLED">Bingo Called</option>
-                <option value="BINGO_REJECTED">Bingo Rejected</option>
-                <option value="WIN_PAID_OUT">Win Paid Out</option>
-                <option value="NUMBER_DRAWN">Number Drawn</option>
-                <option value="CARD_ASSIGNED">Card Assigned</option>
-                <option value="ADMIN_ADD_BALANCE">Admin Add Balance</option>
-                <option value="ENTRY_FEE_PAID">Entry Fee Paid</option>
-                <option value="SUSPICIOUS_BEHAVIOR_DETECTED">⚠️ Suspicious</option>
+                <option value="">All events (filtered)</option>
+                <option value="DEPOSIT_COMPLETED">✅ Deposit Completed</option>
+                <option value="WITHDRAWAL_COMPLETED">💸 Withdrawal Completed</option>
+                <option value="ADMIN_ADD_BALANCE">⚙️ Admin Add Balance</option>
+                <option value="MANUAL_DEPOSIT">📝 Manual Deposit</option>
             </select>
         </div>
         <div class="filter-group">
@@ -222,12 +212,12 @@
         </div>
     </div>
 
-    <!-- Control section (manual actions) -->
+    <!-- Control section with TOTAL RESET -->
     <div class="control-section">
-        <div style="font-weight:bold; margin-bottom:6px;">🎮 Game Control (optional)</div>
+        <div style="font-weight:bold; margin-bottom:6px;">🎮 Game Control & Total Reset</div>
         <div class="control-buttons">
-            <button id="forceResetGame" class="danger-btn">⚠️ Force Reset Game (admin)</button>
-            <button id="checkGameState" class="action-btn">🔄 Check Game State</button>
+            <button id="totalResetBtn" class="danger-btn">⚠️ TOTAL RESET (All data)</button>
+            <button id="forceResetGame" class="danger-btn">🔄 Force Game Reset</button>
             <button id="reloadLogsBtn" class="action-btn">📜 Reload Audit Logs</button>
         </div>
         <div id="gameStateMessage" style="margin-top:12px; font-size:0.75rem; color:#94a3b8;"></div>
@@ -283,9 +273,9 @@
     const resetBtn = document.getElementById('resetFiltersBtn');
     const reloadLogsBtn = document.getElementById('reloadLogsBtn');
     const forceResetBtn = document.getElementById('forceResetGame');
-    const checkStateBtn = document.getElementById('checkGameState');
+    const totalResetBtn = document.getElementById('totalResetBtn');
 
-    let currentLogs = [];   // store raw logs
+    let currentLogs = [];
 
     // Helper: format date for API (ISO string without ms)
     function formatDateForAPI(dateInput) {
@@ -319,13 +309,13 @@
         }
     }
 
-    // Fetch audit logs with filters
+    // Fetch audit logs with filters (only selected events, but backend may return all; we filter client-side for the 4 types)
     async function fetchLogs() {
         const params = new URLSearchParams();
         params.append('secret', ADMIN_SECRET);
-        params.append('limit', '500');   // show up to 500 recent logs
+        params.append('limit', '500');
         const event = eventTypeFilter.value;
-        if (event) params.append('eventType', event);
+        if (event) params.append('eventType', event);  // backend filter if supported
         const userId = userIdFilter.value.trim();
         if (userId) params.append('userId', userId);
         const from = formatDateForAPI(fromDate.value);
@@ -338,7 +328,11 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.success) {
-                currentLogs = data.logs || [];
+                let logs = data.logs || [];
+                // Filter to only the 4 relevant event types (if backend returns more)
+                const allowedEvents = ['DEPOSIT_COMPLETED', 'WITHDRAWAL_COMPLETED', 'ADMIN_ADD_BALANCE', 'MANUAL_DEPOSIT'];
+                logs = logs.filter(log => allowedEvents.includes(log.event_type));
+                currentLogs = logs;
                 renderLogs(currentLogs);
                 logCountSpan.innerText = `(${currentLogs.length} entries)`;
                 lastRefreshSpan.innerText = new Date().toLocaleTimeString();
@@ -355,7 +349,7 @@
     // Render logs table
     function renderLogs(logs) {
         if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No audit logs found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No audit logs found for the selected events.</td></tr>';
             return;
         }
         let html = '';
@@ -389,17 +383,11 @@
         return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
-    // --- Game Control (requires additional endpoints if you want real control) ---
-    // These are placeholder admin actions; they call your existing /admin/ endpoints if you implement them.
-    // For force reset, you might need a POST endpoint on your server: /admin/reset-game
+    // --- Control functions ---
     async function forceResetGame() {
         if (!confirm("⚠️ Force reset the game lobby? This will end current game and clear players.")) return;
         gameStateMsg.innerText = "Sending reset command...";
         try {
-            // You may implement a custom endpoint on server: /admin/reset-game
-            // For now we simulate by emitting via socket? Not possible from HTTP, but we can call a custom endpoint
-            // If your server has an endpoint like /admin/reset-game?secret=... we can use it.
-            // As fallback, we inform user.
             const res = await fetch(`${API_BASE}/admin/reset-game?secret=${ADMIN_SECRET}`, { method: 'POST' });
             if (res.ok) {
                 const data = await res.json();
@@ -408,23 +396,34 @@
                 throw new Error(`HTTP ${res.status}`);
             }
         } catch (err) {
-            gameStateMsg.innerText = `❌ Reset endpoint not available on server. (${err.message}) - Implement /admin/reset-game if needed.`;
+            gameStateMsg.innerText = `❌ Reset endpoint not available. (${err.message}) - Implement /admin/reset-game on server.`;
             console.warn(err);
         }
     }
 
-    async function checkGameState() {
-        gameStateMsg.innerText = "Fetching game state...";
+    async function totalReset() {
+        if (!confirm("🚨 DANGER: TOTAL RESET will delete all deposit/withdrawal requests, game history, and reset user balances to 10 ETB. This cannot be undone. Are you ABSOLUTELY sure?")) return;
+        if (!confirm("Type 'RESET ALL' to confirm:")) return;
+        const confirmation = prompt('Type "RESET ALL" to proceed:');
+        if (confirmation !== 'RESET ALL') {
+            alert('Total reset cancelled.');
+            return;
+        }
+        gameStateMsg.innerText = "Executing total reset...";
         try {
-            const res = await fetch(`${API_BASE}/admin/game-state?secret=${ADMIN_SECRET}`);
+            const res = await fetch(`${API_BASE}/admin/total-reset?secret=${ADMIN_SECRET}`, { method: 'POST' });
             if (res.ok) {
-                const state = await res.json();
-                gameStateMsg.innerText = `Status: ${state.status || 'unknown'} | Players: ${state.playersCount || 0} | Prize: ${state.prizePool || 0} ETB`;
+                const data = await res.json();
+                gameStateMsg.innerText = `✅ Total reset completed: ${data.message || 'All data wiped'}`;
+                // refresh summary and logs after reset
+                await fetchSummary();
+                await fetchLogs();
             } else {
-                throw new Error('No endpoint');
+                throw new Error(`HTTP ${res.status}`);
             }
         } catch (err) {
-            gameStateMsg.innerText = `Game state endpoint not implemented. (Add /admin/game-state to server for live info)`;
+            gameStateMsg.innerText = `❌ Total reset endpoint not available. (${err.message}) - Implement /admin/total-reset on server.`;
+            console.warn(err);
         }
     }
 
@@ -444,11 +443,11 @@
         fetchLogs();
     });
     reloadLogsBtn.addEventListener('click', fetchLogs);
-    if (forceResetBtn) forceResetBtn.addEventListener('click', forceResetGame);
-    if (checkStateBtn) checkStateBtn.addEventListener('click', checkGameState);
+    forceResetBtn.addEventListener('click', forceResetGame);
+    totalResetBtn.addEventListener('click', totalReset);
 
-    // Optionally auto-refresh every 30 sec
-    let interval = setInterval(() => {
+    // Auto-refresh every 30 sec
+    setInterval(() => {
         if (document.hasFocus()) fetchLogs();
     }, 30000);
 
