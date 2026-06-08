@@ -30,11 +30,20 @@
             font-weight: 500; 
             overflow-x: auto; 
             white-space: nowrap; 
-            font-family: monospace; 
+            font-family: 'Inter', monospace; 
             text-align: left; 
             margin-top: 8px; 
             border: 1px solid #2d2d35;
             scroll-behavior: smooth;
+        }
+        .called-history strong {
+            font-weight: 800;
+            color: #ffd966;
+            background: rgba(249,115,22,0.2);
+            padding: 2px 6px;
+            border-radius: 40px;
+            margin: 0 2px;
+            letter-spacing: 0.5px;
         }
         .called-history::-webkit-scrollbar { height: 3px; background: #2d2d35; border-radius: 10px; }
         .called-history::-webkit-scrollbar-thumb { background: #f97316; border-radius: 10px; }
@@ -187,11 +196,16 @@
         
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
         
-        // auto-scroll called history to the rightmost (latest numbers)
-        function scrollCalledHistoryToEnd() {
-            if(calledListEl) {
-                calledListEl.scrollLeft = calledListEl.scrollWidth;
+        // Helper to render bold history numbers
+        function renderCalledHistory(calledNumbersArray) {
+            if (!calledNumbersArray || calledNumbersArray.length === 0) {
+                calledListEl.innerHTML = 'Called: —';
+                return;
             }
+            const boldNumbers = calledNumbersArray.map(num => `<strong>${formatCall(num)}</strong>`).join(', ');
+            calledListEl.innerHTML = `Called: ${boldNumbers}`;
+            // auto-scroll to the rightmost (latest numbers)
+            calledListEl.scrollLeft = calledListEl.scrollWidth;
         }
         
         function showLobby(sec){ 
@@ -245,16 +259,13 @@
         socket.on('cardSelectionFailed',msg=>{ alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
         socket.on('playersCount',c=>{ playersCountEl.innerText=c; if(gamePlayersCountEl) gamePlayersCountEl.innerText=c; winningBalanceEl.innerText=Math.floor(c*10*0.8); });
         socket.on('gameStarted',data=>{ if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
-        // FIX: Show all called numbers including the last one in history
+        // Display ALL called numbers (including last) with BOLD style
         socket.on('numberCalled',data=>{ 
             const num=data.number; 
             currentCallEl.innerText=formatCall(num); 
             const fullCalled = data.calledNumbers || []; 
-            // Display ALL called numbers (including the most recent one)
-            const historyCalled = fullCalled;
-            calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n=>formatCall(n)).join(', ') : '—'); 
-            // Auto-scroll to show the latest numbers on the right
-            scrollCalledHistoryToEnd();
+            // render full list with bold numbers
+            renderCalledHistory(fullCalled);
             speakAmharicNumberWithLetter(num); 
         });
         socket.on('markedNumbers',nums=>{ markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
