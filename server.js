@@ -7,21 +7,6 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
-
-// ---------- Uploads setup ----------
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, unique + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -41,7 +26,6 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.json());
-app.use('/uploads', express.static(uploadDir));
 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'bingo_mega_secret',
@@ -189,7 +173,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const userData = JSON.parse(params.get('user'));
   const id = String(userData.id);
   const displayName = userData.first_name || userData.username || 'Player';
-  const handle = userData.username || null;   // Telegram @username (without @)
+  const handle = userData.username || null;
   const user = await loadUser(id, displayName, handle);
   req.session.userId = id;
   req.session.save((err) => {
@@ -218,7 +202,7 @@ app.post('/admin/add-balance', async (req, res) => {
   user.balance += amt;
   await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
   
-  // ✅ NEW: Insert manual deposit record for audit/stats
+  // Insert manual deposit record (proof_path = null)
   await supabase.from('deposit_requests').insert({
     telegram_id: strId,
     username: user.username,
@@ -278,7 +262,6 @@ const currentGame = {
   winningNumber: null
 };
 
-// Replace the existing getPlayersList() with:
 function getPlayersList() {
   return currentGame.players.map(p => {
     const user = users[p.telegramId];
@@ -351,16 +334,12 @@ async function startGame() {
     }
   }
 
-  // --- MODIFIED PRIZE POOL LOGIC ---
   const totalEntryFees = currentGame.entryFee * currentGame.players.length;
   if (currentGame.players.length === 1) {
-    // Single player: winner takes 100% of entry fee (no house cut)
     currentGame.prizePool = totalEntryFees;
   } else {
-    // 2 or more players: winner takes 80% of total entry fees
     currentGame.prizePool = 0.8 * totalEntryFees;
   }
-  // ---------------------------------
 
   currentGame.status = 'running';
   currentGame.calledNumbers = [];
@@ -483,28 +462,43 @@ async function endGameWithWinners() {
   notifyAdminClients();
 }
 
-// ---------- DEPOSIT, WITHDRAWAL, AUDIT endpoints (unchanged from previous) ----------
-app.post('/api/request-deposit', upload.single('proof'), async (req, res) => {
+// ---------- DEPOSIT endpoint (NO PROOF IMAGE) ----------
+app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
   const { phone, amount, payment_type } = req.body;
-  const file = req.file;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!file) return res.status(400).json({ error: 'Proof image required' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   const user = await loadUser(userId, null);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  const proofPath = `/uploads/${file.filename}`;
+  
   const { data, error } = await supabase.from('deposit_requests').insert({
-    telegram_id: userId, username: user.username, amount: amt, status: 'pending',
-    phone: phone || null, payment_type, proof_path: proofPath
+    telegram_id: userId,
+    username: user.username,
+    amount: amt,
+    status: 'pending',
+    phone: phone || null,
+    payment_type,
+    proof_path: null   // no proof required
   }).select().single();
-  if (error) { console.error('Deposit insert error:', error.message); return res.status(500).json({ error: 'Internal error' }); }
-  Audit.depositInitiated(userId, req.ip, { transactionId: data.id.toString(), amount: amt, currency: 'ETB', method: payment_type });
+  
+  if (error) {
+    console.error('Deposit insert error:', error.message);
+    return res.status(500).json({ error: 'Internal error' });
+  }
+  
+  Audit.depositInitiated(userId, req.ip, {
+    transactionId: data.id.toString(),
+    amount: amt,
+    currency: 'ETB',
+    method: payment_type
+  });
+  
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
+// ---------- Admin deposit processing (unchanged, but proof_path ignored) ----------
 app.get('/admin/deposits', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -541,6 +535,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
+// ---------- Withdrawal endpoints (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -604,18 +599,16 @@ app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
-// ---------- Statistics API: total balance + deposits/withdrawals per method ----------
+// ---------- Statistics API ----------
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   
   try {
-    // 1. Total balance of all users
     const { data: users, error: userErr } = await supabase.from('users').select('balance');
     if (userErr) throw userErr;
     const totalUserBalance = users.reduce((sum, u) => sum + (Number(u.balance) || 0), 0);
     
-    // 2. Deposits grouped by payment_type (approved only)
     const { data: deposits, error: depErr } = await supabase
       .from('deposit_requests')
       .select('amount, payment_type')
@@ -633,10 +626,9 @@ app.get('/admin/stats-summary', async (req, res) => {
       if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
       else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
       else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
-      else depositsByMethod.manual += Number(d.amount); // 'manual' or any other type
+      else depositsByMethod.manual += Number(d.amount);
     });
     
-    // 3. Total approved withdrawals
     const { data: withdrawals, error: wdErr } = await supabase
       .from('withdrawal_requests')
       .select('amount')
@@ -820,7 +812,6 @@ adminNamespace.on('connection', (socket) => {
     });
   });
 
-  // Fetch all registered players including telegram_handle
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
