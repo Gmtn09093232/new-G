@@ -8,7 +8,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* All existing styles remain unchanged */
+        /* All existing styles (same as before) */
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255, 255, 248, 0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(2px); }
@@ -85,6 +85,7 @@
         .game-history-card .stat-row { margin-top: 6px; font-size: 0.85rem; }
         .game-history-card .stat-row span:first-child { font-weight: 600; color: #b45309; }
         @media (max-width: 550px) { .card-container td { width: 48px; height: 48px; border-radius: 18px; font-size: 1rem; } .card-container thead tr th { width: 48px; font-size: 1.2rem; } .grid-100 { gap: 5px; } #bingoBtn { font-size: 1.3rem; } .stake-option { width: 130px; font-size: 1.2rem; padding: 12px 16px; } }
+        .loading-indicator { text-align: center; padding: 20px; color: #ea580c; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -107,6 +108,7 @@
             <button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button>
             <button id="stake30Btn" class="stake-option" data-stake="30">30 ETB</button>
         </div>
+        <div id="stakeLoading" class="loading-indicator hidden">⏳ Connecting to game...</div>
         <div class="rules-text">
             <p><strong>💰 የመግቢያ ክፍያ፦</strong> 10/30 ብር (እንደ ምርጫዎ)</p>
             <p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80% (1 ተጫዋች ከሆነ 100%)</p>
@@ -136,14 +138,8 @@
         <div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- HISTORY PAGE -->
-    <div id="historyPage" class="page hidden">
-        <div class="page-header"><h2>📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn">← Back</button></div>
-        <div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div>
-        <div id="recentGamesList" style="margin-top:16px;"></div>
-    </div>
-
-    <!-- WALLET, PROFILE (unchanged) -->
+    <!-- HISTORY, WALLET, PROFILE (unchanged) -->
+    <div id="historyPage" class="page hidden"><div class="page-header"><h2>📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn">← Back</button></div><div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
     <div id="walletPage" class="page hidden"><div class="page-header"><h2>💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn">← Back</button></div><div class="profile-stat"><div>Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary">- Withdraw</button></div></div>
     <div id="profilePage" class="page hidden"><div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div><div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div><div class="profile-stat"><div>🏆 Total Wins</div><div id="profileTotalWins">0</div></div><div class="profile-stat"><div>💵 Total Earned</div><div id="profileTotalEarned">0</div></div></div>
 
@@ -151,23 +147,8 @@
     <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
 
     <script>
-        // Copy to clipboard function
-        function copyToClipboard(text) {
-            if (!text) return;
-            navigator.clipboard.writeText(text).then(() => {
-                alert("✅ Phone number copied to clipboard!");
-            }).catch(() => {
-                alert("❌ Could not copy. Please select manually.");
-            });
-        }
-
-        // Auto-scroll function for called numbers history
-        function scrollCalledHistoryToEnd() {
-            const calledDiv = document.getElementById('calledList');
-            if (calledDiv) {
-                calledDiv.scrollLeft = calledDiv.scrollWidth;
-            }
-        }
+        function copyToClipboard(text) { if (!text) return; navigator.clipboard.writeText(text).then(() => alert("✅ Phone number copied to clipboard!")).catch(() => alert("❌ Could not copy.")); }
+        function scrollCalledHistoryToEnd() { const calledDiv = document.getElementById('calledList'); if (calledDiv) calledDiv.scrollLeft = calledDiv.scrollWidth; }
 
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
@@ -179,6 +160,7 @@
         let pendingSelection = null, pendingRandom = false;
         let previousCardNumber = null;
         let currentStake = 10;
+        let connecting = false;
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
@@ -201,13 +183,7 @@
                         const winnerText = g.result === 'Win' ? (g.winnerNames || g.winners?.join(', ') || 'Unknown') : 'No winner';
                         const lastNumber = g.result === 'Win' ? (g.winningNumber ? formatCall(g.winningNumber) : '—') : '—';
                         const prizeText = g.prize ? g.prize + ' ETB' : '0 ETB';
-                        return `<div class="game-history-card">
-                            <div><strong>🎮 Game ID:</strong> ${escapeHtml(gameIdShort)}</div>
-                            <div class="stat-row"><span>🏆 Winner:</span> ${escapeHtml(winnerText)}</div>
-                            <div class="stat-row"><span>🎲 Last called:</span> ${escapeHtml(lastNumber)}</div>
-                            <div class="stat-row"><span>💰 Total Prize:</span> ${escapeHtml(prizeText)}</div>
-                            <div class="stat-row"><span>📅 Date:</span> ${escapeHtml(g.date)}</div>
-                        </div>`;
+                        return `<div class="game-history-card"><div><strong>🎮 Game ID:</strong> ${escapeHtml(gameIdShort)}</div><div class="stat-row"><span>🏆 Winner:</span> ${escapeHtml(winnerText)}</div><div class="stat-row"><span>🎲 Last called:</span> ${escapeHtml(lastNumber)}</div><div class="stat-row"><span>💰 Total Prize:</span> ${escapeHtml(prizeText)}</div><div class="stat-row"><span>📅 Date:</span> ${escapeHtml(g.date)}</div></div>`;
                     }).join('');
                 } else {
                     recentDiv.innerHTML = '<div class="game-history-card">No recent games</div>';
@@ -235,6 +211,9 @@
             saveStats(); 
             updateStatsUI(); 
         }
+        function escapeHtml(str) { if(!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
+        function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
+
         const lobbyPage=document.getElementById('lobbyPage'), gamePage=document.getElementById('gamePage'), historyPage=document.getElementById('historyPage'), walletPage=document.getElementById('walletPage'), profilePage=document.getElementById('profilePage'), stakePage=document.getElementById('stakePage');
         const lobbyTimerEl=document.getElementById('lobbyTimer'), playersCountEl=document.getElementById('playersCount'), lobbyBalanceEl=document.getElementById('lobbyBalance'), gamePlayersCountEl=document.getElementById('gamePlayersCount'), winningBalanceEl=document.getElementById('winningBalance'), currentCallEl=document.getElementById('currentCall'), calledListEl=document.getElementById('calledList'), selectedNumberEl=document.getElementById('selectedNumber'), numberGrid=document.getElementById('numberGrid'), lobbyCardPreview=document.getElementById('lobbyCardPreview');
         function syncBalance(v){ currentBalance=v; lobbyBalanceEl.innerText=v; if(document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText=v; if(document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText=v; if(document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText=v; }
@@ -283,7 +262,6 @@
             buildNumberGrid();
         }
         
-        function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
         function showLobby(sec){ 
             currentMainPage='lobby'; 
             stakePage.classList.add('hidden'); 
@@ -338,6 +316,8 @@
             pendingSelection = null;
             pendingRandom = false;
             currentGameId = null;
+            connecting = false;
+            document.getElementById('stakeLoading').classList.add('hidden');
             unlockSpeech();
         }
 
@@ -347,19 +327,9 @@
         function openDepositDetailsModal(type){ 
             selectedDepositType=type; 
             let acc='', title='', hint=''; 
-            if(type==='telebirr'){ 
-                title='Telebirr'; 
-                acc=depositAccounts.telebirr||'0924839730'; 
-                hint='09xxxxxxxx'; 
-            } else if(type==='cbebirr'){ 
-                title='CBE Birr'; 
-                acc=depositAccounts.cbebirr||'1000123456789'; 
-                hint='09xxxxxxxx'; 
-            } else{ 
-                title='M-Pesa'; 
-                acc=depositAccounts.mpesa||'0712345678'; 
-                hint='07xxxxxxxx'; 
-            } 
+            if(type==='telebirr'){ title='Telebirr'; acc=depositAccounts.telebirr||'0924839730'; hint='09xxxxxxxx'; } 
+            else if(type==='cbebirr'){ title='CBE Birr'; acc=depositAccounts.cbebirr||'1000123456789'; hint='09xxxxxxxx'; } 
+            else{ title='M-Pesa'; acc=depositAccounts.mpesa||'0712345678'; hint='07xxxxxxxx'; } 
             document.getElementById('depositDetailsTitle').innerHTML=`Deposit via ${title}`; 
             const copyDiv = document.getElementById('depositAccountNumber');
             if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`;
@@ -372,23 +342,27 @@
             unlockSpeech(); 
         }
         let isSubmittingDeposit=false;
-        async function submitDepositRequest(){ if(isSubmittingDeposit) return; const phone=document.getElementById('depositPlayerPhone').value.trim(); const amount=document.getElementById('depositAmount').value.trim(); if(!phone.match(/^(09|07)\d{8}$/)){ alert('Invalid phone number. Use 09xxxxxxxx or 07xxxxxxxx format'); return; } if(!amount||isNaN(amount)||Number(amount)<10){ alert('Minimum deposit 10 ETB'); return; } isSubmittingDeposit=true; const submitBtn=document.getElementById('submitDepositBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Sending...'; try{ const response=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount,payment_type:selectedDepositType})}); const result=await response.json(); if(result.success){ alert('✅ Deposit request submitted! Admin will verify using your phone number.'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error. Please try again.'); } finally{ isSubmittingDeposit=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
+        async function submitDepositRequest(){ if(isSubmittingDeposit) return; const phone=document.getElementById('depositPlayerPhone').value.trim(); const amount=document.getElementById('depositAmount').value.trim(); if(!phone.match(/^(09|07)\d{8}$/)){ alert('Invalid phone number'); return; } if(!amount||isNaN(amount)||Number(amount)<10){ alert('Minimum deposit 10 ETB'); return; } isSubmittingDeposit=true; const submitBtn=document.getElementById('submitDepositBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Sending...'; try{ const response=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount,payment_type:selectedDepositType})}); const result=await response.json(); if(result.success){ alert('✅ Deposit request submitted!'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingDeposit=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function openWithdrawTypeModal(){ document.getElementById('withdrawTypeModal').classList.add('active'); unlockSpeech(); }
         function openWithdrawDetailsModal(type){ selectedWithdrawType=type; let title=type==='telebirr'?'Telebirr':type==='cbebirr'?'CBE Birr':'M-Pesa'; let hint=type==='mpesa'?'07xxxxxxxx':'09xxxxxxxx'; document.getElementById('withdrawDetailsTitle').innerHTML=`Withdraw via ${title}`; document.getElementById('withdrawReceiver').placeholder=hint; document.getElementById('withdrawReceiver').value=''; document.getElementById('withdrawAmount').value=''; document.getElementById('withdrawName').value=''; document.getElementById('withdrawDetailsModal').classList.add('active'); document.getElementById('withdrawTypeModal').classList.remove('active'); unlockSpeech(); }
         let isSubmittingWithdraw=false;
-        async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error. Please try again.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
+        async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function showWinnerOverlay(data){ if(data.noWinner){ alert('No winner this round.'); return; } const prize=data.prizeEach||data.totalPrize||0; const winnersArray=data.winners||[data.winner]; const title=winnersArray.length>1?`${winnersArray.length} WINNERS!`:'🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersArray.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=prize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true, prize, currentGameId, 1, winnersArray.length, winnersArray.join(', '), data.winningNumber); unlockSpeech(); }
         
         async function connectToGame(stake) {
+            if (connecting) return;
+            connecting = true;
+            document.getElementById('stakeLoading').classList.remove('hidden');
+            
             currentStake = stake;
             const initData = tg.initData;
-            if(!initData){ alert('Open inside Telegram'); return; }
+            if(!initData){ alert('Open inside Telegram'); connecting=false; document.getElementById('stakeLoading').classList.add('hidden'); return; }
             try{
                 const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})});
                 const data=await res.json();
-                if(!data.success){ alert('Auth failed'); return; }
+                if(!data.success){ alert('Auth failed'); connecting=false; document.getElementById('stakeLoading').classList.add('hidden'); return; }
                 document.getElementById('profileUsername').innerText=data.username||'Player';
-            }catch(e){ alert('Network error'); return; }
+            }catch(e){ alert('Network error'); connecting=false; document.getElementById('stakeLoading').classList.add('hidden'); return; }
             
             if(socket) socket.disconnect();
             socket = io();
@@ -406,6 +380,8 @@
                     showLobby(state.startsIn);
                     if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers);
                     if(state.playersCount) playersCountEl.innerText = state.playersCount;
+                    connecting = false;
+                    document.getElementById('stakeLoading').classList.add('hidden');
                 }
             });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
@@ -454,11 +430,16 @@
             socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
             socket.on('depositStatus', data => alert(data.status==='approved'?`✅ Deposit +${data.amount} ETB approved!`:'❌ Deposit rejected.'));
             socket.on('withdrawStatus', data => alert(data.status==='approved'?`✅ Withdrawal -${data.amount} ETB processed.`:'❌ Withdrawal rejected.'));
+            socket.on('connect_error', (err) => {
+                alert('Connection error: ' + err.message);
+                connecting = false;
+                document.getElementById('stakeLoading').classList.add('hidden');
+            });
         }
 
-        // Stake selection handlers
-        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
-        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
+        // Stake selection handlers (removed manual showLobby call)
+        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); connectToGame(10); });
+        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); });
         
         document.getElementById('randomCardBtn')?.addEventListener('click',()=>{ if(!isGameActive && socket){ pendingRandom=true; socket.emit('newCardNumber'); selectedCardNumber=null; selectedNumberEl.textContent='⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
         document.getElementById('bingoBtn')?.addEventListener('click',()=>{ if(socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
