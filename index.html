@@ -75,7 +75,7 @@
         .btn-secondary { background: #e2e8f0; color: #1e293b; }
         .type-btn { background: #f1f5f9; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 60px; margin: 8px 0; font-weight: 600; border: 1px solid #e2e8f0; width: 100%; cursor: pointer; }
         .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .back-btn { background: #f1f5f9; border: 1px solid #fed7aa; padding: 8px 20px; border-radius: 40px; color: #7c2d12; font-weight: 600; }
+        .back-btn { background: #f1f5f9; border: 1px solid #fed7aa; padding: 8px 20px; border-radius: 40px; color: #7c2d12; font-weight: 600; cursor: pointer; }
         .profile-stat { background: #fef9f0; border-radius: 32px; padding: 16px; text-align: center; margin: 12px 0; border: 1px solid #fed7aa; }
         .stake-page-buttons { display: flex; gap: 20px; justify-content: center; margin: 30px 0; flex-wrap: wrap; }
         .stake-option { background: #fef9f0; border: 1px solid #fed7aa; padding: 16px 24px; border-radius: 60px; font-size: 1.6rem; font-weight: 800; color: #ea580c; box-shadow: 0 6px 0 #fed7aa; cursor: pointer; width: 150px; text-align: center; transition: 0.1s; }
@@ -151,7 +151,8 @@
         let depositAccounts = {}, selectedDepositType = null, selectedWithdrawType = null;
         let takenNumbers = new Set();
         let currentBalance = 0, totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
-        let currentMainPage = 'lobby', currentUtterance = null, soundMuted = false, speechUnlocked = false;
+        let currentMainPage = 'lobby', currentTimerSeconds = 30; // track timer for back navigation
+        let currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
         let currentStake = 10;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
@@ -162,11 +163,9 @@
         function getAmharicNumberWord(n) { const ones=["","አንድ","ሁለት","ሶስት","አራት","አምስት","ስድስት","ሰባት","ስምንት","ዘጠኝ"]; const tens=["","አስር","ሃያ","ሰላሳ","አርባ","ሃምሳ","ስልሳ","ሰባ","ሰማንያ","ዘጠና"]; if(n<=10){ if(n===10) return "አስር"; return ones[n]; } if(n<20) return "አስር " + (n===10?"":ones[n-10]); let ten=Math.floor(n/10), unit=n%10; if(unit===0) return tens[ten]; return tens[ten]+" "+ones[unit]; }
         function speakAmharicNumberWithLetter(number){ if(soundMuted||number<1||number>75) return; if(!speechUnlocked){ unlockSpeech(); setTimeout(()=>speakAmharicNumberWithLetter(number),100); return; } const fullText = getBingoLetterAmharic(number)+" "+getAmharicNumberWord(number); if(window.speechSynthesis){ if(currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang='am-ET'; utterance.rate=0.85; const voices=window.speechSynthesis.getVoices(); const amharicVoice=voices.find(v=>v.lang==='am-ET'||v.lang.startsWith('am')); if(amharicVoice) utterance.voice=amharicVoice; currentUtterance=utterance; window.speechSynthesis.speak(utterance); } }
         
-        // UPDATED: loadStats with backwards compatible fields for new history structure
-        function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); }catch(e){ recentGames=[]; } updateStatsUI(); }
+        function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
         
-        // NEW addGameRecord with full details (gameId, result, stake, playerPrize, totalPrize, winnersList, winningNumber)
         function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) {
             totalGames++;
             if(win){ totalWins++; totalEarned += playerPrize; }
@@ -201,11 +200,82 @@
         function buildNumberGrid() { numberGrid.innerHTML=''; for(let i=1;i<=100;i++){ const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.number=i; cell.textContent=i; const isTaken = takenNumbers.has(i); const isOwn = (selectedCardNumber === i); if(isTaken && !isOwn){ cell.classList.add('taken'); cell.onclick=null; } else if(isOwn){ cell.classList.add('own-card'); cell.onclick=null; } else { cell.onclick=()=>{ if(!isGameActive && socket && !takenNumbers.has(i)){ if(selectedCardNumber !== null && selectedCardNumber !== i) takenNumbers.delete(selectedCardNumber); pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
         function updateGridWithTakenNumbers(nums){ const newSet = new Set(nums); if(selectedCardNumber !== null) newSet.delete(selectedCardNumber); takenNumbers = newSet; buildNumberGrid(); }
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
-        function showLobby(sec){ currentMainPage='lobby'; stakePage.classList.add('hidden'); lobbyPage.classList.remove('hidden'); gamePage.classList.add('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=false; markedNumbers=[]; if(socket) socket.emit('getBalance'); startTimer(sec||30); if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); updateStatsUI(); }
-        function showGame(){ currentMainPage='game'; lobbyPage.classList.add('hidden'); gamePage.classList.remove('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=true; clearInterval(lobbyTimerInterval); if(socket) socket.emit('getBalance'); if(userCard.length) renderCard(userCard,'gameCard',true); }
-        function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
-        function goBackToMain(){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); }
-        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; takenNumbers.clear(); currentStake = null; if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); lobbyPage.classList.add('hidden'); gamePage.classList.add('hidden'); stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
+        
+        // Fixed: showLobby now stores current timer value and updates UI
+        function showLobby(sec){ 
+            currentMainPage = 'lobby';
+            currentTimerSeconds = sec;
+            stakePage.classList.add('hidden'); 
+            lobbyPage.classList.remove('hidden'); 
+            gamePage.classList.add('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=false; 
+            markedNumbers=[];
+            if(socket) socket.emit('getBalance'); 
+            startTimer(sec); 
+            if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
+            updateStatsUI(); 
+        }
+        function showGame(){ 
+            currentMainPage = 'game';
+            lobbyPage.classList.add('hidden'); 
+            gamePage.classList.remove('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=true; 
+            clearInterval(lobbyTimerInterval); 
+            if(socket) socket.emit('getBalance'); 
+            if(userCard.length) renderCard(userCard,'gameCard',true); 
+        }
+        
+        function startTimer(sec){ 
+            let left=sec; 
+            lobbyTimerEl.textContent=left+'s'; 
+            clearInterval(lobbyTimerInterval); 
+            lobbyTimerInterval=setInterval(()=>{ 
+                left--; 
+                currentTimerSeconds = left;
+                if(left<=0){ 
+                    clearInterval(lobbyTimerInterval); 
+                    showGame(); 
+                } else lobbyTimerEl.textContent=left+'s'; 
+            },1000); 
+        }
+        
+        // Fixed: goBackToMain now uses currentMainPage and stored timer if needed
+        function goBackToMain() { 
+            if (currentMainPage === 'lobby') {
+                showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30);
+            } else if (currentMainPage === 'game') {
+                showGame();
+            } else {
+                // fallback
+                showLobby(30);
+            }
+        }
+        
+        function goToStakeSelection() { 
+            if (socket) { socket.disconnect(); socket = null; } 
+            isGameActive = false; 
+            userCard = []; 
+            markedNumbers = []; 
+            selectedCardNumber = null; 
+            takenNumbers.clear(); 
+            currentStake = null; 
+            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); 
+            lobbyPage.classList.add('hidden'); 
+            gamePage.classList.add('hidden'); 
+            stakePage.classList.remove('hidden'); 
+            if (selectedNumberEl) selectedNumberEl.textContent = '-'; 
+            pendingSelection = null; 
+            pendingRandom = false; 
+            currentGameId = null; 
+            unlockSpeech(); 
+        }
+        
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
@@ -217,7 +287,6 @@
         let isSubmittingWithdraw=false;
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         
-        // Updated winner overlay storing full history fields
         function showWinnerOverlay(data){ 
             if(data.noWinner){ 
                 if(currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0);
@@ -269,10 +338,15 @@
         document.getElementById('bingoBtn')?.addEventListener('click',()=>{ if(socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
         document.getElementById('muteToggleBtn')?.addEventListener('click',toggleMute);
         document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
-        document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ const page=btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if(page==='lobby'){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); } else{ if(currentMainPage==='lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if(page==='history') historyPage.classList.remove('hidden'); else if(page==='wallet'){ walletPage.classList.remove('hidden'); syncBalance(currentBalance); } else if(page==='profile'){ profilePage.classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); } } unlockSpeech(); }); });
-        document.getElementById('backFromHistoryBtn')?.addEventListener('click',goBackToMain);
-        document.getElementById('backFromWalletBtn')?.addEventListener('click',goBackToMain);
-        document.getElementById('backFromProfileBtn')?.addEventListener('click',goBackToMain);
+        
+        // Tab navigation without breaking back button
+        document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ const page=btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if(page==='lobby'){ if(currentMainPage==='lobby') showLobby(currentTimerSeconds); else showGame(); } else{ if(currentMainPage==='lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if(page==='history') historyPage.classList.remove('hidden'); else if(page==='wallet'){ walletPage.classList.remove('hidden'); syncBalance(currentBalance); } else if(page==='profile'){ profilePage.classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); } } unlockSpeech(); }); });
+        
+        // Back buttons now use fixed goBackToMain
+        document.getElementById('backFromHistoryBtn')?.addEventListener('click', goBackToMain);
+        document.getElementById('backFromWalletBtn')?.addEventListener('click', goBackToMain);
+        document.getElementById('backFromProfileBtn')?.addEventListener('click', goBackToMain);
+        
         document.getElementById('depositFromWalletBtn')?.addEventListener('click',openDepositTypeModal);
         document.getElementById('withdrawFromWalletBtn')?.addEventListener('click',openWithdrawTypeModal);
         document.getElementById('depositBtn')?.addEventListener('click',openDepositTypeModal);
@@ -292,6 +366,17 @@
         loadDepositAccounts(); buildNumberGrid(); loadStats(); updateMuteButton();
         window.speechSynthesis.getVoices();
         stakePage.classList.remove('hidden');
+        
+        // DOM element references
+        const lobbyBalanceEl = document.getElementById('lobbyBalance');
+        const lobbyTimerEl = document.getElementById('lobbyTimer');
+        const playersCountEl = document.getElementById('playersCount');
+        const gamePlayersCountEl = document.getElementById('gamePlayersCount');
+        const winningBalanceEl = document.getElementById('winningBalance');
+        const currentCallEl = document.getElementById('currentCall');
+        const calledListEl = document.getElementById('calledList');
+        const selectedNumberEl = document.getElementById('selectedNumber');
+        const numberGrid = document.getElementById('numberGrid');
     </script>
 </body>
 </html>
