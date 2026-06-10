@@ -160,7 +160,8 @@
         const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
         let socket, userCard = [], markedNumbers = [], isGameActive = false, lobbyTimerInterval = null, selectedCardNumber = null;
         let depositAccounts = {}, selectedDepositType = null, selectedWithdrawType = null;
-        let takenNumbers = new Set();
+        let serverTakenNumbers = new Set();   // Full set from server (all taken card numbers, including current player)
+        let displayTakenNumbers = new Set();  // For grid (excludes current player's own card)
         let currentBalance = 0, totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
         let currentMainPage = 'lobby', currentTimerSeconds = 30;
         let currentUtterance = null, soundMuted = false, speechUnlocked = false;
@@ -175,14 +176,14 @@
         function getAmharicNumberWord(n) { const ones=["","አንድ","ሁለት","ሶስት","አራት","አምስት","ስድስት","ሰባት","ስምንት","ዘጠኝ"]; const tens=["","አስር","ሃያ","ሰላሳ","አርባ","ሃምሳ","ስልሳ","ሰባ","ሰማንያ","ዘጠና"]; if(n<=10){ if(n===10) return "አስር"; return ones[n]; } if(n<20) return "አስር " + (n===10?"":ones[n-10]); let ten=Math.floor(n/10), unit=n%10; if(unit===0) return tens[ten]; return tens[ten]+" "+ones[unit]; }
         function speakAmharicNumberWithLetter(number){ if(soundMuted||number<1||number>75) return; if(!speechUnlocked){ unlockSpeech(); setTimeout(()=>speakAmharicNumberWithLetter(number),100); return; } const fullText = getBingoLetterAmharic(number)+" "+getAmharicNumberWord(number); if(window.speechSynthesis){ if(currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang='am-ET'; utterance.rate=0.85; const voices=window.speechSynthesis.getVoices(); const amharicVoice=voices.find(v=>v.lang==='am-ET'||v.lang.startsWith('am')); if(amharicVoice) utterance.voice=amharicVoice; currentUtterance=utterance; window.speechSynthesis.speak(utterance); } }
         
-        // ========== PLAYER COUNT (based on taken card numbers) ==========
-        function updatePlayerCountFromTaken() {
-            const count = takenNumbers.size;
+        // ========== PLAYER COUNT (based on FULL server taken set) ==========
+        function updatePlayerCountFromServer() {
+            const count = serverTakenNumbers.size;
             if (playersCountEl) playersCountEl.innerText = count;
             if (gamePlayersCountEl) gamePlayersCountEl.innerText = count;
         }
         
-        // ========== HISTORY & STATS ==========
+        // ========== HISTORY & STATS (unchanged) ==========
         function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
         
@@ -254,6 +255,7 @@
             cont.appendChild(table);
         }
         
+        // Build the 1-100 grid using displayTakenNumbers (excludes own card)
         function buildNumberGrid() { 
             if(!numberGrid) return;
             numberGrid.innerHTML=''; 
@@ -262,7 +264,7 @@
                 cell.className='grid-cell'; 
                 cell.dataset.number=i; 
                 cell.textContent=i; 
-                const isTaken = takenNumbers.has(i); 
+                const isTaken = displayTakenNumbers.has(i); 
                 const isOwn = (selectedCardNumber === i); 
                 if(isTaken && !isOwn){ 
                     cell.classList.add('taken'); 
@@ -272,8 +274,12 @@
                     cell.onclick=null; 
                 } else { 
                     cell.onclick=()=>{ 
-                        if(!isGameActive && socket && !takenNumbers.has(i)){ 
-                            if(selectedCardNumber !== null && selectedCardNumber !== i) takenNumbers.delete(selectedCardNumber); 
+                        if(!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)){ 
+                            if(selectedCardNumber !== null && selectedCardNumber !== i) {
+                                // Remove old from sets (server will handle, but we clean locally)
+                                serverTakenNumbers.delete(selectedCardNumber);
+                                displayTakenNumbers.delete(selectedCardNumber);
+                            }
                             pendingSelection = i; 
                             selectedCardNumber = i; 
                             selectedNumberEl.textContent = i; 
@@ -286,12 +292,16 @@
             } 
         }
         
-        function updateGridWithTakenNumbers(nums){ 
-            const newSet = new Set(nums); 
-            if(selectedCardNumber !== null) newSet.delete(selectedCardNumber); 
-            takenNumbers = newSet; 
+        // Update both server and display sets from server's takenNumbers array
+        function updateGridWithTakenNumbers(takenArray){ 
+            const newServerSet = new Set(takenArray); 
+            serverTakenNumbers = newServerSet;
+            // Display set excludes own card
+            const newDisplaySet = new Set(takenArray);
+            if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
+            displayTakenNumbers = newDisplaySet;
             buildNumberGrid(); 
-            updatePlayerCountFromTaken();
+            updatePlayerCountFromServer();
         }
         
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
@@ -311,8 +321,7 @@
             startTimer(sec); 
             if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
             updateStatsUI(); 
-            updatePlayerCountFromTaken();
-            // === AUTO-SELECTION REMOVED: player must manually choose a card ===
+            updatePlayerCountFromServer();
         }
         
         function showGame(){ 
@@ -326,7 +335,7 @@
             clearInterval(lobbyTimerInterval); 
             if(socket) socket.emit('getBalance'); 
             if(userCard.length) renderCard(userCard,'gameCard',true); 
-            updatePlayerCountFromTaken();
+            updatePlayerCountFromServer();
         }
         
         function startTimer(sec){ 
@@ -359,7 +368,8 @@
             userCard = []; 
             markedNumbers = []; 
             selectedCardNumber = null; 
-            takenNumbers.clear(); 
+            serverTakenNumbers.clear();
+            displayTakenNumbers.clear();
             currentStake = null; 
             if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); 
             lobbyPage.classList.add('hidden'); 
@@ -415,16 +425,37 @@
             socket = io();
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
             socket.on('balanceUpdate', syncBalance);
-            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) { updatePlayerCountFromTaken(); } } });
+            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(); } });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
-            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newTaken = new Set(data.takenNumbers); if(selectedCardNumber !== null) newTaken.delete(selectedCardNumber); takenNumbers = newTaken; buildNumberGrid(); updatePlayerCountFromTaken(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
+            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; 
+                // Update both sets from server data
+                const newServerSet = new Set(data.takenNumbers);
+                serverTakenNumbers = newServerSet;
+                // Display set excludes own card
+                const newDisplaySet = new Set(data.takenNumbers);
+                if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
+                displayTakenNumbers = newDisplaySet;
+                buildNumberGrid(); 
+                updatePlayerCountFromServer(); 
+                if(pendingSelection && data.number === pendingSelection){ 
+                    selectedCardNumber = data.number; 
+                    selectedNumberEl.textContent = data.number; 
+                    pendingSelection = null; 
+                    buildNumberGrid(); 
+                } 
+                if(pendingRandom && data.number){ 
+                    selectedCardNumber = data.number; 
+                    selectedNumberEl.textContent = data.number; 
+                    pendingRandom = false; 
+                    buildNumberGrid(); 
+                } 
+            });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
             socket.on('playersCount', c => { 
-                if(!isGameActive) playersCountEl.innerText = c; 
-                if(gamePlayersCountEl && !isGameActive) gamePlayersCountEl.innerText = c; 
-                const prize = Math.floor(c * currentStake * 0.8); 
+                // Override with server count (but we use local serverTakenNumbers for accuracy)
+                updatePlayerCountFromServer();
+                const prize = Math.floor(serverTakenNumbers.size * currentStake * 0.8); 
                 if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; 
-                updatePlayerCountFromTaken();
             });
             socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
             socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
