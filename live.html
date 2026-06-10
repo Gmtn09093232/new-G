@@ -3,56 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Live Admin | Bingo</title>
+    <title>Live Admin | Bingo (10/30 ETB)</title>
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: #1e2a3a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 12px; margin: 0; color: #ecf0f1; }
-        .container { max-width: 1000px; margin: 0 auto; background: #0f1724; border-radius: 28px; padding: 18px 12px 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
+        .container { max-width: 1200px; margin: 0 auto; background: #0f1724; border-radius: 28px; padding: 18px 12px 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
         h1 { font-size: 1.6rem; margin: 0 0 8px 0; text-align: center; border-bottom: 2px solid #f39c12; padding-bottom: 10px; }
         .section-title { font-size: 1.2rem; margin: 28px 0 12px; border-left: 4px solid #f39c12; padding-left: 12px; }
-        .status-bar { background: #2c3e50; border-radius: 40px; padding: 12px 18px; margin: 16px 0; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.9rem; flex-wrap: wrap; gap: 8px; }
-        .game-status { background: #e67e22; padding: 6px 16px; border-radius: 40px; text-transform: uppercase; font-size: 0.75rem; font-weight: bold; }
-        .players-table-wrapper { background: #1a2533; border-radius: 24px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .stake-card { background: #1a2533; border-radius: 28px; padding: 16px; margin-bottom: 28px; border: 1px solid #2c3e50; }
+        .stake-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        .stake-title { font-size: 1.4rem; font-weight: 800; background: #f39c12; color: #1e2a3a; padding: 4px 18px; border-radius: 40px; display: inline-block; }
+        .status-badge { background: #2c3e50; padding: 6px 16px; border-radius: 40px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+        .status-badge.lobby { background: #e67e22; color: white; }
+        .status-badge.running { background: #2ecc71; color: #1e2a3a; }
+        .status-badge.ended { background: #95a5a6; }
+        .player-count { font-size: 0.9rem; background: #0f1724; padding: 4px 12px; border-radius: 40px; }
+        .players-table-wrapper { background: #0f1724; border-radius: 24px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 12px; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 400px; }
         th { text-align: left; padding: 12px 8px; background: #0f1724; color: #f39c12; font-weight: bold; border-bottom: 2px solid #f39c12; }
         td { padding: 12px 8px; border-bottom: 1px solid #2c3e50; vertical-align: middle; }
-        .player-row:active { background: #2c3e50; }
         .username-plain { color: #ecf0f1; font-weight: 500; }
-        .handle { color: #2ecc71; font-family: monospace; font-weight: normal; }
+        .handle { color: #2ecc71; font-family: monospace; }
         .telegram-id { font-family: monospace; font-size: 0.75rem; background: #0f1724; padding: 4px 6px; border-radius: 8px; display: inline-block; }
-        .card-badge { background: #f39c12; color: #1e2a3a; padding: 4px 10px; border-radius: 30px; font-weight: bold; font-size: 0.75rem; display: inline-block; text-align: center; }
-        .balance-positive { color: #2ecc71; font-weight: bold; }
-        .balance-zero { color: #95a5a6; }
-        .balance-negative { color: #e74c3c; font-weight: bold; }
-        .empty-message { text-align: center; padding: 48px 20px; color: #95a5a6; font-style: italic; }
+        .card-badge { background: #f39c12; color: #1e2a3a; padding: 4px 10px; border-radius: 30px; font-weight: bold; font-size: 0.75rem; display: inline-block; }
+        .empty-message { text-align: center; padding: 32px 20px; color: #95a5a6; font-style: italic; }
         .refresh-info { text-align: center; font-size: 0.7rem; margin-top: 20px; color: #7f8c8d; }
-        button { background: #f39c12; border: none; padding: 14px 20px; border-radius: 60px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 18px; width: 100%; transition: 0.1s; color: #1e2a3a; }
+        button { background: #f39c12; border: none; padding: 12px 20px; border-radius: 60px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 12px; transition: 0.1s; color: #1e2a3a; width: auto; display: inline-block; margin-right: 12px; }
         button:active { transform: scale(0.97); background: #e67e22; }
-        .footer { margin-top: 24px; text-align: center; font-size: 0.65rem; color: #5d6d7e; }
-        .total-balance-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
+        .total-balance-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin: 20px 0 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
         .total-balance-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; font-weight: bold; }
         .total-balance-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; line-height: 1; }
-        @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-balance-value { font-size: 1.4rem; } }
+        .footer { margin-top: 28px; text-align: center; font-size: 0.65rem; color: #5d6d7e; }
+        @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-balance-value { font-size: 1.4rem; } .stake-title { font-size: 1.2rem; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎲 Bingo · Live Admin</h1>
+    <h1>🎲 Bingo · Live Admin (10 & 30 ETB)</h1>
 
-    <!-- LIVE PLAYERS SECTION -->
-    <div class="status-bar"><span>🎮 Game state:</span><span id="gameState" class="game-status">Loading...</span></div>
-    <div class="status-bar"><span>👤 Players in game:</span><span id="playerCount">0</span></div>
-    <div class="players-table-wrapper">
-        <table id="playersTable">
-            <thead>
-                <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr>
-            </thead>
-            <tbody id="playersTableBody">
-                <tr><td colspan="4" class="empty-message">No players yet. Waits for lobby/game.</td></tr>
-            </tbody>
-        </table>
+    <!-- 10 ETB STAKE CARD -->
+    <div class="stake-card" id="stake10Card">
+        <div class="stake-header">
+            <span class="stake-title">🎯 10 ETB GAME</span>
+            <div><span class="status-badge" id="status10">—</span> <span class="player-count" id="playerCount10">👥 0 players</span></div>
+        </div>
+        <div class="players-table-wrapper">
+            <table id="playersTable10">
+                <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr></thead>
+                <tbody id="playersTableBody10"><tr><td colspan="4" class="empty-message">No players in 10 ETB stake yet.</td></tr></tbody>
+            </table>
+        </div>
     </div>
-    <button id="refreshBtn">⟳ Refresh Live Players</button>
+
+    <!-- 30 ETB STAKE CARD -->
+    <div class="stake-card" id="stake30Card">
+        <div class="stake-header">
+            <span class="stake-title">🎯 30 ETB GAME</span>
+            <div><span class="status-badge" id="status30">—</span> <span class="player-count" id="playerCount30">👥 0 players</span></div>
+        </div>
+        <div class="players-table-wrapper">
+            <table id="playersTable30">
+                <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr></thead>
+                <tbody id="playersTableBody30"><tr><td colspan="4" class="empty-message">No players in 30 ETB stake yet.</td></tr></tbody>
+            </table>
+        </div>
+    </div>
 
     <!-- ALL REGISTERED PLAYERS SECTION -->
     <h2 class="section-title">📋 All Registered Players</h2>
@@ -60,20 +75,21 @@
         <span class="total-balance-label">💰 TOTAL BALANCE (All users)</span>
         <span class="total-balance-value" id="totalBalanceSum">0</span>
     </div>
-    <div class="status-bar"><span>👥 Total registered:</span><span id="registeredCount">0</span></div>
+    <div class="status-bar" style="background:#2c3e50; border-radius:40px; padding:8px 16px; margin-bottom:16px;">
+        <span>👥 Total registered:</span><span id="registeredCount">0</span>
+    </div>
     <div class="players-table-wrapper">
         <table id="registeredTable">
-            <thead>
-                <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th></tr>
-            </thead>
-            <tbody id="registeredTableBody">
-                <tr><td colspan="4" class="empty-message">Loading registered users…</td></tr>
-            </tbody>
+            <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th></tr></thead>
+            <tbody id="registeredTableBody"><tr><td colspan="4" class="empty-message">Loading registered users…</td></tr></tbody>
         </table>
     </div>
-    <button id="refreshRegisteredBtn">⟳ Refresh Registered List</button>
+    <div>
+        <button id="refreshRegisteredBtn">⟳ Refresh Registered List</button>
+        <button id="refreshAllBtn">⟳ Refresh All Live Data</button>
+    </div>
 
-    <div class="refresh-info">🔄 Live updates via WebSocket · Registered list on demand</div>
+    <div class="refresh-info">🔄 Live updates via WebSocket · Data per stake (10 / 30 ETB)</div>
     <div class="footer">Admin only | <span id="timestamp"></span></div>
 </div>
 
@@ -90,36 +106,48 @@
 
     socket.on('connect', () => {
         console.log('✅ Admin connected');
-        socket.emit('admin:getAllRegisteredPlayers');
+        socket.emit('admin:getAllRegisteredPlayers'); // initial load
     });
 
     socket.on('connect_error', (err) => {
         console.error('❌ Socket error:', err.message);
-        document.getElementById('playersTableBody').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed. Check server & secret.</td></tr>';
+        document.getElementById('playersTableBody10').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed. Check server & secret.</td></tr>';
+        document.getElementById('playersTableBody30').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
         document.getElementById('registeredTableBody').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
     });
 
+    // Receive live players + game status for both stakes
     socket.on('admin:playersList', (data) => {
-        updateLivePlayers(data.players);
-        document.getElementById('gameState').innerText = data.gameStatus || 'unknown';
+        // data = { players: [...], gameStatus: { 10: 'lobby', 30: 'running' } }
+        updateStakeView(10, data.players, data.gameStatus);
+        updateStakeView(30, data.players, data.gameStatus);
     });
 
+    // Receive all registered users (full list)
     socket.on('admin:allRegisteredPlayers', (data) => {
         updateRegisteredTable(data.users);
     });
 
-    function updateLivePlayers(players) {
-        const tbody = document.getElementById('playersTableBody');
-        const countSpan = document.getElementById('playerCount');
-        countSpan.innerText = players ? players.length : 0;
+    function updateStakeView(stake, allPlayers, gameStatus) {
+        const stakePlayers = (allPlayers || []).filter(p => p.stake === stake);
+        const status = (gameStatus && gameStatus[stake]) || 'unknown';
+        const statusEl = document.getElementById(`status${stake}`);
+        const countEl = document.getElementById(`playerCount${stake}`);
+        const tbody = document.getElementById(`playersTableBody${stake}`);
 
-        if (!players || players.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-message">👻 No players currently in the game.</td></tr>';
+        if (statusEl) {
+            statusEl.innerText = status.toUpperCase();
+            statusEl.className = `status-badge ${status}`;
+        }
+        if (countEl) countEl.innerText = `👥 ${stakePlayers.length} players`;
+
+        if (!stakePlayers.length) {
+            tbody.innerHTML = `<tr><td colspan="4" class="empty-message">👻 No players in ${stake} ETB stake yet.</td></tr>`;
             return;
         }
 
         let html = '';
-        players.forEach(p => {
+        stakePlayers.forEach(p => {
             const username = escapeHtml(p.username);
             const telegramId = escapeHtml(p.telegramId);
             const cardNum = p.cardNumber;
@@ -179,8 +207,14 @@
         tbody.innerHTML = html;
     }
 
-    document.getElementById('refreshBtn').onclick = () => socket.emit('admin:requestPlayers');
-    document.getElementById('refreshRegisteredBtn').onclick = () => socket.emit('admin:getAllRegisteredPlayers');
+    // Manual refresh: request latest live players and registered list
+    document.getElementById('refreshAllBtn').onclick = () => {
+        socket.emit('admin:requestPlayers');
+        socket.emit('admin:getAllRegisteredPlayers');
+    };
+    document.getElementById('refreshRegisteredBtn').onclick = () => {
+        socket.emit('admin:getAllRegisteredPlayers');
+    };
 
     function escapeHtml(str) {
         if (!str) return '';
