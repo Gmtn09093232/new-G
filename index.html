@@ -143,7 +143,7 @@
     <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
 
     <script>
-        // ========== DOM ELEMENT REFERENCES (MUST BE BEFORE ANY FUNCTION THAT USES THEM) ==========
+        // ========== DOM ELEMENTS ==========
         const lobbyBalanceEl = document.getElementById('lobbyBalance');
         const lobbyTimerEl = document.getElementById('lobbyTimer');
         const playersCountEl = document.getElementById('playersCount');
@@ -153,10 +153,7 @@
         const calledListEl = document.getElementById('calledList');
         const selectedNumberEl = document.getElementById('selectedNumber');
         const numberGrid = document.getElementById('numberGrid');
-        const lobbyCardPreview = document.getElementById('lobbyCardPreview');
-        const gameCardDiv = document.getElementById('gameCard');
         
-        // ========== UTILITIES ==========
         function copyToClipboard(text) { if (!text) return; navigator.clipboard.writeText(text).then(() => alert("✅ Phone number copied to clipboard!")).catch(() => alert("❌ Could not copy.")); }
         function scrollCalledHistoryToEnd() { if (calledListEl) calledListEl.scrollLeft = calledListEl.scrollWidth; }
         
@@ -178,6 +175,14 @@
         function getAmharicNumberWord(n) { const ones=["","አንድ","ሁለት","ሶስት","አራት","አምስት","ስድስት","ሰባት","ስምንት","ዘጠኝ"]; const tens=["","አስር","ሃያ","ሰላሳ","አርባ","ሃምሳ","ስልሳ","ሰባ","ሰማንያ","ዘጠና"]; if(n<=10){ if(n===10) return "አስር"; return ones[n]; } if(n<20) return "አስር " + (n===10?"":ones[n-10]); let ten=Math.floor(n/10), unit=n%10; if(unit===0) return tens[ten]; return tens[ten]+" "+ones[unit]; }
         function speakAmharicNumberWithLetter(number){ if(soundMuted||number<1||number>75) return; if(!speechUnlocked){ unlockSpeech(); setTimeout(()=>speakAmharicNumberWithLetter(number),100); return; } const fullText = getBingoLetterAmharic(number)+" "+getAmharicNumberWord(number); if(window.speechSynthesis){ if(currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang='am-ET'; utterance.rate=0.85; const voices=window.speechSynthesis.getVoices(); const amharicVoice=voices.find(v=>v.lang==='am-ET'||v.lang.startsWith('am')); if(amharicVoice) utterance.voice=amharicVoice; currentUtterance=utterance; window.speechSynthesis.speak(utterance); } }
         
+        // ========== PLAYER COUNT (based on taken card numbers) ==========
+        function updatePlayerCountFromTaken() {
+            const count = takenNumbers.size;
+            if (playersCountEl) playersCountEl.innerText = count;
+            if (gamePlayersCountEl) gamePlayersCountEl.innerText = count;
+        }
+        
+        // ========== HISTORY & STATS ==========
         function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
         
@@ -281,7 +286,14 @@
             } 
         }
         
-        function updateGridWithTakenNumbers(nums){ const newSet = new Set(nums); if(selectedCardNumber !== null) newSet.delete(selectedCardNumber); takenNumbers = newSet; buildNumberGrid(); }
+        function updateGridWithTakenNumbers(nums){ 
+            const newSet = new Set(nums); 
+            if(selectedCardNumber !== null) newSet.delete(selectedCardNumber); 
+            takenNumbers = newSet; 
+            buildNumberGrid(); 
+            updatePlayerCountFromTaken();
+        }
+        
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
         
         function showLobby(sec){ 
@@ -299,6 +311,7 @@
             startTimer(sec); 
             if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
             updateStatsUI(); 
+            updatePlayerCountFromTaken();
             if(!selectedCardNumber && socket && !pendingRandom){
                 pendingRandom = true;
                 socket.emit('newCardNumber');
@@ -317,6 +330,7 @@
             clearInterval(lobbyTimerInterval); 
             if(socket) socket.emit('getBalance'); 
             if(userCard.length) renderCard(userCard,'gameCard',true); 
+            updatePlayerCountFromTaken();
         }
         
         function startTimer(sec){ 
@@ -362,6 +376,7 @@
             unlockSpeech(); 
         }
         
+        // ========== DEPOSIT / WITHDRAW MODALS (unchanged) ==========
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
@@ -404,11 +419,18 @@
             socket = io();
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
             socket.on('balanceUpdate', syncBalance);
-            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) playersCountEl.innerText = state.playersCount; } });
+            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) { /* also use server count but our local is more reliable */ updatePlayerCountFromTaken(); } } });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
-            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newTaken = new Set(data.takenNumbers); if(selectedCardNumber !== null) newTaken.delete(selectedCardNumber); takenNumbers = newTaken; buildNumberGrid(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
+            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newTaken = new Set(data.takenNumbers); if(selectedCardNumber !== null) newTaken.delete(selectedCardNumber); takenNumbers = newTaken; buildNumberGrid(); updatePlayerCountFromTaken(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
-            socket.on('playersCount', c => { if(!isGameActive) playersCountEl.innerText = c; if(gamePlayersCountEl && !isGameActive) gamePlayersCountEl.innerText = c; const prize = Math.floor(c * currentStake * 0.8); if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; });
+            socket.on('playersCount', c => { 
+                // fallback: server sends count, but we prefer local takenNumbers size for accuracy
+                if(!isGameActive) playersCountEl.innerText = c; 
+                if(gamePlayersCountEl && !isGameActive) gamePlayersCountEl.innerText = c; 
+                const prize = Math.floor(c * currentStake * 0.8); 
+                if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; 
+                updatePlayerCountFromTaken(); // ensure our local count overrides
+            });
             socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
             socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
             socket.on('markedNumbers', nums => { markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
@@ -418,7 +440,7 @@
             socket.on('withdrawStatus', data => alert(data.status==='approved'?`✅ Withdrawal -${data.amount} ETB processed.`:'❌ Withdrawal rejected.'));
         }
         
-        // Event Listeners
+        // ========== EVENT LISTENERS ==========
         document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
         document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
         document.getElementById('randomCardBtn')?.addEventListener('click',()=>{ if(!isGameActive && socket){ pendingRandom=true; socket.emit('newCardNumber'); selectedCardNumber=null; selectedNumberEl.textContent='⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
@@ -449,7 +471,6 @@
         document.getElementById('rulesBtnGame')?.addEventListener('click',()=>rulesModal.classList.add('active'));
         closeRules?.addEventListener('click',()=>rulesModal.classList.remove('active'));
         
-        // Initialization
         loadDepositAccounts(); 
         buildNumberGrid(); 
         loadStats(); 
