@@ -312,11 +312,7 @@
             if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
             updateStatsUI(); 
             updatePlayerCountFromTaken();
-            if(!selectedCardNumber && socket && !pendingRandom){
-                pendingRandom = true;
-                socket.emit('newCardNumber');
-                selectedNumberEl.textContent = '⚡ ...';
-            }
+            // === AUTO-SELECTION REMOVED: player must manually choose a card ===
         }
         
         function showGame(){ 
@@ -419,17 +415,16 @@
             socket = io();
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
             socket.on('balanceUpdate', syncBalance);
-            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) { /* also use server count but our local is more reliable */ updatePlayerCountFromTaken(); } } });
+            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); if(state.playersCount) { updatePlayerCountFromTaken(); } } });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
             socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newTaken = new Set(data.takenNumbers); if(selectedCardNumber !== null) newTaken.delete(selectedCardNumber); takenNumbers = newTaken; buildNumberGrid(); updatePlayerCountFromTaken(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
             socket.on('playersCount', c => { 
-                // fallback: server sends count, but we prefer local takenNumbers size for accuracy
                 if(!isGameActive) playersCountEl.innerText = c; 
                 if(gamePlayersCountEl && !isGameActive) gamePlayersCountEl.innerText = c; 
                 const prize = Math.floor(c * currentStake * 0.8); 
                 if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; 
-                updatePlayerCountFromTaken(); // ensure our local count overrides
+                updatePlayerCountFromTaken();
             });
             socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
             socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
