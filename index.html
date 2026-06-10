@@ -8,6 +8,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* [All existing styles remain exactly the same] */
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255, 255, 248, 0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(2px); }
@@ -82,7 +83,7 @@
     </style>
 </head>
 <body>
-    <!-- MODALS (deposit flow without proof attachment) -->
+    <!-- MODALS (unchanged) -->
     <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title">Deposit</div><div class="bank-sub">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;">Cancel</button></div></div>
     <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub">Enter your details</div></div></div><div class="account-card"><div class="account-label">RECIPIENT ACCOUNT</div><div class="account-number" id="depositAccountNumber">0924839730</div><div class="account-label" style="margin-top:8px;">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label>📞 Your Phone Number</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div><div class="input-group"><label>💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="transaction-summary">💡 After submitting, admin will verify your transaction using the phone number. Funds added within moment.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary">← Back</button></div></div></div>
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title">Withdraw Funds</div><div class="bank-sub">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn">Cancel</button></div></div>
@@ -90,7 +91,7 @@
     <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title">የቢንጎ ሕጎች</div><div class="bank-sub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong>💰 የመግቢያ ክፍያ፦</strong> 10/30 ብር (እንደ ምርጫዎ)</p><p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80% (1 ተጫዋች ከሆነ 100%)</p><p><strong>🎯 ማሸነፍ፦</strong> ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</p><p><strong>⏱️ የይገባኛል ጥያቄ፦</strong> ወዲያው “CLAIM BINGO!”</p></div><button id="closeRulesBtn" class="btn-primary">ገባኝ</button></div></div>
     <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')">🎉 Amazing! 🎉</button></div></div>
 
-    <!-- STAKE PAGE (10 ETB and 30 ETB) -->
+    <!-- STAKE PAGE -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
@@ -109,10 +110,18 @@
         </div>
     </div>
 
-    <!-- LOBBY PAGE -->
+    <!-- LOBBY PAGE (with Back to Stake button added) -->
     <div id="lobbyPage" class="page hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><h2>🎲 DOT BINGO</h2><div class="players-badge">👥 <span id="playersCount">0</span></div></div>
-        <div class="balance-top"><div>💰 BAL <span id="lobbyBalance">0</span> ETB</div><div><button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;">+Deposit</button><button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;">-Withdraw</button></div><div class="timer-badge" id="lobbyTimer">30s</div></div>
+        <div class="balance-top">
+            <div>💰 BAL <span id="lobbyBalance">0</span> ETB</div>
+            <div style="display: flex; gap: 8px;">
+                <button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;">+Deposit</button>
+                <button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;">-Withdraw</button>
+                <button id="backToStakeBtn" style="background:#6c757d; border:none; border-radius:40px; padding:6px 14px; color:white;">↺ Stake</button>
+            </div>
+            <div class="timer-badge" id="lobbyTimer">30s</div>
+        </div>
         <div style="display:flex; justify-content:space-between; margin:12px 0;"><span>🎴 Pick card ID:</span><span>Selected: <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c; border:none; border-radius:40px; padding:6px 16px; color:white;">✨ Random Card</button></div>
         <div id="numberGrid" class="grid-100"></div>
         <div>🎴 Your Bingo Card Preview</div>
@@ -122,15 +131,18 @@
         <div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- HISTORY, WALLET, PROFILE -->
+    <!-- HISTORY, WALLET, PROFILE (unchanged) -->
     <div id="historyPage" class="page hidden"><div class="page-header"><h2>📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn">← Back</button></div><div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList"></div></div>
     <div id="walletPage" class="page hidden"><div class="page-header"><h2>💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn">← Back</button></div><div class="profile-stat"><div>Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary">- Withdraw</button></div></div>
     <div id="profilePage" class="page hidden"><div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div><div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div><div class="profile-stat"><div>🏆 Total Wins</div><div id="profileTotalWins">0</div></div><div class="profile-stat"><div>💵 Total Earned</div><div id="profileTotalEarned">0</div></div></div>
 
-    <!-- GAME PAGE -->
+    <!-- GAME PAGE (unchanged) -->
     <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
 
     <script>
+        // [All existing variables, functions, and event listeners remain exactly the same as before]
+        // We only add the new goToStakeSelection function and attach it to the new button.
+
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
         let socket, userCard = [], markedNumbers = [], isGameActive = false, lobbyTimerInterval = null, selectedCardNumber = null;
@@ -140,7 +152,7 @@
         let currentMainPage = 'lobby', currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
         let previousCardNumber = null;
-        let currentStake = 10; // default, will be set by stake selection
+        let currentStake = 10;
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
@@ -236,6 +248,30 @@
         }
         function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
         function goBackToMain(){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); }
+
+        // NEW: Function to go back to stake selection
+        function goToStakeSelection() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            isGameActive = false;
+            userCard = [];
+            markedNumbers = [];
+            selectedCardNumber = null;
+            takenNumbers.clear();
+            currentStake = null;
+            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+            lobbyPage.classList.add('hidden');
+            gamePage.classList.add('hidden');
+            stakePage.classList.remove('hidden');
+            if (selectedNumberEl) selectedNumberEl.textContent = '-';
+            pendingSelection = null;
+            pendingRandom = false;
+            currentGameId = null;
+            unlockSpeech();
+        }
+
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
@@ -315,6 +351,8 @@
         document.getElementById('randomCardBtn')?.addEventListener('click',()=>{ if(!isGameActive && socket){ pendingRandom=true; socket.emit('newCardNumber'); selectedCardNumber=null; selectedNumberEl.textContent='⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
         document.getElementById('bingoBtn')?.addEventListener('click',()=>{ if(socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
         document.getElementById('muteToggleBtn')?.addEventListener('click',toggleMute);
+        document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
+        
         document.querySelectorAll('.tab-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ const page=btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if(page==='lobby'){ if(currentMainPage==='lobby') showLobby(parseInt(lobbyTimerEl.textContent)||30); else showGame(); } else{ if(currentMainPage==='lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if(page==='history') historyPage.classList.remove('hidden'); else if(page==='wallet'){ walletPage.classList.remove('hidden'); syncBalance(currentBalance); } else if(page==='profile'){ profilePage.classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); } } unlockSpeech(); }); });
         document.getElementById('backFromHistoryBtn')?.addEventListener('click',goBackToMain);
         document.getElementById('backFromWalletBtn')?.addEventListener('click',goBackToMain);
