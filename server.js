@@ -40,7 +40,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger ----------
+// ---------- Audit Logger (unchanged) ----------
 async function logAuditEvent({
   eventType,
   roomId = null,
@@ -126,7 +126,7 @@ app.get('/admin/live-players', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-live-players.html'));
 });
 
-// ---------- User cache (now includes telegram_handle) ----------
+// ---------- User cache ----------
 const users = {};
 async function loadUser(telegramId, username, telegramHandle = null) {
   const id = String(telegramId);
@@ -191,7 +191,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   });
 });
 
-// ---------- Admin add balance ----------
+// ---------- Admin add balance (also records manual deposit) ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -202,7 +202,6 @@ app.post('/admin/add-balance', async (req, res) => {
   user.balance += amt;
   await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
   
-  // Insert manual deposit record (proof_path = null)
   await supabase.from('deposit_requests').insert({
     telegram_id: strId,
     username: user.username,
@@ -245,108 +244,135 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Game state ----------
-const currentGame = {
-  status: 'lobby',
-  players: [],
-  takenCardNumbers: new Set(),
-  calledNumbers: [],
-  entryFee: 10,
-  prizePool: 0,
-  lobbyTimer: null,
-  callInterval: null,
-  lobbyEndTime: 0,
-  cardSet: Array.from({ length: 100 }, () => generateCard()),
-  winners: [],
-  bingoGraceTimeout: null,
-  winningNumber: null
+// ---------- Multi-stake game states ----------
+function createGameState(entryFee) {
+  return {
+    status: 'lobby',
+    players: [],
+    takenCardNumbers: new Set(),
+    calledNumbers: [],
+    entryFee,
+    prizePool: 0,
+    lobbyTimer: null,
+    callInterval: null,
+    lobbyEndTime: 0,
+    cardSet: Array.from({ length: 100 }, () => generateCard()),
+    winners: [],
+    bingoGraceTimeout: null,
+    winningNumber: null
+  };
+}
+
+const games = {
+  10: createGameState(10),
+  30: createGameState(30)
 };
 
-function getPlayersList() {
-  return currentGame.players.map(p => {
-    const user = users[p.telegramId];
-    return {
-      telegramId: p.telegramId,
-      username: p.username,
-      cardNumber: p.cardNumber,
-      telegram_handle: user ? user.telegram_handle : null
-    };
-  });
+function getGame(stake) {
+  return games[stake];
+}
+
+// Helper to get combined players list for admin (all stakes)
+function getAllPlayersList() {
+  const allPlayers = [];
+  for (const stake of [10, 30]) {
+    const game = games[stake];
+    game.players.forEach(p => {
+      const user = users[p.telegramId];
+      allPlayers.push({
+        telegramId: p.telegramId,
+        username: p.username,
+        cardNumber: p.cardNumber,
+        stake,
+        telegram_handle: user ? user.telegram_handle : null
+      });
+    });
+  }
+  return allPlayers;
 }
 
 function notifyAdminClients() {
   const data = {
-    players: getPlayersList(),
-    gameStatus: currentGame.status
+    players: getAllPlayersList(),
+    gameStatus: {
+      10: games[10].status,
+      30: games[30].status
+    }
   };
   adminNamespace.emit('admin:playersList', data);
 }
 
-function resetGame() {
-  clearInterval(currentGame.callInterval);
-  clearTimeout(currentGame.lobbyTimer);
-  clearTimeout(currentGame.bingoGraceTimeout);
-  currentGame.status = 'lobby';
-  currentGame.players = [];
-  currentGame.takenCardNumbers.clear();
-  currentGame.calledNumbers = [];
-  currentGame.prizePool = 0;
-  currentGame.winners = [];
-  currentGame.bingoGraceTimeout = null;
-  currentGame.winningNumber = null;
-  currentGame.lobbyEndTime = Date.now() + 45000;
-  currentGame.cardSet = Array.from({ length: 100 }, () => generateCard());
-  io.emit('lobbyState', { startsIn: 45, takenNumbers: [], playersCount: 0 });
-  currentGame.lobbyTimer = setTimeout(() => startGame(), 45000);
+// Reset a specific stake's game
+function resetGame(stake) {
+  const game = getGame(stake);
+  clearInterval(game.callInterval);
+  clearTimeout(game.lobbyTimer);
+  clearTimeout(game.bingoGraceTimeout);
+  game.status = 'lobby';
+  game.players = [];
+  game.takenCardNumbers.clear();
+  game.calledNumbers = [];
+  game.prizePool = 0;
+  game.winners = [];
+  game.bingoGraceTimeout = null;
+  game.winningNumber = null;
+  game.lobbyEndTime = Date.now() + 45000;
+  game.cardSet = Array.from({ length: 100 }, () => generateCard());
+  
+  // Emit to clients that are in this stake's lobby
+  io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
+  
+  game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
   notifyAdminClients();
 }
 
-async function startGame() {
+async function startGame(stake) {
+  const game = getGame(stake);
   const toRemove = [];
-  for (const p of currentGame.players) {
+  for (const p of game.players) {
     const user = users[p.telegramId];
-    if (!user || user.balance < currentGame.entryFee) toRemove.push(p);
+    if (!user || user.balance < game.entryFee) toRemove.push(p);
   }
   for (const p of toRemove) {
-    const idx = currentGame.players.findIndex(pl => pl.telegramId === p.telegramId);
-    if (idx !== -1) currentGame.players.splice(idx, 1);
-    if (p.cardNumber) currentGame.takenCardNumbers.delete(p.cardNumber);
+    const idx = game.players.findIndex(pl => pl.telegramId === p.telegramId);
+    if (idx !== -1) game.players.splice(idx, 1);
+    if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
   }
-  io.emit('cardTaken', { takenNumbers: Array.from(currentGame.takenCardNumbers) });
-  io.emit('playersCount', currentGame.players.length);
+  io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
+  io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
   notifyAdminClients();
 
-  if (currentGame.players.length === 0) {
-    currentGame.status = 'ended';
-    setTimeout(resetGame, 3000);
+  if (game.players.length === 0) {
+    game.status = 'ended';
+    setTimeout(() => resetGame(stake), 3000);
     notifyAdminClients();
     return;
   }
 
-  for (const p of currentGame.players) {
+  for (const p of game.players) {
     const user = users[p.telegramId];
     if (user) {
-      user.balance -= currentGame.entryFee;
+      user.balance -= game.entryFee;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
-      const socket = await getSocketByUserId(p.telegramId);
-      if (socket) socket.emit('balanceUpdate', user.balance);
-      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: currentGame.entryFee, currency: 'ETB' });
+      const playerSocket = await getSocketByUserId(p.telegramId);
+      if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
+      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: game.entryFee, currency: 'ETB', stake });
     }
   }
 
-  const totalEntryFees = currentGame.entryFee * currentGame.players.length;
-  if (currentGame.players.length === 1) {
-    currentGame.prizePool = totalEntryFees;
+  const totalEntryFees = game.entryFee * game.players.length;
+  if (game.players.length === 1) {
+    game.prizePool = totalEntryFees;
   } else {
-    currentGame.prizePool = 0.8 * totalEntryFees;
+    game.prizePool = 0.8 * totalEntryFees;
   }
 
-  currentGame.status = 'running';
-  currentGame.calledNumbers = [];
-  currentGame.winningNumber = null;
-  io.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
+  game.status = 'running';
+  game.calledNumbers = [];
+  game.winningNumber = null;
+  io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
-  startCalling();
+  startCalling(stake);
 }
 
 async function getSocketByUserId(userId) {
@@ -354,20 +380,21 @@ async function getSocketByUserId(userId) {
   return sockets.find(s => s.userId === userId);
 }
 
-function startCalling() {
-  currentGame.callInterval = setInterval(() => {
-    if (currentGame.status !== 'running') { clearInterval(currentGame.callInterval); return; }
+function startCalling(stake) {
+  const game = getGame(stake);
+  game.callInterval = setInterval(() => {
+    if (game.status !== 'running') { clearInterval(game.callInterval); return; }
     const allNums = Array.from({ length: 75 }, (_, i) => i + 1);
-    const available = allNums.filter(n => !currentGame.calledNumbers.includes(n));
+    const available = allNums.filter(n => !game.calledNumbers.includes(n));
     if (available.length === 0) {
-      clearInterval(currentGame.callInterval);
-      endGameWithWinners();
+      clearInterval(game.callInterval);
+      endGameWithWinners(stake);
       return;
     }
     const number = available[Math.floor(Math.random() * available.length)];
-    currentGame.calledNumbers.push(number);
-    io.emit('numberCalled', { number, calledNumbers: currentGame.calledNumbers });
-    Audit.numberDrawn('global', { drawnNumber: number, drawIndex: currentGame.calledNumbers.length, timestamp: new Date().toISOString() });
+    game.calledNumbers.push(number);
+    io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
+    Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
   }, 4000);
 }
 
@@ -394,75 +421,78 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-async function endGameWithWinners() {
-  currentGame.status = 'ended';
-  clearInterval(currentGame.callInterval);
+async function endGameWithWinners(stake) {
+  const game = getGame(stake);
+  game.status = 'ended';
+  clearInterval(game.callInterval);
 
-  if (currentGame.winners.length > 0) {
-    const prizeEach = Math.floor(currentGame.prizePool / currentGame.winners.length);
-    for (const w of currentGame.winners) {
+  if (game.winners.length > 0) {
+    const prizeEach = Math.floor(game.prizePool / game.winners.length);
+    for (const w of game.winners) {
       const user = users[w.telegramId];
       if (user) {
         user.balance += prizeEach;
         await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
-        const sockets = await io.fetchSockets();
-        const winnerSocket = sockets.find(s => s.userId === w.telegramId);
+        const winnerSocket = await getSocketByUserId(w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
-        Audit.winPaidOut('global', w.telegramId, null, {
+        Audit.winPaidOut(`stake_${stake}`, w.telegramId, null, {
           amount: prizeEach,
           currency: 'ETB',
-          totalPrizePool: currentGame.prizePool,
-          totalWinners: currentGame.winners.length
+          totalPrizePool: game.prizePool,
+          totalWinners: game.winners.length,
+          stake
         });
-        detectRapidWins('global', w.telegramId, null);
+        detectRapidWins(`stake_${stake}`, w.telegramId, null);
       }
     }
 
-    const totalEntryFees = currentGame.players.length * currentGame.entryFee;
-    const houseProfit = totalEntryFees - currentGame.prizePool;
+    const totalEntryFees = game.players.length * game.entryFee;
+    const houseProfit = totalEntryFees - game.prizePool;
     await supabase.from('game_rounds').insert({
       total_entry_fees: totalEntryFees,
-      prize_pool: currentGame.prizePool,
-      house_profit: houseProfit
+      prize_pool: game.prizePool,
+      house_profit: houseProfit,
+      stake
     });
 
     const ipCounts = {};
-    currentGame.winners.forEach(w => {
-      const player = currentGame.players.find(p => p.telegramId === w.telegramId);
+    game.winners.forEach(w => {
+      const player = game.players.find(p => p.telegramId === w.telegramId);
       const ip = player ? player.ip : null;
       if (ip) ipCounts[ip] = (ipCounts[ip] || 0) + 1;
     });
     Object.entries(ipCounts).forEach(([ip, count]) => {
       if (count >= 3) {
-        Audit.suspicious('global', 'system', ip, {
+        Audit.suspicious(`stake_${stake}`, 'system', ip, {
           detectionSource: 'multiple_winners_same_ip',
           reason: `${count} winners from IP ${ip}`,
-          evidence: { winners: currentGame.winners.map(w => w.telegramId) }
+          evidence: { winners: game.winners.map(w => w.telegramId) }
         });
       }
     });
 
-    const winnerNames = currentGame.winners.map(w => w.username);
-    io.emit('gameEnded', {
+    const winnerNames = game.winners.map(w => w.username);
+    io.to(`stake_${stake}`).emit('gameEnded', {
+      stake,
       winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
       winners: winnerNames,
       prizeEach,
-      totalPrize: currentGame.prizePool,
-      winnerCount: currentGame.winners.length,
-      winningNumber: currentGame.winningNumber
+      totalPrize: game.prizePool,
+      winnerCount: game.winners.length,
+      winningNumber: game.winningNumber
     });
   } else {
-    io.emit('gameEnded', { noWinner: true });
+    io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
   }
 
-  currentGame.winners = [];
-  clearTimeout(currentGame.bingoGraceTimeout);
-  currentGame.bingoGraceTimeout = null;
-  setTimeout(resetGame, 5000);
+  game.winners = [];
+  clearTimeout(game.bingoGraceTimeout);
+  game.bingoGraceTimeout = null;
+  setTimeout(() => resetGame(stake), 5000);
   notifyAdminClients();
 }
 
-// ---------- DEPOSIT endpoint (NO PROOF IMAGE) ----------
+// ---------- Deposit endpoint (NO PROOF IMAGE) ----------
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -480,7 +510,7 @@ app.post('/api/request-deposit', async (req, res) => {
     status: 'pending',
     phone: phone || null,
     payment_type,
-    proof_path: null   // no proof required
+    proof_path: null
   }).select().single();
   
   if (error) {
@@ -498,7 +528,7 @@ app.post('/api/request-deposit', async (req, res) => {
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
-// ---------- Admin deposit processing (unchanged, but proof_path ignored) ----------
+// ---------- Admin deposit processing ----------
 app.get('/admin/deposits', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -521,21 +551,19 @@ app.post('/admin/process-deposit', async (req, res) => {
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
     await supabase.from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
     Audit.depositCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), providerRef: reqData.id.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.payment_type || 'unknown' });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
+    const playerSocket = await getSocketByUserId(reqData.telegram_id);
     if (playerSocket) { playerSocket.emit('balanceUpdate', user.balance); playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount }); }
     res.json({ success: true, newBalance: user.balance });
   } else {
     await supabase.from('deposit_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
     Audit.depositFailed(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, reason: 'rejected_by_admin' });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
+    const playerSocket = await getSocketByUserId(reqData.telegram_id);
     if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
     res.json({ success: true });
   }
 });
 
-// ---------- Withdrawal endpoints (unchanged) ----------
+// ---------- Withdrawal endpoints ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -580,26 +608,23 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
     await supabase.from('withdrawal_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
     Audit.withdrawalCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.withdrawal_type || 'N/A', receiver: reqData.phone_number });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
+    const playerSocket = await getSocketByUserId(reqData.telegram_id);
     if (playerSocket) { playerSocket.emit('balanceUpdate', user.balance); playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number }); }
     res.json({ success: true, newBalance: user.balance });
   } else {
     await supabase.from('withdrawal_requests').update({ status: 'rejected', processed_at: new Date().toISOString() }).eq('id', requestId);
     Audit.withdrawalRejected(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), amount: reqData.amount, reason: 'rejected_by_admin' });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === reqData.telegram_id);
+    const playerSocket = await getSocketByUserId(reqData.telegram_id);
     if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
     res.json({ success: true });
   }
 });
 
-// ---------- Serve statistics page ----------
+// ---------- Statistics page and API ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
-// ---------- Statistics API ----------
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -648,7 +673,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-
+// ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -682,7 +707,7 @@ app.get('/admin/audit-summary', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ---------- Socket.IO ----------
+// ---------- Socket.IO with multi-stake support ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
   socket.userId = socket.request.session.userId;
@@ -691,142 +716,160 @@ io.use((socket, next) => {
 });
 
 io.on('connection', async (socket) => {
+  let currentStake = null;
+  
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-  if (currentGame.status === 'lobby') {
-    const timeLeft = Math.max(0, Math.ceil((currentGame.lobbyEndTime - Date.now()) / 1000));
-    socket.emit('lobbyState', { startsIn: timeLeft, takenNumbers: Array.from(currentGame.takenCardNumbers), playersCount: currentGame.players.length });
-  } else if (currentGame.status === 'running') {
-    socket.emit('gameStarted', { prizePool: currentGame.prizePool, playersCount: currentGame.players.length });
-    const player = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (player) {
-      socket.emit('yourCard', player.card);
-      socket.emit('markedNumbers', player.markedNumbers);
-      socket.emit('calledNumbers', currentGame.calledNumbers);
+  
+  socket.on('joinLobby', ({ stake }) => {
+    if (![10, 30].includes(stake)) return;
+    currentStake = stake;
+    socket.join(`stake_${stake}`);
+    const game = getGame(stake);
+    if (game.status === 'lobby') {
+      const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
+      socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
+    } else if (game.status === 'running') {
+      socket.emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
+      const player = game.players.find(p => p.telegramId === socket.userId);
+      if (player) {
+        socket.emit('yourCard', player.card);
+        socket.emit('markedNumbers', player.markedNumbers);
+        socket.emit('calledNumbers', game.calledNumbers);
+      }
     }
-  }
-
+  });
+  
   socket.on('selectCardNumber', (cardNumber) => {
-    if (currentGame.status !== 'lobby') return;
+    if (!currentStake) return;
+    const game = getGame(currentStake);
+    if (game.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < currentGame.entryFee) {
-      socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${currentGame.entryFee} birr.`);
+    if (userBalance < game.entryFee) {
+      socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`);
       return;
     }
     const num = Number(cardNumber);
     if (!Number.isInteger(num) || num < 1 || num > 100) return;
-    if (currentGame.takenCardNumbers.has(num)) { socket.emit('cardSelectionFailed', 'This number is already taken.'); return; }
-    const existing = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existing) { currentGame.takenCardNumbers.delete(existing.cardNumber); currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId); }
-    currentGame.takenCardNumbers.add(num);
+    if (game.takenCardNumbers.has(num)) { socket.emit('cardSelectionFailed', 'This number is already taken.'); return; }
+    const existing = game.players.find(p => p.telegramId === socket.userId);
+    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
+    game.takenCardNumbers.add(num);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip: ip };
-    currentGame.players.push(player);
-    Audit.cardAssigned('global', socket.userId, ip, { cardId: num.toString(), grid: player.card });
-    io.emit('cardTaken', { number: num, takenNumbers: Array.from(currentGame.takenCardNumbers) });
-    io.emit('playersCount', currentGame.players.length);
+    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip: ip };
+    game.players.push(player);
+    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
+    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
+    io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
-
+  
   socket.on('newCardNumber', () => {
-    if (currentGame.status !== 'lobby') return;
+    if (!currentStake) return;
+    const game = getGame(currentStake);
+    if (game.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < currentGame.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${currentGame.entryFee} birr.`); return; }
-    const freeNumbers = []; for (let i = 1; i <= 100; i++) if (!currentGame.takenCardNumbers.has(i)) freeNumbers.push(i);
+    if (userBalance < game.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`); return; }
+    const freeNumbers = []; for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) freeNumbers.push(i);
     if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
     const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
-    const existing = currentGame.players.find(p => p.telegramId === socket.userId);
-    if (existing) { currentGame.takenCardNumbers.delete(existing.cardNumber); currentGame.players = currentGame.players.filter(p => p.telegramId !== socket.userId); }
-    currentGame.takenCardNumbers.add(randomNum);
+    const existing = game.players.find(p => p.telegramId === socket.userId);
+    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
+    game.takenCardNumbers.add(randomNum);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: currentGame.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip: ip };
-    currentGame.players.push(player);
-    Audit.cardAssigned('global', socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
-    io.emit('cardTaken', { number: randomNum, takenNumbers: Array.from(currentGame.takenCardNumbers) });
-    io.emit('playersCount', currentGame.players.length);
+    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip: ip };
+    game.players.push(player);
+    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
+    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
+    io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
-
+  
   socket.on('markNumber', (number) => {
-    if (currentGame.status !== 'running') return;
-    const player = currentGame.players.find(p => p.telegramId === socket.userId);
+    if (!currentStake) return;
+    const game = getGame(currentStake);
+    if (game.status !== 'running') return;
+    const player = game.players.find(p => p.telegramId === socket.userId);
     if (!player) return;
     const num = Number(number);
     if (number !== 'FREE' && (!Number.isInteger(num) || num < 1 || num > 75)) return;
     const flat = player.card.flat();
     if (!flat.includes(number)) return;
-    if (!currentGame.calledNumbers.includes(num) && number !== 'FREE') return;
+    if (!game.calledNumbers.includes(num) && number !== 'FREE') return;
     if (player.markedNumbers.includes(number)) return;
     player.markedNumbers.push(number);
     socket.emit('markedNumbers', player.markedNumbers);
   });
-
+  
   socket.on('claimBingo', () => {
-    if (currentGame.status !== 'running') return;
-    const player = currentGame.players.find(p => p.telegramId === socket.userId);
+    if (!currentStake) return;
+    const game = getGame(currentStake);
+    if (game.status !== 'running') return;
+    const player = game.players.find(p => p.telegramId === socket.userId);
     if (!player) return;
-    const lastCalled = currentGame.calledNumbers.length > 0 ? currentGame.calledNumbers[currentGame.calledNumbers.length - 1] : null;
+    const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
       socket.emit('invalidBingo');
-      Audit.bingoRejected('global', socket.userId, ip, { reason: 'invalid_bingo_call', lastCalled });
+      Audit.bingoRejected(`stake_${currentStake}`, socket.userId, ip, { reason: 'invalid_bingo_call', lastCalled });
       return;
     }
-    if (currentGame.winners.find(w => w.telegramId === socket.userId)) return;
-    if (currentGame.winningNumber === null) {
-      currentGame.winningNumber = lastCalled;
+    if (game.winners.find(w => w.telegramId === socket.userId)) return;
+    if (game.winningNumber === null) {
+      game.winningNumber = lastCalled;
     }
-    currentGame.winners.push({ telegramId: socket.userId, username: socket.username });
-    Audit.bingoCalled('global', socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
+    game.winners.push({ telegramId: socket.userId, username: socket.username });
+    Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
     socket.emit('bingoValid');
-    if (!currentGame.bingoGraceTimeout && currentGame.winners.length === 1) {
-      io.emit('multipleBingoPossible', { message: 'Bingo claimed! Waiting for other potential winners...' });
-      currentGame.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(); }, 3000);
+    if (!game.bingoGraceTimeout && game.winners.length === 1) {
+      io.to(`stake_${currentStake}`).emit('multipleBingoPossible', { stake: currentStake, message: 'Bingo claimed! Waiting for other potential winners...' });
+      game.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(currentStake); }, 3000);
     }
   });
-
+  
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- Admin namespace (with handle support) ----------
+// ---------- Admin namespace ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
-  if (secret === process.env.ADMIN_SECRET) {
-    return next();
-  }
+  if (secret === process.env.ADMIN_SECRET) return next();
   next(new Error('Unauthorized admin access'));
 });
 
 adminNamespace.on('connection', (socket) => {
   console.log('Admin connected to live view');
   socket.emit('admin:playersList', {
-    players: getPlayersList(),
-    gameStatus: currentGame.status
+    players: getAllPlayersList(),
+    gameStatus: {
+      10: games[10].status,
+      30: games[30].status
+    }
   });
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
-      players: getPlayersList(),
-      gameStatus: currentGame.status
+      players: getAllPlayersList(),
+      gameStatus: {
+        10: games[10].status,
+        30: games[30].status
+      }
     });
   });
-
+  
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
         .select('telegram_id, username, balance, telegram_handle');
-      
       if (error) throw error;
-
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
         telegram_handle: u.telegram_handle
       }));
-
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
       console.error('Failed to fetch all registered users:', err);
@@ -841,6 +884,9 @@ setInterval(() => {
 
 app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
 
-resetGame();
+// Start both stakes
+resetGame(10);
+resetGame(30);
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
