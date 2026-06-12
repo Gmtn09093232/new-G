@@ -621,56 +621,71 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics page and API (unchanged) ----------
+// ---------- Statistics page and API (FIXED) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
+// ✅ FIXED: Returns totalDeposits, totalWithdrawals, totalHouseProfit
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  
+
   try {
-    const { data: users, error: userErr } = await supabase.from('users').select('balance');
-    if (userErr) throw userErr;
-    const totalUserBalance = users.reduce((sum, u) => sum + (Number(u.balance) || 0), 0);
-    
+    // 1. Total approved deposits (including manual)
     const { data: deposits, error: depErr } = await supabase
       .from('deposit_requests')
-      .select('amount, payment_type')
+      .select('amount')
       .eq('status', 'approved');
     if (depErr) throw depErr;
-    
-    const depositsByMethod = {
-      telebirr: 0,
-      cbebirr: 0,
-      mpesa: 0,
-      manual: 0
-    };
-    deposits.forEach(d => {
-      const type = d.payment_type;
-      if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
-      else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
-      else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
-      else depositsByMethod.manual += Number(d.amount);
-    });
-    
+    const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
+
+    // 2. Total approved withdrawals
     const { data: withdrawals, error: wdErr } = await supabase
       .from('withdrawal_requests')
       .select('amount')
       .eq('status', 'approved');
     if (wdErr) throw wdErr;
     const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-    
+
+    // 3. Total house profit from game_rounds
+    const { data: rounds, error: rdErr } = await supabase
+      .from('game_rounds')
+      .select('house_profit');
+    if (rdErr) throw rdErr;
+    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
+
+    // Optional: deposits by method (for potential future use)
+    const { data: depositsByMethodData, error: methodErr } = await supabase
+      .from('deposit_requests')
+      .select('amount, payment_type')
+      .eq('status', 'approved');
+    if (methodErr) throw methodErr;
+    const depositsByMethod = {
+      telebirr: 0,
+      cbebirr: 0,
+      mpesa: 0,
+      manual: 0
+    };
+    depositsByMethodData.forEach(d => {
+      const type = d.payment_type;
+      if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
+      else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
+      else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
+      else depositsByMethod.manual += Number(d.amount);
+    });
+
     res.json({
       success: true,
-      totalUserBalance,
-      depositsByMethod,
-      totalWithdrawals
+      totalDeposits,
+      totalWithdrawals,
+      totalHouseProfit,
+      depositsByMethod,   // kept for compatibility if needed
+      totalUserBalance: 0 // optional, can be added later
     });
   } catch (err) {
     console.error('Stats error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
