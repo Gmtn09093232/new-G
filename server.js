@@ -40,7 +40,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger (unchanged) ----------
+// ---------- Audit Logger ----------
 async function logAuditEvent({
   eventType,
   roomId = null,
@@ -103,7 +103,7 @@ function detectRapidWins(roomId, userId, ip) {
   return false;
 }
 
-// ---------- Endpoints ----------
+// ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', (req, res) => {
   res.json({
     telebirr: process.env.ADMIN_PHONE || '0924839730',
@@ -191,7 +191,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   });
 });
 
-// ---------- Admin add balance (also records manual deposit) ----------
+// ---------- Admin add balance (records manual deposit) ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -244,7 +244,7 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Multi-stake game states: now includes 20 ----------
+// ---------- Multi-stake game states (10, 20, 30 ETB) ----------
 function createGameState(entryFee) {
   return {
     status: 'lobby',
@@ -493,7 +493,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Deposit endpoint (unchanged) ----------
+// ---------- Deposit endpoints ----------
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -529,7 +529,6 @@ app.post('/api/request-deposit', async (req, res) => {
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
-// ---------- Admin deposit processing (unchanged) ----------
 app.get('/admin/deposits', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -564,7 +563,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- Withdrawal endpoints (unchanged) ----------
+// ---------- Withdrawal endpoints ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -621,67 +620,70 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics page and API (FIXED) ----------
+// ---------- Statistics endpoints (with date range) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
-// ✅ FIXED: Returns totalDeposits, totalWithdrawals, totalHouseProfit
+// ✅ Stats summary with date range (from, to)
 app.get('/admin/stats-summary', async (req, res) => {
-  const { secret } = req.query;
+  const { secret, from, to } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
 
   try {
-    // 1. Total approved deposits (including manual)
-    const { data: deposits, error: depErr } = await supabase
-      .from('deposit_requests')
-      .select('amount')
-      .eq('status', 'approved');
+    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
+    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
+    let roundsQuery = supabase.from('game_rounds').select('house_profit');
+
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      depositQuery = depositQuery.gte('created_at', fromDate.toISOString());
+      withdrawalQuery = withdrawalQuery.gte('created_at', fromDate.toISOString());
+      roundsQuery = roundsQuery.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      depositQuery = depositQuery.lte('created_at', toDate.toISOString());
+      withdrawalQuery = withdrawalQuery.lte('created_at', toDate.toISOString());
+      roundsQuery = roundsQuery.lte('created_at', toDate.toISOString());
+    }
+
+    const { data: deposits, error: depErr } = await depositQuery;
     if (depErr) throw depErr;
     const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
 
-    // 2. Total approved withdrawals
-    const { data: withdrawals, error: wdErr } = await supabase
-      .from('withdrawal_requests')
-      .select('amount')
-      .eq('status', 'approved');
+    const { data: withdrawals, error: wdErr } = await withdrawalQuery;
     if (wdErr) throw wdErr;
     const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
 
-    // 3. Total house profit from game_rounds
-    const { data: rounds, error: rdErr } = await supabase
-      .from('game_rounds')
-      .select('house_profit');
+    const { data: rounds, error: rdErr } = await roundsQuery;
     if (rdErr) throw rdErr;
     const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
 
-    // Optional: deposits by method (for potential future use)
-    const { data: depositsByMethodData, error: methodErr } = await supabase
-      .from('deposit_requests')
-      .select('amount, payment_type')
-      .eq('status', 'approved');
-    if (methodErr) throw methodErr;
-    const depositsByMethod = {
-      telebirr: 0,
-      cbebirr: 0,
-      mpesa: 0,
-      manual: 0
-    };
-    depositsByMethodData.forEach(d => {
-      const type = d.payment_type;
-      if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
-      else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
-      else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
-      else depositsByMethod.manual += Number(d.amount);
-    });
+    // Optional: deposits by method for the same date range
+    let methodQuery = supabase.from('deposit_requests').select('amount, payment_type').eq('status', 'approved');
+    if (from) methodQuery = methodQuery.gte('created_at', new Date(from).toISOString());
+    if (to) methodQuery = methodQuery.lte('created_at', new Date(to).toISOString());
+    const { data: depositsByMethodData, error: methodErr } = await methodQuery;
+    const depositsByMethod = { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+    if (!methodErr && depositsByMethodData) {
+      depositsByMethodData.forEach(d => {
+        const type = d.payment_type;
+        if (type === 'telebirr') depositsByMethod.telebirr += Number(d.amount);
+        else if (type === 'cbebirr') depositsByMethod.cbebirr += Number(d.amount);
+        else if (type === 'mpesa') depositsByMethod.mpesa += Number(d.amount);
+        else depositsByMethod.manual += Number(d.amount);
+      });
+    }
 
     res.json({
       success: true,
       totalDeposits,
       totalWithdrawals,
       totalHouseProfit,
-      depositsByMethod,   // kept for compatibility if needed
-      totalUserBalance: 0 // optional, can be added later
+      depositsByMethod
     });
   } catch (err) {
     console.error('Stats error:', err);
@@ -689,7 +691,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Audit endpoints (unchanged) ----------
+// ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -723,7 +725,7 @@ app.get('/admin/audit-summary', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ---------- Socket.IO with multi-stake support (updated for 20) ----------
+// ---------- Socket.IO (main namespace) ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
   socket.userId = socket.request.session.userId;
@@ -847,7 +849,7 @@ io.on('connection', async (socket) => {
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- Admin namespace (updated for 20) ----------
+// ---------- Admin namespace ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
@@ -900,6 +902,7 @@ setInterval(() => {
   notifyAdminClients();
 }, 2000);
 
+// Error handler
 app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
 
 // Start all three stakes
