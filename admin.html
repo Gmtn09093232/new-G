@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Bingo Admin Panel</title>
+  <title>🎰 Bingo Admin</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
@@ -70,6 +70,12 @@
 
     .stat-value.withdraw {
       color: #e74c3c;
+    }
+
+    .stat-error {
+      font-size: 0.7rem;
+      color: #e74c3c;
+      margin-top: 4px;
     }
 
     .section {
@@ -310,25 +316,28 @@
     <div class="stat-card">
       <div class="stat-label">💰 TOTAL DEPOSITS</div>
       <div class="stat-value deposit" id="totalDeposits">0</div>
+      <div id="depositStatsError" class="stat-error"></div>
     </div>
     <div class="stat-card">
       <div class="stat-label">💸 TOTAL WITHDRAWALS</div>
       <div class="stat-value withdraw" id="totalWithdrawals">0</div>
+      <div id="withdrawStatsError" class="stat-error"></div>
     </div>
     <div class="stat-card">
       <div class="stat-label">🏦 HOUSE PROFIT</div>
       <div class="stat-value" id="houseProfit">0</div>
+      <div id="profitStatsError" class="stat-error"></div>
     </div>
   </div>
 
-  <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
+  <button class="refresh" id="refreshAllBtn">🔄 Refresh All</button>
 
   <!-- Deposit Section -->
   <div class="section">
     <h2>📸 Pending Deposit Requests</h2>
     <div class="filter-row">
       <label for="depositFilter">Filter by method:</label>
-      <select id="depositFilter" onchange="renderDeposits()">
+      <select id="depositFilter">
         <option value="all">All</option>
         <option value="telebirr">Telebirr</option>
         <option value="cbebirr">CBE Birr</option>
@@ -343,7 +352,7 @@
     <h2>💰 Pending Withdrawal Requests</h2>
     <div class="filter-row">
       <label for="withdrawFilter">Filter by method:</label>
-      <select id="withdrawFilter" onchange="renderWithdrawals()">
+      <select id="withdrawFilter">
         <option value="all">All</option>
         <option value="telebirr">Telebirr</option>
         <option value="cbebirr">CBE Birr</option>
@@ -357,7 +366,7 @@
     <h2>➕ Manual Add Balance</h2>
     <input type="text" id="userId" placeholder="Telegram ID (numeric)" inputmode="numeric">
     <input type="number" id="amount" placeholder="Amount" step="1" min="1">
-    <button onclick="addBalance()">Add Balance</button>
+    <button id="addBalanceBtn">Add Balance</button>
   </div>
 </div>
 
@@ -368,24 +377,37 @@
   let depositData = [];
   let withdrawalData = [];
 
-  // ---------- Fetch totals from stats endpoint ----------
+  // ---------- Fetch totals from stats endpoint with error handling ----------
   async function fetchStats() {
     try {
       const res = await fetch(`${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
       const data = await res.json();
       if (data.success) {
         document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
         document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
         document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
+        document.getElementById('depositStatsError').innerText = '';
+        document.getElementById('withdrawStatsError').innerText = '';
+        document.getElementById('profitStatsError').innerText = '';
       } else {
-        console.warn('Stats error:', data.error);
+        throw new Error(data.error || 'Unknown stats error');
       }
     } catch (err) {
-      console.error('Failed to fetch stats:', err);
+      console.error('Stats fetch error:', err);
+      document.getElementById('depositStatsError').innerText = '⚠️ Could not load totals';
+      document.getElementById('withdrawStatsError').innerText = '⚠️ Could not load totals';
+      document.getElementById('profitStatsError').innerText = '⚠️ Could not load totals';
+      // Optionally set placeholder values
+      document.getElementById('totalDeposits').innerText = '?';
+      document.getElementById('totalWithdrawals').innerText = '?';
+      document.getElementById('houseProfit').innerText = '?';
     }
   }
 
-  // ---------- QR Code scanning ----------
+  // ---------- QR & OCR functions (unchanged) ----------
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -416,7 +438,6 @@
     });
   }
 
-  // ---------- OCR fallback ----------
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
@@ -429,7 +450,6 @@
     }
   }
 
-  // ---------- Unified reference extraction ----------
   async function getReferenceFromProof(imagePath) {
     try {
       const qrRef = await extractRefFromQR(imagePath);
@@ -440,7 +460,6 @@
     return null;
   }
 
-  // ---------- Verification link builder ----------
   function getVerificationLink(paymentType, referenceNumber) {
     const ref = encodeURIComponent(referenceNumber);
     switch (paymentType) {
@@ -464,7 +483,7 @@
       renderDeposits();
     } catch (err) {
       console.error(err);
-      document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
+      document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>';
     }
   }
 
@@ -499,7 +518,7 @@
       card.innerHTML = `
         <div class="request-info">
           <p><strong>ID:</strong> ${req.id}</p>
-          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p>
           <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
           <p><strong>Amount:</strong> ${req.amount} ETB</p>
           <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
@@ -512,12 +531,21 @@
           <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
         </div>
         <div class="action-buttons">
-          <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
-          <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+          <button class="approve" data-id="${req.id}" data-action="approve" data-type="deposit">✅ Approve</button>
+          <button class="reject" data-id="${req.id}" data-action="reject" data-type="deposit">❌ Reject</button>
         </div>
       `;
 
       container.appendChild(card);
+
+      // Attach event listeners for buttons
+      card.querySelectorAll('.approve, .reject').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const id = parseInt(btn.dataset.id);
+          const action = btn.dataset.action;
+          processDeposit(id, action);
+        });
+      });
 
       if (req.proof_path) {
         const verifyDiv = document.getElementById(`verify-${req.id}`);
@@ -559,7 +587,7 @@
       renderWithdrawals();
     } catch (err) {
       console.error(err);
-      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
+      document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>';
     }
   }
 
@@ -577,19 +605,32 @@
       <div class="request-card">
         <div class="request-info">
           <p><strong>ID:</strong> ${req.id}</p>
-          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
-          <p><strong>Phone:</strong> ${req.phone_number}</p>
-          <p><strong>Name:</strong> ${req.receiver_name || 'N/A'}</p>
+          <p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${escapeHtml(req.phone_number)}</p>
+          <p><strong>Name:</strong> ${escapeHtml(req.receiver_name) || 'N/A'}</p>
           <p><strong>Amount:</strong> ${req.amount} ETB</p>
           <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
           <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
         </div>
         <div class="action-buttons">
-          <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
-          <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+          <button class="approve" data-id="${req.id}" data-action="approve" data-type="withdraw">✅ Approve</button>
+          <button class="reject" data-id="${req.id}" data-action="reject" data-type="withdraw">❌ Reject</button>
         </div>
       </div>
     `).join('');
+
+    // Attach event listeners for withdrawal buttons
+    document.querySelectorAll('#withdrawList .approve, #withdrawList .reject').forEach(btn => {
+      btn.removeEventListener('click', handleWithdrawAction);
+      btn.addEventListener('click', handleWithdrawAction);
+    });
+  }
+
+  function handleWithdrawAction(e) {
+    const btn = e.currentTarget;
+    const id = parseInt(btn.dataset.id);
+    const action = btn.dataset.action;
+    processWithdrawal(id, action);
   }
 
   // ---------- Process deposit (approve/reject) ----------
@@ -604,7 +645,7 @@
       const data = await res.json();
       alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
       await fetchDeposits();
-      await fetchStats();   // refresh totals after deposit process
+      await fetchStats();
     } catch (err) { alert(err.message); }
   }
 
@@ -620,11 +661,11 @@
       const data = await res.json();
       alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
       await fetchWithdrawals();
-      await fetchStats();   // refresh totals after withdrawal process
+      await fetchStats();
     } catch (err) { alert(err.message); }
   }
 
-  // ---------- Manual add balance (affects totals) ----------
+  // ---------- Manual add balance ----------
   async function addBalance() {
     const telegramId = document.getElementById('userId').value.trim();
     const amount = document.getElementById('amount').value.trim();
@@ -638,10 +679,16 @@
       const data = await res.json();
       alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
       if (data.success) {
-        await fetchStats();   // manual add increases total deposit
-        await fetchDeposits(); // maybe manual deposits appear as approved deposit requests
+        await fetchStats();
+        await fetchDeposits(); // in case manual deposit appears
       }
     } catch (err) { alert(err.message); }
+  }
+
+  // ---------- Helper ----------
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
   }
 
   // ---------- Main refresh ----------
@@ -651,9 +698,18 @@
     await fetchWithdrawals();
   }
 
-  // ---------- Auto-refresh every 10 seconds ----------
+  // ---------- Event listeners ----------
+  document.getElementById('refreshAllBtn').addEventListener('click', fetchAll);
+  document.getElementById('addBalanceBtn').addEventListener('click', addBalance);
+
+  // Filter change listeners
+  document.getElementById('depositFilter').addEventListener('change', () => renderDeposits());
+  document.getElementById('withdrawFilter').addEventListener('change', () => renderWithdrawals());
+
+  // Initial load
   fetchAll();
-  setInterval(fetchAll, 10000);
+  // Auto-refresh every 15 seconds
+  setInterval(fetchAll, 15000);
 </script>
 </body>
 </html>
