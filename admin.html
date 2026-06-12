@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Bingo Admin Panel – Mobile Friendly</title>
+  <title>🎰 Bingo Admin Panel</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
@@ -30,6 +30,46 @@
       font-size: 1.6rem;
       margin-top: 0;
       word-break: break-word;
+    }
+
+    /* Stats cards */
+    .stats-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: #16202a;
+      border-radius: 24px;
+      padding: 16px 20px;
+      flex: 1 1 200px;
+      text-align: center;
+      border-left: 4px solid #f39c12;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #bbb;
+    }
+
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f39c12;
+      margin-top: 8px;
+      word-break: break-word;
+    }
+
+    .stat-value.deposit {
+      color: #2ecc71;
+    }
+
+    .stat-value.withdraw {
+      color: #e74c3c;
     }
 
     .section {
@@ -171,7 +211,6 @@
       text-align: center;
     }
 
-    /* Improved mobile layout */
     @media (max-width: 640px) {
       body {
         padding: 10px;
@@ -180,6 +219,19 @@
       h1 {
         font-size: 1.4rem;
         text-align: center;
+      }
+
+      .stats-grid {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .stat-card {
+        padding: 12px 16px;
+      }
+
+      .stat-value {
+        font-size: 1.5rem;
       }
 
       .section {
@@ -231,7 +283,6 @@
       }
     }
 
-    /* Very small phones */
     @media (max-width: 480px) {
       .action-buttons {
         flex-direction: column;
@@ -253,6 +304,23 @@
 <body>
 <div class="container">
   <h1>🎰 Bingo Admin Panel</h1>
+
+  <!-- Stats summary cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">💰 TOTAL DEPOSITS</div>
+      <div class="stat-value deposit" id="totalDeposits">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">💸 TOTAL WITHDRAWALS</div>
+      <div class="stat-value withdraw" id="totalWithdrawals">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🏦 HOUSE PROFIT</div>
+      <div class="stat-value" id="houseProfit">0</div>
+    </div>
+  </div>
+
   <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
   <!-- Deposit Section -->
@@ -296,6 +364,26 @@
 <script>
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
+
+  let depositData = [];
+  let withdrawalData = [];
+
+  // ---------- Fetch totals from stats endpoint ----------
+  async function fetchStats() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
+        document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
+        document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
+      } else {
+        console.warn('Stats error:', data.error);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+  }
 
   // ---------- QR Code scanning ----------
   function extractRefFromQR(imageSrc) {
@@ -367,16 +455,7 @@
     }
   }
 
-  // ---------- Global data stores ----------
-  let depositData = [];
-  let withdrawalData = [];
-
-  // ---------- UI rendering ----------
-  async function fetchAll() {
-    await fetchDeposits();
-    await fetchWithdrawals();
-  }
-
+  // ---------- Fetch deposits ----------
   async function fetchDeposits() {
     try {
       const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
@@ -471,6 +550,7 @@
     });
   }
 
+  // ---------- Fetch withdrawals ----------
   async function fetchWithdrawals() {
     try {
       const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
@@ -512,6 +592,7 @@
     `).join('');
   }
 
+  // ---------- Process deposit (approve/reject) ----------
   async function processDeposit(requestId, action) {
     if (!confirm(`Are you sure to ${action} this deposit?`)) return;
     try {
@@ -522,10 +603,12 @@
       });
       const data = await res.json();
       alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
-      fetchDeposits();
+      await fetchDeposits();
+      await fetchStats();   // refresh totals after deposit process
     } catch (err) { alert(err.message); }
   }
 
+  // ---------- Process withdrawal (approve/reject) ----------
   async function processWithdrawal(requestId, action) {
     if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
     try {
@@ -536,10 +619,12 @@
       });
       const data = await res.json();
       alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
-      fetchWithdrawals();
+      await fetchWithdrawals();
+      await fetchStats();   // refresh totals after withdrawal process
     } catch (err) { alert(err.message); }
   }
 
+  // ---------- Manual add balance (affects totals) ----------
   async function addBalance() {
     const telegramId = document.getElementById('userId').value.trim();
     const amount = document.getElementById('amount').value.trim();
@@ -552,9 +637,21 @@
       });
       const data = await res.json();
       alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
+      if (data.success) {
+        await fetchStats();   // manual add increases total deposit
+        await fetchDeposits(); // maybe manual deposits appear as approved deposit requests
+      }
     } catch (err) { alert(err.message); }
   }
 
+  // ---------- Main refresh ----------
+  async function fetchAll() {
+    await fetchStats();
+    await fetchDeposits();
+    await fetchWithdrawals();
+  }
+
+  // ---------- Auto-refresh every 10 seconds ----------
   fetchAll();
   setInterval(fetchAll, 10000);
 </script>
