@@ -244,7 +244,7 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Multi-stake game states ----------
+// ---------- Multi-stake game states: now includes 20 ----------
 function createGameState(entryFee) {
   return {
     status: 'lobby',
@@ -265,6 +265,7 @@ function createGameState(entryFee) {
 
 const games = {
   10: createGameState(10),
+  20: createGameState(20),
   30: createGameState(30)
 };
 
@@ -275,7 +276,7 @@ function getGame(stake) {
 // Helper to get combined players list for admin (all stakes)
 function getAllPlayersList() {
   const allPlayers = [];
-  for (const stake of [10, 30]) {
+  for (const stake of [10, 20, 30]) {
     const game = games[stake];
     game.players.forEach(p => {
       const user = users[p.telegramId];
@@ -296,6 +297,7 @@ function notifyAdminClients() {
     players: getAllPlayersList(),
     gameStatus: {
       10: games[10].status,
+      20: games[20].status,
       30: games[30].status
     }
   };
@@ -319,7 +321,6 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
-  // Emit to clients that are in this stake's lobby
   io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
@@ -492,7 +493,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Deposit endpoint (NO PROOF IMAGE) ----------
+// ---------- Deposit endpoint (unchanged) ----------
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -528,7 +529,7 @@ app.post('/api/request-deposit', async (req, res) => {
   res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
 });
 
-// ---------- Admin deposit processing ----------
+// ---------- Admin deposit processing (unchanged) ----------
 app.get('/admin/deposits', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -563,7 +564,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- Withdrawal endpoints ----------
+// ---------- Withdrawal endpoints (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -620,7 +621,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics page and API ----------
+// ---------- Statistics page and API (unchanged) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
@@ -673,7 +674,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Audit endpoints ----------
+// ---------- Audit endpoints (unchanged) ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -707,7 +708,7 @@ app.get('/admin/audit-summary', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ---------- Socket.IO with multi-stake support ----------
+// ---------- Socket.IO with multi-stake support (updated for 20) ----------
 io.use((socket, next) => {
   if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
   socket.userId = socket.request.session.userId;
@@ -721,7 +722,7 @@ io.on('connection', async (socket) => {
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
   
   socket.on('joinLobby', ({ stake }) => {
-    if (![10, 30].includes(stake)) return;
+    if (![10, 20, 30].includes(stake)) return;
     currentStake = stake;
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
@@ -831,7 +832,7 @@ io.on('connection', async (socket) => {
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
 });
 
-// ---------- Admin namespace ----------
+// ---------- Admin namespace (updated for 20) ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
@@ -845,6 +846,7 @@ adminNamespace.on('connection', (socket) => {
     players: getAllPlayersList(),
     gameStatus: {
       10: games[10].status,
+      20: games[20].status,
       30: games[30].status
     }
   });
@@ -853,6 +855,7 @@ adminNamespace.on('connection', (socket) => {
       players: getAllPlayersList(),
       gameStatus: {
         10: games[10].status,
+        20: games[20].status,
         30: games[30].status
       }
     });
@@ -884,8 +887,9 @@ setInterval(() => {
 
 app.use((err, req, res, next) => { console.error('Unhandled error:', err.message); res.status(err.status || 500).json({ error: err.message || 'Internal server error' }); });
 
-// Start both stakes
+// Start all three stakes
 resetGame(10);
+resetGame(20);
 resetGame(30);
 
 const PORT = process.env.PORT || 3000;
