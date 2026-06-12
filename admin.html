@@ -1,246 +1,562 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>Live Admin | Bingo (10/20/30 ETB)</title>
-    <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: #1e2a3a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 12px; margin: 0; color: #ecf0f1; }
-        .container { max-width: 1400px; margin: 0 auto; background: #0f1724; border-radius: 28px; padding: 18px 12px 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.3); }
-        h1 { font-size: 1.6rem; margin: 0 0 8px 0; text-align: center; border-bottom: 2px solid #f39c12; padding-bottom: 10px; }
-        .section-title { font-size: 1.2rem; margin: 28px 0 12px; border-left: 4px solid #f39c12; padding-left: 12px; }
-        .stake-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stake-card { background: #1a2533; border-radius: 28px; padding: 16px; border: 1px solid #2c3e50; transition: 0.1s; }
-        .stake-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-        .stake-title { font-size: 1.4rem; font-weight: 800; background: #f39c12; color: #1e2a3a; padding: 4px 18px; border-radius: 40px; display: inline-block; }
-        .status-badge { background: #2c3e50; padding: 6px 16px; border-radius: 40px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
-        .status-badge.lobby { background: #e67e22; color: white; }
-        .status-badge.running { background: #2ecc71; color: #1e2a3a; }
-        .status-badge.ended { background: #95a5a6; }
-        .player-count { font-size: 0.9rem; background: #0f1724; padding: 4px 12px; border-radius: 40px; }
-        .players-table-wrapper { background: #0f1724; border-radius: 24px; padding: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 12px; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 400px; }
-        th { text-align: left; padding: 12px 8px; background: #0f1724; color: #f39c12; font-weight: bold; border-bottom: 2px solid #f39c12; }
-        td { padding: 12px 8px; border-bottom: 1px solid #2c3e50; vertical-align: middle; }
-        .username-plain { color: #ecf0f1; font-weight: 500; }
-        .handle { color: #2ecc71; font-family: monospace; }
-        .telegram-id { font-family: monospace; font-size: 0.75rem; background: #0f1724; padding: 4px 6px; border-radius: 8px; display: inline-block; }
-        .card-badge { background: #f39c12; color: #1e2a3a; padding: 4px 10px; border-radius: 30px; font-weight: bold; font-size: 0.75rem; display: inline-block; }
-        .empty-message { text-align: center; padding: 32px 20px; color: #95a5a6; font-style: italic; }
-        .refresh-info { text-align: center; font-size: 0.7rem; margin-top: 20px; color: #7f8c8d; }
-        button { background: #f39c12; border: none; padding: 12px 20px; border-radius: 60px; font-weight: bold; font-size: 0.9rem; cursor: pointer; margin-top: 12px; transition: 0.1s; color: #1e2a3a; width: auto; display: inline-block; margin-right: 12px; }
-        button:active { transform: scale(0.97); background: #e67e22; }
-        .total-balance-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin: 20px 0 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
-        .total-balance-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; font-weight: bold; }
-        .total-balance-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; line-height: 1; }
-        .footer { margin-top: 28px; text-align: center; font-size: 0.65rem; color: #5d6d7e; }
-        @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-balance-value { font-size: 1.4rem; } .stake-title { font-size: 1.2rem; } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>🎰 Bingo Admin Panel – Mobile Friendly</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0f1c;
+      color: #eee;
+      padding: 12px;
+      margin: 0;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #f39c12;
+      font-size: 1.6rem;
+      margin-top: 0;
+      word-break: break-word;
+    }
+
+    .section {
+      background: #16202a;
+      margin: 20px 0;
+      padding: 16px;
+      border-radius: 24px;
+      overflow: hidden;
+    }
+
+    .request-card {
+      background: #1e2a36;
+      border-radius: 20px;
+      margin: 16px 0;
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    .request-info {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    .request-info p {
+      margin: 6px 0;
+      word-break: break-word;
+      font-size: 0.9rem;
+    }
+
+    .proof-img {
+      max-width: 100%;
+      height: auto;
+      max-height: 150px;
+      border-radius: 12px;
+      border: 1px solid #f39c12;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+
+    button {
+      background: #f39c12;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 48px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s ease;
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+
+    button.approve {
+      background: #2ecc71;
+      color: #000;
+    }
+
+    button.reject {
+      background: #e74c3c;
+      color: #fff;
+    }
+
+    .refresh {
+      background: #3498db;
+      color: #fff;
+      margin-bottom: 20px;
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+    }
+
+    .receipt-box {
+      background: #0f1a24;
+      padding: 12px;
+      border-radius: 16px;
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      word-break: break-all;
+    }
+
+    .match {
+      color: #2ecc71;
+      font-weight: bold;
+    }
+
+    .mismatch {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    select, input {
+      background: #1e2a36;
+      border: 1px solid #334455;
+      color: #eee;
+      padding: 12px 16px;
+      border-radius: 48px;
+      font-size: 1rem;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .filter-row label {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .filter-row select {
+      width: auto;
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .action-buttons button {
+      flex: 1 1 auto;
+      min-width: 100px;
+      justify-content: center;
+      text-align: center;
+    }
+
+    /* Improved mobile layout */
+    @media (max-width: 640px) {
+      body {
+        padding: 10px;
+      }
+
+      h1 {
+        font-size: 1.4rem;
+        text-align: center;
+      }
+
+      .section {
+        padding: 12px;
+        border-radius: 20px;
+      }
+
+      .request-card {
+        padding: 14px;
+        gap: 12px;
+      }
+
+      .request-info p {
+        font-size: 0.85rem;
+      }
+
+      button {
+        padding: 12px 16px;
+        font-size: 0.9rem;
+      }
+
+      .refresh {
+        padding: 12px;
+        font-size: 0.95rem;
+      }
+
+      .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .filter-row select {
+        width: 100%;
+        margin-bottom: 0;
+      }
+
+      .action-buttons button {
+        min-width: auto;
+        padding: 12px;
+      }
+
+      .proof-img {
+        max-height: 120px;
+      }
+
+      .receipt-box {
+        font-size: 0.75rem;
+        padding: 10px;
+      }
+    }
+
+    /* Very small phones */
+    @media (max-width: 480px) {
+      .action-buttons {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .action-buttons button {
+        width: 100%;
+      }
+
+      button {
+        width: 100%;
+        white-space: normal;
+        word-break: keep-all;
+      }
+    }
+  </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎲 Bingo · Live Admin (10 / 20 / 30 ETB)</h1>
+  <h1>🎰 Bingo Admin Panel</h1>
+  <button class="refresh" onclick="fetchAll()">🔄 Refresh All</button>
 
-    <div class="stake-grid">
-        <!-- 10 ETB STAKE CARD -->
-        <div class="stake-card" id="stake10Card">
-            <div class="stake-header">
-                <span class="stake-title">🎯 10 ETB GAME</span>
-                <div><span class="status-badge" id="status10">—</span> <span class="player-count" id="playerCount10">👥 0 players</span></div>
-            </div>
-            <div class="players-table-wrapper">
-                <table id="playersTable10">
-                    <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr></thead>
-                    <tbody id="playersTableBody10"><tr><td colspan="4" class="empty-message">No players in 10 ETB stake yet.</td></tr> </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- Deposit Section -->
+  <div class="section">
+    <h2>📸 Pending Deposit Requests</h2>
+    <div class="filter-row">
+      <label for="depositFilter">Filter by method:</label>
+      <select id="depositFilter" onchange="renderDeposits()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="depositList">Loading...</div>
+  </div>
 
-        <!-- 20 ETB STAKE CARD (NEW) -->
-        <div class="stake-card" id="stake20Card">
-            <div class="stake-header">
-                <span class="stake-title">🎯 20 ETB GAME</span>
-                <div><span class="status-badge" id="status20">—</span> <span class="player-count" id="playerCount20">👥 0 players</span></div>
-            </div>
-            <div class="players-table-wrapper">
-                <table id="playersTable20">
-                    <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr></thead>
-                    <tbody id="playersTableBody20"><tr><td colspan="4" class="empty-message">No players in 20 ETB stake yet.</td></tr> </tbody>
-                </table>
-            </div>
-        </div>
+  <!-- Withdrawal Section -->
+  <div class="section">
+    <h2>💰 Pending Withdrawal Requests</h2>
+    <div class="filter-row">
+      <label for="withdrawFilter">Filter by method:</label>
+      <select id="withdrawFilter" onchange="renderWithdrawals()">
+        <option value="all">All</option>
+        <option value="telebirr">Telebirr</option>
+        <option value="cbebirr">CBE Birr</option>
+        <option value="mpesa">M‑Pesa</option>
+      </select>
+    </div>
+    <div id="withdrawList">Loading...</div>
+  </div>
 
-        <!-- 30 ETB STAKE CARD -->
-        <div class="stake-card" id="stake30Card">
-            <div class="stake-header">
-                <span class="stake-title">🎯 30 ETB GAME</span>
-                <div><span class="status-badge" id="status30">—</span> <span class="player-count" id="playerCount30">👥 0 players</span></div>
-            </div>
-            <div class="players-table-wrapper">
-                <table id="playersTable30">
-                    <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>🎴 Card</th></tr></thead>
-                    <tbody id="playersTableBody30"><tr><td colspan="4" class="empty-message">No players in 30 ETB stake yet.</td></tr> </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- ALL REGISTERED PLAYERS SECTION -->
-    <h2 class="section-title">📋 All Registered Players</h2>
-    <div class="total-balance-card">
-        <span class="total-balance-label">💰 TOTAL BALANCE (All users)</span>
-        <span class="total-balance-value" id="totalBalanceSum">0</span>
-    </div>
-    <div class="status-bar" style="background:#2c3e50; border-radius:40px; padding:8px 16px; margin-bottom:16px;">
-        <span>👥 Total registered:</span><span id="registeredCount">0</span>
-    </div>
-    <div class="players-table-wrapper">
-        <table id="registeredTable">
-            <thead><tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th></tr></thead>
-            <tbody id="registeredTableBody"><tr><td colspan="4" class="empty-message">Loading registered users…</td></tr> </tbody>
-        </table>
-    </div>
-    <div>
-        <button id="refreshRegisteredBtn">⟳ Refresh Registered List</button>
-        <button id="refreshAllBtn">⟳ Refresh All Live Data</button>
-    </div>
-
-    <div class="refresh-info">🔄 Live updates via WebSocket · Data per stake (10 / 20 / 30 ETB)</div>
-    <div class="footer">Admin only | <span id="timestamp"></span></div>
+  <div class="section" id="addBalanceSection">
+    <h2>➕ Manual Add Balance</h2>
+    <input type="text" id="userId" placeholder="Telegram ID (numeric)" inputmode="numeric">
+    <input type="number" id="amount" placeholder="Amount" step="1" min="1">
+    <button onclick="addBalance()">Add Balance</button>
+  </div>
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
 <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const adminSecret = urlParams.get('secret');
-    if (!adminSecret) {
-        document.body.innerHTML = '<div style="color:red; text-align:center; margin-top:50px; padding:20px;">❌ Access denied: missing secret.<br>Use: /live?secret=YOUR_SECRET</div>';
-        throw new Error('No secret');
+  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+  const API_BASE = '';
+
+  // ---------- QR Code scanning ----------
+  function extractRefFromQR(imageSrc) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = imageSrc;
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+        if (qrCode && qrCode.data) {
+          const data = qrCode.data;
+          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
+          if (match) {
+            resolve(match[1]);
+          } else {
+            const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+            if (refMatch) resolve(refMatch[1]);
+            else resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      };
+      img.onerror = () => reject('Failed to load image for QR scan');
+    });
+  }
+
+  // ---------- OCR fallback ----------
+  async function extractRefFromOCR(imageUrl) {
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
+      if (match && match[1]) return match[1].trim();
+      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+      return fallback ? fallback[0] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // ---------- Unified reference extraction ----------
+  async function getReferenceFromProof(imagePath) {
+    try {
+      const qrRef = await extractRefFromQR(imagePath);
+      if (qrRef) return { ref: qrRef, method: 'QR' };
+    } catch (e) { console.warn('QR scan failed, trying OCR', e); }
+    const ocrRef = await extractRefFromOCR(imagePath);
+    if (ocrRef) return { ref: ocrRef, method: 'OCR' };
+    return null;
+  }
+
+  // ---------- Verification link builder ----------
+  function getVerificationLink(paymentType, referenceNumber) {
+    const ref = encodeURIComponent(referenceNumber);
+    switch (paymentType) {
+      case 'telebirr':
+        return `https://transactioninfo.ethiotelecom.et/receipt/${ref}`;
+      case 'cbebirr':
+        return `https://cbebirr.com/verify?txn=${ref}`;
+      case 'mpesa':
+        return `https://mpesa.ethiotelecom.et/transaction/${ref}`;
+      default:
+        return null;
+    }
+  }
+
+  // ---------- Global data stores ----------
+  let depositData = [];
+  let withdrawalData = [];
+
+  // ---------- UI rendering ----------
+  async function fetchAll() {
+    await fetchDeposits();
+    await fetchWithdrawals();
+  }
+
+  async function fetchDeposits() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      depositData = data.requests || [];
+      renderDeposits();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('depositList').innerHTML = '<p>Error loading deposits</p>';
+    }
+  }
+
+  function renderDeposits() {
+    const filter = document.getElementById('depositFilter').value;
+    const container = document.getElementById('depositList');
+    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<p>✅ No pending deposits.</p>';
+      return;
     }
 
-    const socket = io('/admin', { query: { secret: adminSecret } });
+    container.innerHTML = '';
+    filtered.forEach(async (req) => {
+      const card = document.createElement('div');
+      card.className = 'request-card';
 
-    socket.on('connect', () => {
-        console.log('✅ Admin connected');
-        socket.emit('admin:getAllRegisteredPlayers'); // initial load
-    });
+      const submittedRef = req.reference_number || '';
+      const refHtml = submittedRef
+        ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>`
+        : '';
 
-    socket.on('connect_error', (err) => {
-        console.error('❌ Socket error:', err.message);
-        document.getElementById('playersTableBody10').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed. Check server & secret.</td></tr>';
-        document.getElementById('playersTableBody20').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
-        document.getElementById('playersTableBody30').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
-        document.getElementById('registeredTableBody').innerHTML = '<tr><td colspan="4" class="empty-message" style="color:#e74c3c;">⚠️ WebSocket failed.</td></tr>';
-    });
-
-    // Receive live players + game status for all three stakes
-    socket.on('admin:playersList', (data) => {
-        // data = { players: [...], gameStatus: { 10: 'lobby', 20: 'running', 30: 'lobby' } }
-        updateStakeView(10, data.players, data.gameStatus);
-        updateStakeView(20, data.players, data.gameStatus);
-        updateStakeView(30, data.players, data.gameStatus);
-    });
-
-    // Receive all registered users (full list)
-    socket.on('admin:allRegisteredPlayers', (data) => {
-        updateRegisteredTable(data.users);
-    });
-
-    function updateStakeView(stake, allPlayers, gameStatus) {
-        const stakePlayers = (allPlayers || []).filter(p => p.stake === stake);
-        const status = (gameStatus && gameStatus[stake]) || 'unknown';
-        const statusEl = document.getElementById(`status${stake}`);
-        const countEl = document.getElementById(`playerCount${stake}`);
-        const tbody = document.getElementById(`playersTableBody${stake}`);
-
-        if (statusEl) {
-            statusEl.innerText = status.toUpperCase();
-            statusEl.className = `status-badge ${status}`;
+      let verifyLinkHtml = '';
+      if (submittedRef) {
+        const link = getVerificationLink(req.payment_type, submittedRef);
+        if (link) {
+          verifyLinkHtml = `<p><a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>`;
         }
-        if (countEl) countEl.innerText = `👥 ${stakePlayers.length} players`;
+      }
 
-        if (!stakePlayers.length) {
-            tbody.innerHTML = `<tr><td colspan="4" class="empty-message">👻 No players in ${stake} ETB stake yet.</td></tr>`;
-            return;
-        }
+      card.innerHTML = `
+        <div class="request-info">
+          <p><strong>ID:</strong> ${req.id}</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${req.phone || 'N/A'}</p>
+          <p><strong>Amount:</strong> ${req.amount} ETB</p>
+          <p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>
+          ${refHtml}
+          ${verifyLinkHtml}
+          <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+          ${req.proof_path
+            ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">`
+            : '<p>No proof</p>'}
+          <div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      `;
 
-        let html = '';
-        stakePlayers.forEach(p => {
-            const username = escapeHtml(p.username);
-            const telegramId = escapeHtml(p.telegramId);
-            const cardNum = p.cardNumber;
-            const handle = p.telegram_handle;
-            const handleDisplay = handle ? `@${handle}` : '—';
+      container.appendChild(card);
 
-            html += `
-                <tr>
-                    <td><span class="handle">${handleDisplay}</span></td>
-                    <td><span class="telegram-id">${telegramId}</span></td>
-                    <td><span class="username-plain">📱 ${username}</span></td>
-                    <td><span class="card-badge">#${cardNum}</span></td>
-                </tr>
+      if (req.proof_path) {
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
+        try {
+          const result = await getReferenceFromProof(req.proof_path);
+          if (result) {
+            const ref = result.ref;
+            const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+            let matchHtml = '';
+            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
+              matchHtml = '<span class="match">✅ Matches submitted ref</span>';
+            } else if (submittedRef) {
+              matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+            }
+            verifyDiv.innerHTML = `
+              <strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br>
+              <a href="${receiptUrl}" target="_blank" rel="noopener noreferrer">📄 Official receipt</a>
             `;
-        });
-        tbody.innerHTML = html;
-    }
-
-    function updateRegisteredTable(users) {
-        const tbody = document.getElementById('registeredTableBody');
-        const countSpan = document.getElementById('registeredCount');
-        countSpan.innerText = users ? users.length : 0;
-
-        let totalBalance = 0;
-        if (users && users.length > 0) {
-            totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
+          } else {
+            verifyDiv.innerHTML = '❌ Could not read reference from image.';
+          }
+        } catch (e) {
+          verifyDiv.innerHTML = '❌ Verification error.';
+          console.error(e);
         }
-        document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
+      } else {
+        const verifyDiv = document.getElementById(`verify-${req.id}`);
+        if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.';
+      }
+    });
+  }
 
-        if (!users || users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty-message">📭 No registered users found.</td></tr>';
-            return;
-        }
+  async function fetchWithdrawals() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+      const data = await res.json();
+      withdrawalData = data.requests || [];
+      renderWithdrawals();
+    } catch (err) {
+      console.error(err);
+      document.getElementById('withdrawList').innerHTML = '<p>Error loading withdrawals</p>';
+    }
+  }
 
-        const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
-        let html = '';
-        sorted.forEach(user => {
-            const telegramId = escapeHtml(user.telegramId);
-            const username = escapeHtml(user.username) || '—';
-            const balance = user.balance ?? 0;
-            const handle = user.telegram_handle;
-            const handleDisplay = handle ? `@${handle}` : '—';
-            let balanceClass = 'balance-zero';
-            if (balance > 0) balanceClass = 'balance-positive';
-            else if (balance < 0) balanceClass = 'balance-negative';
-            const formattedBalance = balance.toLocaleString();
+  function renderWithdrawals() {
+    const filter = document.getElementById('withdrawFilter').value;
+    const container = document.getElementById('withdrawList');
+    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
 
-            html += `
-                <tr>
-                    <td><span class="handle">${handleDisplay}</span></td>
-                    <td><span class="telegram-id">${telegramId}</span></td>
-                    <td><span class="username-plain">📱 ${username}</span></td>
-                    <td><span class="${balanceClass}">${formattedBalance}</span></td>
-                </tr>
-            `;
-        });
-        tbody.innerHTML = html;
+    if (filtered.length === 0) {
+      container.innerHTML = '<p>✅ No pending withdrawals.</p>';
+      return;
     }
 
-    // Manual refresh: request latest live players and registered list
-    document.getElementById('refreshAllBtn').onclick = () => {
-        socket.emit('admin:requestPlayers');
-        socket.emit('admin:getAllRegisteredPlayers');
-    };
-    document.getElementById('refreshRegisteredBtn').onclick = () => {
-        socket.emit('admin:getAllRegisteredPlayers');
-    };
+    container.innerHTML = filtered.map(req => `
+      <div class="request-card">
+        <div class="request-info">
+          <p><strong>ID:</strong> ${req.id}</p>
+          <p><strong>User:</strong> ${req.username} (${req.telegram_id})</p>
+          <p><strong>Phone:</strong> ${req.phone_number}</p>
+          <p><strong>Name:</strong> ${req.receiver_name || 'N/A'}</p>
+          <p><strong>Amount:</strong> ${req.amount} ETB</p>
+          <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
+          <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+        </div>
+        <div class="action-buttons">
+          <button class="approve" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
+          <button class="reject" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+        </div>
+      </div>
+    `).join('');
+  }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
-    }
+  async function processDeposit(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this deposit?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
+      fetchDeposits();
+    } catch (err) { alert(err.message); }
+  }
 
-    setInterval(() => { document.getElementById('timestamp').innerText = new Date().toLocaleString(); }, 1000);
+  async function processWithdrawal(requestId, action) {
+    if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+      });
+      const data = await res.json();
+      alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
+      fetchWithdrawals();
+    } catch (err) { alert(err.message); }
+  }
+
+  async function addBalance() {
+    const telegramId = document.getElementById('userId').value.trim();
+    const amount = document.getElementById('amount').value.trim();
+    if (!telegramId || !amount) { alert('Fill all fields'); return; }
+    try {
+      const res = await fetch(`${API_BASE}/admin/add-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) })
+      });
+      const data = await res.json();
+      alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
+    } catch (err) { alert(err.message); }
+  }
+
+  fetchAll();
+  setInterval(fetchAll, 10000);
 </script>
 </body>
 </html>
