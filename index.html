@@ -135,10 +135,15 @@
         <div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- HISTORY, WALLET, PROFILE -->
+    <!-- HISTORY, WALLET, PROFILE (Profile modified: removed Total Wins and Total Earned) -->
     <div id="historyPage" class="page hidden"><div class="page-header"><h2>📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn">← Back</button></div><div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
     <div id="walletPage" class="page hidden"><div class="page-header"><h2>💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn">← Back</button></div><div class="profile-stat"><div>Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary">- Withdraw</button></div></div>
-    <div id="profilePage" class="page hidden"><div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div><div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div><div class="profile-stat"><div>🏆 Total Wins</div><div id="profileTotalWins">0</div></div><div class="profile-stat"><div>💵 Total Earned</div><div id="profileTotalEarned">0</div></div></div>
+    <div id="profilePage" class="page hidden">
+        <div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div>
+        <div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div>
+        <div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div>
+        <!-- Total Wins and Total Earned removed -->
+    </div>
 
     <!-- GAME PAGE -->
     <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
@@ -184,7 +189,7 @@
             if (gamePlayersCountEl) gamePlayersCountEl.innerText = count;
         }
         
-        // ========== HISTORY & STATS (unchanged) ==========
+        // ========== HISTORY & STATS ==========
         function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
         
@@ -202,8 +207,7 @@
         
         function updateStatsUI(){
             document.getElementById('totalGamesCount').innerText = totalGames;
-            document.getElementById('profileTotalWins').innerText = totalWins;
-            document.getElementById('profileTotalEarned').innerText = totalEarned;
+            // Profile total wins and total earned removed from HTML – no need to update
             const recentDiv = document.getElementById('recentGamesList');
             if(recentDiv){
                 if(recentGames.length){
