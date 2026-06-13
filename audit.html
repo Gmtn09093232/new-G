@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>🎯 Bingo Audit | Total Reset (Deposits/Withdrawals only)</title>
+    <title>🔍 Bingo Full Audit | All Events</title>
     <style>
         * {
             box-sizing: border-box;
@@ -173,9 +173,9 @@
 </head>
 <body>
 <div class="container">
-    <h1>🔍 Bingo Audit & Control <small>Deposits/Withdrawals only</small></h1>
+    <h1>🔍 Bingo Full Audit <small>All Events</small></h1>
 
-    <!-- Summary Cards -->
+    <!-- Summary Cards (financial totals only) -->
     <div class="summary-cards" id="summaryArea">
         <div class="card"><div class="label">💰 Total Deposits</div><div class="value" id="totalDeposits">—</div></div>
         <div class="card"><div class="label">💸 Total Withdrawals</div><div class="value" id="totalWithdrawals">—</div></div>
@@ -183,16 +183,28 @@
         <div class="card"><div class="label">📊 Net Float</div><div class="value" id="netFloat">—</div></div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters (all event types) -->
     <div class="filters">
         <div class="filter-group">
             <label>📌 Event Type</label>
             <select id="eventTypeFilter">
-                <option value="">All events (filtered)</option>
+                <option value="">All events</option>
+                <option value="DEPOSIT_INITIATED">📥 Deposit Initiated</option>
                 <option value="DEPOSIT_COMPLETED">✅ Deposit Completed</option>
+                <option value="DEPOSIT_FAILED">❌ Deposit Failed</option>
+                <option value="WITHDRAWAL_REQUESTED">📤 Withdrawal Requested</option>
                 <option value="WITHDRAWAL_COMPLETED">💸 Withdrawal Completed</option>
+                <option value="WITHDRAWAL_REJECTED">🚫 Withdrawal Rejected</option>
                 <option value="ADMIN_ADD_BALANCE">⚙️ Admin Add Balance</option>
                 <option value="MANUAL_DEPOSIT">📝 Manual Deposit</option>
+                <option value="BINGO_CALLED">🏆 Bingo Called</option>
+                <option value="BINGO_REJECTED">❌ Bingo Rejected</option>
+                <option value="WIN_PAID_OUT">💰 Win Paid Out</option>
+                <option value="NUMBER_DRAWN">🎲 Number Drawn</option>
+                <option value="CARD_ASSIGNED">🃏 Card Assigned</option>
+                <option value="ADMIN_ACTION">🛠️ Admin Action</option>
+                <option value="SUSPICIOUS_BEHAVIOR_DETECTED">⚠️ Suspicious Activity</option>
+                <option value="ENTRY_FEE_PAID">🎟️ Entry Fee Paid</option>
             </select>
         </div>
         <div class="filter-group">
@@ -217,7 +229,7 @@
         </div>
     </div>
 
-    <!-- Control section with TOTAL RESET (deposits/withdrawals only) -->
+    <!-- Control section: total reset (deposits/withdrawals only) -->
     <div class="control-section">
         <div style="font-weight:bold; margin-bottom:6px;">🎮 System Control</div>
         <div class="control-buttons">
@@ -228,9 +240,9 @@
         <div id="gameStateMessage" style="margin-top:12px; font-size:0.75rem; color:#94a3b8;"></div>
     </div>
 
-    <!-- Logs table -->
+    <!-- Logs table (shows ALL audit events) -->
     <div class="refresh-row">
-        <span><strong>📋 Audit Logs</strong> <span id="logCount"></span></span>
+        <span><strong>📋 All Audit Logs</strong> <span id="logCount"></span></span>
         <span style="font-size:0.7rem;">Last refresh: <span id="lastRefresh">—</span></span>
     </div>
     <div class="logs-table">
@@ -241,7 +253,7 @@
             <tbody id="auditTableBody">
                 <tr><td colspan="6" style="text-align:center;">Loading logs... (enter admin secret)</td></tr>
             </tbody>
-        </table>
+         </table>
     </div>
 </div>
 
@@ -281,7 +293,7 @@
 
     let currentLogs = [];
 
-    // Helper: format date for API (ISO string without ms)
+    // Helper: format date for API (ISO string)
     function formatDateForAPI(dateInput) {
         if (!dateInput) return null;
         const d = new Date(dateInput);
@@ -289,7 +301,7 @@
         return d.toISOString();
     }
 
-    // Fetch audit summary
+    // Fetch financial summary (deposits, withdrawals, house profit)
     async function fetchSummary() {
         try {
             const res = await fetch(`${API_BASE}/admin/audit-summary?secret=${ADMIN_SECRET}`);
@@ -313,11 +325,11 @@
         }
     }
 
-    // Fetch audit logs with filters (only selected events)
+    // Fetch audit logs with filters (ALL event types from backend)
     async function fetchLogs() {
         const params = new URLSearchParams();
         params.append('secret', ADMIN_SECRET);
-        params.append('limit', '500');
+        params.append('limit', '1000');  // get more logs
         const event = eventTypeFilter.value;
         if (event) params.append('eventType', event);
         const userId = userIdFilter.value.trim();
@@ -332,11 +344,8 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.success) {
-                let logs = data.logs || [];
-                // Filter to only the 4 relevant event types
-                const allowedEvents = ['DEPOSIT_COMPLETED', 'WITHDRAWAL_COMPLETED', 'ADMIN_ADD_BALANCE', 'MANUAL_DEPOSIT'];
-                logs = logs.filter(log => allowedEvents.includes(log.event_type));
-                currentLogs = logs;
+                // Keep ALL logs – no client-side filtering
+                currentLogs = data.logs || [];
                 renderLogs(currentLogs);
                 logCountSpan.innerText = `(${currentLogs.length} entries)`;
                 lastRefreshSpan.innerText = new Date().toLocaleTimeString();
@@ -353,7 +362,7 @@
     // Render logs table
     function renderLogs(logs) {
         if (!logs.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No audit logs found for the selected events.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No audit logs found for the selected filters.</td></tr>';
             return;
         }
         let html = '';
@@ -365,8 +374,9 @@
             const ip = log.ip_address || '—';
             let details = '';
             try {
-                details = JSON.stringify(log.details || {}).slice(0, 100);
-                if (JSON.stringify(log.details || {}).length > 100) details += '…';
+                const detailsObj = log.details || {};
+                details = JSON.stringify(detailsObj).slice(0, 150);
+                if (JSON.stringify(detailsObj).length > 150) details += '…';
             } catch(e) { details = '—'; }
             html += `
                 <tr>
@@ -387,7 +397,7 @@
         return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
     }
 
-    // --- Total Reset (deposits & withdrawals only, preserve balances) ---
+    // --- Total Reset (deposits & withdrawals only) ---
     async function totalReset() {
         if (!confirm("🚨 WARNING: This will DELETE all deposit and withdrawal requests and reset the TOTAL DEPOSIT & TOTAL WITHDRAWAL sums to zero.\n✅ Player balances will NOT be affected.\n\nAre you sure?")) return;
         const confirmation = prompt('Type "RESET TOTALS" to proceed:');
@@ -401,7 +411,6 @@
             if (res.ok) {
                 const data = await res.json();
                 gameStateMsg.innerText = `✅ Total reset completed: ${data.message || 'Deposit/withdrawal records cleared, totals reset to zero.'}`;
-                // refresh summary and logs after reset
                 await fetchSummary();
                 await fetchLogs();
             } else {
@@ -418,9 +427,7 @@
         await Promise.all([fetchSummary(), fetchLogs()]);
     }
 
-    applyBtn.addEventListener('click', () => {
-        fetchLogs();
-    });
+    applyBtn.addEventListener('click', () => fetchLogs());
     resetBtn.addEventListener('click', () => {
         eventTypeFilter.value = '';
         userIdFilter.value = '';
@@ -431,7 +438,7 @@
     reloadLogsBtn.addEventListener('click', fetchLogs);
     totalResetBtn.addEventListener('click', totalReset);
 
-    // Auto-refresh every 30 sec
+    // Auto-refresh every 30 seconds
     setInterval(() => {
         if (document.hasFocus()) fetchLogs();
     }, 30000);
