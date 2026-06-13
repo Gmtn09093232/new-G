@@ -621,12 +621,12 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics endpoints (with date range) ----------
+// ---------- Statistics endpoints (with date range & withdrawals by method) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
-// ✅ Stats summary with date range (from, to)
+// ✅ Stats summary with date range (from, to) – INCLUDES WITHDRAWALS BY METHOD
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret, from, to } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -663,7 +663,7 @@ app.get('/admin/stats-summary', async (req, res) => {
     if (rdErr) throw rdErr;
     const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
 
-    // Optional: deposits by method for the same date range
+    // Deposits by method
     let methodQuery = supabase.from('deposit_requests').select('amount, payment_type').eq('status', 'approved');
     if (from) methodQuery = methodQuery.gte('created_at', new Date(from).toISOString());
     if (to) methodQuery = methodQuery.lte('created_at', new Date(to).toISOString());
@@ -679,12 +679,29 @@ app.get('/admin/stats-summary', async (req, res) => {
       });
     }
 
+    // Withdrawals by method
+    let withdrawalMethodQuery = supabase.from('withdrawal_requests').select('amount, withdrawal_type').eq('status', 'approved');
+    if (from) withdrawalMethodQuery = withdrawalMethodQuery.gte('created_at', new Date(from).toISOString());
+    if (to) withdrawalMethodQuery = withdrawalMethodQuery.lte('created_at', new Date(to).toISOString());
+    const { data: withdrawalsByMethodData, error: wdMethodErr } = await withdrawalMethodQuery;
+    const withdrawalsByMethod = { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+    if (!wdMethodErr && withdrawalsByMethodData) {
+      withdrawalsByMethodData.forEach(w => {
+        const type = w.withdrawal_type;
+        if (type === 'telebirr') withdrawalsByMethod.telebirr += Number(w.amount);
+        else if (type === 'cbebirr') withdrawalsByMethod.cbebirr += Number(w.amount);
+        else if (type === 'mpesa') withdrawalsByMethod.mpesa += Number(w.amount);
+        else withdrawalsByMethod.manual += Number(w.amount);
+      });
+    }
+
     res.json({
       success: true,
       totalDeposits,
       totalWithdrawals,
       totalHouseProfit,
-      depositsByMethod
+      depositsByMethod,
+      withdrawalsByMethod
     });
   } catch (err) {
     console.error('Stats error:', err);
