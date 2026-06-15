@@ -118,6 +118,7 @@ app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html'))
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
+app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -129,6 +130,7 @@ app.get('/admin/live-players', (req, res) => {
 
 // ---------- User cache ----------
 const users = {};
+
 async function loadUser(telegramId, username, telegramHandle = null) {
   const id = String(telegramId);
   if (users[id]) return users[id];
@@ -138,17 +140,19 @@ async function loadUser(telegramId, username, telegramHandle = null) {
       id, 
       username: data.username, 
       balance: Number(data.balance),
-      telegram_handle: data.telegram_handle
+      telegram_handle: data.telegram_handle,
+      win_handicap: data.win_handicap !== undefined ? data.win_handicap : 5
     };
   } else {
     const newUser = { 
       telegram_id: id, 
       username: username || 'Player', 
       telegram_handle: telegramHandle || null,
-      balance: 10 
+      balance: 10,
+      win_handicap: 5
     };
     await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle };
+    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle, win_handicap: 5 };
   }
   return users[id];
 }
@@ -227,7 +231,6 @@ app.post('/admin/delete-user', async (req, res) => {
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
 
   const strId = String(telegramId);
-  // Check if user exists
   const { data: user, error: findErr } = await supabase
     .from('users')
     .select('telegram_id')
@@ -236,28 +239,24 @@ app.post('/admin/delete-user', async (req, res) => {
   if (findErr) return res.status(500).json({ error: findErr.message });
   if (!user) return res.status(404).json({ error: 'User not found' });
 
-  // Delete from users table
   const { error: delErr } = await supabase.from('users').delete().eq('telegram_id', strId);
   if (delErr) return res.status(500).json({ error: delErr.message });
 
-  // Remove user from all active game states (10,20,30)
+  // Remove from all active game stakes
   for (const stake of [10, 20, 30]) {
     const game = games[stake];
     if (!game) continue;
-
     const playerIndex = game.players.findIndex(p => p.telegramId === strId);
     if (playerIndex !== -1) {
       const player = game.players[playerIndex];
       if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
       game.players.splice(playerIndex, 1);
-
       io.to(`stake_${stake}`).emit('cardTaken', {
         stake,
         number: player.cardNumber,
         takenNumbers: Array.from(game.takenCardNumbers)
       });
       io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
-
       if (game.status === 'running' && game.players.length === 0) {
         clearInterval(game.callInterval);
         endGameWithWinners(stake);
@@ -270,28 +269,63 @@ app.post('/admin/delete-user', async (req, res) => {
   res.json({ success: true, message: `User ${strId} deleted and removed from active games.` });
 });
 
-// ---------- Bingo card generator ----------
-function generateCard() {
-  const columns = [
-    [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
-    [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
-    [31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],
-    [46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
-    [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75]
+// ========== ADAPTIVE CARD DIFFICULTY (HANDICAP SYSTEM) ==========
+// Generates a card where the number ranges depend on the player's win_handicap.
+// handicap 0 = easiest (numbers from bottom 10-90% of each column)
+// handicap 10 = hardest (numbers from top 10-90% of each column)
+function generateHandicapCard(winHandicap) {
+  const fullRanges = [
+    [1, 15],   // B
+    [16, 30],  // I
+    [31, 45],  // N
+    [46, 60],  // G
+    [61, 75]   // O
   ];
-  const card = [];
+  
+  // handicap 0..10 -> factor 0..1
+  const factor = winHandicap / 10;
+  const ranges = [];
   for (let col = 0; col < 5; col++) {
-    const colNumbers = [];
-    const available = [...columns[col]];
-    for (let row = 0; row < 5; row++) {
-      if (col === 2 && row === 2) { colNumbers.push('FREE'); }
-      else { colNumbers.push(available.splice(Math.floor(Math.random() * available.length), 1)[0]); }
+    const [min, max] = fullRanges[col];
+    const width = max - min + 1;
+    if (factor <= 0.5) {
+      // Easier: lower part (factor 0 -> 10% width, factor 0.5 -> 90% width)
+      const subWidth = Math.floor(width * (0.1 + factor * 0.8));
+      const newMax = Math.min(max, min + subWidth - 1);
+      ranges.push([min, newMax]);
+    } else {
+      // Harder: upper part (factor 0.5 -> 90% width, factor 1 -> 10% width)
+      const subWidth = Math.floor(width * (0.1 + (1 - factor) * 0.8));
+      const newMin = Math.max(min, max - subWidth + 1);
+      ranges.push([newMin, max]);
     }
-    card.push(colNumbers);
   }
-  const transposed = [];
-  for (let r = 0; r < 5; r++) transposed.push([card[0][r], card[1][r], card[2][r], card[3][r], card[4][r]]);
-  return transposed;
+
+  const columns = [];
+  for (let col = 0; col < 5; col++) {
+    const [min, max] = ranges[col];
+    const available = Array.from({ length: max - min + 1 }, (_, i) => min + i);
+    const colNumbers = [];
+    for (let row = 0; row < 5; row++) {
+      if (col === 2 && row === 2) {
+        colNumbers.push('FREE');
+      } else {
+        const idx = Math.floor(Math.random() * available.length);
+        colNumbers.push(available.splice(idx, 1)[0]);
+      }
+    }
+    columns.push(colNumbers);
+  }
+  const card = [];
+  for (let r = 0; r < 5; r++) {
+    card.push([columns[0][r], columns[1][r], columns[2][r], columns[3][r], columns[4][r]]);
+  }
+  return card;
+}
+
+// Neutral card generator (handicap 5) for cached decks
+function generateCard() {
+  return generateHandicapCard(5);
 }
 
 // ---------- Multi-stake game states (10,20,30) ----------
@@ -323,7 +357,6 @@ function getGame(stake) {
   return games[stake];
 }
 
-// Helper to get combined players list for admin (all stakes)
 function getAllPlayersList() {
   const allPlayers = [];
   for (const stake of [10, 20, 30]) {
@@ -400,6 +433,7 @@ async function startGame(stake) {
     return;
   }
 
+  // Deduct entry fees
   for (const p of game.players) {
     const user = users[p.telegramId];
     if (user) {
@@ -412,17 +446,27 @@ async function startGame(stake) {
   }
 
   const totalEntryFees = game.entryFee * game.players.length;
-  if (game.players.length === 1) {
-    game.prizePool = totalEntryFees;
-  } else {
-    game.prizePool = 0.8 * totalEntryFees;
-  }
+  game.prizePool = (game.players.length === 1) ? totalEntryFees : 0.8 * totalEntryFees;
 
   game.status = 'running';
   game.calledNumbers = [];
   game.winningNumber = null;
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
+
+  // Regenerate each player's card using their current handicap (fairness adjustment)
+  for (const p of game.players) {
+    const user = users[p.telegramId];
+    const newCard = generateHandicapCard(user.win_handicap);
+    p.card = newCard;
+    p.markedNumbers = [];
+    const playerSocket = await getSocketByUserId(p.telegramId);
+    if (playerSocket) {
+      playerSocket.emit('yourCard', newCard);
+      playerSocket.emit('markedNumbers', []);
+    }
+  }
+
   startCalling(stake);
 }
 
@@ -534,6 +578,24 @@ async function endGameWithWinners(stake) {
     });
   } else {
     io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
+  }
+
+  // Adjust win_handicap for all players (handicap fairness)
+  for (const p of game.players) {
+    const user = users[p.telegramId];
+    if (!user) continue;
+    const isWinner = game.winners.some(w => w.telegramId === p.telegramId);
+    if (isWinner) {
+      // Winner: increase handicap (harder next card), max 10
+      user.win_handicap = Math.min(user.win_handicap + 1, 10);
+      await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
+    } else {
+      // Loser: decrease handicap (easier next card), min 0
+      if (user.win_handicap > 0) {
+        user.win_handicap = Math.max(user.win_handicap - 1, 0);
+        await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
+      }
+    }
   }
 
   game.winners = [];
@@ -670,7 +732,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics endpoints (with date range & method breakdown) ----------
+// ---------- Statistics endpoints ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
@@ -839,7 +901,9 @@ io.on('connection', async (socket) => {
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(num);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip: ip };
+    const user = users[socket.userId];
+    const playerCard = generateHandicapCard(user.win_handicap);
+    const player = { telegramId: socket.userId, username: socket.username, card: playerCard, markedNumbers: [], cardNumber: num, ip: ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
@@ -861,7 +925,9 @@ io.on('connection', async (socket) => {
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(randomNum);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip: ip };
+    const user = users[socket.userId];
+    const playerCard = generateHandicapCard(user.win_handicap);
+    const player = { telegramId: socket.userId, username: socket.username, card: playerCard, markedNumbers: [], cardNumber: randomNum, ip: ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
