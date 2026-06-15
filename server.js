@@ -269,10 +269,7 @@ app.post('/admin/delete-user', async (req, res) => {
   res.json({ success: true, message: `User ${strId} deleted and removed from active games.` });
 });
 
-// ========== ADAPTIVE CARD DIFFICULTY (HANDICAP SYSTEM) ==========
-// Generates a card where the number ranges depend on the player's win_handicap.
-// handicap 0 = easiest (numbers from bottom 10-90% of each column)
-// handicap 10 = hardest (numbers from top 10-90% of each column)
+// ---------- Handicap card generator (0 = easiest, 10 = hardest) ----------
 function generateHandicapCard(winHandicap) {
   const fullRanges = [
     [1, 15],   // B
@@ -282,19 +279,18 @@ function generateHandicapCard(winHandicap) {
     [61, 75]   // O
   ];
   
-  // handicap 0..10 -> factor 0..1
-  const factor = winHandicap / 10;
+  const factor = winHandicap / 10;   // 0 .. 1
   const ranges = [];
   for (let col = 0; col < 5; col++) {
     const [min, max] = fullRanges[col];
     const width = max - min + 1;
     if (factor <= 0.5) {
-      // Easier: lower part (factor 0 -> 10% width, factor 0.5 -> 90% width)
+      // easier: lower part (factor 0 -> 10%, factor 0.5 -> 90%)
       const subWidth = Math.floor(width * (0.1 + factor * 0.8));
       const newMax = Math.min(max, min + subWidth - 1);
       ranges.push([min, newMax]);
     } else {
-      // Harder: upper part (factor 0.5 -> 90% width, factor 1 -> 10% width)
+      // harder: upper part (factor 0.5 -> 90%, factor 1 -> 10%)
       const subWidth = Math.floor(width * (0.1 + (1 - factor) * 0.8));
       const newMin = Math.max(min, max - subWidth + 1);
       ranges.push([newMin, max]);
@@ -323,7 +319,6 @@ function generateHandicapCard(winHandicap) {
   return card;
 }
 
-// Neutral card generator (handicap 5) for cached decks
 function generateCard() {
   return generateHandicapCard(5);
 }
@@ -454,7 +449,7 @@ async function startGame(stake) {
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
 
-  // Regenerate each player's card using their current handicap (fairness adjustment)
+  // Regenerate each player's card using their current win_handicap
   for (const p of game.players) {
     const user = users[p.telegramId];
     const newCard = generateHandicapCard(user.win_handicap);
@@ -580,17 +575,15 @@ async function endGameWithWinners(stake) {
     io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
   }
 
-  // Adjust win_handicap for all players (handicap fairness)
+  // Adjust win_handicap for all players
   for (const p of game.players) {
     const user = users[p.telegramId];
     if (!user) continue;
     const isWinner = game.winners.some(w => w.telegramId === p.telegramId);
     if (isWinner) {
-      // Winner: increase handicap (harder next card), max 10
       user.win_handicap = Math.min(user.win_handicap + 1, 10);
       await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
     } else {
-      // Loser: decrease handicap (easier next card), min 0
       if (user.win_handicap > 0) {
         user.win_handicap = Math.max(user.win_handicap - 1, 0);
         await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
