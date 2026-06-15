@@ -141,7 +141,7 @@ async function loadUser(telegramId, username, telegramHandle = null) {
       username: data.username, 
       balance: Number(data.balance),
       telegram_handle: data.telegram_handle,
-      win_handicap: data.win_handicap !== undefined ? data.win_handicap : 5
+      consecutive_wins: data.consecutive_wins || 0
     };
   } else {
     const newUser = { 
@@ -149,10 +149,10 @@ async function loadUser(telegramId, username, telegramHandle = null) {
       username: username || 'Player', 
       telegram_handle: telegramHandle || null,
       balance: 10,
-      win_handicap: 5
+      consecutive_wins: 0
     };
     await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle, win_handicap: 5 };
+    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle, consecutive_wins: 0 };
   }
   return users[id];
 }
@@ -269,34 +269,40 @@ app.post('/admin/delete-user', async (req, res) => {
   res.json({ success: true, message: `User ${strId} deleted and removed from active games.` });
 });
 
-// ---------- Handicap card generator (0 = easiest, 10 = hardest) ----------
-function generateHandicapCard(winHandicap) {
-  const fullRanges = [
-    [1, 15],   // B
-    [16, 30],  // I
-    [31, 45],  // N
-    [46, 60],  // G
-    [61, 75]   // O
-  ];
-  
-  const factor = winHandicap / 10;   // 0 .. 1
+// ---------- Fair card generator based on consecutive wins ----------
+// Column boundaries (B, I, N, G, O)
+const FULL_RANGES = [
+  [1, 15],   // B
+  [16, 30],  // I
+  [31, 45],  // N
+  [46, 60],  // G
+  [61, 75]   // O
+];
+
+function generateFairCard(consecutiveWins) {
+  // Adjust range width based on consecutive wins:
+  // 0 wins -> easier: use lower 60% of numbers in each column
+  // 1 win  -> normal: use full column
+  // >=2 wins -> harder: use upper 60% of numbers in each column
   const ranges = [];
   for (let col = 0; col < 5; col++) {
-    const [min, max] = fullRanges[col];
+    const [min, max] = FULL_RANGES[col];
     const width = max - min + 1;
-    if (factor <= 0.5) {
-      // easier: lower part (factor 0 -> 10%, factor 0.5 -> 90%)
-      const subWidth = Math.floor(width * (0.1 + factor * 0.8));
-      const newMax = Math.min(max, min + subWidth - 1);
+    if (consecutiveWins === 0) {
+      // Easier: lower 60%
+      const newMax = min + Math.floor(width * 0.6) - 1;
       ranges.push([min, newMax]);
-    } else {
-      // harder: upper part (factor 0.5 -> 90%, factor 1 -> 10%)
-      const subWidth = Math.floor(width * (0.1 + (1 - factor) * 0.8));
-      const newMin = Math.max(min, max - subWidth + 1);
+    } else if (consecutiveWins >= 2) {
+      // Harder: upper 60%
+      const newMin = max - Math.floor(width * 0.6) + 1;
       ranges.push([newMin, max]);
+    } else {
+      // Normal (consecutiveWins === 1)
+      ranges.push([min, max]);
     }
   }
 
+  // Build the card column by column
   const columns = [];
   for (let col = 0; col < 5; col++) {
     const [min, max] = ranges[col];
@@ -312,6 +318,8 @@ function generateHandicapCard(winHandicap) {
     }
     columns.push(colNumbers);
   }
+
+  // Transpose to row‑major (5 rows, each with 5 numbers)
   const card = [];
   for (let r = 0; r < 5; r++) {
     card.push([columns[0][r], columns[1][r], columns[2][r], columns[3][r], columns[4][r]]);
@@ -319,8 +327,9 @@ function generateHandicapCard(winHandicap) {
   return card;
 }
 
+// Standard card generator for neutral situations (e.g., cardSet cache)
 function generateCard() {
-  return generateHandicapCard(5);
+  return generateFairCard(1); // normal difficulty
 }
 
 // ---------- Multi-stake game states (10,20,30) ----------
@@ -449,10 +458,10 @@ async function startGame(stake) {
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
 
-  // Regenerate each player's card using their current win_handicap
+  // Regenerate each player's card using their current consecutive_wins (fairness adjustment)
   for (const p of game.players) {
     const user = users[p.telegramId];
-    const newCard = generateHandicapCard(user.win_handicap);
+    const newCard = generateFairCard(user.consecutive_wins);
     p.card = newCard;
     p.markedNumbers = [];
     const playerSocket = await getSocketByUserId(p.telegramId);
@@ -488,6 +497,7 @@ function startCalling(stake) {
   }, 4000);
 }
 
+// ---------- Bingo line utilities (unchanged) ----------
 function getLines(card) {
   const lines = [];
   for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
@@ -575,18 +585,18 @@ async function endGameWithWinners(stake) {
     io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
   }
 
-  // Adjust win_handicap for all players
+  // Adjust consecutive_wins for all players
   for (const p of game.players) {
     const user = users[p.telegramId];
     if (!user) continue;
     const isWinner = game.winners.some(w => w.telegramId === p.telegramId);
     if (isWinner) {
-      user.win_handicap = Math.min(user.win_handicap + 1, 10);
-      await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
+      user.consecutive_wins += 1;
+      await supabase.from('users').update({ consecutive_wins: user.consecutive_wins }).eq('telegram_id', p.telegramId);
     } else {
-      if (user.win_handicap > 0) {
-        user.win_handicap = Math.max(user.win_handicap - 1, 0);
-        await supabase.from('users').update({ win_handicap: user.win_handicap }).eq('telegram_id', p.telegramId);
+      if (user.consecutive_wins !== 0) {
+        user.consecutive_wins = 0;
+        await supabase.from('users').update({ consecutive_wins: 0 }).eq('telegram_id', p.telegramId);
       }
     }
   }
@@ -895,7 +905,7 @@ io.on('connection', async (socket) => {
     game.takenCardNumbers.add(num);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const user = users[socket.userId];
-    const playerCard = generateHandicapCard(user.win_handicap);
+    const playerCard = generateFairCard(user.consecutive_wins);
     const player = { telegramId: socket.userId, username: socket.username, card: playerCard, markedNumbers: [], cardNumber: num, ip: ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
@@ -919,7 +929,7 @@ io.on('connection', async (socket) => {
     game.takenCardNumbers.add(randomNum);
     const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const user = users[socket.userId];
-    const playerCard = generateHandicapCard(user.win_handicap);
+    const playerCard = generateFairCard(user.consecutive_wins);
     const player = { telegramId: socket.userId, username: socket.username, card: playerCard, markedNumbers: [], cardNumber: randomNum, ip: ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
