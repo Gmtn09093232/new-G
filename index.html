@@ -12,6 +12,8 @@
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255, 255, 248, 0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(2px); }
         .hidden { display: none !important; }
+        .lang-toggle { position: fixed; top: 16px; right: 16px; background: #f97316; color: white; border: none; border-radius: 40px; padding: 8px 16px; font-weight: bold; cursor: pointer; z-index: 1000; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        @media (max-width: 550px) { .lang-toggle { top: 8px; right: 8px; padding: 6px 12px; font-size: 0.7rem; } }
         .card-container { margin: 20px 0 16px; display: flex; justify-content: center; background: #fef7ef; border-radius: 40px; padding: 14px 8px; box-shadow: 0 8px 18px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8); overflow-x: auto; min-height: 200px; }
         .card-container table { border-collapse: separate; border-spacing: 10px; margin: 0 auto; }
         .card-container thead tr th { font-family: 'Inter', monospace; font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #ea580c, #f97316); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; padding: 8px 0; text-align: center; width: 58px; }
@@ -24,7 +26,6 @@
         .called-history { background: #0a0a0c; border-radius: 48px; font-size: 0.7rem; color: #fcd34d; font-weight: 500; overflow-x: auto; white-space: nowrap; font-family: monospace; text-align: center; margin-top: 8px; border: 1px solid #2d2d35; padding: 8px 14px; scroll-behavior: smooth; }
         .balance-top, .game-top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; background: #ffffffdd; backdrop-filter: blur(4px); padding: 6px 12px; border-radius: 60px; margin-bottom: 16px; border: 1px solid #fed7aa; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
         .game-top-bar div:first-child { font-size: 0.8rem; font-weight: 600; background: #fef3c7; padding: 4px 8px; border-radius: 40px; }
-        .game-top-bar button { font-size: 0.7rem; padding: 4px 10px; }
         .players-badge { background: #f97316; padding: 6px 18px; border-radius: 40px; color: white; font-weight: 600; font-size: 0.75rem; box-shadow: 0 2px 8px rgba(249,115,22,0.2); }
         .timer-badge { font-size: 1.3rem; font-weight: 700; font-family: monospace; color: #ea580c; background: #fef3c7; padding: 4px 18px; border-radius: 50px; letter-spacing: 1px; border: 1px solid #fde68a; }
         .grid-100 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; margin: 20px 0; background: #fef9f0; padding: 14px; border-radius: 40px; box-shadow: inset 0 0 0 1px #fff6e5, 0 4px 12px rgba(0,0,0,0.02); }
@@ -86,13 +87,15 @@
     </style>
 </head>
 <body>
-    <!-- MODALS (unchanged) -->
-    <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title">Deposit</div><div class="bank-sub">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;">Cancel</button></div></div>
-    <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label>📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div><div class="input-group"><label>💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="transaction-summary">💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary">← Back</button></div></div></div>
-    <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title">Withdraw Funds</div><div class="bank-sub">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn">Cancel</button></div></div>
-    <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub">Your account details</div></div></div><div class="input-group"><label>👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label>📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label>💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary">⏱️ Withdrawals processed within 24h.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary">← Back</button></div></div></div>
-    <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title">የቢንጎ ሕጎች</div><div class="bank-sub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong>💰 የመግቢያ ክፍያ፦</strong> 10/20/30 ብር (እንደ ምርጫዎ)</p><p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80% (1 ተጫዋች ከሆነ 100%)</p><p><strong>🎯 ማሸነፍ፦</strong> ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</p><p><strong>⏱️ የይገባኛል ጥያቄ፦</strong> ወዲያው “CLAIM BINGO!”</p></div><button id="closeRulesBtn" class="btn-primary">ገባኝ</button></div></div>
-    <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')">🎉 Amazing! 🎉</button></div></div>
+    <button id="langToggleBtn" class="lang-toggle">🌐 አማርኛ/English</button>
+
+    <!-- MODALS -->
+    <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;"><span data-key="cancel">Cancel</span></button></div></div>
+    <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div><div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="transaction-summary" data-key="depositHint">💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
+    <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
+    <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div><div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within 24h.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
+    <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
+    <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
 
     <!-- STAKE PAGE -->
     <div id="stakePage" class="page">
@@ -100,17 +103,17 @@
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
             <div class="players-badge">DOT BINGO</div>
         </div>
-        <h3 style="text-align:center; margin:20px 0 10px;">Choose Your Stake</h3>
+        <h3 style="text-align:center; margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
         <div class="stake-page-buttons">
             <button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button>
             <button id="stake20Btn" class="stake-option" data-stake="20">20 ETB</button>
             <button id="stake30Btn" class="stake-option" data-stake="30">30 ETB</button>
         </div>
         <div class="rules-text">
-            <p><strong>💰 የመግቢያ ክፍያ፦</strong> 10/20/30 ብር (እንደ ምርጫዎ)</p>
-            <p><strong>🏆 የሽልማት ገንዘብ፦</strong> 80% (1 ተጫዋች ከሆነ 100%)</p>
-            <p><strong>🎯 ማሸነፍ፦</strong> ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</p>
-            <p><strong>⏱️ የይገባኛል ጥያቄ፦</strong> ወዲያው “CLAIM BINGO!”</p>
+            <p><strong data-key="entryFeeLabelShort">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
+            <p><strong data-key="prizeLabelShort">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
+            <p><strong data-key="winLabelShort">🎯 ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
+            <p><strong data-key="claimLabelShort">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው “CLAIM BINGO!”</span></p>
         </div>
     </div>
 
@@ -118,34 +121,30 @@
     <div id="lobbyPage" class="page hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><h2>🎲 DOT BINGO</h2><div class="players-badge">👥 <span id="playersCount">0</span></div></div>
         <div class="balance-top">
-            <div>💰 BAL <span id="lobbyBalance">0</span> ETB</div>
+            <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance">0</span> ETB</div>
             <div style="display: flex; gap: 8px;">
-                <button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;">+Deposit</button>
-                <button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;">-Withdraw</button>
-                <button id="backToStakeBtn" style="background:#6c757d; border:none; border-radius:40px; padding:6px 14px; color:white;">↺ Stake</button>
+                <button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="deposit">+Deposit</span></button>
+                <button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="withdraw">-Withdraw</span></button>
+                <button id="backToStakeBtn" style="background:#6c757d; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="stakeBtn">↺ Stake</span></button>
             </div>
             <div class="timer-badge" id="lobbyTimer">30s</div>
         </div>
-        <div style="display:flex; justify-content:space-between; margin:12px 0;"><span>🎴 Pick card ID:</span><span>Selected: <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c; border:none; border-radius:40px; padding:6px 16px; color:white;">✨ Random Card</button></div>
+        <div style="display:flex; justify-content:space-between; margin:12px 0;"><span data-key="pickCard">🎴 Pick card ID:</span><span><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c; border:none; border-radius:40px; padding:6px 16px; color:white;" data-key="randomCard">✨ Random Card</button></div>
         <div id="numberGrid" class="grid-100"></div>
-        <div>🎴 Your Bingo Card Preview</div>
+        <div data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
         <div id="lobbyCardPreview" class="card-container"></div>
-        <div class="tab-bar"><button class="tab-btn active" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div>
-        <button id="rulesBtn" style="width:100%; background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa;">📜 Game Rules</button>
+        <div class="tab-bar"><button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
+        <button id="rulesBtn" style="width:100%; background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa;" data-key="rulesBtn">📜 Game Rules</button>
         <div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
     <!-- HISTORY, WALLET, PROFILE -->
-    <div id="historyPage" class="page hidden"><div class="page-header"><h2>📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn">← Back</button></div><div><strong>Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
-    <div id="walletPage" class="page hidden"><div class="page-header"><h2>💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn">← Back</button></div><div class="profile-stat"><div>Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary">- Withdraw</button></div></div>
-    <div id="profilePage" class="page hidden">
-        <div class="page-header"><h2>👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn">← Back</button></div>
-        <div class="profile-stat"><div>Username</div><div><strong id="profileUsername">Player</strong></div></div>
-        <div class="profile-stat"><div>💰 Balance</div><div id="profileBalancePage">0</div></div>
-    </div>
+    <div id="historyPage" class="page hidden"><div class="page-header"><h2 data-key="gameHistory">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div><div><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
+    <div id="walletPage" class="page hidden"><div class="page-header"><h2 data-key="myWallet">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="currentBalance">Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw">- Withdraw</button></div></div>
+    <div id="profilePage" class="page hidden"><div class="page-header"><h2 data-key="myProfile">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div></div>
 
     <!-- GAME PAGE -->
-    <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;">📜 Rules</button></div><div class="prize-pool"><span>🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby">🎮 Game</button><button class="tab-btn" data-page="history">📜 History</button><button class="tab-btn" data-page="wallet">💰 Wallet</button><button class="tab-btn" data-page="profile">👤 Profile</button></div></div>
+    <div id="gamePage" class="page hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h2>⚡ BINGO ARENA</h2><div class="players-badge">👥 <span id="gamePlayersCount">0</span></div></div><div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="deposit">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="withdraw">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;" data-key="rulesBtn">📜 Rules</button></div><div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div></div>
 
     <script>
         // ========== DOM ELEMENTS ==========
@@ -165,8 +164,8 @@
         const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
         let socket, userCard = [], markedNumbers = [], isGameActive = false, lobbyTimerInterval = null, selectedCardNumber = null;
         let depositAccounts = {}, selectedDepositType = null, selectedWithdrawType = null;
-        let serverTakenNumbers = new Set();   // Full set from server (all taken card numbers, including current player)
-        let displayTakenNumbers = new Set();  // For grid (excludes current player's own card)
+        let serverTakenNumbers = new Set();
+        let displayTakenNumbers = new Set();
         let currentBalance = 0, totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
         let currentMainPage = 'lobby', currentTimerSeconds = 30;
         let currentUtterance = null, soundMuted = false, speechUnlocked = false;
@@ -174,6 +173,75 @@
         let currentStake = 10;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
         
+        // ========== LANGUAGE SUPPORT ==========
+        let currentLang = 'bilingual';
+        const langToggleBtn = document.getElementById('langToggleBtn');
+        const langData = {
+            am: {
+                depositTitle: "ተቀማጭ", chooseMethod: "የክፍያ ዘዴ ይምረጡ", cancel: "ይቅር", sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
+                recipientLabel: "📞 ተቀባይ አካውንት (ለመቅዳት ይንኩ)", accountName: "የአካውንት ስም", yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
+                amountLabel: "💰 መጠን (ETB)", depositHint: "💡 ክፍያ ከላኩ በኋላ ይህን ቅጽ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ያረጋግጣል እና ገንዘብ ይጨምራል።",
+                requestDeposit: "✔ ተቀማጭ ጠይቅ", back: "← ተመለስ", withdrawTitle: "ገንዘብ አውጣ", selectMethod: "የማውጫ ዘዴ ይምረጡ",
+                yourDetails: "የአካውንትዎ ዝርዝሮች", fullName: "👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)", accountNumber: "📞 አካውንት / ስልክ ቁጥር",
+                amountWithdraw: "💰 መጠን (ETB) - ዝቅተኛ 20 ETB", withdrawHint: "⏱️ ገንዘብ ማውጣት በ24 ሰዓታት ውስጥ ይከናወናል።", requestWithdrawal: "✔ ገንዘብ ማውጣት ጠይቅ",
+                rulesTitle: "የቢንጎ ሕጎች", rulesSub: "75-ኳስ ክላሲክ", entryFeeLabel: "💰 የመግቢያ ክፍያ፦", entryFeeValue: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabel: "🏆 የሽልማት ገንዘብ፦", prizeValue: "80% (1 ተጫዋች ከሆነ 100%)", winLabel: "🎯 ማሸነፍ፦", winValue: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabel: "⏱️ የይገባኛል ጥያቄ፦", claimValue: "ወዲያው “CLAIM BINGO!”", gotIt: "ገባኝ", congrats: "እንኳን ደስ ያለዎት!", winningPrize: "🎁 የሽልማት ገንዘብ", amazing: "🎉 ደስ ያለኝ! 🎉",
+                chooseStake: "የመግቢያ ክፍያ ይምረጡ", bal: "ቀሪ ሂሳብ", deposit: "+ተቀማጭ", withdraw: "-ማውጣት", stakeBtn: "↺ ውርርድ",
+                pickCard: "🎴 የካርድ መለያ ይምረጡ:", selected: "የተመረጠው:", randomCard: "✨ በዘፈቀደ ካርድ", yourCardPreview: "🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
+                gameTab: "🎮 ጨዋታ", historyTab: "📜 ታሪክ", walletTab: "💰 ቦርሳ", profileTab: "👤 መገለጫ", rulesBtn: "📜 የጨዋታ ሕጎች",
+                gameHistory: "📜 የጨዋታ ታሪክ", totalGamesLabel: "ጠቅላላ ጨዋታዎች:", myWallet: "💰 ቦርሳዬ", currentBalance: "አሁን ያለው ቀሪ ሂሳብ",
+                myProfile: "👤 መገለጫዬ", usernameLabel: "የተጠቃሚ ስም", balanceLabel: "💰 ቀሪ ሂሳብ", prizePoolLabel: "🏆 የሽልማት ገንዘብ",
+                lastCall: "🎲 የመጨረሻ ጥሪ", calledPrefix: "የተጠሩ:", claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆"
+            },
+            en: {
+                depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel", sendPayment: "Send payment to the number below",
+                recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)", accountName: "ACCOUNT NAME", yourPhone: "📞 Your Phone Number (for verification)",
+                amountLabel: "💰 Amount (ETB)", depositHint: "💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.",
+                requestDeposit: "✔ Request Deposit", back: "← Back", withdrawTitle: "Withdraw Funds", selectMethod: "Select withdrawal method",
+                yourDetails: "Your account details", fullName: "👤 Full Name (as per bank/mobile money)", accountNumber: "📞 Account / Phone Number",
+                amountWithdraw: "💰 Amount (ETB) - Min 20 ETB", withdrawHint: "⏱️ Withdrawals processed within 24h.", requestWithdrawal: "✔ Request Withdrawal",
+                rulesTitle: "Bingo Rules", rulesSub: "75-ball Classic", entryFeeLabel: "💰 Entry Fee:", entryFeeValue: "10/20/30 Birr (as per your choice)",
+                prizeLabel: "🏆 Prize Money:", prizeValue: "80% (100% if 1 player)", winLabel: "🎯 Winning:", winValue: "Row, Column, Diagonal or 4 Corners",
+                claimLabel: "⏱️ Claim:", claimValue: "Immediately 'CLAIM BINGO!'", gotIt: "Got it", congrats: "Congratulations!", winningPrize: "🎁 WINNING PRIZE", amazing: "🎉 Amazing! 🎉",
+                chooseStake: "Choose Your Stake", bal: "BAL", deposit: "+Deposit", withdraw: "-Withdraw", stakeBtn: "↺ Stake",
+                pickCard: "🎴 Pick card ID:", selected: "Selected:", randomCard: "✨ Random Card", yourCardPreview: "🎴 Your Bingo Card Preview",
+                gameTab: "🎮 Game", historyTab: "📜 History", walletTab: "💰 Wallet", profileTab: "👤 Profile", rulesBtn: "📜 Game Rules",
+                gameHistory: "📜 Game History", totalGamesLabel: "Total Games:", myWallet: "💰 My Wallet", currentBalance: "Current Balance",
+                myProfile: "👤 My Profile", usernameLabel: "Username", balanceLabel: "💰 Balance", prizePoolLabel: "🏆 PRIZE POOL",
+                lastCall: "🎲 LAST CALL", calledPrefix: "Called:", claimBingo: "🏆 CLAIM BINGO! 🏆"
+            }
+        };
+        
+        function applyLanguage() {
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.getAttribute('data-key');
+                if (currentLang === 'bilingual') {
+                    const amText = langData.am[key] || '';
+                    const enText = langData.en[key] || '';
+                    el.innerText = `${amText} ${amText && enText ? '(' + enText + ')' : enText}`;
+                } else if (currentLang === 'am') {
+                    el.innerText = langData.am[key] || langData.en[key] || '';
+                } else {
+                    el.innerText = langData.en[key] || '';
+                }
+            });
+        }
+        
+        function toggleLanguage() {
+            if (currentLang === 'bilingual') currentLang = 'am';
+            else if (currentLang === 'am') currentLang = 'en';
+            else currentLang = 'bilingual';
+            applyLanguage();
+            localStorage.setItem('dot_bingo_lang', currentLang);
+        }
+        
+        langToggleBtn.addEventListener('click', toggleLanguage);
+        const savedLang = localStorage.getItem('dot_bingo_lang');
+        if (savedLang && ['bilingual', 'am', 'en'].includes(savedLang)) currentLang = savedLang;
+        applyLanguage();
+        
+        // ========== ORIGINAL GAME FUNCTIONS (unchanged) ==========
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
         function unlockSpeech() { if(speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(()=>window.speechSynthesis.cancel(),100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if(soundMuted && currentUtterance){ window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
@@ -181,212 +249,23 @@
         function getAmharicNumberWord(n) { const ones=["","አንድ","ሁለት","ሶስት","አራት","አምስት","ስድስት","ሰባት","ስምንት","ዘጠኝ"]; const tens=["","አስር","ሃያ","ሰላሳ","አርባ","ሃምሳ","ስልሳ","ሰባ","ሰማንያ","ዘጠና"]; if(n<=10){ if(n===10) return "አስር"; return ones[n]; } if(n<20) return "አስር " + (n===10?"":ones[n-10]); let ten=Math.floor(n/10), unit=n%10; if(unit===0) return tens[ten]; return tens[ten]+" "+ones[unit]; }
         function speakAmharicNumberWithLetter(number){ if(soundMuted||number<1||number>75) return; if(!speechUnlocked){ unlockSpeech(); setTimeout(()=>speakAmharicNumberWithLetter(number),100); return; } const fullText = getBingoLetterAmharic(number)+" "+getAmharicNumberWord(number); if(window.speechSynthesis){ if(currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang='am-ET'; utterance.rate=0.85; const voices=window.speechSynthesis.getVoices(); const amharicVoice=voices.find(v=>v.lang==='am-ET'||v.lang.startsWith('am')); if(amharicVoice) utterance.voice=amharicVoice; currentUtterance=utterance; window.speechSynthesis.speak(utterance); } }
         
-        // ========== PLAYER COUNT (based on FULL server taken set) ==========
-        function updatePlayerCountFromServer() {
-            const count = serverTakenNumbers.size;
-            if (playersCountEl) playersCountEl.innerText = count;
-            if (gamePlayersCountEl) gamePlayersCountEl.innerText = count;
-        }
+        function updatePlayerCountFromServer() { const count = serverTakenNumbers.size; if (playersCountEl) playersCountEl.innerText = count; if (gamePlayersCountEl) gamePlayersCountEl.innerText = count; }
         
-        // ========== HISTORY & STATS ==========
         function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
-        
-        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) {
-            totalGames++;
-            if(win){ totalWins++; totalEarned += playerPrize; }
-            recentGames.unshift({
-                gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost',
-                stake: stake, playerPrize: playerPrize, totalPrize: totalPrize || 0,
-                winnersList: winnersList || [], winningNumber: winningNumber || null
-            });
-            if(recentGames.length > 10) recentGames.pop();
-            saveStats(); updateStatsUI();
-        }
-        
-        function updateStatsUI(){
-            document.getElementById('totalGamesCount').innerText = totalGames;
-            // Profile total wins and total earned removed from HTML – no need to update
-            const recentDiv = document.getElementById('recentGamesList');
-            if(recentDiv){
-                if(recentGames.length){
-                    recentDiv.innerHTML = recentGames.map(g => {
-                        const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—');
-                        const lastNumberDisplay = g.winningNumber ? (()=>{ let l='B'; if(g.winningNumber>15) l='I'; if(g.winningNumber>30) l='N'; if(g.winningNumber>45) l='G'; if(g.winningNumber>60) l='O'; return `${l}-${g.winningNumber}`; })() : '—';
-                        const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—');
-                        return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
-                    }).join('');
-                } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>';
-            }
-        }
-        
+        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++; if(win){ totalWins++; totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null }); if(recentGames.length > 10) recentGames.pop(); saveStats(); updateStatsUI(); }
+        function updateStatsUI(){ document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if(recentDiv){ if(recentGames.length){ recentDiv.innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g.winningNumber ? (()=>{ let l='B'; if(g.winningNumber>15) l='I'; if(g.winningNumber>30) l='N'; if(g.winningNumber>45) l='G'; if(g.winningNumber>60) l='O'; return `${l}-${g.winningNumber}`; })() : '—'; const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
         function syncBalance(v){ currentBalance=v; lobbyBalanceEl.innerText=v; if(document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText=v; if(document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText=v; if(document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText=v; }
-        
-        function renderCard(card, containerId, clickable){ 
-            const cont = document.getElementById(containerId);
-            if(!cont) return;
-            cont.innerHTML = '';
-            if(!card || !Array.isArray(card) || card.length === 0){
-                cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>';
-                return;
-            }
-            const table = document.createElement('table');
-            table.style.borderCollapse = 'separate';
-            table.style.borderSpacing = '10px';
-            const thead = document.createElement('thead');
-            const hr = document.createElement('tr');
-            ['B','I','N','G','O'].forEach(l=>{let th=document.createElement('th'); th.textContent=l; hr.appendChild(th);});
-            thead.appendChild(hr);
-            table.appendChild(thead);
-            const tbody = document.createElement('tbody');
-            for(let r=0; r<5; r++){
-                const tr = document.createElement('tr');
-                for(let c=0; c<5; c++){
-                    const val = card[r][c];
-                    const td = document.createElement('td');
-                    td.textContent = val === 'FREE' ? '★' : val;
-                    if(val === 'FREE') td.classList.add('free');
-                    if(markedNumbers.includes(val)) td.classList.add('marked');
-                    if(clickable && val !== 'FREE'){
-                        td.style.cursor = 'pointer';
-                        td.onclick = () => { if(isGameActive && socket) socket.emit('markNumber', val); };
-                    }
-                    tr.appendChild(td);
-                }
-                tbody.appendChild(tr);
-            }
-            table.appendChild(tbody);
-            cont.appendChild(table);
-        }
-        
-        // Build the 1-100 grid using displayTakenNumbers (excludes own card)
-        function buildNumberGrid() { 
-            if(!numberGrid) return;
-            numberGrid.innerHTML=''; 
-            for(let i=1;i<=100;i++){ 
-                const cell=document.createElement('div'); 
-                cell.className='grid-cell'; 
-                cell.dataset.number=i; 
-                cell.textContent=i; 
-                const isTaken = displayTakenNumbers.has(i); 
-                const isOwn = (selectedCardNumber === i); 
-                if(isTaken && !isOwn){ 
-                    cell.classList.add('taken'); 
-                    cell.onclick=null; 
-                } else if(isOwn){ 
-                    cell.classList.add('own-card'); 
-                    cell.onclick=null; 
-                } else { 
-                    cell.onclick=()=>{ 
-                        if(!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)){ 
-                            if(selectedCardNumber !== null && selectedCardNumber !== i) {
-                                // Remove old from sets (server will handle, but we clean locally)
-                                serverTakenNumbers.delete(selectedCardNumber);
-                                displayTakenNumbers.delete(selectedCardNumber);
-                            }
-                            pendingSelection = i; 
-                            selectedCardNumber = i; 
-                            selectedNumberEl.textContent = i; 
-                            buildNumberGrid(); 
-                            socket.emit('selectCardNumber', i); 
-                        } 
-                    }; 
-                } 
-                numberGrid.appendChild(cell); 
-            } 
-        }
-        
-        // Update both server and display sets from server's takenNumbers array
-        function updateGridWithTakenNumbers(takenArray){ 
-            const newServerSet = new Set(takenArray); 
-            serverTakenNumbers = newServerSet;
-            // Display set excludes own card
-            const newDisplaySet = new Set(takenArray);
-            if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
-            displayTakenNumbers = newDisplaySet;
-            buildNumberGrid(); 
-            updatePlayerCountFromServer();
-        }
-        
+        function renderCard(card, containerId, clickable){ const cont = document.getElementById(containerId); if(!cont) return; cont.innerHTML = ''; if(!card || !Array.isArray(card) || card.length === 0){ cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>'; return; } const table = document.createElement('table'); table.style.borderCollapse = 'separate'; table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document.createElement('tr'); ['B','I','N','G','O'].forEach(l=>{let th=document.createElement('th'); th.textContent=l; hr.appendChild(th);}); thead.appendChild(hr); table.appendChild(thead); const tbody = document.createElement('tbody'); for(let r=0; r<5; r++){ const tr = document.createElement('tr'); for(let c=0; c<5; c++){ const val = card[r][c]; const td = document.createElement('td'); td.textContent = val === 'FREE' ? '★' : val; if(val === 'FREE') td.classList.add('free'); if(markedNumbers.includes(val)) td.classList.add('marked'); if(clickable && val !== 'FREE'){ td.style.cursor = 'pointer'; td.onclick = () => { if(isGameActive && socket) socket.emit('markNumber', val); }; } tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
+        function buildNumberGrid() { if(!numberGrid) return; numberGrid.innerHTML=''; for(let i=1;i<=100;i++){ const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.number=i; cell.textContent=i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i); if(isTaken && !isOwn){ cell.classList.add('taken'); cell.onclick=null; } else if(isOwn){ cell.classList.add('own-card'); cell.onclick=null; } else { cell.onclick=()=>{ if(!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)){ if(selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); } pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
+        function updateGridWithTakenNumbers(takenArray){ const newServerSet = new Set(takenArray); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(takenArray); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(); }
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
+        function showLobby(sec){ currentMainPage = 'lobby'; currentTimerSeconds = sec; stakePage.classList.add('hidden'); lobbyPage.classList.remove('hidden'); gamePage.classList.add('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=false; markedNumbers=[]; if(socket) socket.emit('getBalance'); startTimer(sec); if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); updateStatsUI(); updatePlayerCountFromServer(); }
+        function showGame(){ currentMainPage = 'game'; lobbyPage.classList.add('hidden'); gamePage.classList.remove('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=true; clearInterval(lobbyTimerInterval); if(socket) socket.emit('getBalance'); if(userCard.length) renderCard(userCard,'gameCard',true); updatePlayerCountFromServer(); }
+        function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; currentTimerSeconds = left; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
+        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
+        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; serverTakenNumbers.clear(); displayTakenNumbers.clear(); currentStake = null; if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); lobbyPage.classList.add('hidden'); gamePage.classList.add('hidden'); stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
         
-        function showLobby(sec){ 
-            currentMainPage = 'lobby';
-            currentTimerSeconds = sec;
-            stakePage.classList.add('hidden'); 
-            lobbyPage.classList.remove('hidden'); 
-            gamePage.classList.add('hidden'); 
-            historyPage.classList.add('hidden'); 
-            walletPage.classList.add('hidden'); 
-            profilePage.classList.add('hidden'); 
-            isGameActive=false; 
-            markedNumbers=[];
-            if(socket) socket.emit('getBalance'); 
-            startTimer(sec); 
-            if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
-            updateStatsUI(); 
-            updatePlayerCountFromServer();
-        }
-        
-        function showGame(){ 
-            currentMainPage = 'game';
-            lobbyPage.classList.add('hidden'); 
-            gamePage.classList.remove('hidden'); 
-            historyPage.classList.add('hidden'); 
-            walletPage.classList.add('hidden'); 
-            profilePage.classList.add('hidden'); 
-            isGameActive=true; 
-            clearInterval(lobbyTimerInterval); 
-            if(socket) socket.emit('getBalance'); 
-            if(userCard.length) renderCard(userCard,'gameCard',true); 
-            updatePlayerCountFromServer();
-        }
-        
-        function startTimer(sec){ 
-            let left=sec; 
-            lobbyTimerEl.textContent=left+'s'; 
-            clearInterval(lobbyTimerInterval); 
-            lobbyTimerInterval=setInterval(()=>{ 
-                left--; 
-                currentTimerSeconds = left;
-                if(left<=0){ 
-                    clearInterval(lobbyTimerInterval); 
-                    showGame(); 
-                } else lobbyTimerEl.textContent=left+'s'; 
-            },1000); 
-        }
-        
-        function goBackToMain() { 
-            if (currentMainPage === 'lobby') {
-                showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30);
-            } else if (currentMainPage === 'game') {
-                showGame();
-            } else {
-                showLobby(30);
-            }
-        }
-        
-        function goToStakeSelection() { 
-            if (socket) { socket.disconnect(); socket = null; } 
-            isGameActive = false; 
-            userCard = []; 
-            markedNumbers = []; 
-            selectedCardNumber = null; 
-            serverTakenNumbers.clear();
-            displayTakenNumbers.clear();
-            currentStake = null; 
-            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); 
-            lobbyPage.classList.add('hidden'); 
-            gamePage.classList.add('hidden'); 
-            stakePage.classList.remove('hidden'); 
-            if (selectedNumberEl) selectedNumberEl.textContent = '-'; 
-            pendingSelection = null; 
-            pendingRandom = false; 
-            currentGameId = null; 
-            unlockSpeech(); 
-        }
-        
-        // ========== DEPOSIT / WITHDRAW MODALS (unchanged) ==========
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
@@ -398,27 +277,7 @@
         let isSubmittingWithdraw=false;
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         
-        function showWinnerOverlay(data){ 
-            if(data.noWinner){ 
-                if(currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0);
-                alert('No winner this round.'); 
-                return; 
-            } 
-            const winnersList = data.winners || [data.winner].filter(Boolean);
-            const winningNumber = data.winningNumber;
-            const totalPrize = data.totalPrize || 0;
-            const playerPrize = data.prizeEach || 0;
-            const title = winnersList.length>1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉';
-            document.getElementById('winTitle').innerHTML=title;
-            document.getElementById('winListContainer').innerHTML=winnersList.map(w=>`<span class="winner-badge">${w}</span>`).join('');
-            document.getElementById('winPrize').innerHTML=playerPrize+' <small>ETB</small>';
-            document.getElementById('winnerOverlay').classList.add('active');
-            const confDiv=document.createElement('div'); confDiv.className='confetti';
-            for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); }
-            document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000);
-            if(currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize);
-            unlockSpeech();
-        }
+        function showWinnerOverlay(data){ if(data.noWinner){ if(currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length>1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersList.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=playerPrize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
         
         async function connectToGame(stake) {
             currentStake = stake;
@@ -431,36 +290,9 @@
             socket.on('balanceUpdate', syncBalance);
             socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(); } });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
-            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; 
-                // Update both sets from server data
-                const newServerSet = new Set(data.takenNumbers);
-                serverTakenNumbers = newServerSet;
-                // Display set excludes own card
-                const newDisplaySet = new Set(data.takenNumbers);
-                if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
-                displayTakenNumbers = newDisplaySet;
-                buildNumberGrid(); 
-                updatePlayerCountFromServer(); 
-                if(pendingSelection && data.number === pendingSelection){ 
-                    selectedCardNumber = data.number; 
-                    selectedNumberEl.textContent = data.number; 
-                    pendingSelection = null; 
-                    buildNumberGrid(); 
-                } 
-                if(pendingRandom && data.number){ 
-                    selectedCardNumber = data.number; 
-                    selectedNumberEl.textContent = data.number; 
-                    pendingRandom = false; 
-                    buildNumberGrid(); 
-                } 
-            });
+            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newServerSet = new Set(data.takenNumbers); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(data.takenNumbers); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
-            socket.on('playersCount', c => { 
-                // Override with server count (but we use local serverTakenNumbers for accuracy)
-                updatePlayerCountFromServer();
-                const prize = Math.floor(serverTakenNumbers.size * currentStake * 0.8); 
-                if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; 
-            });
+            socket.on('playersCount', c => { updatePlayerCountFromServer(); const prize = Math.floor(serverTakenNumbers.size * currentStake * 0.8); if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; });
             socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
             socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
             socket.on('markedNumbers', nums => { markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
