@@ -221,6 +221,55 @@ app.post('/admin/add-balance', async (req, res) => {
   res.json({ success: true, newBalance: user.balance });
 });
 
+// ---------- Delete user (removes from DB and active games) ----------
+app.post('/admin/delete-user', async (req, res) => {
+  const { secret, telegramId } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+
+  const strId = String(telegramId);
+  // Check if user exists
+  const { data: user, error: findErr } = await supabase
+    .from('users')
+    .select('telegram_id')
+    .eq('telegram_id', strId)
+    .maybeSingle();
+  if (findErr) return res.status(500).json({ error: findErr.message });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Delete from users table
+  const { error: delErr } = await supabase.from('users').delete().eq('telegram_id', strId);
+  if (delErr) return res.status(500).json({ error: delErr.message });
+
+  // Remove user from all active game states (10,20,30)
+  for (const stake of [10, 20, 30]) {
+    const game = games[stake];
+    if (!game) continue;
+
+    const playerIndex = game.players.findIndex(p => p.telegramId === strId);
+    if (playerIndex !== -1) {
+      const player = game.players[playerIndex];
+      if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
+      game.players.splice(playerIndex, 1);
+
+      io.to(`stake_${stake}`).emit('cardTaken', {
+        stake,
+        number: player.cardNumber,
+        takenNumbers: Array.from(game.takenCardNumbers)
+      });
+      io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
+
+      if (game.status === 'running' && game.players.length === 0) {
+        clearInterval(game.callInterval);
+        endGameWithWinners(stake);
+      }
+    }
+  }
+
+  delete users[strId];
+  Audit.adminAction('ADMIN_DELETE_USER', 'admin', req.ip, { targetUserId: strId });
+  res.json({ success: true, message: `User ${strId} deleted and removed from active games.` });
+});
+
 // ---------- Bingo card generator ----------
 function generateCard() {
   const columns = [
@@ -245,7 +294,7 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Multi-stake game states (10, 20, 30 ETB) ----------
+// ---------- Multi-stake game states (10,20,30) ----------
 function createGameState(entryFee) {
   return {
     status: 'lobby',
@@ -621,12 +670,11 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics endpoints (with date range & withdrawals by method) ----------
+// ---------- Statistics endpoints (with date range & method breakdown) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
 
-// ✅ Stats summary with date range (from, to) – INCLUDES WITHDRAWALS BY METHOD
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret, from, to } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
