@@ -2,424 +2,159 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎲 Bingo Dashboard – Live Analytics</title>
-  <!-- Chart.js for graphs -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <!-- Socket.IO for live players -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>👥 User Management | Bingo Admin</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0f1c;
-      color: #eef2ff;
-      padding: 20px;
-    }
-
-    .dashboard-container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    /* Header */
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 28px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid #1e2a3a;
-    }
-    h1 {
-      font-size: 1.8rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f39c12, #e67e22);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-    }
-    .badge {
-      background: #1e2a36;
-      padding: 8px 16px;
-      border-radius: 60px;
-      font-size: 0.8rem;
-      color: #f39c12;
-    }
-
-    /* Stats cards grid */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-      margin-bottom: 32px;
-    }
-    .stat-card {
-      background: #16202a;
-      border-radius: 28px;
-      padding: 20px;
-      border-left: 4px solid #f39c12;
-      transition: 0.2s;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    .stat-title {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #9ca3af;
-      margin-bottom: 8px;
-    }
-    .stat-number {
-      font-size: 2.2rem;
-      font-weight: 800;
-      color: #f39c12;
-    }
-    .stat-number.deposit { color: #2ecc71; }
-    .stat-number.withdraw { color: #e74c3c; }
-    .stat-number.profit { color: #f39c12; }
-
-    /* Two column layout */
-    .two-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      margin-bottom: 32px;
-    }
-    .card {
-      background: #16202a;
-      border-radius: 28px;
-      padding: 20px;
-    }
-    .card-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 16px;
-      border-left: 3px solid #f39c12;
-      padding-left: 12px;
-    }
-    .players-stake {
-      display: flex;
-      justify-content: space-between;
-      background: #1e2a36;
-      padding: 12px 16px;
-      border-radius: 60px;
-      margin-bottom: 12px;
-    }
-    .stake-label {
-      font-weight: 700;
-      background: #f39c12;
-      color: #0a0f1c;
-      padding: 4px 14px;
-      border-radius: 40px;
-      font-size: 0.8rem;
-    }
-    .player-count {
-      font-size: 1.3rem;
-      font-weight: 800;
-    }
-    .activity-item {
-      padding: 12px 0;
-      border-bottom: 1px solid #1e2a3a;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .activity-time {
-      font-size: 0.7rem;
-      color: #9ca3af;
-    }
-    .winner-name {
-      color: #2ecc71;
-      font-weight: 600;
-    }
-
-    /* Pending requests summary */
-    .pending-summary {
-      display: flex;
-      gap: 16px;
-      margin-top: 16px;
-    }
-    .pending-item {
-      flex: 1;
-      text-align: center;
-      background: #1e2a36;
-      border-radius: 24px;
-      padding: 12px;
-    }
-    .pending-number {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: #f39c12;
-    }
-
-    /* Chart container */
-    .chart-container {
-      margin-top: 16px;
-      height: 250px;
-    }
-
-    /* Responsive */
-    @media (max-width: 800px) {
-      .two-columns { grid-template-columns: 1fr; }
-      body { padding: 12px; }
-      .stat-number { font-size: 1.6rem; }
-    }
-
-    .refresh-btn {
-      background: #3498db;
-      border: none;
-      padding: 8px 20px;
-      border-radius: 60px;
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      transition: 0.1s;
-    }
-    .refresh-btn:active { transform: scale(0.96); }
-    .last-update {
-      font-size: 0.7rem;
-      color: #7f8c8d;
-      margin-top: 8px;
-      text-align: right;
-    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #f39c12; font-size: 1.6rem; margin: 0 0 16px; text-align: center; }
+    .total-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
+    .total-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; font-weight: bold; }
+    .total-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
+    .stats-bar { background: #2c3e50; border-radius: 40px; padding: 10px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .players-table-wrapper { background: #0f1724; border-radius: 24px; padding: 4px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 500px; }
+    th { text-align: left; padding: 12px 8px; background: #0f1724; color: #f39c12; font-weight: bold; border-bottom: 2px solid #f39c12; }
+    td { padding: 12px 8px; border-bottom: 1px solid #2c3e50; vertical-align: middle; }
+    .handle { color: #2ecc71; font-family: monospace; }
+    .telegram-id { font-family: monospace; font-size: 0.75rem; background: #0f1724; padding: 4px 6px; border-radius: 8px; display: inline-block; }
+    .balance-positive { color: #2ecc71; font-weight: bold; }
+    .balance-zero { color: #95a5a6; }
+    .balance-negative { color: #e74c3c; font-weight: bold; }
+    button { background: #f39c12; border: none; padding: 10px 20px; border-radius: 48px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.1s; }
+    .delete-btn { background: #e74c3c; color: white; padding: 4px 12px; font-size: 0.75rem; }
+    .refresh-btn { background: #3498db; color: white; margin-bottom: 20px; width: auto; display: inline-block; }
+    button:active { transform: scale(0.97); }
+    .empty-message { text-align: center; padding: 32px 20px; color: #95a5a6; font-style: italic; }
+    .footer { text-align: center; font-size: 0.7rem; margin-top: 24px; color: #5d6d7e; }
+    @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-value { font-size: 1.4rem; } }
   </style>
 </head>
 <body>
-<div class="dashboard-container">
-  <div class="header">
-    <h1>🎲 Bingo Dashboard</h1>
-    <div><button class="refresh-btn" id="refreshBtn">⟳ Refresh Data</button></div>
+<div class="container">
+  <h1>👥 User Management</h1>
+
+  <div class="total-card">
+    <span class="total-label">💰 TOTAL BALANCE (All users)</span>
+    <span class="total-value" id="totalBalanceSum">0</span>
+  </div>
+  <div class="stats-bar">
+    <span>👥 Total registered:</span>
+    <span id="registeredCount">0</span>
+    <button id="refreshBtn" class="refresh-btn">⟳ Refresh List</button>
   </div>
 
-  <!-- Top Stats Cards -->
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-title">💰 TOTAL DEPOSITS</div><div class="stat-number deposit" id="totalDeposits">0</div></div>
-    <div class="stat-card"><div class="stat-title">💸 TOTAL WITHDRAWALS</div><div class="stat-number withdraw" id="totalWithdrawals">0</div></div>
-    <div class="stat-card"><div class="stat-title">🏦 HOUSE PROFIT</div><div class="stat-number profit" id="houseProfit">0</div></div>
-    <div class="stat-card"><div class="stat-title">👥 TOTAL REGISTERED</div><div class="stat-number" id="totalUsers">0</div></div>
+  <div class="players-table-wrapper">
+    <table id="usersTable">
+      <thead>
+        <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="usersTableBody">
+        <tr><td colspan="5" class="empty-message">Loading users…</td></tr>
+      </tbody>
+    </table>
   </div>
-
-  <!-- Two columns: Active Players + Recent Activity -->
-  <div class="two-columns">
-    <!-- Active players per stake -->
-    <div class="card">
-      <div class="card-title">🎯 Active Players by Stake</div>
-      <div id="stakePlayersContainer">
-        <div class="players-stake"><span class="stake-label">10 ETB</span><span id="players10" class="player-count">0</span></div>
-        <div class="players-stake"><span class="stake-label">20 ETB</span><span id="players20" class="player-count">0</span></div>
-        <div class="players-stake"><span class="stake-label">30 ETB</span><span id="players30" class="player-count">0</span></div>
-      </div>
-      <div class="pending-summary">
-        <div class="pending-item"><div>⏳ Pending Deposits</div><div class="pending-number" id="pendingDeposits">0</div></div>
-        <div class="pending-item"><div>⏳ Pending Withdrawals</div><div class="pending-number" id="pendingWithdrawals">0</div></div>
-      </div>
-    </div>
-
-    <!-- Recent Activity Feed -->
-    <div class="card">
-      <div class="card-title">📋 Recent Activity</div>
-      <div id="recentActivityList">
-        <div class="activity-item">Loading recent games...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Chart: Deposit / Withdrawal Trend (mock or real?) -->
-  <div class="card">
-    <div class="card-title">📊 Weekly Deposits vs Withdrawals (Last 7 days)</div>
-    <div class="chart-container">
-      <canvas id="trendChart"></canvas>
-    </div>
-  </div>
-  <div class="last-update" id="lastUpdateTime">Last update: --</div>
+  <div class="footer">⚠️ Deleting a user removes them from all active games and the database. They can rejoin as a new player.</div>
 </div>
 
 <script>
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
-
-  let depositChart = null;
-  let autoRefreshInterval = null;
-
-  // Helper: format time
-  function updateTimestamp() {
-    document.getElementById('lastUpdateTime').innerText = `Last update: ${new Date().toLocaleTimeString()}`;
-  }
-
-  // Fetch totals (with no date filter for overall)
-  async function fetchTotals() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
-        document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
-        document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (err) {
-      console.error('Totals error:', err);
-      document.getElementById('totalDeposits').innerText = '?';
-      document.getElementById('totalWithdrawals').innerText = '?';
-      document.getElementById('houseProfit').innerText = '?';
-    }
-  }
-
-  // Fetch total registered users
-  async function fetchRegisteredUsers() {
-    try {
-      // Use admin namespace endpoint via socket? but easier: we have /admin/audit-summary maybe not.
-      // We'll use the getAllRegisteredPlayers from admin socket. But for simplicity, fetch via admin endpoint if exists.
-      // Alternative: we can fetch from /admin/stats-summary? but it doesn't return user count.
-      // Let's use a direct supabase query through a custom endpoint? But we don't have it.
-      // Instead we can use the same socket method: we'll connect to admin socket to get all registered players count.
-      // But for simplicity, we'll create a fetch to a new endpoint? Wait – in the original server there's no endpoint for total registered.
-      // I'll add a call to admin namespace via socket later.
-      // For now, we'll get it from the admin:allRegisteredPlayers event.
-      // I'll handle it via the Socket.IO connection below.
-    } catch (err) { console.warn(err); }
-  }
-
-  // Fetch pending deposit/withdrawal counts
-  async function fetchPendingCounts() {
-    try {
-      const [depRes, wdRes] = await Promise.all([
-        fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`),
-        fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`)
-      ]);
-      const deposits = await depRes.json();
-      const withdrawals = await wdRes.json();
-      document.getElementById('pendingDeposits').innerText = (deposits.requests || []).length;
-      document.getElementById('pendingWithdrawals').innerText = (withdrawals.requests || []).length;
-    } catch (err) {
-      console.error('Pending counts error:', err);
-    }
-  }
-
-  // Fetch recent games from localStorage (or from server if available)
-  async function fetchRecentGames() {
-    try {
-      // Try to get from localStorage (client-side history)
-      const stored = localStorage.getItem('dot_bingo_recent_games');
-      if (stored) {
-        const games = JSON.parse(stored).slice(0, 8);
-        const container = document.getElementById('recentActivityList');
-        if (games.length === 0) {
-          container.innerHTML = '<div class="activity-item">No recent games yet.</div>';
-        } else {
-          container.innerHTML = games.map(g => `
-            <div class="activity-item">
-              <div><strong>${g.gameId}</strong><br><span class="activity-time">${g.date}</span></div>
-              <div>${g.result === 'Win' ? '🏆 WIN' : '❌ LOST'} | ${g.prize || 0} ETB</div>
-              <div>Stake: ${g.stake} ETB</div>
-            </div>
-          `).join('');
-        }
-      } else {
-        document.getElementById('recentActivityList').innerHTML = '<div class="activity-item">No recent games found.</div>';
-      }
-    } catch (err) {
-      console.error('Recent games error:', err);
-    }
-  }
-
-  // Chart: weekly deposits/withdrawals (mock data for demo, but you can extend)
-  async function loadChartData() {
-    // Ideally fetch from a weekly summary endpoint. For now, generate sample based on totals.
-    try {
-      const res = await fetch(`${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      if (data.success) {
-        // Dummy weekly distribution based on total (just for visual)
-        const totalDep = data.totalDeposits || 0;
-        const totalWtd = data.totalWithdrawals || 0;
-        const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        // Distribute 70% of total across week
-        const depositsWeekly = weekLabels.map(() => Math.floor(totalDep * (0.1 + Math.random() * 0.2)));
-        const withdrawalsWeekly = weekLabels.map(() => Math.floor(totalWtd * (0.05 + Math.random() * 0.15)));
-        
-        if (depositChart) depositChart.destroy();
-        const ctx = document.getElementById('trendChart').getContext('2d');
-        depositChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: weekLabels,
-            datasets: [
-              { label: 'Deposits (ETB)', data: depositsWeekly, borderColor: '#2ecc71', backgroundColor: 'rgba(46,204,113,0.1)', tension: 0.3, fill: true },
-              { label: 'Withdrawals (ETB)', data: withdrawalsWeekly, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', tension: 0.3, fill: true }
-            ]
-          },
-          options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#eef2ff' } } }, scales: { y: { ticks: { color: '#eef2ff' }, grid: { color: '#1e2a3a' } }, x: { ticks: { color: '#eef2ff' }, grid: { color: '#1e2a3a' } } } }
-        });
-      }
-    } catch(e) { console.warn('Chart data error', e); }
-  }
-
-  // ----- Socket.IO for live players per stake -----
   let adminSocket = null;
+
+  function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
   function connectAdminSocket() {
     if (adminSocket) adminSocket.disconnect();
     adminSocket = io('/admin', { query: { secret: ADMIN_SECRET } });
-    
     adminSocket.on('connect', () => {
-      console.log('Admin socket connected for dashboard');
-      adminSocket.emit('admin:requestPlayers');
-    });
-    
-    adminSocket.on('admin:playersList', (data) => {
-      const players = data.players || [];
-      const players10 = players.filter(p => p.stake === 10).length;
-      const players20 = players.filter(p => p.stake === 20).length;
-      const players30 = players.filter(p => p.stake === 30).length;
-      document.getElementById('players10').innerText = players10;
-      document.getElementById('players20').innerText = players20;
-      document.getElementById('players30').innerText = players30;
-      
-      // Also get total registered users from the same socket? Request them.
+      console.log('Admin socket connected for user management');
       adminSocket.emit('admin:getAllRegisteredPlayers');
     });
-    
     adminSocket.on('admin:allRegisteredPlayers', (data) => {
-      const users = data.users || [];
-      document.getElementById('totalUsers').innerText = users.length.toLocaleString();
+      renderUsersTable(data.users);
     });
-    
     adminSocket.on('connect_error', (err) => {
-      console.error('Admin socket error:', err);
+      console.error('Socket error:', err);
+      document.getElementById('usersTableBody').innerHTML = '<td><td colspan="5" class="empty-message">❌ WebSocket error – check secret and server.</td></tr>';
     });
   }
 
-  // Full refresh of all data
-  async function refreshAll() {
-    await fetchTotals();
-    await fetchPendingCounts();
-    await fetchRecentGames();
-    await loadChartData();
-    if (adminSocket) adminSocket.emit('admin:requestPlayers');
-    updateTimestamp();
+  function renderUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    const countSpan = document.getElementById('registeredCount');
+    countSpan.innerText = users ? users.length : 0;
+
+    let totalBalance = 0;
+    if (users && users.length > 0) {
+      totalBalance = users.reduce((sum, u) => sum + (u.balance || 0), 0);
+    }
+    document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
+
+    if (!users || users.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-message">📭 No registered users found.</td></tr>';
+      return;
+    }
+
+    const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
+    let html = '';
+    sorted.forEach(user => {
+      const telegramId = escapeHtml(user.telegramId);
+      const username = escapeHtml(user.username) || '—';
+      const balance = user.balance ?? 0;
+      const handle = user.telegram_handle;
+      const handleDisplay = handle ? `@${handle}` : '—';
+      let balanceClass = 'balance-zero';
+      if (balance > 0) balanceClass = 'balance-positive';
+      else if (balance < 0) balanceClass = 'balance-negative';
+      const formattedBalance = balance.toLocaleString();
+
+      html += `
+        <tr>
+          <td><span class="handle">${handleDisplay}</span></td>
+          <td><span class="telegram-id">${telegramId}</span></td>
+          <td>📱 ${username}</td>
+          <td><span class="${balanceClass}">${formattedBalance}</span></td>
+          <td><button class="delete-btn" data-id="${telegramId}" style="background:#e74c3c; padding:4px 12px;">🗑️ Delete</button></td>
+        </tr>
+      `;
+    });
+    tbody.innerHTML = html;
+
+    // Attach delete event listeners
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.removeEventListener('click', handleDelete);
+      btn.addEventListener('click', handleDelete);
+    });
   }
 
-  // Auto-refresh every 30 seconds
-  function startAutoRefresh() {
-    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
-    autoRefreshInterval = setInterval(() => {
-      refreshAll();
-    }, 30000);
+  async function handleDelete(e) {
+    const telegramId = e.currentTarget.getAttribute('data-id');
+    if (!confirm(`⚠️ Delete user ${telegramId}?\nThis will remove them from all active games and database permanently.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/delete-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId })
+      });
+      const data = await res.json();
+      alert(data.success ? `User ${telegramId} deleted.` : `Error: ${data.error}`);
+      if (data.success && adminSocket) {
+        adminSocket.emit('admin:getAllRegisteredPlayers');
+        // Also refresh financial stats in main admin panel if needed – but this page doesn't show them.
+      }
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`);
+    }
   }
 
-  // Initialization
+  document.getElementById('refreshBtn').addEventListener('click', () => {
+    if (adminSocket) adminSocket.emit('admin:getAllRegisteredPlayers');
+  });
+
   connectAdminSocket();
-  refreshAll();
-  startAutoRefresh();
-  document.getElementById('refreshBtn').addEventListener('click', refreshAll);
 </script>
 </body>
 </html>
