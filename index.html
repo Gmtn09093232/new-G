@@ -90,7 +90,7 @@
 <body>
     <button id="langToggleBtn" class="lang-toggle">🌐 አማርኛ/English</button>
 
-    <!-- MODALS (unchanged) -->
+    <!-- MODALS -->
     <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;"><span data-key="cancel">Cancel</span></button></div></div>
     <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div><div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="transaction-summary" data-key="depositHint">💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
@@ -276,13 +276,7 @@
         function loadStats(){ try{ totalGames=parseInt(localStorage.getItem('dot_bingo_total_games')||'0'); totalWins=parseInt(localStorage.getItem('dot_bingo_total_wins')||'0'); totalEarned=parseInt(localStorage.getItem('dot_bingo_total_earned')||'0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games')||'[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch(e){ recentGames=[]; } updateStatsUI(); }
         function saveStats(){ localStorage.setItem('dot_bingo_total_games',totalGames); localStorage.setItem('dot_bingo_total_wins',totalWins); localStorage.setItem('dot_bingo_total_earned',totalEarned); localStorage.setItem('dot_bingo_recent_games',JSON.stringify(recentGames.slice(0,10))); }
         function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++; if(win){ totalWins++; totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null }); if(recentGames.length > 10) recentGames.pop(); saveStats(); updateStatsUI(); }
-        function updateStatsUI(){ document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if(recentDiv){ if(recentGames.length){ recentDiv.innerHTML = recentGames.map(g => { 
-            // Display winners as card numbers if they are numbers, else as usernames (fallback)
-            const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.map(w => isNaN(w) ? w : `#${w}`).join(', ') : (g.result === 'Win' ? 'You' : '—');
-            const lastNumberDisplay = g.winningNumber ? (()=>{ let l='B'; if(g.winningNumber>15) l='I'; if(g.winningNumber>30) l='N'; if(g.winningNumber>45) l='G'; if(g.winningNumber>60) l='O'; return `${l}-${g.winningNumber}`; })() : '—';
-            const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—');
-            return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
-        }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
+        function updateStatsUI(){ document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if(recentDiv){ if(recentGames.length){ recentDiv.innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g.winningNumber ? (()=>{ let l='B'; if(g.winningNumber>15) l='I'; if(g.winningNumber>30) l='N'; if(g.winningNumber>45) l='G'; if(g.winningNumber>60) l='O'; return `${l}-${g.winningNumber}`; })() : '—'; const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
         function syncBalance(v){ currentBalance=v; lobbyBalanceEl.innerText=v; if(document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText=v; if(document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText=v; if(document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText=v; }
         function renderCard(card, containerId, clickable){ const cont = document.getElementById(containerId); if(!cont) return; cont.innerHTML = ''; if(!card || !Array.isArray(card) || card.length === 0){ cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>'; return; } const table = document.createElement('table'); table.style.borderCollapse = 'separate'; table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document.createElement('tr'); ['B','I','N','G','O'].forEach(l=>{let th=document.createElement('th'); th.textContent=l; hr.appendChild(th);}); thead.appendChild(hr); table.appendChild(thead); const tbody = document.createElement('tbody'); for(let r=0; r<5; r++){ const tr = document.createElement('tr'); for(let c=0; c<5; c++){ const val = card[r][c]; const td = document.createElement('td'); td.textContent = val === 'FREE' ? '★' : val; if(val === 'FREE') td.classList.add('free'); if(markedNumbers.includes(val)) td.classList.add('marked'); if(clickable && val !== 'FREE'){ td.style.cursor = 'pointer'; td.onclick = () => { if(isGameActive && socket) socket.emit('markNumber', val); }; } tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
         function buildNumberGrid() { if(!numberGrid) return; numberGrid.innerHTML=''; for(let i=1;i<=100;i++){ const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.number=i; cell.textContent=i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i); if(isTaken && !isOwn){ cell.classList.add('taken'); cell.onclick=null; } else if(isOwn){ cell.classList.add('own-card'); cell.onclick=null; } else { cell.onclick=()=>{ if(!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)){ if(selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); } pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
@@ -305,55 +299,7 @@
         let isSubmittingWithdraw=false;
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         
-        // ========== SHOW WINNER OVERLAY (modified to display card numbers) ==========
-        function showWinnerOverlay(data) {
-            if (data.noWinner) {
-                if (currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0);
-                alert('No winner this round.');
-                return;
-            }
-            // Use winnerCardNumbers if provided, fallback to winners (usernames)
-            let displayWinners = data.winnerCardNumbers || data.winners || [];
-            // If we have usernames but want to show card numbers? Actually we send both, but we prioritize winnerCardNumbers.
-            // If winnerCardNumbers is not present (old data), we fallback to winners (usernames) – but we want numbers now.
-            const winningNumber = data.winningNumber;
-            const totalPrize = data.totalPrize || 0;
-            const playerPrize = data.prizeEach || 0;
-            
-            // Build display strings: if the value is a number, show as "#X", else as is (username)
-            const winnerDisplay = displayWinners.map(w => {
-                // If it's a number (card number), show as "#42"
-                if (!isNaN(w) && w !== null && w !== undefined && w !== '') {
-                    return `#${w}`;
-                }
-                return w; // fallback to username
-            });
-            
-            const title = winnerDisplay.length > 1 ? `${winnerDisplay.length} WINNERS!` : '🎉 BINGO! 🎉';
-            document.getElementById('winTitle').innerHTML = title;
-            document.getElementById('winListContainer').innerHTML = winnerDisplay.map(w => `<span class="winner-badge">${w}</span>`).join('');
-            document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>';
-            document.getElementById('winnerOverlay').classList.add('active');
-            
-            // Confetti
-            const confDiv = document.createElement('div');
-            confDiv.className = 'confetti';
-            for (let i = 0; i < 120; i++) {
-                let p = document.createElement('div');
-                p.className = 'confetti-piece';
-                p.style.left = Math.random() * 100 + '%';
-                p.style.animationDuration = (Math.random() * 3 + 2) + 's';
-                p.style.backgroundColor = `hsl(${Math.random() * 30 + 20},90%,60%)`;
-                confDiv.appendChild(p);
-            }
-            document.body.appendChild(confDiv);
-            setTimeout(() => confDiv.remove(), 4000);
-            
-            // Save to history using the same display list (store the raw numbers, not the formatted "#X")
-            const historyWinners = displayWinners; // raw numbers or usernames
-            if (currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, historyWinners, winningNumber, totalPrize);
-            unlockSpeech();
-        }
+        function showWinnerOverlay(data){ if(data.noWinner){ if(currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length>1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersList.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=playerPrize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
 
         // ========== AUTH & SOCKET SETUP ==========
         async function authenticateAndConnect() {
