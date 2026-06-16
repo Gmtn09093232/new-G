@@ -350,7 +350,7 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
-// ---------- Broadcast player counts to ALL connected clients ----------
+// ---------- Broadcast player counts ----------
 function broadcastGlobalCounts() {
   const counts = {
     10: games[10].players.length,
@@ -531,11 +531,15 @@ async function endGameWithWinners(stake) {
       }
     });
 
+    // --- NEW: collect card numbers for the winner announcement ---
+    const winnerCardNumbers = game.winners.map(w => w.cardNumber);
     const winnerNames = game.winners.map(w => w.username);
+
     io.to(`stake_${stake}`).emit('gameEnded', {
       stake,
-      winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
-      winners: winnerNames,
+      winnerCardNumbers,           // <-- new field for frontend to display
+      winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`, // fallback
+      winners: winnerNames,        // keep for backward compatibility
       prizeEach,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
@@ -913,7 +917,8 @@ io.on('connection', async (socket) => {
     if (game.winningNumber === null) {
       game.winningNumber = lastCalled;
     }
-    game.winners.push({ telegramId: socket.userId, username: socket.username });
+    // Store the winner with cardNumber
+    game.winners.push({ telegramId: socket.userId, username: socket.username, cardNumber: player.cardNumber });
     Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
     socket.emit('bingoValid');
     if (!game.bingoGraceTimeout && game.winners.length === 1) {
