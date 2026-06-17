@@ -40,7 +40,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger ----------
+// ---------- Audit Logger (unchanged) ----------
 async function logAuditEvent({
   eventType,
   roomId = null,
@@ -193,7 +193,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   });
 });
 
-// ---------- Admin add balance ----------
+// ---------- Admin add balance (records manual deposit) ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -222,7 +222,7 @@ app.post('/admin/add-balance', async (req, res) => {
   res.json({ success: true, newBalance: user.balance });
 });
 
-// ---------- DELETE USER ----------
+// ---------- DELETE USER (removes from DB and active games) ----------
 app.post('/admin/delete-user', async (req, res) => {
   const { secret, telegramId } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -239,6 +239,7 @@ app.post('/admin/delete-user', async (req, res) => {
   const { error: delErr } = await supabase.from('users').delete().eq('telegram_id', strId);
   if (delErr) return res.status(500).json({ error: delErr.message });
 
+  // Remove from all active game stakes
   for (const stake of [10, 20, 30]) {
     const game = games[stake];
     if (!game) continue;
@@ -262,8 +263,6 @@ app.post('/admin/delete-user', async (req, res) => {
 
   delete users[strId];
   Audit.adminAction('ADMIN_DELETE_USER', 'admin', req.ip, { targetUserId: strId });
-  broadcastGlobalCounts();
-  notifyAdminClients();
   res.json({ success: true, message: `User ${strId} deleted and removed from active games.` });
 });
 
@@ -291,7 +290,7 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Multi-stake game states ----------
+// ---------- Multi-stake game states (10,20,30) ----------
 function createGameState(entryFee) {
   return {
     status: 'lobby',
@@ -320,6 +319,7 @@ function getGame(stake) {
   return games[stake];
 }
 
+// Helper to get combined players list for admin (all stakes)
 function getAllPlayersList() {
   const allPlayers = [];
   for (const stake of [10, 20, 30]) {
@@ -350,16 +350,6 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
-// ---------- Broadcast player counts to ALL connected clients ----------
-function broadcastGlobalCounts() {
-  const counts = {
-    10: games[10].players.length,
-    20: games[20].players.length,
-    30: games[30].players.length
-  };
-  io.emit('globalCounts', counts);
-}
-
 // Reset a specific stake's game
 function resetGame(stake) {
   const game = getGame(stake);
@@ -378,10 +368,9 @@ function resetGame(stake) {
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
   io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
-  broadcastGlobalCounts();
-  notifyAdminClients();
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
+  notifyAdminClients();
 }
 
 async function startGame(stake) {
@@ -398,7 +387,6 @@ async function startGame(stake) {
   }
   io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
   io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
-  broadcastGlobalCounts();
   notifyAdminClients();
 
   if (game.players.length === 0) {
@@ -430,7 +418,6 @@ async function startGame(stake) {
   game.calledNumbers = [];
   game.winningNumber = null;
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
-  broadcastGlobalCounts();
   notifyAdminClients();
   startCalling(stake);
 }
@@ -679,7 +666,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics endpoints ----------
+// ---------- Statistics endpoints (with date range & method breakdown) ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
@@ -720,6 +707,7 @@ app.get('/admin/stats-summary', async (req, res) => {
     if (rdErr) throw rdErr;
     const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
 
+    // Deposits by method
     let methodQuery = supabase.from('deposit_requests').select('amount, payment_type').eq('status', 'approved');
     if (from) methodQuery = methodQuery.gte('created_at', new Date(from).toISOString());
     if (to) methodQuery = methodQuery.lte('created_at', new Date(to).toISOString());
@@ -735,6 +723,7 @@ app.get('/admin/stats-summary', async (req, res) => {
       });
     }
 
+    // Withdrawals by method
     let withdrawalMethodQuery = supabase.from('withdrawal_requests').select('amount, withdrawal_type').eq('status', 'approved');
     if (from) withdrawalMethodQuery = withdrawalMethodQuery.gte('created_at', new Date(from).toISOString());
     if (to) withdrawalMethodQuery = withdrawalMethodQuery.lte('created_at', new Date(to).toISOString());
@@ -809,7 +798,6 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   let currentStake = null;
   
-  broadcastGlobalCounts();
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
   
   socket.on('joinLobby', ({ stake }) => {
@@ -852,7 +840,6 @@ io.on('connection', async (socket) => {
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
     io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
-    broadcastGlobalCounts();
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
@@ -875,7 +862,6 @@ io.on('connection', async (socket) => {
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
     io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
-    broadcastGlobalCounts();
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
@@ -923,24 +909,6 @@ io.on('connection', async (socket) => {
   });
   
   socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
-  
-  socket.on('disconnect', async () => {
-    if (currentStake) {
-      const game = getGame(currentStake);
-      if (game && game.status === 'lobby') {
-        const playerIndex = game.players.findIndex(p => p.telegramId === socket.userId);
-        if (playerIndex !== -1) {
-          const player = game.players[playerIndex];
-          if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
-          game.players.splice(playerIndex, 1);
-          io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: player.cardNumber, takenNumbers: Array.from(game.takenCardNumbers) });
-          io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
-          broadcastGlobalCounts();
-          notifyAdminClients();
-        }
-      }
-    }
-  });
 });
 
 // ---------- Admin namespace ----------
