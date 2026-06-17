@@ -351,14 +351,26 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
-// ---------- GLOBAL PLAYER COUNT BROADCAST (for stake page) ----------
+// ---------- PUBLIC NAMESPACE (for unauthenticated viewers) ----------
+const publicNamespace = io.of('/public');
+publicNamespace.on('connection', (socket) => {
+  // Send current player counts for all stakes immediately
+  for (const stake of [10, 20, 30]) {
+    const game = getGame(stake);
+    socket.emit('playersCount', { stake, count: game.players.length });
+  }
+});
+
+// ---------- GLOBAL PLAYER COUNT BROADCAST ----------
 function broadcastPlayerCount(stake) {
   const game = getGame(stake);
   const count = game.players.length;
-  // Emit to the room (for players already in the game)
+  // To the stake room (for players in the game)
   io.to(`stake_${stake}`).emit('playersCount', { stake, count });
-  // Emit globally so that users on the stake page see the count
+  // To the main namespace (for authenticated users)
   io.emit('playersCount', { stake, count });
+  // To the public namespace (for unauthenticated users on stake page)
+  publicNamespace.emit('playersCount', { stake, count });
 }
 
 // Reset a specific stake's game
@@ -380,8 +392,9 @@ function resetGame(stake) {
   
   // Emit to the room
   io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
-  // Broadcast lobby state globally for the stake page
+  // Broadcast lobby state globally (for the stake page)
   io.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
+  publicNamespace.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   
   // Broadcast player count (0) globally
   broadcastPlayerCount(stake);
@@ -818,7 +831,7 @@ io.on('connection', async (socket) => {
   
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
 
-  // Send current player counts for all stakes to this new socket (so stake page gets live counts)
+  // Send current player counts for all stakes to this new socket
   for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
