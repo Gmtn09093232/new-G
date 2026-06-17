@@ -842,6 +842,10 @@ io.on('connection', async (socket) => {
     currentStake = stake;
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
+    
+    // 👇 EXPLICITLY SEND THE PLAYER COUNT TO THIS SOCKET
+    socket.emit('playersCount', { stake, count: game.players.length });
+    
     if (game.status === 'lobby') {
       const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
       socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
