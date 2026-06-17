@@ -322,8 +322,7 @@
                     selectedNumberEl.textContent = '-'; 
                     showLobby(state.startsIn); 
                     if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); 
-                    // Update count from lobbyState
-                    updatePlayerCountFromServer(state.playersCount);
+                    updatePlayerCountFromServer(state.playersCount); 
                 } 
             });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
@@ -335,9 +334,6 @@
                 if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); 
                 displayTakenNumbers = newDisplaySet; 
                 buildNumberGrid(); 
-                // serverTakenNumbers.size is now updated, but we rely on playersCount event
-                // We'll still update count from the event's data, but the playersCount event will also fire.
-                // For safety, we can update from serverTakenNumbers.size now
                 updatePlayerCountFromServer(serverTakenNumbers.size);
                 if(pendingSelection && data.number === pendingSelection){ 
                     selectedCardNumber = data.number; 
@@ -354,7 +350,6 @@
             });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
             socket.on('playersCount', (data) => {
-                // Use currentStake, fallback to localStorage if not set (for reload edge case)
                 const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem('dot_bingo_stake'));
                 if (data.stake === stake) {
                     updatePlayerCountFromServer(data.count);
@@ -367,7 +362,6 @@
             socket.on('gameStarted', data => { 
                 if(data.stake !== currentStake) return; 
                 if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; 
-                // Set count from gameStarted event
                 if(data?.playersCount) updatePlayerCountFromServer(data.playersCount);
                 showGame(); 
                 currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); 
@@ -418,11 +412,10 @@
             startTimer(sec); 
             if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
             updateStatsUI(); 
-            // DO NOT call updatePlayerCountFromServer(serverTakenNumbers.size) here
-            // The count will be updated by lobbyState or playersCount event.
         }
         function showGame(){ 
             currentMainPage = 'game'; 
+            stakePage.classList.add('hidden'); // 👈 FIX: hide stake page
             lobbyPage.classList.add('hidden'); 
             gamePage.classList.remove('hidden'); 
             historyPage.classList.add('hidden'); 
@@ -432,8 +425,6 @@
             clearInterval(lobbyTimerInterval); 
             if(socket) socket.emit('getBalance'); 
             if(userCard.length) renderCard(userCard,'gameCard',true); 
-            // DO NOT call updatePlayerCountFromServer(serverTakenNumbers.size) here
-            // The count will be updated by gameStarted or playersCount event.
         }
         function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; currentTimerSeconds = left; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
         function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
