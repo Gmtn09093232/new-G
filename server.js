@@ -253,7 +253,8 @@ app.post('/admin/delete-user', async (req, res) => {
         number: player.cardNumber,
         takenNumbers: Array.from(game.takenCardNumbers)
       });
-      io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
+      // Broadcast updated player count globally
+      broadcastPlayerCount(stake);
       if (game.status === 'running' && game.players.length === 0) {
         clearInterval(game.callInterval);
         endGameWithWinners(stake);
@@ -350,6 +351,16 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
+// ---------- GLOBAL PLAYER COUNT BROADCAST (for stake page) ----------
+function broadcastPlayerCount(stake) {
+  const game = getGame(stake);
+  const count = game.players.length;
+  // Emit to the room (for players already in the game)
+  io.to(`stake_${stake}`).emit('playersCount', { stake, count });
+  // Emit globally so that users on the stake page see the count
+  io.emit('playersCount', { stake, count });
+}
+
 // Reset a specific stake's game
 function resetGame(stake) {
   const game = getGame(stake);
@@ -367,7 +378,13 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
+  // Emit to the room
   io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
+  // Broadcast lobby state globally for the stake page
+  io.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
+  
+  // Broadcast player count (0) globally
+  broadcastPlayerCount(stake);
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
   notifyAdminClients();
@@ -386,7 +403,8 @@ async function startGame(stake) {
     if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
   }
   io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
-  io.to(`stake_${stake}`).emit('playersCount', { stake, count: game.players.length });
+  // Broadcast updated player count
+  broadcastPlayerCount(stake);
   notifyAdminClients();
 
   if (game.players.length === 0) {
@@ -799,6 +817,12 @@ io.on('connection', async (socket) => {
   let currentStake = null;
   
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
+
+  // Send current player counts for all stakes to this new socket (so stake page gets live counts)
+  for (const stake of [10, 20, 30]) {
+    const game = getGame(stake);
+    socket.emit('playersCount', { stake, count: game.players.length });
+  }
   
   socket.on('joinLobby', ({ stake }) => {
     if (![10, 20, 30].includes(stake)) return;
@@ -839,7 +863,8 @@ io.on('connection', async (socket) => {
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
-    io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
+    // Broadcast updated player count
+    broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
@@ -861,7 +886,8 @@ io.on('connection', async (socket) => {
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
-    io.to(`stake_${currentStake}`).emit('playersCount', { stake: currentStake, count: game.players.length });
+    // Broadcast updated player count
+    broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
   });
