@@ -12,6 +12,7 @@
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255, 255, 248, 0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(2px); }
         .hidden { display: none !important; }
+        /* Language toggle moved to top-left */
         .lang-toggle { position: fixed; top: 16px; left: 16px; background: #f97316; color: white; border: none; border-radius: 40px; padding: 8px 16px; font-weight: bold; cursor: pointer; z-index: 1000; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
         @media (max-width: 550px) { .lang-toggle { top: 8px; left: 8px; padding: 6px 12px; font-size: 0.7rem; } }
         .card-container { margin: 20px 0 16px; display: flex; justify-content: center; background: #fef7ef; border-radius: 40px; padding: 14px 8px; box-shadow: 0 8px 18px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8); overflow-x: auto; min-height: 200px; }
@@ -98,7 +99,7 @@
     <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
     <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
 
-    <!-- STAKE PAGE -->
+    <!-- STAKE PAGE (with live player counts) -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
@@ -177,6 +178,7 @@
         const selectedNumberEl = document.getElementById('selectedNumber');
         const numberGrid = document.getElementById('numberGrid');
         
+        // Stake page player count elements
         const stake10CountEl = document.getElementById('stake10Count');
         const stake20CountEl = document.getElementById('stake20Count');
         const stake30CountEl = document.getElementById('stake30Count');
@@ -194,7 +196,6 @@
         let currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
         let currentStake = 10;
-        let isAuthenticated = false;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
         
         // ========== LANGUAGE SUPPORT ==========
@@ -265,7 +266,58 @@
         if (savedLang && ['bilingual', 'am', 'en'].includes(savedLang)) currentLang = savedLang;
         applyLanguage();
         
-        // ========== GLOBAL FUNCTIONS ==========
+        // ========== LIVE PLAYER COUNTS FOR STAKE PAGE ==========
+        let listenerSocket = null;
+        
+        async function connectToGame(stake) {
+            currentStake = stake;
+            const initData = tg.initData;
+            if(!initData){ alert('Open inside Telegram'); return; }
+            try{ 
+                const res=await fetch('/api/telegram-miniapp-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({initData})});
+                const data=await res.json(); 
+                if(!data.success){ alert('Auth failed'); return; } 
+                document.getElementById('profileUsername').innerText=data.username||'Player';
+                
+                // After successful auth, create a listener socket for global player counts (if not already created)
+                if (!listenerSocket) {
+                    listenerSocket = io();
+                    listenerSocket.on('connect', () => {
+                        console.log('Listener socket connected');
+                    });
+                    listenerSocket.on('playersCount', (data) => {
+                        if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
+                        if (data.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${data.count} players`;
+                        if (data.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${data.count} players`;
+                    });
+                    listenerSocket.on('lobbyState', (state) => {
+                        if (state.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${state.playersCount} players`;
+                        if (state.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${state.playersCount} players`;
+                        if (state.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${state.playersCount} players`;
+                    });
+                    listenerSocket.on('disconnect', () => console.log('Listener socket disconnected'));
+                }
+                
+            }catch(e){ alert('Network error'); return; }
+            if(socket) socket.disconnect();
+            socket = io();
+            socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
+            socket.on('balanceUpdate', syncBalance);
+            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(); } });
+            socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
+            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newServerSet = new Set(data.takenNumbers); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(data.takenNumbers); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
+            socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
+            socket.on('playersCount', c => { updatePlayerCountFromServer(); const prize = Math.floor(serverTakenNumbers.size * currentStake * 0.8); if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; });
+            socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
+            socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
+            socket.on('markedNumbers', nums => { markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
+            socket.on('gameEnded', data => { if(data.stake !== currentStake) return; if(data.winningNumber) currentCallEl.innerText=formatCall(data.winningNumber); showWinnerOverlay(data); currentGameId=null; markedNumbers=[]; if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
+            socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
+            socket.on('depositStatus', data => alert(data.status==='approved'?`✅ Deposit +${data.amount} ETB approved!`:'❌ Deposit rejected.'));
+            socket.on('withdrawStatus', data => alert(data.status==='approved'?`✅ Withdrawal -${data.amount} ETB processed.`:'❌ Withdrawal rejected.'));
+        }
+        
+        // ========== REST OF ORIGINAL FUNCTIONS (unchanged) ==========
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
         function unlockSpeech() { if(speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(()=>window.speechSynthesis.cancel(),100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if(soundMuted && currentUtterance){ window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
@@ -300,85 +352,11 @@
         async function submitWithdrawRequest(){ if(isSubmittingWithdraw) return; const receiver=document.getElementById('withdrawReceiver').value.trim(); const amount=document.getElementById('withdrawAmount').value.trim(); const name=document.getElementById('withdrawName').value.trim(); if(!name){ alert("Full name required"); return; } if(!amount||isNaN(amount)||Number(amount)<20){ alert('Min 20 ETB'); return; } if(!receiver.match(/^(09|07)\d{8}$/)){ alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw=true; const submitBtn=document.getElementById('submitWithdrawBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Processing...'; try{ const response=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount,phone:receiver,withdrawal_type:selectedWithdrawType,name})}); const result=await response.json(); if(result.success){ alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingWithdraw=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         
         function showWinnerOverlay(data){ if(data.noWinner){ if(currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length>1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML=title; document.getElementById('winListContainer').innerHTML=winnersList.map(w=>`<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML=playerPrize+' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv=document.createElement('div'); confDiv.className='confetti'; for(let i=0;i<120;i++){ let p=document.createElement('div'); p.className='confetti-piece'; p.style.left=Math.random()*100+'%'; p.style.animationDuration=(Math.random()*3+2)+'s'; p.style.backgroundColor=`hsl(${Math.random()*30+20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(()=>confDiv.remove(),4000); if(currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
-
-        // ========== AUTH & SOCKET SETUP ==========
-        async function authenticateAndConnect() {
-            const initData = tg.initData;
-            if (!initData) {
-                alert('Open inside Telegram');
-                return false;
-            }
-            try {
-                const res = await fetch('/api/telegram-miniapp-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData })
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    alert('Auth failed');
-                    return false;
-                }
-                document.getElementById('profileUsername').innerText = data.username || 'Player';
-                syncBalance(data.balance || 0);
-                isAuthenticated = true;
-                
-                if (socket) socket.disconnect();
-                socket = io();
-                
-                socket.on('globalCounts', (counts) => {
-                    if (stake10CountEl) stake10CountEl.innerText = `👥 ${counts[10] || 0} players`;
-                    if (stake20CountEl) stake20CountEl.innerText = `👥 ${counts[20] || 0} players`;
-                    if (stake30CountEl) stake30CountEl.innerText = `👥 ${counts[30] || 0} players`;
-                });
-                
-                socket.on('balanceUpdate', syncBalance);
-                socket.on('depositStatus', data => alert(data.status==='approved'?`✅ Deposit +${data.amount} ETB approved!`:'❌ Deposit rejected.'));
-                socket.on('withdrawStatus', data => alert(data.status==='approved'?`✅ Withdrawal -${data.amount} ETB processed.`:'❌ Withdrawal rejected.'));
-                socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
-                
-                socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(); } });
-                socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
-                socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newServerSet = new Set(data.takenNumbers); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(data.takenNumbers); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
-                socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
-                socket.on('playersCount', c => { updatePlayerCountFromServer(); const prize = Math.floor(serverTakenNumbers.size * currentStake * 0.8); if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize; });
-                socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
-                socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
-                socket.on('markedNumbers', nums => { markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
-                socket.on('gameEnded', data => { if(data.stake !== currentStake) return; if(data.winningNumber) currentCallEl.innerText=formatCall(data.winningNumber); showWinnerOverlay(data); currentGameId=null; markedNumbers=[]; if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
-                
-                return true;
-            } catch(e) {
-                alert('Network error during auth');
-                return false;
-            }
-        }
-        
-        async function joinGame(stake) {
-            if (!isAuthenticated) {
-                const ok = await authenticateAndConnect();
-                if (!ok) return;
-            }
-            if (!socket) return;
-            currentStake = stake;
-            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
-            userCard = [];
-            markedNumbers = [];
-            selectedCardNumber = null;
-            serverTakenNumbers.clear();
-            displayTakenNumbers.clear();
-            pendingSelection = null;
-            pendingRandom = false;
-            isGameActive = false;
-            socket.emit('joinLobby', { stake: currentStake });
-            showLobby(30);
-            unlockSpeech();
-        }
         
         // ========== EVENT LISTENERS ==========
-        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); joinGame(10); });
-        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected'); loadStats(); joinGame(20); });
-        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); joinGame(30); });
+        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected'); loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
         document.getElementById('randomCardBtn')?.addEventListener('click',()=>{ if(!isGameActive && socket){ pendingRandom=true; socket.emit('newCardNumber'); selectedCardNumber=null; selectedNumberEl.textContent='⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
         document.getElementById('bingoBtn')?.addEventListener('click',()=>{ if(socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
         document.getElementById('muteToggleBtn')?.addEventListener('click',toggleMute);
@@ -407,18 +385,12 @@
         document.getElementById('rulesBtnGame')?.addEventListener('click',()=>rulesModal.classList.add('active'));
         closeRules?.addEventListener('click',()=>rulesModal.classList.remove('active'));
         
-        (async () => {
-            await loadDepositAccounts();
-            buildNumberGrid();
-            loadStats();
-            updateMuteButton();
-            window.speechSynthesis.getVoices();
-            const authSuccess = await authenticateAndConnect();
-            if (!authSuccess) {
-                console.warn("Auto‑auth failed, counts may stay at 0 until user selects a stake.");
-            }
-            stakePage.classList.remove('hidden');
-        })();
+        loadDepositAccounts(); 
+        buildNumberGrid(); 
+        loadStats(); 
+        updateMuteButton();
+        window.speechSynthesis.getVoices();
+        stakePage.classList.remove('hidden');
     </script>
 </body>
-</html>
+</html> only the above correction..do not change other thing.
