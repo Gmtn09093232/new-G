@@ -298,15 +298,10 @@
                 const stake = parseInt(savedStake);
                 if ([10,20,30].includes(stake)) {
                     console.log(`🔄 Auto-joining stake ${stake} from saved session`);
-                    // We'll call connectToGame after the page is ready
-                    // but we need to wait for socket connection.
-                    // We'll set a flag and call it after a small delay.
                     setTimeout(() => {
                         if (!socket) {
-                            // connectToGame will set up socket and join
                             connectToGame(stake);
                         } else {
-                            // already connected? just emit join
                             socket.emit('joinLobby', { stake });
                         }
                     }, 500);
@@ -331,7 +326,6 @@
             socket = io();
             socket.on('connect', () => {
                 socket.emit('joinLobby', { stake: currentStake });
-                // The server will send current player count on connection
             });
             socket.on('balanceUpdate', syncBalance);
             socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(state.playersCount); } });
@@ -342,7 +336,6 @@
                 if (data.stake === currentStake) {
                     updatePlayerCountFromServer(data.count);
                 }
-                // Also update prize pool if not in game
                 const prize = Math.floor(data.count * currentStake * 0.8);
                 if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize;
             });
