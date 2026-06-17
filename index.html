@@ -10,7 +10,7 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* (all styles unchanged) */
+        /* (all your existing styles – unchanged) */
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255, 255, 248, 0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(2px); }
@@ -101,7 +101,7 @@
     <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
     <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
 
-    <!-- STAKE PAGE (with live player counts) -->
+    <!-- STAKE PAGE -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
@@ -180,18 +180,13 @@
         const selectedNumberEl = document.getElementById('selectedNumber');
         const numberGrid = document.getElementById('numberGrid');
 
-        // Stake page player count elements
         const stake10CountEl = document.getElementById('stake10Count');
         const stake20CountEl = document.getElementById('stake20Count');
         const stake30CountEl = document.getElementById('stake30Count');
 
-        // ---- GLOBAL PLAYER-COUNT SOCKET (connects to public namespace) ----
+        // ---- GLOBAL PLAYER-COUNT SOCKET (public) ----
         const stakeCountSocket = io('/public');
-        stakeCountSocket.on('connect', () => {
-            console.log('📡 Stake count socket connected (public)');
-        });
         stakeCountSocket.on('playersCount', (data) => {
-            // Update the stake page badges using the count from the event
             if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
             if (data.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${data.count} players`;
             if (data.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${data.count} players`;
@@ -200,9 +195,6 @@
             if (state.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${state.playersCount} players`;
             if (state.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${state.playersCount} players`;
             if (state.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${state.playersCount} players`;
-        });
-        stakeCountSocket.on('disconnect', () => {
-            console.log('📡 Stake count socket disconnected');
         });
 
         function copyToClipboard(text) { if (!text) return; navigator.clipboard.writeText(text).then(() => alert("✅ Phone number copied to clipboard!")).catch(() => alert("❌ Could not copy.")); }
@@ -217,7 +209,7 @@
         let currentMainPage = 'lobby', currentTimerSeconds = 30;
         let currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
-        let currentStake = null; // will be restored from localStorage
+        let currentStake = null;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
 
         // ========== LANGUAGE SUPPORT ==========
@@ -288,9 +280,6 @@
         if (savedLang && ['bilingual', 'am', 'en'].includes(savedLang)) currentLang = savedLang;
         applyLanguage();
 
-        // ========== LIVE PLAYER COUNTS FOR STAKE PAGE ==========
-        // (already handled by stakeCountSocket above)
-
         // ---------- AUTO-RECONNECT ON PAGE LOAD ----------
         function restoreGameSession() {
             const savedStake = localStorage.getItem('dot_bingo_stake');
@@ -311,7 +300,6 @@
 
         async function connectToGame(stake) {
             currentStake = stake;
-            // Save to localStorage for auto-reconnect
             localStorage.setItem('dot_bingo_stake', stake);
 
             const initData = tg.initData;
@@ -328,18 +316,62 @@
                 socket.emit('joinLobby', { stake: currentStake });
             });
             socket.on('balanceUpdate', syncBalance);
-            socket.on('lobbyState', state => { if(state.stake === currentStake) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; showLobby(state.startsIn); if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); updatePlayerCountFromServer(state.playersCount); } });
+            socket.on('lobbyState', state => { 
+                if(state.stake === currentStake) { 
+                    selectedCardNumber = null; 
+                    selectedNumberEl.textContent = '-'; 
+                    showLobby(state.startsIn); 
+                    if(state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers); 
+                    // Update count from lobbyState
+                    updatePlayerCountFromServer(state.playersCount);
+                } 
+            });
             socket.on('yourCard', card => { userCard = card; if(isGameActive) renderCard(card,'gameCard',true); else renderCard(card,'lobbyCardPreview',false); });
-            socket.on('cardTaken', data => { if(data.stake !== currentStake) return; const newServerSet = new Set(data.takenNumbers); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(data.takenNumbers); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(serverTakenNumbers.size); if(pendingSelection && data.number === pendingSelection){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingSelection = null; buildNumberGrid(); } if(pendingRandom && data.number){ selectedCardNumber = data.number; selectedNumberEl.textContent = data.number; pendingRandom = false; buildNumberGrid(); } });
+            socket.on('cardTaken', data => { 
+                if(data.stake !== currentStake) return; 
+                const newServerSet = new Set(data.takenNumbers); 
+                serverTakenNumbers = newServerSet; 
+                const newDisplaySet = new Set(data.takenNumbers); 
+                if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); 
+                displayTakenNumbers = newDisplaySet; 
+                buildNumberGrid(); 
+                // serverTakenNumbers.size is now updated, but we rely on playersCount event
+                // We'll still update count from the event's data, but the playersCount event will also fire.
+                // For safety, we can update from serverTakenNumbers.size now
+                updatePlayerCountFromServer(serverTakenNumbers.size);
+                if(pendingSelection && data.number === pendingSelection){ 
+                    selectedCardNumber = data.number; 
+                    selectedNumberEl.textContent = data.number; 
+                    pendingSelection = null; 
+                    buildNumberGrid(); 
+                } 
+                if(pendingRandom && data.number){ 
+                    selectedCardNumber = data.number; 
+                    selectedNumberEl.textContent = data.number; 
+                    pendingRandom = false; 
+                    buildNumberGrid(); 
+                } 
+            });
             socket.on('cardSelectionFailed', msg => { alert(msg); if(pendingSelection){ pendingSelection=null; if(selectedCardNumber){ selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if(pendingRandom) pendingRandom=false; });
             socket.on('playersCount', (data) => {
-                if (data.stake === currentStake) {
+                // Use currentStake, fallback to localStorage if not set (for reload edge case)
+                const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem('dot_bingo_stake'));
+                if (data.stake === stake) {
                     updatePlayerCountFromServer(data.count);
                 }
-                const prize = Math.floor(data.count * currentStake * 0.8);
-                if(winningBalanceEl && !isGameActive) winningBalanceEl.innerText = prize;
+                if (stake && winningBalanceEl && !isGameActive) {
+                    const prize = Math.floor(data.count * stake * 0.8);
+                    winningBalanceEl.innerText = prize;
+                }
             });
-            socket.on('gameStarted', data => { if(data.stake !== currentStake) return; if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; if(data?.playersCount) gamePlayersCountEl.innerText=data.playersCount; showGame(); currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); });
+            socket.on('gameStarted', data => { 
+                if(data.stake !== currentStake) return; 
+                if(data?.prizePool) winningBalanceEl.innerText=data.prizePool; 
+                // Set count from gameStarted event
+                if(data?.playersCount) updatePlayerCountFromServer(data.playersCount);
+                showGame(); 
+                currentGameId='GAME_'+Date.now().toString(36).toUpperCase(); 
+            });
             socket.on('numberCalled', data => { if(data.stake !== currentStake) return; const num = data.number; currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || []; const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n)).join(', ') : '—'); scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
             socket.on('markedNumbers', nums => { markedNumbers=nums; if(isGameActive && userCard.length) renderCard(userCard,'gameCard',true); else if(!isGameActive && userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
             socket.on('gameEnded', data => { if(data.stake !== currentStake) return; if(data.winningNumber) currentCallEl.innerText=formatCall(data.winningNumber); showWinnerOverlay(data); currentGameId=null; markedNumbers=[]; if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); });
@@ -371,8 +403,38 @@
         function buildNumberGrid() { if(!numberGrid) return; numberGrid.innerHTML=''; for(let i=1;i<=100;i++){ const cell=document.createElement('div'); cell.className='grid-cell'; cell.dataset.number=i; cell.textContent=i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i); if(isTaken && !isOwn){ cell.classList.add('taken'); cell.onclick=null; } else if(isOwn){ cell.classList.add('own-card'); cell.onclick=null; } else { cell.onclick=()=>{ if(!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)){ if(selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); } pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
         function updateGridWithTakenNumbers(takenArray){ const newServerSet = new Set(takenArray); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(takenArray); if(selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(serverTakenNumbers.size); }
         function formatCall(n){ let l='B'; if(n>15) l='I'; if(n>30) l='N'; if(n>45) l='G'; if(n>60) l='O'; return `${l}-${n}`; }
-        function showLobby(sec){ currentMainPage = 'lobby'; currentTimerSeconds = sec; stakePage.classList.add('hidden'); lobbyPage.classList.remove('hidden'); gamePage.classList.add('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=false; markedNumbers=[]; if(socket) socket.emit('getBalance'); startTimer(sec); if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); updateStatsUI(); updatePlayerCountFromServer(serverTakenNumbers.size); }
-        function showGame(){ currentMainPage = 'game'; lobbyPage.classList.add('hidden'); gamePage.classList.remove('hidden'); historyPage.classList.add('hidden'); walletPage.classList.add('hidden'); profilePage.classList.add('hidden'); isGameActive=true; clearInterval(lobbyTimerInterval); if(socket) socket.emit('getBalance'); if(userCard.length) renderCard(userCard,'gameCard',true); updatePlayerCountFromServer(serverTakenNumbers.size); }
+        function showLobby(sec){ 
+            currentMainPage = 'lobby'; 
+            currentTimerSeconds = sec; 
+            stakePage.classList.add('hidden'); 
+            lobbyPage.classList.remove('hidden'); 
+            gamePage.classList.add('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=false; 
+            markedNumbers=[]; 
+            if(socket) socket.emit('getBalance'); 
+            startTimer(sec); 
+            if(userCard.length) renderCard(userCard,'lobbyCardPreview',false); 
+            updateStatsUI(); 
+            // DO NOT call updatePlayerCountFromServer(serverTakenNumbers.size) here
+            // The count will be updated by lobbyState or playersCount event.
+        }
+        function showGame(){ 
+            currentMainPage = 'game'; 
+            lobbyPage.classList.add('hidden'); 
+            gamePage.classList.remove('hidden'); 
+            historyPage.classList.add('hidden'); 
+            walletPage.classList.add('hidden'); 
+            profilePage.classList.add('hidden'); 
+            isGameActive=true; 
+            clearInterval(lobbyTimerInterval); 
+            if(socket) socket.emit('getBalance'); 
+            if(userCard.length) renderCard(userCard,'gameCard',true); 
+            // DO NOT call updatePlayerCountFromServer(serverTakenNumbers.size) here
+            // The count will be updated by gameStarted or playersCount event.
+        }
         function startTimer(sec){ let left=sec; lobbyTimerEl.textContent=left+'s'; clearInterval(lobbyTimerInterval); lobbyTimerInterval=setInterval(()=>{ left--; currentTimerSeconds = left; if(left<=0){ clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent=left+'s'; },1000); }
         function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
         function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; serverTakenNumbers.clear(); displayTakenNumbers.clear(); currentStake = null; localStorage.removeItem('dot_bingo_stake'); if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); lobbyPage.classList.add('hidden'); gamePage.classList.add('hidden'); stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
@@ -429,10 +491,9 @@
         updateMuteButton();
         window.speechSynthesis.getVoices();
 
-        // Show stake page initially
         stakePage.classList.remove('hidden');
 
-        // Attempt to restore session
+        // Auto-reconnect after page load
         restoreGameSession();
     </script>
 </body>
