@@ -6,24 +6,21 @@
   <title>Bingo Invite Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   <style>
-    /* Same dark theme as before – you can reuse the CSS */
+    /* (Same styles as before, plus minor additions) */
     * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
     body {
       background: linear-gradient(145deg, #0b0e14 0%, #1a1f2b 100%);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       padding: 20px;
     }
     .container {
-      max-width: 1100px;
-      width: 100%;
+      max-width: 1300px;
+      margin: 0 auto;
       background: rgba(255,255,255,0.04);
       backdrop-filter: blur(12px);
       border-radius: 40px;
-      padding: 35px 30px 45px;
-      box-shadow: 0 25px 50px -10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+      padding: 35px 30px;
+      box-shadow: 0 25px 50px -10px rgba(0,0,0,0.8);
       border: 1px solid rgba(255,255,255,0.05);
     }
     .header {
@@ -41,13 +38,8 @@
       background: linear-gradient(135deg, #f0b94b, #fcd34d);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
-    .header-left p {
-      color: #8892a8;
-      font-size: 14px;
-      margin-top: 4px;
-    }
+    .header-left p { color: #8892a8; font-size: 14px; }
     .total-box {
       background: rgba(255,215,0,0.08);
       padding: 10px 24px;
@@ -55,12 +47,7 @@
       border: 1px solid rgba(255,215,0,0.15);
       text-align: center;
     }
-    .total-box span {
-      color: #aab4c9;
-      font-size: 14px;
-      font-weight: 500;
-      display: block;
-    }
+    .total-box span { color: #aab4c9; font-size: 14px; display: block; }
     .total-box .total-count {
       color: #fcd34d;
       font-size: 32px;
@@ -81,13 +68,6 @@
       border-radius: 40px;
       font-size: 13px;
       color: #cbd5e1;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .status-bar .mode-badge i {
-      color: #10b981;
-      font-size: 10px;
     }
     .refresh-btn {
       background: transparent;
@@ -95,22 +75,17 @@
       color: #b0bcca;
       padding: 8px 22px;
       border-radius: 40px;
-      font-size: 14px;
       cursor: pointer;
       transition: 0.2s;
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .refresh-btn:hover {
-      background: #2a3242;
-      border-color: #fcd34d;
-      color: #fff;
-    }
+    .refresh-btn:hover { background: #2a3242; border-color: #fcd34d; color: #fff; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 20px;
     }
     .card {
       background: rgba(255,255,255,0.03);
@@ -120,119 +95,110 @@
       transition: 0.25s ease;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      backdrop-filter: blur(4px);
+      gap: 10px;
     }
-    .card:hover {
-      background: rgba(255,255,255,0.07);
-      border-color: rgba(255,215,0,0.2);
-      transform: translateY(-3px);
-      box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
-    }
-    .card-top {
+    .card:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,215,0,0.2); transform: translateY(-3px); }
+    .card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 8px;
     }
     .code-badge {
       background: #2f3b4f;
       padding: 4px 14px;
       border-radius: 30px;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
       color: #fcd34d;
-      letter-spacing: 0.5px;
       text-transform: uppercase;
     }
-    .player-count {
+    .stats-mini {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #94a3b8;
-      font-size: 14px;
-      font-weight: 500;
+      gap: 16px;
+      font-size: 13px;
+      color: #aab4c9;
     }
-    .player-count i {
-      color: #fcd34d;
+    .stats-mini span i { color: #fcd34d; margin-right: 4px; }
+    .stats-mini .num { color: #e2e8f0; font-weight: 600; }
+    .player-list {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 6px;
+      background: #0f141e;
+      border-radius: 12px;
+      padding: 6px 10px;
     }
-    .player-count .count-num {
-      color: #e2e8f0;
-      font-weight: 700;
-      font-size: 18px;
-      min-width: 30px;
-      text-align: right;
+    .player-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 13px;
+      color: #cbd5e1;
     }
+    .player-item:last-child { border-bottom: none; }
+    .player-item .bonus { color: #4ade80; font-weight: 600; }
     .link-box {
       display: flex;
       background: #131a24;
       border-radius: 12px;
       padding: 4px;
       border: 1px solid #293241;
+      margin-top: 6px;
     }
     .link-box input {
       flex: 1;
       background: transparent;
       border: none;
-      padding: 10px 14px;
+      padding: 8px 12px;
       color: #b9c7dd;
-      font-size: 13px;
+      font-size: 12px;
       outline: none;
       font-family: 'Courier New', monospace;
-      min-width: 0;
-      width: 100%;
     }
     .copy-btn {
       background: #2a3548;
       border: none;
       color: #d1dbe8;
-      padding: 8px 16px;
+      padding: 6px 14px;
       border-radius: 10px;
-      font-size: 14px;
       cursor: pointer;
+      font-size: 13px;
       transition: 0.2s;
+    }
+    .copy-btn:hover { background: #fcd34d; color: #0b0e14; }
+    .copy-btn.copied { background: #10b981; color: #fff; }
+    .no-players { color: #64748b; font-style: italic; font-size: 13px; padding: 4px 0; }
+    .total-bonus-row {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
+      justify-content: flex-end;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 14px;
       font-weight: 600;
+      color: #fcd34d;
     }
-    .copy-btn:hover {
-      background: #fcd34d;
-      color: #0b0e14;
-    }
-    .copy-btn.copied {
-      background: #10b981;
-      color: #fff;
-    }
-    @media (max-width: 650px) {
-      .container { padding: 20px 15px; }
-      .header { flex-direction: column; align-items: flex-start; gap: 15px; }
-      .total-box { align-self: stretch; }
-      .grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div class="header-left">
-        <h1><i class="fas fa-dice" style="margin-right:12px; color:#fcd34d;"></i>Bingo Invites</h1>
-        <p><i class="fas fa-robot" style="margin-right:6px;"></i> @bingomkmk0120_bot · Real-time Tracker</p>
+        <h1><i class="fas fa-gift" style="margin-right:12px; color:#fcd34d;"></i>Referral Dashboard</h1>
+        <p>@bingomkmk0120_bot · Each invite earns 10% of first deposit</p>
       </div>
       <div class="total-box">
-        <span>TOTAL PLAYERS</span>
-        <div class="total-count" id="totalCount">0</div>
+        <span>TOTAL BONUS EARNED</span>
+        <div class="total-count" id="totalBonus">0</div>
       </div>
     </div>
     <div class="status-bar">
-      <div class="mode-badge">
-        <i class="fas fa-circle"></i> 
-        <span id="statusText">Live (API)</span>
-        <span id="timeStamp" style="margin-left:8px; color:#64748b; font-size:12px;"></span>
-      </div>
-      <button class="refresh-btn" onclick="fetchStats()">
-        <i class="fas fa-sync-alt"></i> Refresh
-      </button>
+      <div class="mode-badge"><i class="fas fa-circle" style="color:#10b981;"></i> Live</div>
+      <button class="refresh-btn" onclick="loadData()"><i class="fas fa-sync-alt"></i> Refresh</button>
     </div>
     <div class="grid" id="cardsContainer"></div>
   </div>
@@ -240,95 +206,104 @@
   <script>
     const CODES = ['db', 'mk', 'hd', 'ji', 'ok', 'ghy', 'bghu', 'kil', 'hg', 'jkl', 'jkil'];
     const BOT_USERNAME = 'bingomkmk0120_bot';
-    // If you protect the endpoint with a secret, include it here:
-    // const API_URL = '/api/invite-stats?secret=YOUR_ADMIN_SECRET';
-    const API_URL = '/api/invite-stats'; // no secret (or you can add)
 
-    async function fetchStats() {
-      const statusText = document.getElementById('statusText');
-      const refreshIcon = document.querySelector('.refresh-btn i');
-      refreshIcon.className = 'fas fa-spinner fa-pulse';
+    // We'll fetch both stats and details
+    const STATS_URL = '/api/invite-stats';
+    const DETAILS_URL = '/api/invite-details';
+
+    let allData = {};
+
+    async function loadData() {
+      const btn = document.querySelector('.refresh-btn i');
+      btn.className = 'fas fa-spinner fa-pulse';
 
       try {
-        const response = await fetch(API_URL);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        // data is like { db: 5, mk: 10, ... }
-        renderCards(data);
-        statusText.textContent = 'Live (API)';
-        statusText.style.color = '#10b981';
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-        statusText.textContent = 'Error – using fallback data';
-        statusText.style.color = '#f87171';
-        // Fallback: show zeros
-        const fallback = {};
-        CODES.forEach(c => fallback[c] = 0);
-        renderCards(fallback);
+        // Fetch stats (total join counts)
+        const statsRes = await fetch(STATS_URL);
+        if (!statsRes.ok) throw new Error('Stats fetch failed');
+        const stats = await statsRes.json();
+
+        // Fetch details (players & bonuses)
+        const detailsRes = await fetch(DETAILS_URL);
+        if (!detailsRes.ok) throw new Error('Details fetch failed');
+        const details = await detailsRes.json();
+
+        allData = { stats, details: details.data };
+        renderCards();
+      } catch (err) {
+        console.error(err);
+        alert('Error loading data: ' + err.message);
       } finally {
-        refreshIcon.className = 'fas fa-sync-alt';
-        document.getElementById('timeStamp').textContent = `⏱ ${new Date().toLocaleTimeString()}`;
+        btn.className = 'fas fa-sync-alt';
       }
     }
 
-    function renderCards(stats) {
+    function renderCards() {
       const container = document.getElementById('cardsContainer');
       container.innerHTML = '';
-      let total = 0;
+
+      let grandTotalBonus = 0;
 
       CODES.forEach(code => {
-        const count = stats[code] !== undefined ? stats[code] : 0;
-        total += count;
+        const count = allData.stats[code] || 0;
+        const detail = allData.details[code] || { players: [], totalBonus: 0, totalDeposits: 0 };
+        const totalBonus = detail.totalBonus || 0;
+        grandTotalBonus += totalBonus;
+
         const link = `https://t.me/${BOT_USERNAME}?start=${code}`;
+        const players = detail.players || [];
+
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-          <div class="card-top">
-            <span class="code-badge"><i class="fas fa-hashtag" style="margin-right:4px;"></i>${code}</span>
-            <div class="player-count">
-              <i class="fas fa-user"></i>
-              <span class="count-num">${count}</span>
-              <span style="color:#64748b;font-size:13px;">joined</span>
+          <div class="card-header">
+            <span class="code-badge"><i class="fas fa-hashtag"></i> ${code}</span>
+            <div class="stats-mini">
+              <span><i class="fas fa-users"></i> <span class="num">${count}</span> joined</span>
+              <span><i class="fas fa-coins"></i> <span class="num">${totalBonus.toFixed(2)}</span> bonus</span>
             </div>
+          </div>
+          <div class="player-list">
+            ${players.length === 0 ? '<div class="no-players">No referred players with deposits yet.</div>' :
+              players.map(p => `
+                <div class="player-item">
+                  <span>${p.username || 'Anonymous'}</span>
+                  <span>Deposit: ${p.deposit.toFixed(2)} → <span class="bonus">+${p.bonus.toFixed(2)}</span></span>
+                </div>
+              `).join('')
+            }
+          </div>
+          <div class="total-bonus-row">
+            Total Bonus: ${totalBonus.toFixed(2)} ETB
           </div>
           <div class="link-box">
             <input type="text" value="${link}" readonly id="input-${code}" />
-            <button class="copy-btn" onclick="copyLink('${code}')">
-              <i class="fas fa-copy"></i> Copy
-            </button>
+            <button class="copy-btn" onclick="copyLink('${code}')"><i class="fas fa-copy"></i> Copy</button>
           </div>
         `;
         container.appendChild(card);
       });
 
-      document.getElementById('totalCount').textContent = total;
+      document.getElementById('totalBonus').textContent = grandTotalBonus.toFixed(2);
     }
 
     function copyLink(code) {
       const input = document.getElementById(`input-${code}`);
       if (!input) return;
       input.select();
-      input.setSelectionRange(0, 99999);
-      try {
-        navigator.clipboard.writeText(input.value).then(() => showCopied(code))
-          .catch(() => { document.execCommand('copy'); showCopied(code); });
-      } catch (_) { document.execCommand('copy'); showCopied(code); }
+      navigator.clipboard.writeText(input.value).then(() => {
+        const btn = input.nextElementSibling;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+      }).catch(() => {
+        document.execCommand('copy');
+      });
     }
 
-    function showCopied(code) {
-      const btn = document.querySelector(`#input-${code}`)?.nextElementSibling;
-      if (!btn) return;
-      const original = btn.innerHTML;
-      btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.innerHTML = original; btn.classList.remove('copied'); }, 2000);
-    }
-
-    // Auto-refresh every 30 seconds
-    let interval = setInterval(fetchStats, 30000);
-
-    // Initial load
-    document.addEventListener('DOMContentLoaded', fetchStats);
+    document.addEventListener('DOMContentLoaded', loadData);
+    setInterval(loadData, 30000);
   </script>
 </body>
 </html>
