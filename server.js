@@ -119,11 +119,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
-
-// [NEW] Serve the Invite Dashboard
-app.get('/invite-dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'invite-dashboard.html'));
-});
+app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html'))); // [REFERRAL] Dashboard
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -136,7 +132,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// [CHANGED] Added `inviteCode` parameter
+// [REFERRAL] Added inviteCode & first_deposit_amount
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null) {
   const id = String(telegramId);
   if (users[id]) return users[id];
@@ -148,21 +144,23 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       username: data.username, 
       balance: Number(data.balance),
       telegram_handle: data.telegram_handle,
-      referred_by: data.referred_by // [NEW] store referral info
+      referred_by: data.referred_by,                    // [REFERRAL]
+      first_deposit_amount: data.first_deposit_amount || 0 // [REFERRAL]
     };
     return users[id];
   } else {
-    // [NEW] Insert new user with referred_by field
+    // [REFERRAL] Insert new user with referred_by and first_deposit_amount
     const newUser = { 
       telegram_id: id, 
       username: username || 'Player', 
       telegram_handle: telegramHandle || null,
       balance: 10,
-      referred_by: inviteCode || null
+      referred_by: inviteCode || null,
+      first_deposit_amount: 0
     };
     await supabase.from('users').insert(newUser);
 
-    // [NEW] Increment invite_stats if this user came via a referral link
+    // [REFERRAL] Increment invite_stats if this user came via a referral link
     if (inviteCode) {
       const { data: inviteData } = await supabase
         .from('invite_stats')
@@ -176,7 +174,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .update({ count: inviteData.count + 1 })
           .eq('invite_code', inviteCode);
       } else {
-        // Insert if somehow missing (though we pre‑insert)
         await supabase.from('invite_stats').insert({ invite_code: inviteCode, count: 1 });
       }
     }
@@ -186,7 +183,8 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       username: newUser.username, 
       balance: 10, 
       telegram_handle: newUser.telegram_handle,
-      referred_by: newUser.referred_by
+      referred_by: newUser.referred_by,
+      first_deposit_amount: 0
     };
     return users[id];
   }
@@ -216,10 +214,10 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const displayName = userData.first_name || userData.username || 'Player';
   const handle = userData.username || null;
 
-  // [NEW] Extract the start_param (invite code) from the deep link
+  // [REFERRAL] Extract the start_param (invite code) from the deep link
   const startParam = params.get('start_param');
 
-  // [CHANGED] Pass the invite code to loadUser
+  // [REFERRAL] Pass the invite code to loadUser
   const user = await loadUser(id, displayName, handle, startParam);
 
   req.session.userId = id;
@@ -398,7 +396,6 @@ function notifyAdminClients() {
 // ---------- PUBLIC NAMESPACE (for unauthenticated viewers) ----------
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
-  // Send current player counts for all stakes immediately
   for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
@@ -665,6 +662,13 @@ app.post('/admin/process-deposit', async (req, res) => {
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
     await supabase.from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
     Audit.depositCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), providerRef: reqData.id.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.payment_type || 'unknown' });
+    
+    // [REFERRAL] Record first deposit if this is the user's first
+    if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
+      user.first_deposit_amount = reqData.amount;
+      await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
+    }
+    
     const playerSocket = await getSocketByUserId(reqData.telegram_id);
     if (playerSocket) { playerSocket.emit('balanceUpdate', user.balance); playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount }); }
     res.json({ success: true, newBalance: user.balance });
@@ -821,10 +825,9 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- [NEW] Invite Stats Endpoint ----------
+// ---------- [REFERRAL] Invite Stats Endpoint ----------
 app.get('/api/invite-stats', async (req, res) => {
   const { secret } = req.query;
-  // Optional: protect with admin secret (if provided, it must match)
   if (secret && secret !== process.env.ADMIN_SECRET) {
     return res.status(403).json({ error: 'Forbidden' });
   }
@@ -839,12 +842,61 @@ app.get('/api/invite-stats', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  // Convert to object: { "db": 5, "mk": 10, ... }
   const stats = {};
   data.forEach(row => {
     stats[row.invite_code] = row.count;
   });
   res.json(stats);
+});
+
+// ---------- [REFERRAL] Invite Details (with players & bonuses) ----------
+app.get('/api/invite-details', async (req, res) => {
+  const { secret } = req.query;
+  if (secret && secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    // Get all users who have a referred_by code and a first_deposit_amount > 0
+    const { data: referredUsers, error } = await supabase
+      .from('users')
+      .select('username, referred_by, first_deposit_amount')
+      .not('referred_by', 'is', null)
+      .gt('first_deposit_amount', 0);
+
+    if (error) throw error;
+
+    // Group by invite code
+    const grouped = {};
+    for (const user of referredUsers) {
+      const code = user.referred_by;
+      if (!grouped[code]) {
+        grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
+      }
+      const bonus = user.first_deposit_amount * 0.1;
+      grouped[code].players.push({
+        username: user.username || 'Anonymous',
+        deposit: user.first_deposit_amount,
+        bonus: bonus
+      });
+      grouped[code].totalBonus += bonus;
+      grouped[code].totalDeposits += user.first_deposit_amount;
+    }
+
+    // Also include codes that have no referred players yet
+    const { data: allCodes } = await supabase.from('invite_stats').select('invite_code');
+    const allCodeSet = new Set(allCodes.map(c => c.invite_code));
+    for (const code of allCodeSet) {
+      if (!grouped[code]) {
+        grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
+      }
+    }
+
+    res.json({ success: true, data: grouped });
+  } catch (error) {
+    console.error('Error fetching invite details:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ---------- Audit endpoints ----------
@@ -894,7 +946,6 @@ io.on('connection', async (socket) => {
   
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
 
-  // Send current player counts for all stakes to this new socket
   for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
@@ -1043,18 +1094,20 @@ adminNamespace.on('connection', (socket) => {
     });
   });
   
+  // [REFERRAL] Include referred_by and first_deposit_amount in admin user list
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle, referred_by'); // [NEW] include referred_by
+        .select('telegram_id, username, balance, telegram_handle, referred_by, first_deposit_amount');
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
         telegram_handle: u.telegram_handle,
-        referred_by: u.referred_by // [NEW] show which code they used
+        referred_by: u.referred_by,
+        first_deposit_amount: u.first_deposit_amount || 0
       }));
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
