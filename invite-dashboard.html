@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bingo Invite Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    /* Same dark theme as before – you can reuse the CSS */
+    * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
+    body {
+      background: linear-gradient(145deg, #0b0e14 0%, #1a1f2b 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1100px;
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(12px);
+      border-radius: 40px;
+      padding: 35px 30px 45px;
+      box-shadow: 0 25px 50px -10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 20px;
+    }
+    .header-left h1 {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f0b94b, #fcd34d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-left p {
+      color: #8892a8;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .total-box {
+      background: rgba(255,215,0,0.08);
+      padding: 10px 24px;
+      border-radius: 60px;
+      border: 1px solid rgba(255,215,0,0.15);
+      text-align: center;
+    }
+    .total-box span {
+      color: #aab4c9;
+      font-size: 14px;
+      font-weight: 500;
+      display: block;
+    }
+    .total-box .total-count {
+      color: #fcd34d;
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .status-bar .mode-badge {
+      background: #2a3242;
+      padding: 6px 18px;
+      border-radius: 40px;
+      font-size: 13px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-bar .mode-badge i {
+      color: #10b981;
+      font-size: 10px;
+    }
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid #3a4458;
+      color: #b0bcca;
+      padding: 8px 22px;
+      border-radius: 40px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .refresh-btn:hover {
+      background: #2a3242;
+      border-color: #fcd34d;
+      color: #fff;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
+      padding: 18px 20px 20px;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      backdrop-filter: blur(4px);
+    }
+    .card:hover {
+      background: rgba(255,255,255,0.07);
+      border-color: rgba(255,215,0,0.2);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px -10px rgba(0,0,0,0.5);
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .code-badge {
+      background: #2f3b4f;
+      padding: 4px 14px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fcd34d;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .player-count {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #94a3b8;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .player-count i {
+      color: #fcd34d;
+    }
+    .player-count .count-num {
+      color: #e2e8f0;
+      font-weight: 700;
+      font-size: 18px;
+      min-width: 30px;
+      text-align: right;
+    }
+    .link-box {
+      display: flex;
+      background: #131a24;
+      border-radius: 12px;
+      padding: 4px;
+      border: 1px solid #293241;
+    }
+    .link-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 10px 14px;
+      color: #b9c7dd;
+      font-size: 13px;
+      outline: none;
+      font-family: 'Courier New', monospace;
+      min-width: 0;
+      width: 100%;
+    }
+    .copy-btn {
+      background: #2a3548;
+      border: none;
+      color: #d1dbe8;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+    .copy-btn:hover {
+      background: #fcd34d;
+      color: #0b0e14;
+    }
+    .copy-btn.copied {
+      background: #10b981;
+      color: #fff;
+    }
+    @media (max-width: 650px) {
+      .container { padding: 20px 15px; }
+      .header { flex-direction: column; align-items: flex-start; gap: 15px; }
+      .total-box { align-self: stretch; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <h1><i class="fas fa-dice" style="margin-right:12px; color:#fcd34d;"></i>Bingo Invites</h1>
+        <p><i class="fas fa-robot" style="margin-right:6px;"></i> @bingomkmk0120_bot · Real-time Tracker</p>
+      </div>
+      <div class="total-box">
+        <span>TOTAL PLAYERS</span>
+        <div class="total-count" id="totalCount">0</div>
+      </div>
+    </div>
+    <div class="status-bar">
+      <div class="mode-badge">
+        <i class="fas fa-circle"></i> 
+        <span id="statusText">Live (API)</span>
+        <span id="timeStamp" style="margin-left:8px; color:#64748b; font-size:12px;"></span>
+      </div>
+      <button class="refresh-btn" onclick="fetchStats()">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+    <div class="grid" id="cardsContainer"></div>
+  </div>
+
+  <script>
+    const CODES = ['db', 'mk', 'hd', 'ji', 'ok', 'ghy', 'bghu', 'kil', 'hg', 'jkl', 'jkil'];
+    const BOT_USERNAME = 'bingomkmk0120_bot';
+    // If you protect the endpoint with a secret, include it here:
+    // const API_URL = '/api/invite-stats?secret=YOUR_ADMIN_SECRET';
+    const API_URL = '/api/invite-stats'; // no secret (or you can add)
+
+    async function fetchStats() {
+      const statusText = document.getElementById('statusText');
+      const refreshIcon = document.querySelector('.refresh-btn i');
+      refreshIcon.className = 'fas fa-spinner fa-pulse';
+
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        // data is like { db: 5, mk: 10, ... }
+        renderCards(data);
+        statusText.textContent = 'Live (API)';
+        statusText.style.color = '#10b981';
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        statusText.textContent = 'Error – using fallback data';
+        statusText.style.color = '#f87171';
+        // Fallback: show zeros
+        const fallback = {};
+        CODES.forEach(c => fallback[c] = 0);
+        renderCards(fallback);
+      } finally {
+        refreshIcon.className = 'fas fa-sync-alt';
+        document.getElementById('timeStamp').textContent = `⏱ ${new Date().toLocaleTimeString()}`;
+      }
+    }
+
+    function renderCards(stats) {
+      const container = document.getElementById('cardsContainer');
+      container.innerHTML = '';
+      let total = 0;
+
+      CODES.forEach(code => {
+        const count = stats[code] !== undefined ? stats[code] : 0;
+        total += count;
+        const link = `https://t.me/${BOT_USERNAME}?start=${code}`;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="code-badge"><i class="fas fa-hashtag" style="margin-right:4px;"></i>${code}</span>
+            <div class="player-count">
+              <i class="fas fa-user"></i>
+              <span class="count-num">${count}</span>
+              <span style="color:#64748b;font-size:13px;">joined</span>
+            </div>
+          </div>
+          <div class="link-box">
+            <input type="text" value="${link}" readonly id="input-${code}" />
+            <button class="copy-btn" onclick="copyLink('${code}')">
+              <i class="fas fa-copy"></i> Copy
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      document.getElementById('totalCount').textContent = total;
+    }
+
+    function copyLink(code) {
+      const input = document.getElementById(`input-${code}`);
+      if (!input) return;
+      input.select();
+      input.setSelectionRange(0, 99999);
+      try {
+        navigator.clipboard.writeText(input.value).then(() => showCopied(code))
+          .catch(() => { document.execCommand('copy'); showCopied(code); });
+      } catch (_) { document.execCommand('copy'); showCopied(code); }
+    }
+
+    function showCopied(code) {
+      const btn = document.querySelector(`#input-${code}`)?.nextElementSibling;
+      if (!btn) return;
+      const original = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = original; btn.classList.remove('copied'); }, 2000);
+    }
+
+    // Auto-refresh every 30 seconds
+    let interval = setInterval(fetchStats, 30000);
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', fetchStats);
+  </script>
+</body>
+</html>
