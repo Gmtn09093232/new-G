@@ -120,6 +120,11 @@ app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
 
+// [NEW] Serve the Invite Dashboard
+app.get('/invite-dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'invite-dashboard.html'));
+});
+
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) {
@@ -130,28 +135,61 @@ app.get('/admin/live-players', (req, res) => {
 
 // ---------- User cache ----------
 const users = {};
-async function loadUser(telegramId, username, telegramHandle = null) {
+
+// [CHANGED] Added `inviteCode` parameter
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null) {
   const id = String(telegramId);
   if (users[id]) return users[id];
+
   const { data } = await supabase.from('users').select('*').eq('telegram_id', id).maybeSingle();
   if (data) {
     users[id] = { 
       id, 
       username: data.username, 
       balance: Number(data.balance),
-      telegram_handle: data.telegram_handle
+      telegram_handle: data.telegram_handle,
+      referred_by: data.referred_by // [NEW] store referral info
     };
+    return users[id];
   } else {
+    // [NEW] Insert new user with referred_by field
     const newUser = { 
       telegram_id: id, 
       username: username || 'Player', 
       telegram_handle: telegramHandle || null,
-      balance: 10 
+      balance: 10,
+      referred_by: inviteCode || null
     };
     await supabase.from('users').insert(newUser);
-    users[id] = { id, username: newUser.username, balance: 10, telegram_handle: newUser.telegram_handle };
+
+    // [NEW] Increment invite_stats if this user came via a referral link
+    if (inviteCode) {
+      const { data: inviteData } = await supabase
+        .from('invite_stats')
+        .select('count')
+        .eq('invite_code', inviteCode)
+        .maybeSingle();
+
+      if (inviteData) {
+        await supabase
+          .from('invite_stats')
+          .update({ count: inviteData.count + 1 })
+          .eq('invite_code', inviteCode);
+      } else {
+        // Insert if somehow missing (though we pre‑insert)
+        await supabase.from('invite_stats').insert({ invite_code: inviteCode, count: 1 });
+      }
+    }
+
+    users[id] = { 
+      id, 
+      username: newUser.username, 
+      balance: 10, 
+      telegram_handle: newUser.telegram_handle,
+      referred_by: newUser.referred_by
+    };
+    return users[id];
   }
-  return users[id];
 }
 
 // ---------- Telegram verification ----------
@@ -171,12 +209,19 @@ function verifyTelegram(initData) {
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) return res.status(403).json({ success: false });
+
   const params = new URLSearchParams(initData);
   const userData = JSON.parse(params.get('user'));
   const id = String(userData.id);
   const displayName = userData.first_name || userData.username || 'Player';
   const handle = userData.username || null;
-  const user = await loadUser(id, displayName, handle);
+
+  // [NEW] Extract the start_param (invite code) from the deep link
+  const startParam = params.get('start_param');
+
+  // [CHANGED] Pass the invite code to loadUser
+  const user = await loadUser(id, displayName, handle, startParam);
+
   req.session.userId = id;
   req.session.save((err) => {
     if (err) {
@@ -253,7 +298,6 @@ app.post('/admin/delete-user', async (req, res) => {
         number: player.cardNumber,
         takenNumbers: Array.from(game.takenCardNumbers)
       });
-      // Broadcast updated player count globally
       broadcastPlayerCount(stake);
       if (game.status === 'running' && game.players.length === 0) {
         clearInterval(game.callInterval);
@@ -365,11 +409,8 @@ publicNamespace.on('connection', (socket) => {
 function broadcastPlayerCount(stake) {
   const game = getGame(stake);
   const count = game.players.length;
-  // To the stake room (for players in the game)
   io.to(`stake_${stake}`).emit('playersCount', { stake, count });
-  // To the main namespace (for authenticated users)
   io.emit('playersCount', { stake, count });
-  // To the public namespace (for unauthenticated users on stake page)
   publicNamespace.emit('playersCount', { stake, count });
 }
 
@@ -390,13 +431,10 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
-  // Emit to the room
   io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
-  // Broadcast lobby state globally (for the stake page)
   io.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   publicNamespace.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   
-  // Broadcast player count (0) globally
   broadcastPlayerCount(stake);
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
@@ -416,7 +454,6 @@ async function startGame(stake) {
     if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
   }
   io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
-  // Broadcast updated player count
   broadcastPlayerCount(stake);
   notifyAdminClients();
 
@@ -784,6 +821,32 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
+// ---------- [NEW] Invite Stats Endpoint ----------
+app.get('/api/invite-stats', async (req, res) => {
+  const { secret } = req.query;
+  // Optional: protect with admin secret (if provided, it must match)
+  if (secret && secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { data, error } = await supabase
+    .from('invite_stats')
+    .select('*')
+    .order('invite_code', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching invite stats:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  // Convert to object: { "db": 5, "mk": 10, ... }
+  const stats = {};
+  data.forEach(row => {
+    stats[row.invite_code] = row.count;
+  });
+  res.json(stats);
+});
+
 // ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
@@ -843,7 +906,6 @@ io.on('connection', async (socket) => {
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
     
-    // 👇 EXPLICITLY SEND THE PLAYER COUNT TO THIS SOCKET
     socket.emit('playersCount', { stake, count: game.players.length });
     
     if (game.status === 'lobby') {
@@ -880,7 +942,6 @@ io.on('connection', async (socket) => {
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
-    // Broadcast updated player count
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
@@ -903,7 +964,6 @@ io.on('connection', async (socket) => {
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
     io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
-    // Broadcast updated player count
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
@@ -987,13 +1047,14 @@ adminNamespace.on('connection', (socket) => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle');
+        .select('telegram_id, username, balance, telegram_handle, referred_by'); // [NEW] include referred_by
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
-        telegram_handle: u.telegram_handle
+        telegram_handle: u.telegram_handle,
+        referred_by: u.referred_by // [NEW] show which code they used
       }));
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
