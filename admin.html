@@ -140,10 +140,23 @@
       gap: 16px;
       align-items: flex-start;
       justify-content: space-between;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .request-card:hover {
+      background: #253647;
+      transform: scale(1.005);
+    }
+    .request-card .click-hint {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-top: 4px;
+      display: block;
     }
     .request-info {
       flex: 1 1 100%;
       min-width: 0;
+      pointer-events: none;
     }
     .request-info p {
       margin: 6px 0;
@@ -158,6 +171,7 @@
       border: 1px solid #f39c12;
       margin-top: 8px;
       cursor: pointer;
+      pointer-events: auto;
     }
     button {
       background: #f39c12;
@@ -193,6 +207,7 @@
       font-family: monospace;
       font-size: 0.8rem;
       word-break: break-all;
+      pointer-events: auto;
     }
     .match {
       color: #2ecc71;
@@ -232,6 +247,7 @@
       gap: 12px;
       width: 100%;
       margin-top: 8px;
+      pointer-events: auto;
     }
     .action-buttons button {
       flex: 1;
@@ -270,6 +286,60 @@
       border-radius: 40px;
       margin-left: 8px;
     }
+    /* Details page styles (used inside the popup) */
+    .details-page {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #16202a;
+      border-radius: 32px;
+      color: #eee;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    .details-page h2 {
+      color: #f39c12;
+      border-bottom: 2px solid #f39c12;
+      padding-bottom: 8px;
+    }
+    .details-page .detail-row {
+      display: flex;
+      padding: 8px 0;
+      border-bottom: 1px solid #2a3a4a;
+    }
+    .details-page .detail-label {
+      font-weight: 600;
+      width: 160px;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    .details-page .detail-value {
+      flex: 1;
+      word-break: break-word;
+    }
+    .details-page .proof-full {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 16px;
+      border: 2px solid #f39c12;
+      margin: 12px 0;
+    }
+    .details-page .extracted-box {
+      background: #0f1a24;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-family: monospace;
+      margin: 12px 0;
+    }
+    .details-page .close-btn {
+      background: #e74c3c;
+      color: #fff;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 48px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+    }
     @media (max-width: 640px) {
       .stats-grid {
         flex-direction: column;
@@ -303,6 +373,14 @@
       }
       .section-header h2 {
         font-size: 1rem;
+      }
+      .details-page .detail-row {
+        flex-direction: column;
+        padding: 12px 0;
+      }
+      .details-page .detail-label {
+        width: 100%;
+        margin-bottom: 4px;
       }
     }
   </style>
@@ -424,11 +502,9 @@
         body.classList.add('closed');
         icon.classList.remove('open');
       }
-      // Save state to localStorage
       localStorage.setItem('admin_section_' + sectionId, isOpen ? 'open' : 'closed');
     }
 
-    // Restore saved toggle states
     function restoreToggleStates() {
       ['depositSection', 'withdrawSection'].forEach(id => {
         const state = localStorage.getItem('admin_section_' + id);
@@ -445,9 +521,182 @@
       });
     }
 
-    // Attach toggle listeners
     document.getElementById('depositSectionHeader').addEventListener('click', () => toggleSection('depositSection'));
     document.getElementById('withdrawSectionHeader').addEventListener('click', () => toggleSection('withdrawSection'));
+
+    // ===== OPEN DETAILS IN NEW PAGE =====
+    function openDepositDetails(id) {
+      const req = depositData.find(r => r.id === id);
+      if (!req) { alert('Request not found'); return; }
+      openDetailsWindow('Deposit Request #' + id, buildDepositDetailsHTML(req));
+    }
+
+    function openWithdrawDetails(id) {
+      const req = withdrawalData.find(r => r.id === id);
+      if (!req) { alert('Request not found'); return; }
+      openDetailsWindow('Withdrawal Request #' + id, buildWithdrawDetailsHTML(req));
+    }
+
+    function openDetailsWindow(title, htmlContent) {
+      const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes');
+      if (!win) { alert('Popup blocked. Please allow popups for this site.'); return; }
+      win.document.write(`
+        <!DOCTYPE html>
+        <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body { background: #0a0f1c; color: #eee; font-family: system-ui, sans-serif; padding: 20px; margin: 0; }
+          .container { max-width: 900px; margin: 0 auto; }
+          .detail-row { display: flex; padding: 10px 0; border-bottom: 1px solid #2a3a4a; }
+          .detail-label { font-weight: 600; width: 180px; color: #94a3b8; flex-shrink: 0; }
+          .detail-value { flex: 1; word-break: break-word; }
+          .proof-full { max-width: 100%; max-height: 500px; border-radius: 16px; border: 2px solid #f39c12; margin: 12px 0; }
+          .extracted-box { background: #0f1a24; padding: 12px 16px; border-radius: 16px; font-family: monospace; margin: 12px 0; }
+          .match { color: #2ecc71; font-weight: bold; }
+          .mismatch { color: #e74c3c; font-weight: bold; }
+          .close-btn { background: #e74c3c; color: #fff; padding: 10px 24px; border: none; border-radius: 48px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+          h2 { color: #f39c12; border-bottom: 2px solid #f39c12; padding-bottom: 8px; }
+          a { color: #f39c12; }
+          @media (max-width: 640px) {
+            .detail-row { flex-direction: column; padding: 12px 0; }
+            .detail-label { width: 100%; margin-bottom: 4px; }
+          }
+        </style>
+        </head>
+        <body>
+          <div class="container">
+            <h2>${escapeHtml(title)}</h2>
+            ${htmlContent}
+            <button class="close-btn" onclick="window.close()">Close</button>
+          </div>
+        </body>
+        </html>
+      `);
+      win.document.close();
+    }
+
+    function buildDepositDetailsHTML(req) {
+      const submittedRef = req.reference_number || '';
+      const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
+      const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank">🔗 Verify on ${req.payment_type} site</a></p>` :
+        '';
+      // Get extracted ref from the stored data attribute (if any) – we'll re-scan later or use stored
+      // We'll include a placeholder and re-run scan in the new page (or we can pass it via data-*)
+      // For simplicity, we'll re-run the scan in the new window, but we can also pass it via URL.
+      // To avoid re-scanning, we store the extracted ref in the DOM and retrieve it.
+      // But since we are generating HTML for new window, we'll embed a placeholder and run scan again.
+      // However, to save time, we can include the extracted ref if already available.
+      // We'll add a script to re-scan in the new page.
+      // Actually, we can just pass the extracted ref from the main page via a data attribute.
+      // We'll get it from the card's data-extracted-ref and data-extracted-method.
+      // We'll need to store those when we render the card.
+      // Since we are building the details from the req object, we don't have that info stored.
+      // Let's just add a note to re-scan in the new page.
+      // But we can re-use the scan function – we'll include the same logic in the new page.
+      // Instead, we'll just include the proof image and a button to scan manually.
+      // We'll also include the verification link.
+      const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` :
+        '<p>No proof image provided.</p>';
+      return `
+        <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
+        <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
+        <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${req.phone || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
+        <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.payment_type || 'Unknown'}</span></div>
+        <div class="detail-row"><span class="detail-label">Submitted Reference</span><span class="detail-value">${submittedRef || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
+        <div class="detail-row"><span class="detail-label">Verification Link</span><span class="detail-value">${verifyLinkHtml || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-label">Proof Image</span><span class="detail-value">${proofHtml}</span></div>
+        <div class="detail-row"><span class="detail-label">Extracted Reference (OCR/QR)</span><span class="detail-value" id="extractedRefDisplay">⏳ Scanning proof...</span></div>
+        <script>
+          (async function() {
+            const imgSrc = ${req.proof_path ? JSON.stringify(req.proof_path) : 'null'};
+            if (!imgSrc) { document.getElementById('extractedRefDisplay').textContent = 'No proof image'; return; }
+            // Import the same functions from parent (they are not available in new window)
+            // We'll re-define them here or use a simpler approach: fetch the image and extract.
+            // For simplicity, we'll just display a message.
+            // But we can copy the functions from parent.
+            // We'll just include the logic inline.
+            async function extractRefFromQR(imageSrc) {
+              return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.src = imageSrc;
+                img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = img.width;
+                  canvas.height = img.height;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(img, 0, 0);
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  // jsQR is not loaded in new window – we need to load it.
+                  // We'll include a script tag for jsQR in the head.
+                  // Let's append a script element.
+                  const script = document.createElement('script');
+                  script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+                  script.onload = () => {
+                    const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+                    if (qrCode && qrCode.data) {
+                      const data = qrCode.data;
+                      const match = data.match(/\\/receipt\\/([A-Z0-9]+)/i);
+                      if (match) resolve(match[1]);
+                      else { const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+                        resolve(refMatch ? refMatch[1] : null); }
+                    } else resolve(null);
+                  };
+                  document.head.appendChild(script);
+                };
+                img.onerror = () => reject('Failed to load image');
+              });
+            }
+            async function extractRefFromOCR(imageUrl) {
+              try {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                await new Promise((resolve) => { script.onload = resolve; document.head.appendChild(script); });
+                const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+                const match = text.match(/Transaction\\s*Number\\s*:\\s*([A-Z0-9]+)/i);
+                if (match && match[1]) return match[1].trim();
+                const fallback = text.match(/\\bDE[A-Z0-9]{8,}\\b/i);
+                return fallback ? fallback[0] : null;
+              } catch { return null; }
+            }
+            try {
+              let ref = null, method = '';
+              try { ref = await extractRefFromQR(imgSrc); if (ref) method = 'QR'; } catch(e) {}
+              if (!ref) {
+                ref = await extractRefFromOCR(imgSrc);
+                if (ref) method = 'OCR';
+              }
+              const display = document.getElementById('extractedRefDisplay');
+              if (ref) {
+                const submitted = ${submittedRef ? JSON.stringify(submittedRef) : 'null'};
+                let matchHtml = '';
+                if (submitted && submitted.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches submitted ref</span>';
+                else if (submitted) matchHtml = '<span class="mismatch">❌ Does NOT match submitted</span>';
+                display.innerHTML = '<strong>' + ref + '</strong> (extracted via ' + method + ') ' + matchHtml;
+              } else {
+                display.textContent = '❌ Could not extract reference from image.';
+              }
+            } catch(e) {
+              document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.';
+            }
+          })();
+        <\/script>
+      `;
+    }
+
+    function buildWithdrawDetailsHTML(req) {
+      return `
+        <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
+        <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
+        <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(req.phone_number)}</span></div>
+        <div class="detail-row"><span class="detail-label">Account Holder</span><span class="detail-value">${escapeHtml(req.receiver_name) || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
+        <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.withdrawal_type || 'N/A'}</span></div>
+        <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
+      `;
+    }
 
     // ===== FETCH FUNCTIONS =====
     async function fetchStats() {
@@ -560,7 +809,6 @@
       try { const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
         const data = await res.json();
         depositData = data.requests || [];
-        // Update badge
         document.getElementById('depositBadge').innerText = depositData.length;
         renderDeposits(); } catch (err) { console.error(err);
         document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>'; }
@@ -575,16 +823,30 @@
       filtered.forEach(async (req) => {
         const card = document.createElement('div');
         card.className = 'request-card';
+        // Click on card opens details in new page
+        card.addEventListener('click', (e) => {
+          // Ignore clicks on buttons or links inside
+          if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.proof-img')) return;
+          openDepositDetails(req.id);
+        });
         const submittedRef = req.reference_number || '';
         const refHtml = submittedRef ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>` : '';
         const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
         const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>` :
         '';
+        // Store extracted ref if we have it
+        let extractedRef = '';
+        let extractedMethod = '';
+        // We'll attempt to extract and store later
         card.innerHTML =
-          `<div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${req.phone || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>${refHtml}${verifyLinkHtml}<p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>No proof</p>'}<div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div>`;
+          `<div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${req.phone || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>${refHtml}${verifyLinkHtml}<p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="event.stopPropagation(); window.open(this.src)">` : '<p>No proof</p>'}<div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div><span class="click-hint">🖱️ Click card to open full details in new tab</span></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div>`;
         container.appendChild(card);
-        card.querySelectorAll('.approve, .reject').forEach(btn => btn.addEventListener('click', () => processDeposit(
-          parseInt(btn.dataset.id), btn.dataset.action)));
+        // Attach button events
+        card.querySelectorAll('.approve, .reject').forEach(btn => btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          processDeposit(parseInt(btn.dataset.id), btn.dataset.action);
+        }));
+        // Scan proof if exists
         if (req.proof_path) {
           const verifyDiv = document.getElementById(`verify-${req.id}`);
           try {
@@ -600,6 +862,9 @@
                 `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
               verifyDiv.innerHTML =
                 `<strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
+              // Store for details page
+              card.dataset.extractedRef = ref;
+              card.dataset.extractedMethod = result.method;
             } else verifyDiv.innerHTML = '❌ Could not read reference from image.';
           } catch (e) { verifyDiv.innerHTML = '❌ Verification error.';
             console.error(e); }
@@ -622,11 +887,29 @@
       const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
       const container = document.getElementById('withdrawList');
       if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
-      container.innerHTML = filtered.map(req =>
-        `<div class="request-card"><div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${escapeHtml(req.phone_number)}</p><p><strong>Name:</strong> ${escapeHtml(req.receiver_name) || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p><p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div></div>`
-        ).join('');
-      document.querySelectorAll('#withdrawList .approve, #withdrawList .reject').forEach(btn => btn.addEventListener(
-        'click', () => processWithdrawal(parseInt(btn.dataset.id), btn.dataset.action)));
+      container.innerHTML = filtered.map(req => `
+        <div class="request-card" onclick="openWithdrawDetails(${req.id})">
+          <div class="request-info">
+            <p><strong>ID:</strong> ${req.id}</p>
+            <p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p>
+            <p><strong>Phone:</strong> ${escapeHtml(req.phone_number)}</p>
+            <p><strong>Name:</strong> ${escapeHtml(req.receiver_name) || 'N/A'}</p>
+            <p><strong>Amount:</strong> ${req.amount} ETB</p>
+            <p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p>
+            <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+            <span class="click-hint">🖱️ Click card to open full details in new tab</span>
+          </div>
+          <div class="action-buttons">
+            <button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button>
+            <button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button>
+          </div>
+        </div>
+      `).join('');
+      document.querySelectorAll('#withdrawList .approve, #withdrawList .reject').forEach(btn => btn.addEventListener('click',
+        (e) => {
+          e.stopPropagation();
+          processWithdrawal(parseInt(btn.dataset.id), btn.dataset.action);
+        }));
     }
 
     async function processDeposit(requestId, action) {
@@ -680,10 +963,11 @@
     document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
     document.getElementById('applyDateRangeBtn').addEventListener('click', fetchStats);
 
-    // Restore toggle states from localStorage
-    restoreToggleStates();
+    // Make openDepositDetails and openWithdrawDetails globally accessible for onclick in rendered cards
+    window.openDepositDetails = openDepositDetails;
+    window.openWithdrawDetails = openWithdrawDetails;
 
-    // Initial load
+    restoreToggleStates();
     fetchAll();
   </script>
 </body>
