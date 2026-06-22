@@ -20,18 +20,44 @@
     .date-range label { font-size: 0.8rem; color: #94a3b8; }
     .date-range input { background: #0a0f1c; border: 1px solid #334455; color: #eee; padding: 8px 14px; border-radius: 40px; flex: 1; min-width: 120px; }
     .date-range button { background: #3498db; border: none; color: #fff; padding: 8px 20px; border-radius: 40px; font-weight: bold; cursor: pointer; }
-    .stats-grid { display: flex; flex-wrap: wrap; gap: 16px; margin: 16px 0; }
-    .stat-card { background: #1e2a36; border-radius: 20px; padding: 16px; flex: 1 1 180px; text-align: center; }
-    .stat-card .label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; }
-    .stat-card .value { font-size: 1.6rem; font-weight: 800; margin-top: 4px; }
+
+    /* ---- Stat cards ---- compact */
+    .stats-grid { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+    .stat-card {
+      background: #1e2a36;
+      border-radius: 16px;
+      padding: 10px 14px;           /* reduced padding */
+      flex: 1 1 140px;             /* reduced basis */
+      text-align: center;
+      min-width: 100px;
+    }
+    .stat-card .label {
+      font-size: 0.65rem;          /* smaller label */
+      text-transform: uppercase;
+      color: #94a3b8;
+      letter-spacing: 0.3px;
+    }
+    .stat-card .value {
+      font-size: 1.3rem;           /* smaller value */
+      font-weight: 800;
+      margin-top: 2px;
+    }
     .stat-card .value.deposit-color { color: #2ecc71; }
     .stat-card .value.withdraw-color { color: #e74c3c; }
     .stat-card .value.profit-color { color: #f39c12; }
-    .method-grid { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
-    .method-card { background: #1e2a36; border-radius: 16px; padding: 10px 16px; flex: 1 1 140px; text-align: center; }
-    .method-card .method-label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; }
-    .method-card .method-value { font-size: 1.1rem; font-weight: 700; color: #facc15; margin-top: 2px; }
-    .stat-error { color: #e74c3c; font-size: 0.75rem; }
+    .stat-error { color: #e74c3c; font-size: 0.65rem; }
+
+    /* Method breakdown – compact */
+    .method-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+    .method-card {
+      background: #1e2a36;
+      border-radius: 12px;
+      padding: 6px 12px;
+      flex: 1 1 110px;
+      text-align: center;
+    }
+    .method-card .method-label { font-size: 0.6rem; text-transform: uppercase; color: #94a3b8; }
+    .method-card .method-value { font-size: 0.95rem; font-weight: 700; color: #facc15; margin-top: 2px; }
 
     /* Tabs */
     .tabs { display: flex; gap: 4px; margin: 20px 0 16px; background: #16202a; border-radius: 48px; padding: 4px; }
@@ -43,7 +69,7 @@
     .tab-content.active { display: block; }
 
     /* Request list */
-    .stat-box { background: #16202a; border-radius: 24px; padding: 16px; text-align: center; margin-bottom: 20px; }
+    .stat-box { background: #16202a; border-radius: 24px; padding: 12px; text-align: center; margin-bottom: 20px; }
     .stat-box .label { font-size: 0.8rem; color: #bbb; text-transform: uppercase; }
     .stat-box .value { font-size: 2rem; font-weight: 800; }
     .stat-box .value.deposit-color { color: #2ecc71; }
@@ -78,6 +104,7 @@
     .match { color: #2ecc71; font-weight: bold; }
     .mismatch { color: #e74c3c; font-weight: bold; }
 
+    /* ---- Mobile ---- */
     @media (max-width: 640px) {
       .modal-content .detail-row { flex-direction: column; padding: 12px 0; }
       .modal-content .detail-label { width: 100%; margin-bottom: 4px; }
@@ -87,9 +114,35 @@
       .tab-btn { width: 100%; }
       .date-range { flex-direction: column; align-items: stretch; }
       .date-range input { width: 100%; }
-      .stats-grid { flex-direction: column; }
-      .method-grid { flex-direction: column; }
-      .method-card { width: 100%; }
+
+      /* Stack stat cards vertically but keep them compact */
+      .stats-grid { flex-direction: column; gap: 8px; }
+      .stat-card { padding: 8px 12px; flex: none; width: 100%; }
+      .stat-card .value { font-size: 1.1rem; }
+
+      /* Method cards: 2‑column grid */
+      .method-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin: 6px 0;
+      }
+      .method-card {
+        padding: 6px 8px;
+        border-radius: 10px;
+        flex: none;
+        width: 100%;
+      }
+      .method-card .method-label { font-size: 0.55rem; }
+      .method-card .method-value { font-size: 0.8rem; }
+    }
+    @media (max-width: 480px) {
+      .method-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+      }
+      .method-card { padding: 4px 6px; }
+      .method-card .method-value { font-size: 0.7rem; }
     }
   </style>
 </head>
@@ -109,13 +162,27 @@
       <button id="refreshStatsBtn" style="background:#f39c12;">🔄 Refresh</button>
     </div>
 
+    <!-- compact stats grid -->
     <div class="stats-grid">
-      <div class="stat-card"><div class="label">💰 Total Deposits</div><div class="value deposit-color" id="totalDeposits">0</div><div id="depositStatsError" class="stat-error"></div></div>
-      <div class="stat-card"><div class="label">💸 Total Withdrawals</div><div class="value withdraw-color" id="totalWithdrawals">0</div><div id="withdrawStatsError" class="stat-error"></div></div>
-      <div class="stat-card"><div class="label">🏦 House Profit</div><div class="value profit-color" id="houseProfit">0</div><div id="profitStatsError" class="stat-error"></div></div>
+      <div class="stat-card">
+        <div class="label">💰 Total Deposits</div>
+        <div class="value deposit-color" id="totalDeposits">0</div>
+        <div id="depositStatsError" class="stat-error"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">💸 Total Withdrawals</div>
+        <div class="value withdraw-color" id="totalWithdrawals">0</div>
+        <div id="withdrawStatsError" class="stat-error"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">🏦 House Profit</div>
+        <div class="value profit-color" id="houseProfit">0</div>
+        <div id="profitStatsError" class="stat-error"></div>
+      </div>
     </div>
 
-    <div style="margin: 12px 0 8px; font-size:0.8rem; color:#94a3b8;">📥 Deposits by Method</div>
+    <!-- Method breakdowns -->
+    <div style="margin: 8px 0 4px; font-size:0.75rem; color:#94a3b8;">📥 Deposits by Method</div>
     <div class="method-grid">
       <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrDeposit">0</div></div>
       <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrDeposit">0</div></div>
@@ -123,7 +190,7 @@
       <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualDeposit">0</div></div>
     </div>
 
-    <div style="margin: 12px 0 8px; font-size:0.8rem; color:#94a3b8;">📤 Withdrawals by Method</div>
+    <div style="margin: 8px 0 4px; font-size:0.75rem; color:#94a3b8;">📤 Withdrawals by Method</div>
     <div class="method-grid">
       <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrWithdraw">0</div></div>
       <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrWithdraw">0</div></div>
@@ -144,7 +211,6 @@
       <div class="label">Total Pending Deposits</div>
       <div class="value deposit-color" id="depositPendingCount">0</div>
     </div>
-
     <div class="filter-row">
       <label for="depositFilter">Filter by method:</label>
       <select id="depositFilter">
@@ -164,7 +230,6 @@
       <div class="label">Total Pending Withdrawals</div>
       <div class="value withdraw-color" id="withdrawPendingCount">0</div>
     </div>
-
     <div class="filter-row">
       <label for="withdrawFilter">Filter by method:</label>
       <select id="withdrawFilter">
@@ -179,7 +244,7 @@
   </div>
 </div>
 
-<!-- ===== DETAIL MODAL (shared) ===== -->
+<!-- ===== DETAIL MODAL ===== -->
 <div class="modal-overlay" id="detailModal">
   <div class="modal-content">
     <button class="close-modal" id="closeModalBtn">✕ Close</button>
@@ -192,14 +257,11 @@
   const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
   const API_BASE = '';
 
-  // ---- State ----
-  let depositData = [];
-  let withdrawalData = [];
+  let depositData = [], withdrawalData = [];
 
-  // ---- Utilities ----
   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
-  // ---- QR/OCR functions (for deposits) ----
+  // ---- QR/OCR functions ----
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -223,7 +285,6 @@
       img.onerror = () => reject('Failed to load image for QR scan');
     });
   }
-
   async function extractRefFromOCR(imageUrl) {
     try {
       const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
@@ -233,14 +294,12 @@
       return fallback ? fallback[0] : null;
     } catch { return null; }
   }
-
   async function getReferenceFromProof(imagePath) {
     try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' }; } catch (e) { console.warn('QR failed'); }
     const ocrRef = await extractRefFromOCR(imagePath);
     if (ocrRef) return { ref: ocrRef, method: 'OCR' };
     return null;
   }
-
   function getVerificationLink(paymentType, ref) {
     const encoded = encodeURIComponent(ref);
     switch (paymentType) {
@@ -325,15 +384,11 @@
       document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>';
     }
   }
-
   function renderDeposits() {
     const filter = document.getElementById('depositFilter').value;
     const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
     const container = document.getElementById('depositList');
-    if (filtered.length === 0) {
-      container.innerHTML = '<p>✅ No pending deposits.</p>';
-      return;
-    }
+    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending deposits.</p>'; return; }
     container.innerHTML = '';
     filtered.forEach((req) => {
       const card = document.createElement('div');
@@ -354,13 +409,11 @@
           <button class="reject" data-id="${req.id}">❌ Reject</button>
         </div>
       `;
-      // Click on card opens modal
       card.addEventListener('click', (e) => {
         if (e.target.closest('button') || e.target.closest('img')) return;
         openDepositDetail(req.id);
       });
       container.appendChild(card);
-      // Attach button events
       card.querySelectorAll('.approve, .reject').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -383,15 +436,11 @@
       document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>';
     }
   }
-
   function renderWithdrawals() {
     const filter = document.getElementById('withdrawFilter').value;
     const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
     const container = document.getElementById('withdrawList');
-    if (filtered.length === 0) {
-      container.innerHTML = '<p>✅ No pending withdrawals.</p>';
-      return;
-    }
+    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
     container.innerHTML = '';
     filtered.forEach((req) => {
       const card = document.createElement('div');
@@ -411,13 +460,11 @@
           <button class="reject" data-id="${req.id}">❌ Reject</button>
         </div>
       `;
-      // Click on card opens modal
       card.addEventListener('click', (e) => {
         if (e.target.closest('button')) return;
         openWithdrawDetail(req.id);
       });
       container.appendChild(card);
-      // Attach button events
       card.querySelectorAll('.approve, .reject').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -427,7 +474,7 @@
     });
   }
 
-  // ---- Deposit Detail Modal ----
+  // ---- Detail modals ----
   async function openDepositDetail(id) {
     const req = depositData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -437,7 +484,6 @@
     const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
     const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank">🔗 Verify on ${req.payment_type} site</a></p>` : '';
     const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` : '<p>No proof image</p>';
-
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
       <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
@@ -451,8 +497,6 @@
       <div class="detail-row"><span class="detail-label">Extracted Reference</span><span class="detail-value" id="extractedRefDisplay">⏳ Scanning...</span></div>
     `;
     document.getElementById('detailModal').classList.add('active');
-
-    // Scan proof if exists
     if (req.proof_path) {
       try {
         const result = await getReferenceFromProof(req.proof_path);
@@ -464,18 +508,11 @@
           if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches submitted ref</span>';
           else if (submittedRef) matchHtml = `<span class="mismatch">❌ Does NOT match submitted</span>`;
           display.innerHTML = `<strong>${ref}</strong> (via ${result.method}) ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
-        } else {
-          display.textContent = '❌ Could not extract reference from image.';
-        }
-      } catch (e) {
-        document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.';
-      }
-    } else {
-      document.getElementById('extractedRefDisplay').textContent = 'No proof image to scan.';
-    }
+        } else { display.textContent = '❌ Could not extract reference from image.'; }
+      } catch (e) { document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.'; }
+    } else { document.getElementById('extractedRefDisplay').textContent = 'No proof image to scan.'; }
   }
 
-  // ---- Withdrawal Detail Modal ----
   function openWithdrawDetail(id) {
     const req = withdrawalData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -504,14 +541,9 @@
       });
       const data = await res.json();
       alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
-      if (data.success) {
-        await fetchDeposits();
-        await fetchStats(); // update totals
-        document.getElementById('detailModal').classList.remove('active');
-      }
+      if (data.success) { await fetchDeposits(); await fetchStats(); document.getElementById('detailModal').classList.remove('active'); }
     } catch (err) { alert(err.message); }
   }
-
   async function processWithdrawal(requestId, action) {
     if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
     try {
@@ -522,11 +554,7 @@
       });
       const data = await res.json();
       alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
-      if (data.success) {
-        await fetchWithdrawals();
-        await fetchStats(); // update totals
-        document.getElementById('detailModal').classList.remove('active');
-      }
+      if (data.success) { await fetchWithdrawals(); await fetchStats(); document.getElementById('detailModal').classList.remove('active'); }
     } catch (err) { alert(err.message); }
   }
 
@@ -538,13 +566,11 @@
     if (e.target === e.currentTarget) document.getElementById('detailModal').classList.remove('active');
   });
 
-  // ---- Refresh & filter events ----
+  // ---- Refresh & filter ----
   document.getElementById('refreshDepositsBtn').addEventListener('click', fetchDeposits);
   document.getElementById('depositFilter').addEventListener('change', renderDeposits);
-
   document.getElementById('refreshWithdrawalsBtn').addEventListener('click', fetchWithdrawals);
   document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
-
   document.getElementById('applyStatsBtn').addEventListener('click', fetchStats);
   document.getElementById('refreshStatsBtn').addEventListener('click', fetchStats);
 
