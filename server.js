@@ -59,7 +59,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger (unchanged) ----------
+// ---------- Audit Logger ----------
 async function logAuditEvent({
   eventType,
   roomId = null,
@@ -138,7 +138,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
-app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html'))); // referral dashboard
+app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -151,17 +151,18 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null) {
+// ---------- UPDATED loadUser with refresh parameter ----------
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false) {
   const id = String(telegramId);
-  
-  // Return from cache if exists
-  if (users[id]) {
+
+  // Return cached copy only if refresh is false and cache exists
+  if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
     return users[id];
   }
 
   try {
-    // Check if user exists in DB
+    // Always fetch from Supabase when refresh is true or cache missing
     const { data, error } = await supabase
       .from('users')
       .select('*')
@@ -171,7 +172,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     if (error) throw error;
 
     if (data) {
-      // Existing user
+      // Update cache with fresh data
       users[id] = {
         id,
         username: data.username,
@@ -180,7 +181,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         referred_by: data.referred_by,
         first_deposit_amount: data.first_deposit_amount || 0
       };
-      console.log(`✅ Loaded existing user ${id} (referred_by: ${data.referred_by || 'none'})`);
+      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance})`);
       return users[id];
     } else {
       // New user – insert with optional invite code
@@ -217,7 +218,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           if (updateError) throw updateError;
           console.log(`✅ Invite count for ${inviteCode} is now ${newCount}`);
         } else {
-          // Insert if not exists (should not happen if you pre-inserted)
           const { error: insertInviteError } = await supabase
             .from('invite_stats')
             .insert({ invite_code: inviteCode, count: 1 });
@@ -239,7 +239,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     }
   } catch (err) {
     console.error(`❌ loadUser error for ${id}:`, err.message);
-    // Re-throw to be handled by the calling endpoint
     throw err;
   }
 }
@@ -284,7 +283,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
-    const user = await loadUser(id, displayName, handle, startParam);
+    // No refresh needed for auth
+    const user = await loadUser(id, displayName, handle, startParam, false);
 
     req.session.userId = id;
     req.session.save((err) => {
@@ -306,7 +306,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   }
 });
 
-// ---------- Admin add balance (records manual deposit) ----------
+// ---------- Admin add balance ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -314,7 +314,7 @@ app.post('/admin/add-balance', async (req, res) => {
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   try {
-    const user = await loadUser(strId, 'unknown');
+    const user = await loadUser(strId, 'unknown', null, null, false);
     user.balance += amt;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
     await supabase.from('deposit_requests').insert({
@@ -338,7 +338,7 @@ app.post('/admin/add-balance', async (req, res) => {
   }
 });
 
-// ---------- DELETE USER (removes from DB and active games) ----------
+// ---------- DELETE USER ----------
 app.post('/admin/delete-user', async (req, res) => {
   const { secret, telegramId } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -356,7 +356,6 @@ app.post('/admin/delete-user', async (req, res) => {
     const { error: delErr } = await supabase.from('users').delete().eq('telegram_id', strId);
     if (delErr) throw delErr;
 
-    // Remove from all active game stakes
     for (const stake of [10, 20, 30]) {
       const game = games[stake];
       if (!game) continue;
@@ -411,7 +410,7 @@ function generateCard() {
   return transposed;
 }
 
-// ---------- Multi-stake game states (10,20,30) ----------
+// ---------- Multi-stake game states ----------
 function createGameState(entryFee) {
   return {
     status: 'lobby',
@@ -440,7 +439,6 @@ function getGame(stake) {
   return games[stake];
 }
 
-// Helper to get combined players list for admin (all stakes)
 function getAllPlayersList() {
   const allPlayers = [];
   for (const stake of [10, 20, 30]) {
@@ -471,7 +469,7 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
-// ---------- PUBLIC NAMESPACE (for unauthenticated viewers) ----------
+// ---------- PUBLIC NAMESPACE ----------
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
   for (const stake of [10, 20, 30]) {
@@ -489,7 +487,6 @@ function broadcastPlayerCount(stake) {
   publicNamespace.emit('playersCount', { stake, count });
 }
 
-// Reset a specific stake's game
 function resetGame(stake) {
   const game = getGame(stake);
   clearInterval(game.callInterval);
@@ -691,7 +688,7 @@ app.post('/api/request-deposit', async (req, res) => {
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   try {
-    const user = await loadUser(userId, null);
+    const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
     
     const { data, error } = await supabase.from('deposit_requests').insert({
@@ -741,14 +738,13 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
     if (action === 'approve') {
-      const user = await loadUser(reqData.telegram_id, null);
+      const user = await loadUser(reqData.telegram_id, null, null, null, false);
       if (!user) return res.status(404).json({ error: 'User not found' });
       user.balance += reqData.amount;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
       await supabase.from('deposit_requests').update({ status: 'approved', processed_at: new Date().toISOString() }).eq('id', requestId);
       Audit.depositCompleted(reqData.telegram_id, req.ip, { transactionId: requestId.toString(), providerRef: reqData.id.toString(), amount: reqData.amount, currency: 'ETB', method: reqData.payment_type || 'unknown' });
       
-      // Record first deposit if this is the user's first
       if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
         user.first_deposit_amount = reqData.amount;
         await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
@@ -784,7 +780,7 @@ app.post('/api/request-withdraw', async (req, res) => {
   const receiverName = (name || '').trim();
   if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
   try {
-    const user = await loadUser(userId, null);
+    const user = await loadUser(userId, null, null, null, false);
     if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
     const { data, error } = await supabase.from('withdrawal_requests').insert({
       telegram_id: userId, username: user.username, amount: amt, status: 'pending',
@@ -820,7 +816,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
     if (action === 'approve') {
-      const user = await loadUser(reqData.telegram_id, null);
+      const user = await loadUser(reqData.telegram_id, null, null, null, false);
       if (!user || user.balance < reqData.amount) return res.status(400).json({ error: 'Insufficient balance now' });
       user.balance -= reqData.amount;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
@@ -842,7 +838,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics endpoints (with date range & method breakdown) ----------
+// ---------- Statistics endpoints ----------
 app.get('/stats', (req, res) => {
   res.sendFile(path.join(__dirname, 'stats.html'));
 });
@@ -883,7 +879,6 @@ app.get('/admin/stats-summary', async (req, res) => {
     if (rdErr) throw rdErr;
     const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
 
-    // Deposits by method
     let methodQuery = supabase.from('deposit_requests').select('amount, payment_type').eq('status', 'approved');
     if (from) methodQuery = methodQuery.gte('created_at', new Date(from).toISOString());
     if (to) methodQuery = methodQuery.lte('created_at', new Date(to).toISOString());
@@ -899,7 +894,6 @@ app.get('/admin/stats-summary', async (req, res) => {
       });
     }
 
-    // Withdrawals by method
     let withdrawalMethodQuery = supabase.from('withdrawal_requests').select('amount, withdrawal_type').eq('status', 'approved');
     if (from) withdrawalMethodQuery = withdrawalMethodQuery.gte('created_at', new Date(from).toISOString());
     if (to) withdrawalMethodQuery = withdrawalMethodQuery.lte('created_at', new Date(to).toISOString());
@@ -930,8 +924,6 @@ app.get('/admin/stats-summary', async (req, res) => {
 });
 
 // ---------- REFERRAL ENDPOINTS ----------
-
-// Get total join counts per invite code
 app.get('/api/invite-stats', async (req, res) => {
   const { secret } = req.query;
   if (secret && secret !== process.env.ADMIN_SECRET) {
@@ -957,7 +949,6 @@ app.get('/api/invite-stats', async (req, res) => {
   }
 });
 
-// Get detailed referral info (players + 10% bonus)
 app.get('/api/invite-details', async (req, res) => {
   const { secret } = req.query;
   if (secret && secret !== process.env.ADMIN_SECRET) {
@@ -965,7 +956,6 @@ app.get('/api/invite-details', async (req, res) => {
   }
 
   try {
-    // Get all users with a referral code and a first deposit
     const { data: referredUsers, error } = await supabase
       .from('users')
       .select('username, referred_by, first_deposit_amount')
@@ -974,7 +964,6 @@ app.get('/api/invite-details', async (req, res) => {
 
     if (error) throw error;
 
-    // Group by invite code
     const grouped = {};
     for (const user of referredUsers) {
       const code = user.referred_by;
@@ -991,7 +980,6 @@ app.get('/api/invite-details', async (req, res) => {
       grouped[code].totalDeposits += user.first_deposit_amount;
     }
 
-    // Include all codes even if no players yet
     const { data: allCodes } = await supabase.from('invite_stats').select('invite_code');
     const allCodeSet = new Set(allCodes.map(c => c.invite_code));
     for (const code of allCodeSet) {
@@ -1174,7 +1162,12 @@ io.on('connection', async (socket) => {
     }
   });
   
-  socket.on('getBalance', async () => { const u = await loadUser(socket.userId, socket.username); socket.emit('balanceUpdate', u.balance); });
+  // ------- UPDATED getBalance to force refresh -------
+  socket.on('getBalance', async () => {
+    // Pass refresh=true to always fetch fresh from Supabase
+    const u = await loadUser(socket.userId, socket.username, null, null, true);
+    socket.emit('balanceUpdate', u.balance);
+  });
 });
 
 // ---------- Admin namespace ----------
