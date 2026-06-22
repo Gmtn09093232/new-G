@@ -7,316 +7,684 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    h1 { color: #f39c12; font-size: 1.6rem; margin: 0 0 16px; text-align: center; }
-    .stats-grid { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: #16202a; border-radius: 24px; padding: 16px 20px; flex: 1 1 200px; text-align: center; border-left: 4px solid #f39c12; }
-    .stat-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #bbb; }
-    .stat-value { font-size: 1.8rem; font-weight: 800; margin-top: 8px; }
-    .stat-value.deposit { color: #2ecc71; }
-    .stat-value.withdraw { color: #e74c3c; }
-    .stat-error { font-size: 0.7rem; color: #e74c3c; margin-top: 4px; }
-    .method-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; margin-bottom: 16px; }
-    .method-card { background: #1e2a36; border-radius: 20px; padding: 12px 16px; flex: 1 1 150px; text-align: center; }
-    .method-label { font-size: 0.7rem; text-transform: uppercase; color: #94a3b8; }
-    .method-value { font-size: 1.2rem; font-weight: 700; color: #facc15; margin-top: 4px; }
-    .section { background: #16202a; margin: 20px 0; padding: 16px; border-radius: 24px; }
-    .request-card { background: #1e2a36; border-radius: 20px; margin: 16px 0; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between; }
-    .request-info { flex: 1 1 100%; min-width: 0; }
-    .request-info p { margin: 6px 0; word-break: break-word; font-size: 0.9rem; }
-    .proof-img { max-width: 100%; height: auto; max-height: 150px; border-radius: 12px; border: 1px solid #f39c12; margin-top: 8px; cursor: pointer; }
-    button { background: #f39c12; border: none; padding: 12px 20px; border-radius: 48px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.2s ease; }
-    button.approve { background: #2ecc71; color: #000; }
-    button.reject { background: #e74c3c; color: #fff; }
-    .refresh { background: #3498db; color: #fff; margin-bottom: 20px; width: 100%; padding: 14px; font-size: 1rem; }
-    .receipt-box { background: #0f1a24; padding: 12px; border-radius: 16px; margin-top: 12px; font-family: monospace; font-size: 0.8rem; word-break: break-all; }
-    .match { color: #2ecc71; font-weight: bold; }
-    .mismatch { color: #e74c3c; font-weight: bold; }
-    select, input { background: #1e2a36; border: 1px solid #334455; color: #eee; padding: 12px 16px; border-radius: 48px; font-size: 1rem; width: 100%; margin-bottom: 10px; }
-    .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
-    .filter-row select { width: auto; flex: 1; margin-bottom: 0; }
-    .action-buttons { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; margin-top: 8px; }
-    .action-buttons button { flex: 1; }
-    .date-range { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 20px; background: #1e2a36; padding: 12px; border-radius: 48px; }
-    .date-range label { font-size: 0.8rem; }
-    .date-range input { width: auto; margin-bottom: 0; flex: 1; min-width: 130px; }
-    .date-range button { background: #3498db; padding: 10px 20px; width: auto; margin-bottom: 0; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0f1c;
+      color: #eee;
+      padding: 12px;
+      margin: 0;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #f39c12;
+      font-size: 1.6rem;
+      margin: 0 0 16px;
+      text-align: center;
+    }
+    .stats-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #16202a;
+      border-radius: 24px;
+      padding: 16px 20px;
+      flex: 1 1 200px;
+      text-align: center;
+      border-left: 4px solid #f39c12;
+    }
+    .stat-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #bbb;
+    }
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-top: 8px;
+    }
+    .stat-value.deposit {
+      color: #2ecc71;
+    }
+    .stat-value.withdraw {
+      color: #e74c3c;
+    }
+    .stat-error {
+      font-size: 0.7rem;
+      color: #e74c3c;
+      margin-top: 4px;
+    }
+    .method-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+      margin-bottom: 16px;
+    }
+    .method-card {
+      background: #1e2a36;
+      border-radius: 20px;
+      padding: 12px 16px;
+      flex: 1 1 150px;
+      text-align: center;
+    }
+    .method-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+    .method-value {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #facc15;
+      margin-top: 4px;
+    }
+    .section {
+      background: #16202a;
+      margin: 20px 0;
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 16px 20px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1a2533;
+      transition: background 0.2s;
+      user-select: none;
+    }
+    .section-header:hover {
+      background: #1e2e40;
+    }
+    .section-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: #f39c12;
+    }
+    .section-header .toggle-icon {
+      font-size: 1.4rem;
+      transition: transform 0.3s ease;
+      color: #94a3b8;
+    }
+    .section-header .toggle-icon.open {
+      transform: rotate(180deg);
+    }
+    .section-body {
+      padding: 0 16px 16px;
+      display: block;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .section-body.closed {
+      display: none;
+    }
+    .request-card {
+      background: #1e2a36;
+      border-radius: 20px;
+      margin: 16px 0;
+      padding: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .request-info {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+    .request-info p {
+      margin: 6px 0;
+      word-break: break-word;
+      font-size: 0.9rem;
+    }
+    .proof-img {
+      max-width: 100%;
+      height: auto;
+      max-height: 150px;
+      border-radius: 12px;
+      border: 1px solid #f39c12;
+      margin-top: 8px;
+      cursor: pointer;
+    }
+    button {
+      background: #f39c12;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 48px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+    button.approve {
+      background: #2ecc71;
+      color: #000;
+    }
+    button.reject {
+      background: #e74c3c;
+      color: #fff;
+    }
+    .refresh {
+      background: #3498db;
+      color: #fff;
+      margin-bottom: 20px;
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+    }
+    .receipt-box {
+      background: #0f1a24;
+      padding: 12px;
+      border-radius: 16px;
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      word-break: break-all;
+    }
+    .match {
+      color: #2ecc71;
+      font-weight: bold;
+    }
+    .mismatch {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    select,
+    input {
+      background: #1e2a36;
+      border: 1px solid #334455;
+      color: #eee;
+      padding: 12px 16px;
+      border-radius: 48px;
+      font-size: 1rem;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-top: 8px;
+    }
+    .filter-row select {
+      width: auto;
+      flex: 1;
+      margin-bottom: 0;
+    }
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .action-buttons button {
+      flex: 1;
+    }
+    .date-range {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+      background: #1e2a36;
+      padding: 12px;
+      border-radius: 48px;
+    }
+    .date-range label {
+      font-size: 0.8rem;
+    }
+    .date-range input {
+      width: auto;
+      margin-bottom: 0;
+      flex: 1;
+      min-width: 130px;
+    }
+    .date-range button {
+      background: #3498db;
+      padding: 10px 20px;
+      width: auto;
+      margin-bottom: 0;
+    }
+    .badge-count {
+      background: #f39c12;
+      color: #0a0f1c;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 40px;
+      margin-left: 8px;
+    }
     @media (max-width: 640px) {
-      .stats-grid { flex-direction: column; gap: 12px; }
-      .stat-value { font-size: 1.5rem; }
-      .filter-row { flex-direction: column; align-items: stretch; }
-      .filter-row select { width: 100%; }
-      .action-buttons button { width: 100%; }
-      .date-range { flex-direction: column; align-items: stretch; }
-      .date-range input { width: 100%; }
-      .method-grid { flex-direction: column; }
-      .method-card { width: 100%; }
+      .stats-grid {
+        flex-direction: column;
+        gap: 12px;
+      }
+      .stat-value {
+        font-size: 1.5rem;
+      }
+      .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .filter-row select {
+        width: 100%;
+      }
+      .action-buttons button {
+        width: 100%;
+      }
+      .date-range {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .date-range input {
+        width: 100%;
+      }
+      .method-grid {
+        flex-direction: column;
+      }
+      .method-card {
+        width: 100%;
+      }
+      .section-header h2 {
+        font-size: 1rem;
+      }
     }
   </style>
 </head>
 <body>
-<div class="container">
-  <h1>🎰 Bingo Admin Panel</h1>
+  <div class="container">
+    <h1>🎰 Bingo Admin Panel</h1>
 
-  <!-- Date Range Filter -->
-  <div class="date-range">
-    <label>📅 From:</label>
-    <input type="date" id="startDate" value="2026-10-10">
-    <label>To:</label>
-    <input type="date" id="endDate" value="2026-10-20">
-    <button id="applyDateRangeBtn">Apply Date Range</button>
-  </div>
+    <!-- Date Range Filter -->
+    <div class="date-range">
+      <label>📅 From:</label>
+      <input type="date" id="startDate" value="2026-10-10">
+      <label>To:</label>
+      <input type="date" id="endDate" value="2026-10-20">
+      <button id="applyDateRangeBtn">Apply Date Range</button>
+    </div>
 
-  <!-- Main financial stats -->
-  <div class="stats-grid">
-    <div class="stat-card"><div class="stat-label">💰 TOTAL DEPOSITS</div><div class="stat-value deposit" id="totalDeposits">0</div><div id="depositStatsError" class="stat-error"></div></div>
-    <div class="stat-card"><div class="stat-label">💸 TOTAL WITHDRAWALS</div><div class="stat-value withdraw" id="totalWithdrawals">0</div><div id="withdrawStatsError" class="stat-error"></div></div>
-    <div class="stat-card"><div class="stat-label">🏦 HOUSE PROFIT</div><div class="stat-value" id="houseProfit">0</div><div id="profitStatsError" class="stat-error"></div></div>
-  </div>
+    <!-- Main financial stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">💰 TOTAL DEPOSITS</div>
+        <div class="stat-value deposit" id="totalDeposits">0</div>
+        <div id="depositStatsError" class="stat-error"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">💸 TOTAL WITHDRAWALS</div>
+        <div class="stat-value withdraw" id="totalWithdrawals">0</div>
+        <div id="withdrawStatsError" class="stat-error"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">🏦 HOUSE PROFIT</div>
+        <div class="stat-value" id="houseProfit">0</div>
+        <div id="profitStatsError" class="stat-error"></div>
+      </div>
+    </div>
 
-  <!-- Deposit Breakdown -->
-  <div style="background: #16202a; border-radius: 24px; padding: 16px; margin-bottom: 16px;">
-    <div class="stat-label" style="margin-bottom: 12px;">📥 DEPOSITS BY METHOD</div>
-    <div class="method-grid">
-      <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualDeposit">0</div></div>
+    <!-- Deposit Breakdown -->
+    <div style="background: #16202a; border-radius: 24px; padding: 16px; margin-bottom: 16px;">
+      <div class="stat-label" style="margin-bottom: 12px;">📥 DEPOSITS BY METHOD</div>
+      <div class="method-grid">
+        <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrDeposit">0</div></div>
+        <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrDeposit">0</div></div>
+        <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaDeposit">0</div></div>
+        <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualDeposit">0</div></div>
+      </div>
+    </div>
+
+    <!-- Withdrawal Breakdown -->
+    <div style="background: #16202a; border-radius: 24px; padding: 16px; margin-bottom: 24px;">
+      <div class="stat-label" style="margin-bottom: 12px;">📤 WITHDRAWALS BY METHOD</div>
+      <div class="method-grid">
+        <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrWithdraw">0</div></div>
+        <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrWithdraw">0</div></div>
+        <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaWithdraw">0</div></div>
+        <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualWithdraw">0</div></div>
+      </div>
+    </div>
+
+    <button class="refresh" id="refreshAllBtn">🔄 Refresh All</button>
+
+    <!-- ====== DEPOSIT SECTION (collapsible) ====== -->
+    <div class="section" id="depositSection">
+      <div class="section-header" id="depositSectionHeader">
+        <h2>📸 Pending Deposit Requests <span class="badge-count" id="depositBadge">0</span></h2>
+        <span class="toggle-icon open" id="depositToggleIcon">▼</span>
+      </div>
+      <div class="section-body" id="depositSectionBody">
+        <div class="filter-row">
+          <label for="depositFilter">Filter by method:</label>
+          <select id="depositFilter"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE Birr</option><option value="mpesa">M‑Pesa</option></select>
+        </div>
+        <div id="depositList">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ====== WITHDRAWAL SECTION (collapsible) ====== -->
+    <div class="section" id="withdrawSection">
+      <div class="section-header" id="withdrawSectionHeader">
+        <h2>💰 Pending Withdrawal Requests <span class="badge-count" id="withdrawBadge">0</span></h2>
+        <span class="toggle-icon open" id="withdrawToggleIcon">▼</span>
+      </div>
+      <div class="section-body" id="withdrawSectionBody">
+        <div class="filter-row">
+          <label for="withdrawFilter">Filter by method:</label>
+          <select id="withdrawFilter"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE Birr</option><option value="mpesa">M‑Pesa</option></select>
+        </div>
+        <div id="withdrawList">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Manual Balance Addition -->
+    <div class="section" style="padding: 16px;">
+      <h2 style="margin-top:0;color:#f39c12;">➕ Manual Add Balance</h2>
+      <input type="text" id="userId" placeholder="Telegram ID (numeric)" inputmode="numeric">
+      <input type="number" id="amount" placeholder="Amount (ETB)" step="1" min="1">
+      <button id="addBalanceBtn" style="width:100%;">Add Balance</button>
     </div>
   </div>
 
-  <!-- Withdrawal Breakdown -->
-  <div style="background: #16202a; border-radius: 24px; padding: 16px; margin-bottom: 24px;">
-    <div class="stat-label" style="margin-bottom: 12px;">📤 WITHDRAWALS BY METHOD</div>
-    <div class="method-grid">
-      <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualWithdraw">0</div></div>
-    </div>
-  </div>
+  <script>
+    const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+    const API_BASE = '';
+    let depositData = [],
+      withdrawalData = [];
 
-  <button class="refresh" id="refreshAllBtn">🔄 Refresh All</button>
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' :
+        '&gt;')); }
 
-  <!-- Pending Deposits -->
-  <div class="section">
-    <h2>📸 Pending Deposit Requests</h2>
-    <div class="filter-row"><label for="depositFilter">Filter by method:</label><select id="depositFilter"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE Birr</option><option value="mpesa">M‑Pesa</option></select></div>
-    <div id="depositList">Loading...</div>
-  </div>
-
-  <!-- Pending Withdrawals -->
-  <div class="section">
-    <h2>💰 Pending Withdrawal Requests</h2>
-    <div class="filter-row"><label for="withdrawFilter">Filter by method:</label><select id="withdrawFilter"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE Birr</option><option value="mpesa">M‑Pesa</option></select></div>
-    <div id="withdrawList">Loading...</div>
-  </div>
-
-  <!-- Manual Balance Addition -->
-  <div class="section">
-    <h2>➕ Manual Add Balance</h2>
-    <input type="text" id="userId" placeholder="Telegram ID (numeric)" inputmode="numeric">
-    <input type="number" id="amount" placeholder="Amount (ETB)" step="1" min="1">
-    <button id="addBalanceBtn">Add Balance</button>
-  </div>
-</div>
-
-<script>
-  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
-  const API_BASE = '';
-  let depositData = [], withdrawalData = [];
-
-  function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
-
-  // Fetch totals with date range (including depositsByMethod and withdrawalsByMethod)
-  async function fetchStats() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    let url = `${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`;
-    if (startDate) url += `&from=${startDate}`;
-    if (endDate) url += `&to=${endDate}`;
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
-        document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
-        document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
-        document.getElementById('depositStatsError').innerText = '';
-        document.getElementById('withdrawStatsError').innerText = '';
-        document.getElementById('profitStatsError').innerText = '';
-
-        // Deposits by method
-        const depByMethod = data.depositsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
-        document.getElementById('telebirrDeposit').innerText = (depByMethod.telebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('cbebirrDeposit').innerText = (depByMethod.cbebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('mpesaDeposit').innerText = (depByMethod.mpesa || 0).toLocaleString() + ' ETB';
-        document.getElementById('manualDeposit').innerText = (depByMethod.manual || 0).toLocaleString() + ' ETB';
-
-        // Withdrawals by method
-        const wdByMethod = data.withdrawalsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
-        document.getElementById('telebirrWithdraw').innerText = (wdByMethod.telebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('cbebirrWithdraw').innerText = (wdByMethod.cbebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('mpesaWithdraw').innerText = (wdByMethod.mpesa || 0).toLocaleString() + ' ETB';
-        document.getElementById('manualWithdraw').innerText = (wdByMethod.manual || 0).toLocaleString() + ' ETB';
-      } else throw new Error(data.error || 'Unknown stats error');
-    } catch (err) {
-      console.error('Stats error:', err);
-      document.getElementById('depositStatsError').innerText = `⚠️ ${err.message}`;
-      document.getElementById('withdrawStatsError').innerText = '⚠️ Could not load totals';
-      document.getElementById('profitStatsError').innerText = '⚠️ Could not load totals';
-      document.getElementById('totalDeposits').innerText = '?';
-      document.getElementById('totalWithdrawals').innerText = '?';
-      document.getElementById('houseProfit').innerText = '?';
-      // reset method displays
-      document.getElementById('telebirrDeposit').innerText = '?';
-      document.getElementById('cbebirrDeposit').innerText = '?';
-      document.getElementById('mpesaDeposit').innerText = '?';
-      document.getElementById('manualDeposit').innerText = '?';
-      document.getElementById('telebirrWithdraw').innerText = '?';
-      document.getElementById('cbebirrWithdraw').innerText = '?';
-      document.getElementById('mpesaWithdraw').innerText = '?';
-      document.getElementById('manualWithdraw').innerText = '?';
+    // ===== COLLAPSIBLE TOGGLE LOGIC =====
+    function toggleSection(sectionId) {
+      const body = document.getElementById(sectionId + 'Body');
+      const icon = document.getElementById(sectionId + 'ToggleIcon');
+      if (!body || !icon) return;
+      const isOpen = body.classList.contains('closed');
+      if (isOpen) {
+        body.classList.remove('closed');
+        icon.classList.add('open');
+      } else {
+        body.classList.add('closed');
+        icon.classList.remove('open');
+      }
+      // Save state to localStorage
+      localStorage.setItem('admin_section_' + sectionId, isOpen ? 'open' : 'closed');
     }
-  }
 
-  // QR / OCR functions (unchanged)
-  function extractRefFromQR(imageSrc) {
-    return new Promise((resolve, reject) => {
-      const img = new Image(); img.crossOrigin = 'Anonymous'; img.src = imageSrc;
-      img.onload = () => {
-        const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-        if (qrCode && qrCode.data) {
-          const data = qrCode.data;
-          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) resolve(match[1]);
-          else { const refMatch = data.match(/^([A-Z0-9]{8,})$/); resolve(refMatch ? refMatch[1] : null); }
-        } else resolve(null);
-      };
-      img.onerror = () => reject('Failed to load image for QR scan');
-    });
-  }
-  async function extractRefFromOCR(imageUrl) {
-    try { const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
-      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      if (match && match[1]) return match[1].trim();
-      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i); return fallback ? fallback[0] : null;
-    } catch { return null; }
-  }
-  async function getReferenceFromProof(imagePath) {
-    try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' };
-    } catch (e) { console.warn('QR failed'); }
-    const ocrRef = await extractRefFromOCR(imagePath); if (ocrRef) return { ref: ocrRef, method: 'OCR' };
-    return null;
-  }
-  function getVerificationLink(paymentType, ref) {
-    const encoded = encodeURIComponent(ref);
-    switch (paymentType) {
-      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${encoded}`;
-      case 'cbebirr': return `https://cbebirr.com/verify?txn=${encoded}`;
-      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${encoded}`;
-      default: return null;
+    // Restore saved toggle states
+    function restoreToggleStates() {
+      ['depositSection', 'withdrawSection'].forEach(id => {
+        const state = localStorage.getItem('admin_section_' + id);
+        const body = document.getElementById(id + 'Body');
+        const icon = document.getElementById(id + 'ToggleIcon');
+        if (!body || !icon) return;
+        if (state === 'closed') {
+          body.classList.add('closed');
+          icon.classList.remove('open');
+        } else {
+          body.classList.remove('closed');
+          icon.classList.add('open');
+        }
+      });
     }
-  }
 
-  async function fetchDeposits() {
-    try { const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`); const data = await res.json(); depositData = data.requests || []; renderDeposits(); }
-    catch (err) { console.error(err); document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>'; }
-  }
-  function renderDeposits() {
-    const filter = document.getElementById('depositFilter').value;
-    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
-    const container = document.getElementById('depositList');
-    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending deposits.</p>'; return; }
-    container.innerHTML = '';
-    filtered.forEach(async (req) => {
-      const card = document.createElement('div'); card.className = 'request-card';
-      const submittedRef = req.reference_number || '';
-      const refHtml = submittedRef ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>` : '';
-      const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
-      const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>` : '';
-      card.innerHTML = `<div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${req.phone || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>${refHtml}${verifyLinkHtml}<p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>No proof</p>'}<div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div>`;
-      container.appendChild(card);
-      card.querySelectorAll('.approve, .reject').forEach(btn => btn.addEventListener('click', () => processDeposit(parseInt(btn.dataset.id), btn.dataset.action)));
-      if (req.proof_path) {
-        const verifyDiv = document.getElementById(`verify-${req.id}`);
-        try {
-          const result = await getReferenceFromProof(req.proof_path);
-          if (result) {
-            const ref = result.ref;
-            const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
-            let matchHtml = '';
-            if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches submitted ref</span>';
-            else if (submittedRef) matchHtml = `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
-            verifyDiv.innerHTML = `<strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
-          } else verifyDiv.innerHTML = '❌ Could not read reference from image.';
-        } catch (e) { verifyDiv.innerHTML = '❌ Verification error.'; console.error(e); }
-      } else { const verifyDiv = document.getElementById(`verify-${req.id}`); if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.'; }
-    });
-  }
+    // Attach toggle listeners
+    document.getElementById('depositSectionHeader').addEventListener('click', () => toggleSection('depositSection'));
+    document.getElementById('withdrawSectionHeader').addEventListener('click', () => toggleSection('withdrawSection'));
 
-  async function fetchWithdrawals() {
-    try { const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`); const data = await res.json(); withdrawalData = data.requests || []; renderWithdrawals(); }
-    catch (err) { console.error(err); document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>'; }
-  }
-  function renderWithdrawals() {
-    const filter = document.getElementById('withdrawFilter').value;
-    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
-    const container = document.getElementById('withdrawList');
-    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
-    container.innerHTML = filtered.map(req => `<div class="request-card"><div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${escapeHtml(req.phone_number)}</p><p><strong>Name:</strong> ${escapeHtml(req.receiver_name) || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p><p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div></div>`).join('');
-    document.querySelectorAll('#withdrawList .approve, #withdrawList .reject').forEach(btn => btn.addEventListener('click', () => processWithdrawal(parseInt(btn.dataset.id), btn.dataset.action)));
-  }
+    // ===== FETCH FUNCTIONS =====
+    async function fetchStats() {
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      let url = `${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`;
+      if (startDate) url += `&from=${startDate}`;
+      if (endDate) url += `&to=${endDate}`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
+          document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
+          document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
+          document.getElementById('depositStatsError').innerText = '';
+          document.getElementById('withdrawStatsError').innerText = '';
+          document.getElementById('profitStatsError').innerText = '';
 
-  async function processDeposit(requestId, action) {
-    if (!confirm(`Are you sure to ${action} this deposit?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-deposit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action }) });
-      const data = await res.json();
-      alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
-      await fetchDeposits(); await fetchStats();
-    } catch (err) { alert(err.message); }
-  }
-  async function processWithdrawal(requestId, action) {
-    if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action }) });
-      const data = await res.json();
-      alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
-      await fetchWithdrawals(); await fetchStats();
-    } catch (err) { alert(err.message); }
-  }
-  async function addBalance() {
-    const telegramId = document.getElementById('userId').value.trim();
-    const amount = document.getElementById('amount').value.trim();
-    if (!telegramId || !amount) { alert('Fill all fields'); return; }
-    try {
-      const res = await fetch(`${API_BASE}/admin/add-balance`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) }) });
-      const data = await res.json();
-      alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
-      if (data.success) { await fetchStats(); await fetchDeposits(); }
-    } catch (err) { alert(err.message); }
-  }
+          const depByMethod = data.depositsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+          document.getElementById('telebirrDeposit').innerText = (depByMethod.telebirr || 0).toLocaleString() + ' ETB';
+          document.getElementById('cbebirrDeposit').innerText = (depByMethod.cbebirr || 0).toLocaleString() + ' ETB';
+          document.getElementById('mpesaDeposit').innerText = (depByMethod.mpesa || 0).toLocaleString() + ' ETB';
+          document.getElementById('manualDeposit').innerText = (depByMethod.manual || 0).toLocaleString() + ' ETB';
 
-  async function fetchAll() {
-    await fetchStats();
-    await fetchDeposits();
-    await fetchWithdrawals();
-  }
+          const wdByMethod = data.withdrawalsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+          document.getElementById('telebirrWithdraw').innerText = (wdByMethod.telebirr || 0).toLocaleString() + ' ETB';
+          document.getElementById('cbebirrWithdraw').innerText = (wdByMethod.cbebirr || 0).toLocaleString() + ' ETB';
+          document.getElementById('mpesaWithdraw').innerText = (wdByMethod.mpesa || 0).toLocaleString() + ' ETB';
+          document.getElementById('manualWithdraw').innerText = (wdByMethod.manual || 0).toLocaleString() + ' ETB';
+        } else throw new Error(data.error || 'Unknown stats error');
+      } catch (err) {
+        console.error('Stats error:', err);
+        document.getElementById('depositStatsError').innerText = `⚠️ ${err.message}`;
+        document.getElementById('withdrawStatsError').innerText = '⚠️ Could not load totals';
+        document.getElementById('profitStatsError').innerText = '⚠️ Could not load totals';
+        document.getElementById('totalDeposits').innerText = '?';
+        document.getElementById('totalWithdrawals').innerText = '?';
+        document.getElementById('houseProfit').innerText = '?';
+        document.getElementById('telebirrDeposit').innerText = '?';
+        document.getElementById('cbebirrDeposit').innerText = '?';
+        document.getElementById('mpesaDeposit').innerText = '?';
+        document.getElementById('manualDeposit').innerText = '?';
+        document.getElementById('telebirrWithdraw').innerText = '?';
+        document.getElementById('cbebirrWithdraw').innerText = '?';
+        document.getElementById('mpesaWithdraw').innerText = '?';
+        document.getElementById('manualWithdraw').innerText = '?';
+      }
+    }
 
-  document.getElementById('refreshAllBtn').addEventListener('click', fetchAll);
-  document.getElementById('addBalanceBtn').addEventListener('click', addBalance);
-  document.getElementById('depositFilter').addEventListener('change', renderDeposits);
-  document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
-  document.getElementById('applyDateRangeBtn').addEventListener('click', fetchStats);
+    // QR / OCR functions (unchanged)
+    function extractRefFromQR(imageSrc) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = imageSrc;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+          if (qrCode && qrCode.data) {
+            const data = qrCode.data;
+            const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
+            if (match) resolve(match[1]);
+            else { const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+              resolve(refMatch ? refMatch[1] : null); }
+          } else resolve(null);
+        };
+        img.onerror = () => reject('Failed to load image for QR scan');
+      });
+    }
 
-  fetchAll();
-</script>
+    async function extractRefFromOCR(imageUrl) {
+      try { const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+        const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
+        if (match && match[1]) return match[1].trim();
+        const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+        return fallback ? fallback[0] : null;
+      } catch { return null; }
+    }
+
+    async function getReferenceFromProof(imagePath) {
+      try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' }; } catch (e) { console
+          .warn('QR failed'); }
+      const ocrRef = await extractRefFromOCR(imagePath);
+      if (ocrRef) return { ref: ocrRef, method: 'OCR' };
+      return null;
+    }
+
+    function getVerificationLink(paymentType, ref) {
+      const encoded = encodeURIComponent(ref);
+      switch (paymentType) {
+        case 'telebirr':
+          return `https://transactioninfo.ethiotelecom.et/receipt/${encoded}`;
+        case 'cbebirr':
+          return `https://cbebirr.com/verify?txn=${encoded}`;
+        case 'mpesa':
+          return `https://mpesa.ethiotelecom.et/transaction/${encoded}`;
+        default:
+          return null;
+      }
+    }
+
+    async function fetchDeposits() {
+      try { const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+        const data = await res.json();
+        depositData = data.requests || [];
+        // Update badge
+        document.getElementById('depositBadge').innerText = depositData.length;
+        renderDeposits(); } catch (err) { console.error(err);
+        document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>'; }
+    }
+
+    function renderDeposits() {
+      const filter = document.getElementById('depositFilter').value;
+      const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
+      const container = document.getElementById('depositList');
+      if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending deposits.</p>'; return; }
+      container.innerHTML = '';
+      filtered.forEach(async (req) => {
+        const card = document.createElement('div');
+        card.className = 'request-card';
+        const submittedRef = req.reference_number || '';
+        const refHtml = submittedRef ? `<p><strong>Submitted Ref:</strong> ${submittedRef}</p>` : '';
+        const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
+        const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank" style="color:#f39c12;">🔗 Verify on ${req.payment_type} site</a></p>` :
+        '';
+        card.innerHTML =
+          `<div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${req.phone || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.payment_type || 'Unknown'}</p>${refHtml}${verifyLinkHtml}<p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>${req.proof_path ? `<img src="${req.proof_path}" class="proof-img" onclick="window.open(this.src)">` : '<p>No proof</p>'}<div id="verify-${req.id}" class="receipt-box">⏳ Scanning proof...</div></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div>`;
+        container.appendChild(card);
+        card.querySelectorAll('.approve, .reject').forEach(btn => btn.addEventListener('click', () => processDeposit(
+          parseInt(btn.dataset.id), btn.dataset.action)));
+        if (req.proof_path) {
+          const verifyDiv = document.getElementById(`verify-${req.id}`);
+          try {
+            const result = await getReferenceFromProof(req.proof_path);
+            if (result) {
+              const ref = result.ref;
+              const receiptUrl =
+                `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+              let matchHtml = '';
+              if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml =
+                '<span class="match">✅ Matches submitted ref</span>';
+              else if (submittedRef) matchHtml =
+                `<span class="mismatch">❌ Does NOT match submitted (${submittedRef})</span>`;
+              verifyDiv.innerHTML =
+                `<strong>🧾 Extracted (${result.method}):</strong> ${ref} ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
+            } else verifyDiv.innerHTML = '❌ Could not read reference from image.';
+          } catch (e) { verifyDiv.innerHTML = '❌ Verification error.';
+            console.error(e); }
+        } else { const verifyDiv = document.getElementById(`verify-${req.id}`);
+          if (verifyDiv) verifyDiv.innerHTML = 'No proof image to scan.'; }
+      });
+    }
+
+    async function fetchWithdrawals() {
+      try { const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+        const data = await res.json();
+        withdrawalData = data.requests || [];
+        document.getElementById('withdrawBadge').innerText = withdrawalData.length;
+        renderWithdrawals(); } catch (err) { console.error(err);
+        document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>'; }
+    }
+
+    function renderWithdrawals() {
+      const filter = document.getElementById('withdrawFilter').value;
+      const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
+      const container = document.getElementById('withdrawList');
+      if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
+      container.innerHTML = filtered.map(req =>
+        `<div class="request-card"><div class="request-info"><p><strong>ID:</strong> ${req.id}</p><p><strong>User:</strong> ${escapeHtml(req.username)} (${req.telegram_id})</p><p><strong>Phone:</strong> ${escapeHtml(req.phone_number)}</p><p><strong>Name:</strong> ${escapeHtml(req.receiver_name) || 'N/A'}</p><p><strong>Amount:</strong> ${req.amount} ETB</p><p><strong>Method:</strong> ${req.withdrawal_type || 'N/A'}</p><p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p></div><div class="action-buttons"><button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button><button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button></div></div>`
+        ).join('');
+      document.querySelectorAll('#withdrawList .approve, #withdrawList .reject').forEach(btn => btn.addEventListener(
+        'click', () => processWithdrawal(parseInt(btn.dataset.id), btn.dataset.action)));
+    }
+
+    async function processDeposit(requestId, action) {
+      if (!confirm(`Are you sure to ${action} this deposit?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/admin/process-deposit`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action }) });
+        const data = await res.json();
+        alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
+        await fetchDeposits();
+        await fetchStats();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function processWithdrawal(requestId, action) {
+      if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
+      try {
+        const res = await fetch(`${API_BASE}/admin/process-withdrawal`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action }) });
+        const data = await res.json();
+        alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
+        await fetchWithdrawals();
+        await fetchStats();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function addBalance() {
+      const telegramId = document.getElementById('userId').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+      if (!telegramId || !amount) { alert('Fill all fields'); return; }
+      try {
+        const res = await fetch(`${API_BASE}/admin/add-balance`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) }) });
+        const data = await res.json();
+        alert(data.success ? `Added ${amount} to user. New balance: ${data.newBalance}` : (data.error || 'Error'));
+        if (data.success) { await fetchStats();
+          await fetchDeposits(); }
+      } catch (err) { alert(err.message); }
+    }
+
+    async function fetchAll() {
+      await fetchStats();
+      await fetchDeposits();
+      await fetchWithdrawals();
+    }
+
+    // ===== EVENT LISTENERS =====
+    document.getElementById('refreshAllBtn').addEventListener('click', fetchAll);
+    document.getElementById('addBalanceBtn').addEventListener('click', addBalance);
+    document.getElementById('depositFilter').addEventListener('change', renderDeposits);
+    document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
+    document.getElementById('applyDateRangeBtn').addEventListener('click', fetchStats);
+
+    // Restore toggle states from localStorage
+    restoreToggleStates();
+
+    // Initial load
+    fetchAll();
+  </script>
 </body>
 </html>
