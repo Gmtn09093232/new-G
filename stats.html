@@ -1,372 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-    <title>📊 Bingo Stats | Total Balance & Deposits/Withdrawals</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            background: #0b1120;
-            font-family: -apple-system, 'Segoe UI', Roboto, system-ui, 'Helvetica Neue', sans-serif;
-            padding: 20px 16px 40px;
-            color: #e2e8f0;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 700px;
-            margin: 0 auto;
-        }
-        h1 {
-            font-size: 1.6rem;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-        h1 small {
-            font-size: 0.7rem;
-            font-weight: normal;
-            background: #1e293b;
-            padding: 5px 12px;
-            border-radius: 40px;
-            letter-spacing: 0.3px;
-        }
-        .refresh-btn {
-            background: #f97316;
-            border: none;
-            padding: 10px 22px;
-            border-radius: 50px;
-            font-weight: 700;
-            font-size: 0.9rem;
-            cursor: pointer;
-            color: #0f172a;
-            transition: 0.1s ease;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .refresh-btn:active {
-            transform: scale(0.96);
-            background: #e86a0c;
-        }
-        .subhead {
-            margin-bottom: 20px;
-            font-size: 0.75rem;
-            color: #94a3b8;
-            border-left: 3px solid #f97316;
-            padding-left: 10px;
-        }
-        .summary-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            margin: 24px 0;
-        }
-        .card {
-            background: #1e293b;
-            border-radius: 28px;
-            padding: 18px 20px;
-            box-shadow: 0 6px 14px rgba(0,0,0,0.3);
-            border-left: 5px solid #f97316;
-            transition: 0.2s;
-        }
-        .card h3 {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #94a3b8;
-            margin-bottom: 10px;
-        }
-        .card .big-number {
-            font-size: 1.9rem;
-            font-weight: 800;
-            color: #facc15;
-            line-height: 1.2;
-            word-break: break-word;
-        }
-        .deposit-methods {
-            background: #0f172a;
-            border-radius: 28px;
-            padding: 18px 16px;
-            margin: 24px 0;
-        }
-        .deposit-methods h3 {
-            font-size: 1rem;
-            margin-bottom: 14px;
-            padding-left: 4px;
-        }
-        .method-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 14px 4px;
-            border-bottom: 1px solid #334155;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        .method-row:last-child {
-            border-bottom: none;
-        }
-        .method-name {
-            font-weight: 600;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .method-amount {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #facc15;
-            letter-spacing: 0.3px;
-        }
-        .total-row {
-            border-top: 2px solid #f97316;
-            margin-top: 8px;
-            padding-top: 16px;
-        }
-        .total-row .method-name {
-            font-size: 1rem;
-            font-weight: 800;
-        }
-        .total-row .method-amount {
-            font-size: 1.4rem;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 28px;
-            font-size: 0.65rem;
-            color: #64748b;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px 20px;
-            color: #facc15;
-        }
-        .error-msg {
-            background: #7f1a1a;
-            color: #fecaca;
-            text-align: center;
-            padding: 20px;
-            border-radius: 28px;
-            margin-top: 30px;
-        }
-        button {
-            background: none;
-            border: none;
-        }
-        @media (min-width: 550px) {
-            .summary-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 20px;
-            }
-            .card .big-number {
-                font-size: 2rem;
-            }
-            .method-amount {
-                font-size: 1.3rem;
-            }
-            .total-row .method-amount {
-                font-size: 1.6rem;
-            }
-        }
-        @media (max-width: 480px) {
-            body {
-                padding: 16px 12px 32px;
-            }
-            .card {
-                padding: 14px 16px;
-            }
-            .card .big-number {
-                font-size: 1.6rem;
-            }
-            .method-name {
-                font-size: 0.85rem;
-            }
-            .method-amount {
-                font-size: 1rem;
-            }
-            .total-row .method-amount {
-                font-size: 1.3rem;
-            }
-            .refresh-btn {
-                padding: 8px 18px;
-                font-size: 0.8rem;
-            }
-            h1 {
-                font-size: 1.4rem;
-            }
-        }
-        @media (prefers-color-scheme: dark) {
-            body {
-                background: #0b1120;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎲 Live Bingo · All Players' Cards</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    body { background: #0b0e14; color: #e9edf2; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #2a313c; padding-bottom: 12px; }
+    .header h1 { background: linear-gradient(135deg, #f0b94b, #f7d875); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .status { color: #6ab0f7; font-size: 0.9rem; }
+    .stake-section { margin-bottom: 30px; }
+    .stake-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; color: #b4bfd4; }
+    .stake-title span { background: #1f2937; padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; }
+    .card-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+    .player-card { background: #141b24; border-radius: 12px; padding: 8px; border: 1px solid #232c38; width: 180px; }
+    .player-card .pname { font-size: 0.7rem; font-weight: 600; color: #b4bfd4; text-align: center; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
+    .mini-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; background: #1f2937; border-radius: 4px; color: #6b7a93; }
+    .mini-cell.free { background: #2a3342; color: #f7c35c; font-size: 0.45rem; }
+    .mini-cell.called { background: #3d6b4a; color: #e2f0e6; }
+    .mini-cell.bingo-highlight { background: #f7c35c; color: #0b0e14; font-weight: 700; }
+    .no-players { color: #6b7a93; padding: 10px 0; }
+    .called-numbers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .called-num { background: #1f2937; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; color: #b4bfd4; }
+    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.6rem; font-weight: 600; }
+    .status-badge.lobby { background: #374151; color: #9ca3af; }
+    .status-badge.running { background: #065f46; color: #6ee7b7; }
+    .status-badge.ended { background: #78350f; color: #fcd34d; }
+    .error-msg { color: #f28b9c; padding: 20px; text-align: center; }
+  </style>
 </head>
 <body>
-<div class="container">
-    <h1>
-        📊 Bingo Stats
-        <button id="refreshBtn" class="refresh-btn">⟳ Refresh</button>
-    </h1>
-    <div class="subhead">All values in ETB (Ethiopian Birr)</div>
+  <div class="header">
+    <h1>🎲 Live Bingo · All Cards</h1>
+    <div class="status">🟢 Connected to <span id="roomStatus">—</span></div>
+  </div>
+  <div id="container"></div>
 
-    <!-- Summary Cards (mobile: stacked, desktop: 3 columns) -->
-    <div class="summary-grid" id="summaryGrid">
-        <div class="card">
-            <h3>💰 Total Player Balances</h3>
-            <div class="big-number" id="totalBalance">—</div>
-        </div>
-        <div class="card">
-            <h3>💸 Total Withdrawals</h3>
-            <div class="big-number" id="totalWithdrawals">—</div>
-        </div>
-        <div class="card">
-            <h3>📈 Net Float</h3>
-            <div class="big-number" id="netFloat">—</div>
-        </div>
-    </div>
+  <script>
+    // ---- Get admin secret from URL ----
+    const urlParams = new URLSearchParams(window.location.search);
+    const secret = urlParams.get('secret');
+    if (!secret) {
+      document.getElementById('container').innerHTML = `<div class="error-msg">⚠️ Missing admin secret. Use ?secret=YOUR_SECRET</div>`;
+      throw new Error('Missing secret');
+    }
 
-    <!-- Deposits by Method -->
-    <div class="deposit-methods">
-        <h3>📥 Total Deposits by Method</h3>
-        <div id="depositMethodsList">
-            <div class="method-row"><span class="method-name">📱 Telebirr</span><span class="method-amount" id="depTelebirr">—</span></div>
-            <div class="method-row"><span class="method-name">🏦 CBE Birr</span><span class="method-amount" id="depCbebirr">—</span></div>
-            <div class="method-row"><span class="method-name">📲 M-Pesa</span><span class="method-amount" id="depMpesa">—</span></div>
-            <div class="method-row"><span class="method-name">🖊️ Manual / Admin</span><span class="method-amount" id="depManual">—</span></div>
-            <div class="method-row total-row">
-                <span class="method-name" style="font-weight: 800;">📌 TOTAL DEPOSITS</span>
-                <span class="method-amount" id="totalDeposits">—</span>
-            </div>
-        </div>
-    </div>
+    // ---- Connect to admin namespace ----
+    const socket = io('/admin', {
+      query: { secret }
+    });
 
-    <div class="footer">
-        Data from approved deposit/withdrawal requests.<br>
-        Manual deposits include admin “Add Balance” actions.<br>
-        Last updated: <span id="lastUpdate">—</span>
-    </div>
-</div>
+    const container = document.getElementById('container');
+    const roomStatus = document.getElementById('roomStatus');
 
-<script>
-    (function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        let ADMIN_SECRET = urlParams.get('secret');
-        if (!ADMIN_SECRET) {
-            ADMIN_SECRET = prompt("🔐 Enter admin secret to view stats:");
-            if (!ADMIN_SECRET) {
-                document.body.innerHTML = '<div class="error-msg" style="margin-top: 30vh;">❌ Access denied. Use /stats?secret=YOUR_SECRET</div>';
-                throw new Error('No secret');
+    socket.on('connect', () => {
+      roomStatus.textContent = 'Admin connected';
+    });
+
+    socket.on('connect_error', (err) => {
+      container.innerHTML = `<div class="error-msg">❌ Connection failed: ${err.message}</div>`;
+    });
+
+    socket.on('admin:gameState', (state) => {
+      renderState(state);
+    });
+
+    // ---- Render function ----
+    function renderState(state) {
+      let html = '';
+      for (const stake of [10, 20, 30]) {
+        const room = state[stake];
+        if (!room) continue;
+        const players = room.players || [];
+        const called = room.calledNumbers || [];
+        const status = room.status || 'unknown';
+        const statusClass = status === 'lobby' ? 'lobby' : status === 'running' ? 'running' : 'ended';
+
+        html += `<div class="stake-section">
+          <div class="stake-title">🎯 ${stake} ETB <span class="status-badge ${statusClass}">${status.toUpperCase()}</span> <span style="font-weight:normal;font-size:0.8rem;color:#7b879c;">${players.length} players</span></div>
+          <div class="called-numbers">${called.map(n => `<span class="called-num">${n}</span>`).join('')}</div>
+          <div class="card-grid">`;
+
+        if (players.length === 0) {
+          html += `<div class="no-players">No players yet</div>`;
+        } else {
+          for (const p of players) {
+            const card = p.card;
+            if (!card) continue;
+            const marked = p.markedNumbers || [];
+            html += `<div class="player-card">
+              <div class="pname">${p.username || p.telegramId}</div>
+              <div class="mini-grid">`;
+            for (let row = 0; row < 5; row++) {
+              for (let col = 0; col < 5; col++) {
+                const val = card[col][row];
+                let cls = 'mini-cell';
+                if (val === 'FREE') cls += ' free';
+                else if (marked.includes(val)) cls += ' called';
+                // Optional bingo highlight if we detect bingo (we don't have that info, but could add)
+                const display = val === 'FREE' ? '★' : val;
+                html += `<div class="${cls}">${display}</div>`;
+              }
             }
+            html += `</div></div>`;
+          }
         }
 
-        const API_BASE = '';
-        let loading = false;
-
-        // Show loading state on elements
-        function setLoading(isLoading) {
-            const elements = ['totalBalance', 'totalWithdrawals', 'netFloat', 'depTelebirr', 'depCbebirr', 'depMpesa', 'depManual', 'totalDeposits'];
-            if (isLoading) {
-                elements.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el && el.innerText !== '⟳') el.innerText = '⟳';
-                });
-                document.getElementById('lastUpdate').innerText = 'updating...';
-            }
-        }
-
-        async function fetchStats() {
-            if (loading) return;
-            loading = true;
-            setLoading(true);
-            try {
-                const res = await fetch(`${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Unknown error');
-
-                // Total balance
-                document.getElementById('totalBalance').innerText = (data.totalUserBalance || 0).toLocaleString() + ' ETB';
-                
-                // Withdrawals
-                const totalWithdraw = data.totalWithdrawals || 0;
-                document.getElementById('totalWithdrawals').innerText = totalWithdraw.toLocaleString() + ' ETB';
-                
-                // Deposits by method
-                const dep = data.depositsByMethod || {};
-                const tele = dep.telebirr || 0;
-                const cbe = dep.cbebirr || 0;
-                const mpesa = dep.mpesa || 0;
-                const manual = dep.manual || 0;
-                const totalDep = tele + cbe + mpesa + manual;
-                
-                document.getElementById('depTelebirr').innerText = tele.toLocaleString() + ' ETB';
-                document.getElementById('depCbebirr').innerText = cbe.toLocaleString() + ' ETB';
-                document.getElementById('depMpesa').innerText = mpesa.toLocaleString() + ' ETB';
-                document.getElementById('depManual').innerText = manual.toLocaleString() + ' ETB';
-                document.getElementById('totalDeposits').innerText = totalDep.toLocaleString() + ' ETB';
-                
-                // Net float
-                const net = totalDep - totalWithdraw;
-                document.getElementById('netFloat').innerText = net.toLocaleString() + ' ETB';
-                
-                document.getElementById('lastUpdate').innerText = new Date().toLocaleString();
-            } catch (err) {
-                console.error(err);
-                // Show error within container without breaking layout
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error-msg';
-                errorDiv.innerText = `❌ Failed to load stats: ${err.message}. Tap refresh to retry.`;
-                const existingError = document.querySelector('.error-msg');
-                if (!existingError) {
-                    document.querySelector('.container').prepend(errorDiv);
-                    setTimeout(() => errorDiv.remove(), 5000);
-                }
-                // Reset numbers to 'Error'
-                const ids = ['totalBalance', 'totalWithdrawals', 'netFloat', 'depTelebirr', 'depCbebirr', 'depMpesa', 'depManual', 'totalDeposits'];
-                ids.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el && el.innerText !== '—') el.innerText = '⚠️';
-                });
-            } finally {
-                loading = false;
-                // Remove loading indicator after a short delay
-                setTimeout(() => {
-                    const elements = ['totalBalance', 'totalWithdrawals', 'netFloat', 'depTelebirr', 'depCbebirr', 'depMpesa', 'depManual', 'totalDeposits'];
-                    elements.forEach(id => {
-                        const el = document.getElementById(id);
-                        if (el && el.innerText === '⟳') {
-                            // if still loading, but shouldn't happen, keep as is
-                        }
-                    });
-                }, 100);
-            }
-        }
-
-        document.getElementById('refreshBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            fetchStats();
-        });
-        fetchStats();
-        // Auto refresh every 45 seconds (less aggressive)
-        setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                fetchStats();
-            }
-        }, 45000);
-    })();
-</script>
+        html += `</div></div>`;
+      }
+      container.innerHTML = html;
+    }
+  </script>
 </body>
 </html>
