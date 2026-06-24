@@ -390,7 +390,7 @@
     <div id="errorContainer" class="error"></div>
     <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
 
-    <!-- Stats Grid -->
+    <!-- Stats Grid - only Commission and Deposits -->
     <div id="statsGrid" class="stats-grid"></div>
 
     <!-- Top Performer Tables -->
@@ -459,7 +459,7 @@
     // ================================================================
     //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
     // ================================================================
-  const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+    const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
     // ================================================================
 
@@ -559,20 +559,16 @@
     // Main load function
     async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds for stats
-            let roundsQuery = supabase.from('game_rounds').select('total_entry_fees, prize_pool, house_profit');
+            // 1. Fetch game_rounds for commission only (total_house_profit)
+            let roundsQuery = supabase.from('game_rounds').select('house_profit');
             roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
             const { data: rounds, error: roundsErr } = await roundsQuery;
             if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
-            const totalRounds = rounds.length;
-            let totalPayout = 0, totalStakes = 0, totalCommission = 0;
+            let totalCommission = 0;
             rounds.forEach(r => {
-                totalPayout += Number(r.prize_pool) || 0;
-                totalStakes += Number(r.total_entry_fees) || 0;
                 totalCommission += Number(r.house_profit) || 0;
             });
-            const avgPayout = totalRounds > 0 ? totalPayout / totalRounds : 0;
 
             // 2. Fetch total deposits (approved)
             let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
@@ -584,13 +580,9 @@
                 totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
             }
 
-            // 3. Render Stats Cards (with Total Deposits)
+            // 3. Render Stats Cards (only Commission and Deposits)
             statsGrid.innerHTML = `
-                <div class="stat-card"><div class="label">Total Rounds</div><div class="value">${totalRounds}</div></div>
-                <div class="stat-card"><div class="label">Total Payout</div><div class="value">${fmt(totalPayout)} ETB</div></div>
                 <div class="stat-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
-                <div class="stat-card"><div class="label">Total Stakes (implied)</div><div class="value">${fmt(totalStakes)} ETB</div></div>
-                <div class="stat-card"><div class="label">Avg Payout / Round</div><div class="value">${fmt(avgPayout)} ETB</div></div>
                 <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
             `;
 
