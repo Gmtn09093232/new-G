@@ -1,561 +1,528 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎲 Bingo · Data Analysis Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    body {
-      background: #0b0e14;
-      color: #e9edf2;
-      padding: 18px;
-      min-height: 100vh;
-    }
-    .dashboard {
-      max-width: 1500px;
-      margin: 0 auto;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 22px;
-      border-bottom: 1px solid #2a313c;
-      padding-bottom: 14px;
-    }
-    .header h1 {
-      font-weight: 600;
-      font-size: 1.8rem;
-      letter-spacing: -0.01em;
-      background: linear-gradient(135deg, #f0b94b, #f7d875);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .header-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .btn {
-      background: #1f2937;
-      border: 1px solid #374151;
-      color: #d1d9e6;
-      padding: 5px 16px;
-      border-radius: 40px;
-      font-size: 0.75rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: 0.15s;
-    }
-    .btn:hover {
-      background: #2d3a4b;
-      border-color: #5a6a7e;
-    }
-    .btn.primary {
-      background: #f7c35c;
-      border-color: #f7c35c;
-      color: #0b0e14;
-    }
-    .btn.primary:hover {
-      background: #fad073;
-      border-color: #fad073;
-    }
-    .filter-bar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-      background: #141b24;
-      padding: 12px 18px;
-      border-radius: 14px;
-      border: 1px solid #232c38;
-      margin-bottom: 22px;
-    }
-    .filter-bar label {
-      font-size: 0.7rem;
-      color: #7b879c;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-    }
-    .filter-bar input[type="date"] {
-      background: #1f2937;
-      border: 1px solid #374151;
-      color: #e9edf2;
-      padding: 4px 10px;
-      border-radius: 8px;
-      font-size: 0.75rem;
-      font-family: inherit;
-    }
-    .filter-bar .filter-actions {
-      display: flex;
-      gap: 8px;
-      margin-left: auto;
-    }
-    .filter-bar .btn-sm {
-      padding: 4px 14px;
-      font-size: 0.7rem;
-    }
-    .filter-info {
-      font-size: 0.7rem;
-      color: #6b7a93;
-      margin-left: auto;
-    }
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-    .kpi-card {
-      background: #141b24;
-      border-radius: 14px;
-      padding: 14px 16px;
-      border: 1px solid #232c38;
-    }
-    .kpi-label {
-      font-size: 0.6rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #7b879c;
-      font-weight: 600;
-    }
-    .kpi-value {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-top: 2px;
-      letter-spacing: -0.02em;
-      color: #f0f4fa;
-    }
-    .kpi-value .unit {
-      font-size: 0.85rem;
-      color: #8892a8;
-      font-weight: 400;
-      margin-left: 3px;
-    }
-    .kpi-card.accent .kpi-value { color: #f7c35c; }
-    .kpi-card.green .kpi-value { color: #5fcb8a; }
-    .kpi-card.pink .kpi-value { color: #f28b9c; }
-    .kpi-card.blue .kpi-value { color: #6ab0f7; }
-    .kpi-card.purple .kpi-value { color: #b794f4; }
-    .chart-box {
-      background: #141b24;
-      border-radius: 16px;
-      padding: 16px 14px 12px;
-      border: 1px solid #232c38;
-      display: flex;
-      flex-direction: column;
-      margin-bottom: 22px;
-    }
-    .chart-box h3 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: #b4bfd4;
-      margin-bottom: 10px;
-      letter-spacing: 0.02em;
-    }
-    .chart-container {
-      position: relative;
-      height: 200px;
-      flex: 1;
-    }
-    .extra-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 18px;
-      margin-top: 18px;
-      margin-bottom: 10px;
-    }
-    .extra-box {
-      background: #141b24;
-      border-radius: 16px;
-      border: 1px solid #232c38;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-    }
-    .extra-box h3 {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: #b4bfd4;
-      margin-bottom: 8px;
-    }
-    .round-history-scroll {
-      max-height: 190px;
-      overflow-y: auto;
-      flex: 1;
-    }
-    .round-entry {
-      display: grid;
-      grid-template-columns: 70px 45px 50px 50px 55px;
-      gap: 4px;
-      padding: 3px 0;
-      border-bottom: 1px solid #1a212b;
-      font-size: 0.65rem;
-      color: #cbd5e1;
-    }
-    .round-entry .r-time { color: #6b7a93; }
-    .round-entry .r-stake { color: #f7c35c; }
-    .round-entry .r-players { color: #6ab0f7; }
-    .round-entry .r-prize { color: #f28b9c; }
-    .round-entry .r-profit { color: #5fcb8a; font-weight: 600; }
-    .top-player-entry {
-      display: flex;
-      justify-content: space-between;
-      padding: 3px 0;
-      border-bottom: 1px solid #1a212b;
-      font-size: 0.72rem;
-      color: #dce2ec;
-    }
-    .top-player-entry .name { color: #9aa9c0; }
-    .top-player-entry .score { font-weight: 500; color: #f7c35c; }
-    .extra-box .chart-container { height: 170px; }
-    .text-muted { color: #6b7a93; font-size: 0.7rem; }
-    .loading { text-align: center; padding: 20px; color: #6b7a93; }
-    .error-msg { color: #f28b9c; padding: 20px; text-align: center; }
-
-    @media (max-width: 920px) {
-      .extra-grid { grid-template-columns: 1fr 1fr; }
-      .filter-bar .filter-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
-    }
-    @media (max-width: 640px) {
-      .extra-grid { grid-template-columns: 1fr; }
-      .header h1 { font-size: 1.2rem; }
-      .kpi-value { font-size: 1.1rem; }
-      body { padding: 10px; }
-      .filter-bar { flex-direction: column; align-items: stretch; }
-      .filter-bar .filter-actions { justify-content: stretch; }
-    }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #0b0e14; }
-    ::-webkit-scrollbar-thumb { background: #3b485a; border-radius: 10px; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bingo Win Dashboard</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: #f5f7fc;
+            padding: 24px;
+            color: #1e293b;
+        }
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-weight: 600;
+            font-size: 1.8rem;
+            margin-bottom: 24px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        h1 small {
+            font-weight: 400;
+            font-size: 1rem;
+            color: #64748b;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 18px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #e9edf4;
+        }
+        .stat-card .label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .stat-card .value {
+            font-size: 1.9rem;
+            font-weight: 700;
+            margin-top: 4px;
+            color: #0f172a;
+        }
+        .stat-card .sub {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 28px;
+        }
+        .chart-box {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9edf4;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .chart-box h3 {
+            font-weight: 500;
+            font-size: 1rem;
+            color: #334155;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            position: relative;
+            height: 260px;
+        }
+        .table-container {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9edf4;
+            margin-top: 8px;
+            overflow-x: auto;
+        }
+        .table-container h3 {
+            font-weight: 500;
+            font-size: 1rem;
+            color: #334155;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            text-align: left;
+            padding: 10px 8px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #eef2f6;
+            color: #1e293b;
+        }
+        tr:hover td {
+            background: #fafcff;
+        }
+        .badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e4c8e;
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+        }
+        @media (max-width: 768px) {
+            .chart-row { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
+<div class="container">
+    <h1>🎯 Win Dashboard <small>stake_20 · real‑time analytics</small></h1>
 
-  <div class="dashboard">
-    <!-- HEADER -->
-    <div class="header">
-      <h1>📊 Bingo · Data Analysis</h1>
-      <div class="header-actions">
-        <span class="text-muted" id="status">Ready</span>
-      </div>
+    <div id="errorContainer" class="error"></div>
+    <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
+
+    <div id="statsGrid" class="stats-grid"></div>
+
+    <div class="chart-row">
+        <div class="chart-box">
+            <h3>🏅 Top Users by Commission (20% fee)</h3>
+            <div class="chart-container"><canvas id="commissionChart"></canvas></div>
+        </div>
+        <div class="chart-box">
+            <h3>📊 Payout Distribution (frequency)</h3>
+            <div class="chart-container"><canvas id="distributionChart"></canvas></div>
+        </div>
     </div>
 
-    <!-- DATE FILTER -->
-    <div class="filter-bar">
-      <label for="filterFrom">From</label>
-      <input type="date" id="filterFrom" />
-      <label for="filterTo">To</label>
-      <input type="date" id="filterTo" />
-      <div class="filter-actions">
-        <button class="btn btn-sm primary" id="applyFilterBtn">Apply</button>
-        <button class="btn btn-sm" id="clearFilterBtn">Clear</button>
-      </div>
-      <span class="filter-info" id="filterInfo">Loading…</span>
+    <div class="chart-box" style="margin-bottom:28px;">
+        <h3>⏳ Payout Timeline (over time)</h3>
+        <div class="chart-container" style="height:220px;"><canvas id="timelineChart"></canvas></div>
     </div>
 
-    <!-- KPI CARDS -->
-    <div class="kpi-grid" id="kpiContainer"></div>
-
-    <!-- HISTORICAL DATA GRID -->
-    <div class="extra-grid">
-      <div class="extra-box">
-        <h3>📜 Past Rounds (with House Profit)</h3>
-        <div class="round-history-scroll" id="roundHistoryList">
-          <div class="loading">Loading history…</div>
-        </div>
-      </div>
-      <div class="extra-box">
-        <h3>🏆 Top Players by Rounds Played</h3>
-        <div style="max-height:190px; overflow-y:auto;" id="topRoundsPlayers">
-          <div class="loading">Loading history…</div>
-        </div>
-      </div>
-      <div class="extra-box">
-        <h3>💰 Player Winning Distribution</h3>
-        <div class="chart-container"><canvas id="playerWinChart"></canvas></div>
-      </div>
+    <div class="table-container">
+        <h3>📋 User Performance Summary</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>User ID</th>
+                    <th>Wins</th>
+                    <th>Total Payout (ETB)</th>
+                    <th>Implied Stakes (ETB)</th>
+                    <th>Commission (20%)</th>
+                    <th>Avg Payout</th>
+                </tr>
+            </thead>
+            <tbody id="userTableBody"></tbody>
+        </table>
     </div>
-  </div>
+    <footer>Data from Supabase · Updated on load</footer>
+</div>
 
-  <script>
-    // ============================================================
-    // DATA ANALYSIS DASHBOARD – no WebSocket, only API calls
-    // ============================================================
+<script>
+    // ================================================================
+    //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
+    // ================================================================
+    const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
+    // ================================================================
 
-    const ADMIN_SECRET = '0120705@Gizie'; // ⚠️ CHANGE THIS
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ---- DOM refs ----
-    const kpiContainer = document.getElementById('kpiContainer');
-    const roundHistoryList = document.getElementById('roundHistoryList');
-    const topRoundsPlayers = document.getElementById('topRoundsPlayers');
-    const filterFromInput = document.getElementById('filterFrom');
-    const filterToInput = document.getElementById('filterTo');
-    const applyFilterBtn = document.getElementById('applyFilterBtn');
-    const clearFilterBtn = document.getElementById('clearFilterBtn');
-    const filterInfo = document.getElementById('filterInfo');
-    const statusEl = document.getElementById('status');
+    // DOM refs
+    const statsGrid = document.getElementById('statsGrid');
+    const userTableBody = document.getElementById('userTableBody');
+    const loadingEl = document.getElementById('loadingMessage');
+    const errorEl = document.getElementById('errorContainer');
 
-    // ---- Chart instance ----
-    let playerWinChart = null;
+    let commissionChartInstance = null;
+    let distributionChartInstance = null;
+    let timelineChartInstance = null;
 
-    function initChart() {
-      const ctx = document.getElementById('playerWinChart').getContext('2d');
-      playerWinChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: [],
-          datasets: [{ label: 'Est. Winnings (ETB)', data: [], backgroundColor: '#f7c35c', borderRadius: 4 }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { color: '#232c38' }, ticks: { color: '#8892a8' } },
-            y: { grid: { display: false }, ticks: { color: '#b4bfd4' } }
-          }
-        }
-      });
+    function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.style.display = 'block';
+        loadingEl.style.display = 'none';
     }
 
-    // ---- Helper: format time ----
-    function formatTime(d) {
-      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
+    function fmt(num) { return Number(num).toFixed(1); }
 
-    // ---- Fetch data from API ----
-    async function fetchHistory(from, to) {
-      statusEl.textContent = 'Loading…';
-      let url = `/admin/rounds-history?secret=${ADMIN_SECRET}&limit=500`;
-      if (from) url += `&from=${from}T00:00:00`;
-      if (to) url += `&to=${to}T23:59:59`;
+    // ------------------------------------------------------------------
+    // Main fetch & render
+    // ------------------------------------------------------------------
+    async function loadDashboard() {
+        try {
+            // 1. Fetch game_rounds (for totals, timeline, distribution)
+            const { data: rounds, error: roundsErr } = await supabase
+                .from('game_rounds')
+                .select('total_entry_fees, prize_pool, house_profit, created_at')
+                .order('created_at', { ascending: true });
 
-      try {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-          const errData = await resp.json();
-          throw new Error(errData.error || `HTTP ${resp.status}`);
-        }
-        const data = await resp.json();
-        if (!data.success) throw new Error(data.error || 'Unknown API error');
-        return data.rounds || [];
-      } catch (err) {
-        console.error('Fetch error:', err);
-        statusEl.textContent = '❌ Error loading data';
-        throw err;
-      }
-    }
+            if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
-    // ---- Process rounds ----
-    function processRounds(rounds) {
-      // Sort by date descending for display (newest first)
-      const sorted = rounds.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+            const totalRounds = rounds.length;
+            let totalPayout = 0, totalStakes = 0, totalCommission = 0;
+            const payouts = [];
+            const timelineData = [];
 
-      // Compute aggregate stats
-      const totalRounds = rounds.length;
-      let totalRevenue = 0, totalPrize = 0, totalProfit = 0;
-      rounds.forEach(r => {
-        totalRevenue += r.revenue || 0;
-        totalPrize += r.prizePool || 0;
-        totalProfit += r.profit || 0;
-      });
-      const avgPlayers = totalRounds > 0 ? rounds.reduce((s, r) => s + r.playerCount, 0) / totalRounds : 0;
-      const avgPrize = totalRounds > 0 ? rounds.reduce((s, r) => s + (r.prizePool || 0), 0) / totalRounds : 0;
-      const houseNet = totalRevenue - totalPrize;
+            rounds.forEach(r => {
+                const payout = Number(r.prize_pool) || 0;
+                const entry = Number(r.total_entry_fees) || 0;
+                const commission = Number(r.house_profit) || 0;
+                totalPayout += payout;
+                totalStakes += entry;
+                totalCommission += commission;
+                payouts.push(payout);
+                timelineData.push({ x: new Date(r.created_at), y: payout });
+            });
 
-      return { sorted, totalRounds, totalRevenue, totalPrize, totalProfit, avgPlayers, avgPrize, houseNet };
-    }
+            const avgPayout = totalRounds > 0 ? totalPayout / totalRounds : 0;
 
-    // ---- Render KPIs ----
-    function renderKPIs(stats) {
-      const cards = [
-        { label: 'Total Rounds', value: stats.totalRounds, cls: 'blue', unit: '' },
-        { label: 'Total Revenue', value: stats.totalRevenue, cls: 'accent', unit: 'ETB' },
-        { label: 'Total Prize Pool', value: stats.totalPrize, cls: 'pink', unit: 'ETB' },
-        { label: 'House Net', value: stats.houseNet, cls: stats.houseNet >= 0 ? 'green' : 'pink', unit: 'ETB' },
-        { label: 'Avg Players / Round', value: stats.avgPlayers, cls: 'purple', unit: '' },
-        { label: 'Avg Prize / Round', value: stats.avgPrize, cls: '', unit: 'ETB' },
-      ];
+            // Render stats cards
+            statsGrid.innerHTML = `
+                <div class="stat-card"><div class="label">Total Rounds</div><div class="value">${totalRounds}</div></div>
+                <div class="stat-card"><div class="label">Total Payout</div><div class="value">${fmt(totalPayout)} ETB</div></div>
+                <div class="stat-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
+                <div class="stat-card"><div class="label">Total Stakes (implied)</div><div class="value">${fmt(totalStakes)} ETB</div></div>
+                <div class="stat-card"><div class="label">Avg Payout / Round</div><div class="value">${fmt(avgPayout)} ETB</div></div>
+            `;
 
-      kpiContainer.innerHTML = cards.map(k => `
-        <div class="kpi-card ${k.cls}">
-          <div class="kpi-label">${k.label}</div>
-          <div class="kpi-value">${k.value % 1 === 0 ? k.value : k.value.toFixed(1)} <span class="unit">${k.unit}</span></div>
-        </div>
-      `).join('');
-    }
+            // 2. Payout Distribution (histogram)
+            const binSize = 16; // adjust as needed
+            const bins = {};
+            payouts.forEach(p => {
+                const bin = Math.floor(p / binSize) * binSize;
+                bins[bin] = (bins[bin] || 0) + 1;
+            });
+            const sortedBins = Object.keys(bins).sort((a,b) => Number(a)-Number(b));
+            const distLabels = sortedBins.map(b => `${b}-${Number(b)+binSize-1} ETB`);
+            const distData = sortedBins.map(b => bins[b]);
 
-    // ---- Render Past Rounds ----
-    function renderRounds(sorted) {
-      if (sorted.length === 0) {
-        roundHistoryList.innerHTML = `<div class="text-muted" style="padding:10px;">No rounds match the filter</div>`;
-        return;
-      }
-      const html = sorted.slice(0, 50).map(r => `
-        <div class="round-entry">
-          <span class="r-time">${r.time || formatTime(new Date(r.date))}</span>
-          <span class="r-stake">${r.stake}ETB</span>
-          <span class="r-players">${r.playerCount}p</span>
-          <span class="r-prize">${r.prizePool}</span>
-          <span class="r-profit">${r.profit >= 0 ? '+' : ''}${r.profit}</span>
-        </div>
-      `).join('');
-      roundHistoryList.innerHTML = html;
-    }
+            // 3. User-level data from audit_logs
+            // Fetch WIN_PAID_OUT and ENTRY_FEE_PAID
+            const { data: winLogs, error: winErr } = await supabase
+                .from('audit_logs')
+                .select('user_id, details')
+                .eq('event_type', 'WIN_PAID_OUT');
 
-    // ---- Render Top Players ----
-    function renderTopPlayers(rounds) {
-      // Build player stats from all rounds
-      const stats = {};
-      for (const round of rounds) {
-        const players = round.players || [];
-        const playerCount = players.length;
-        const prizePool = round.prizePool || 0;
-        if (prizePool > 0 && playerCount > 0) {
-          const perPlayer = prizePool / playerCount;
-          for (const p of players) {
-            const id = p.telegram_id;
-            const name = p.username || 'Player';
-            if (!id) continue;
-            if (!stats[id]) {
-              stats[id] = { username: name, rounds: 0, totalEstimatedWinnings: 0 };
+            if (winErr) throw new Error('Failed to fetch win logs: ' + winErr.message);
+
+            const { data: entryLogs, error: entryErr } = await supabase
+                .from('audit_logs')
+                .select('user_id, details')
+                .eq('event_type', 'ENTRY_FEE_PAID');
+
+            if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
+
+            // Aggregate per user
+            const userMap = {};
+            // Wins
+            winLogs.forEach(log => {
+                const uid = log.user_id;
+                if (!uid) return;
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0 };
+                userMap[uid].wins += 1;
+                userMap[uid].totalPayout += Number(log.details?.amount) || 0;
+            });
+            // Stakes
+            entryLogs.forEach(log => {
+                const uid = log.user_id;
+                if (!uid) return;
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0 };
+                userMap[uid].totalStakes += Number(log.details?.amount) || 0;
+            });
+
+            // Fetch usernames
+            const userIds = Object.keys(userMap);
+            let usernameMap = {};
+            if (userIds.length > 0) {
+                const { data: users, error: usersErr } = await supabase
+                    .from('users')
+                    .select('telegram_id, username')
+                    .in('telegram_id', userIds);
+                if (!usersErr && users) {
+                    users.forEach(u => { usernameMap[u.telegram_id] = u.username || u.telegram_id; });
+                }
             }
-            stats[id].rounds += 1;
-            stats[id].totalEstimatedWinnings += perPlayer;
-            stats[id].username = name;
-          }
-        } else {
-          // still count rounds even if no prize
-          for (const p of players) {
-            const id = p.telegram_id;
-            const name = p.username || 'Player';
-            if (!id) continue;
-            if (!stats[id]) {
-              stats[id] = { username: name, rounds: 0, totalEstimatedWinnings: 0 };
-            }
-            stats[id].rounds += 1;
-            stats[id].username = name;
-          }
+
+            // Build user summary array
+            const userSummaries = userIds.map(uid => {
+                const d = userMap[uid];
+                const commission = 0.2 * d.totalStakes;
+                const avgPayoutUser = d.wins > 0 ? d.totalPayout / d.wins : 0;
+                return {
+                    userId: uid,
+                    username: usernameMap[uid] || uid,
+                    wins: d.wins,
+                    totalPayout: d.totalPayout,
+                    totalStakes: d.totalStakes,
+                    commission: commission,
+                    avgPayout: avgPayoutUser
+                };
+            });
+
+            // Sort by commission descending for chart and table
+            userSummaries.sort((a,b) => b.commission - a.commission);
+
+            // --- Render Commission Chart (top 10) ---
+            const topCommission = userSummaries.slice(0, 10);
+            const commLabels = topCommission.map(u => u.username);
+            const commData = topCommission.map(u => u.commission);
+
+            renderCommissionChart(commLabels, commData);
+
+            // --- Render Distribution Chart ---
+            renderDistributionChart(distLabels, distData);
+
+            // --- Render Timeline Chart ---
+            renderTimelineChart(timelineData);
+
+            // --- Render Table (all users, sorted by commission) ---
+            let tableRows = '';
+            userSummaries.forEach(u => {
+                tableRows += `<tr>
+                    <td><span class="badge">${u.userId}</span></td>
+                    <td>${u.wins}</td>
+                    <td>${fmt(u.totalPayout)}</td>
+                    <td>${fmt(u.totalStakes)}</td>
+                    <td><strong>${fmt(u.commission)}</strong></td>
+                    <td>${fmt(u.avgPayout)}</td>
+                </tr>`;
+            });
+            userTableBody.innerHTML = tableRows;
+
+            loadingEl.style.display = 'none';
+
+        } catch (err) {
+            console.error(err);
+            showError('Error loading dashboard: ' + err.message);
         }
-      }
-
-      const sorted = Object.values(stats)
-        .sort((a, b) => b.rounds - a.rounds)
-        .slice(0, 15);
-
-      if (sorted.length === 0) {
-        topRoundsPlayers.innerHTML = `<div class="text-muted" style="padding:10px;">No data available</div>`;
-        return;
-      }
-      topRoundsPlayers.innerHTML = sorted.map(p => `
-        <div class="top-player-entry">
-          <span class="name">${p.username}</span>
-          <span class="score">${p.rounds} rounds · ${p.totalEstimatedWinnings.toFixed(1)} ETB</span>
-        </div>
-      `).join('');
     }
 
-    // ---- Render Winning Distribution chart ----
-    function renderWinningChart(rounds) {
-      // Build aggregated winnings per player
-      const stats = {};
-      for (const round of rounds) {
-        const players = round.players || [];
-        const playerCount = players.length;
-        const prizePool = round.prizePool || 0;
-        if (prizePool > 0 && playerCount > 0) {
-          const perPlayer = prizePool / playerCount;
-          for (const p of players) {
-            const id = p.telegram_id;
-            const name = p.username || 'Player';
-            if (!id) continue;
-            if (!stats[id]) {
-              stats[id] = { username: name, total: 0 };
+    // ------------------------------------------------------------------
+    // Chart renderers
+    // ------------------------------------------------------------------
+    function renderCommissionChart(labels, data) {
+        const ctx = document.getElementById('commissionChart').getContext('2d');
+        if (commissionChartInstance) commissionChartInstance.destroy();
+        commissionChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Commission (ETB)',
+                    data: data,
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } },
+                    x: { ticks: { maxRotation: 30, font: { size: 10 } } }
+                }
             }
-            stats[id].total += perPlayer;
-            stats[id].username = name;
-          }
+        });
+    }
+
+    function renderDistributionChart(labels, data) {
+        const ctx = document.getElementById('distributionChart').getContext('2d');
+        if (distributionChartInstance) distributionChartInstance.destroy();
+        distributionChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Frequency',
+                    data: data,
+                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                    x: { ticks: { maxRotation: 40, font: { size: 9 } } }
+                }
+            }
+        });
+    }
+
+    function renderTimelineChart(data) {
+        const ctx = document.getElementById('timelineChart').getContext('2d');
+        if (timelineChartInstance) timelineChartInstance.destroy();
+        timelineChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Payout per Round (ETB)',
+                    data: data.map(d => ({ x: d.x, y: d.y })),
+                    borderColor: 'rgba(139, 92, 246, 1)',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    fill: true,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointBackgroundColor: 'rgba(139, 92, 246, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, ticks: { maxRotation: 30, font: { size: 9 } } },
+                    y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } }
+                }
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Init
+    // ------------------------------------------------------------------
+    // Since we use time scale, we need to register the time adapter.
+    // Chart.js v4 requires the adapter for time – we'll load it via CDN.
+    // Add this script dynamically.
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js';
+    document.head.appendChild(script);
+    // After loading, call loadDashboard
+    script.onload = () => {
+        loadDashboard();
+    };
+    // Fallback if adapter fails
+    setTimeout(() => {
+        if (typeof window['chartjs-adapter-date-fns'] === 'undefined') {
+            // Fallback: use category scale for timeline
+            console.warn('Time adapter not loaded; using category fallback.');
+            // We'll override renderTimelineChart to use category scale.
+            const origRender = renderTimelineChart;
+            renderTimelineChart = function(data) {
+                const labels = data.map(d => d.x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
+                const values = data.map(d => d.y);
+                const ctx = document.getElementById('timelineChart').getContext('2d');
+                if (timelineChartInstance) timelineChartInstance.destroy();
+                timelineChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Payout per Round (ETB)',
+                            data: values,
+                            borderColor: 'rgba(139, 92, 246, 1)',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { maxRotation: 40, font: { size: 8 } } },
+                            y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } }
+                        }
+                    }
+                });
+            };
+            // re-render timeline with fallback
+            loadDashboard();
         }
-      }
-
-      const sorted = Object.values(stats)
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 10);
-
-      const labels = sorted.map(p => p.username);
-      const data = sorted.map(p => p.total);
-
-      if (playerWinChart) {
-        playerWinChart.data.labels = labels;
-        playerWinChart.data.datasets[0].data = data;
-        playerWinChart.update();
-      }
-    }
-
-    // ---- Main load function ----
-    async function loadData(from, to) {
-      try {
-        statusEl.textContent = 'Loading…';
-        const rounds = await fetchHistory(from, to);
-        const stats = processRounds(rounds);
-        renderKPIs(stats);
-        renderRounds(stats.sorted);
-        renderTopPlayers(rounds);
-        renderWinningChart(rounds);
-        filterInfo.textContent = `Showing ${rounds.length} rounds`;
-        statusEl.textContent = `✅ Loaded ${rounds.length} rounds`;
-      } catch (err) {
-        statusEl.textContent = '❌ Error';
-        filterInfo.textContent = 'Error loading data';
-        roundHistoryList.innerHTML = `<div class="error-msg">⚠️ Failed to load history: ${err.message}</div>`;
-        topRoundsPlayers.innerHTML = `<div class="error-msg">⚠️ ${err.message}</div>`;
-      }
-    }
-
-    // ---- Filter handlers ----
-    function applyFilter() {
-      const fromVal = filterFromInput.value;
-      const toVal = filterToInput.value;
-      loadData(fromVal, toVal);
-    }
-
-    function clearFilter() {
-      filterFromInput.value = '';
-      filterToInput.value = '';
-      loadData(null, null);
-    }
-
-    // ---- Init ----
-    document.addEventListener('DOMContentLoaded', () => {
-      initChart();
-      // Set default filter to today (optional)
-      const today = new Date().toISOString().split('T')[0];
-      filterFromInput.value = today;
-      filterToInput.value = today;
-      // Load with today's filter
-      loadData(today, today);
-
-      // Event listeners
-      applyFilterBtn.addEventListener('click', applyFilter);
-      clearFilterBtn.addEventListener('click', clearFilter);
-    });
-  </script>
+    }, 2000);
+</script>
 </body>
 </html>
