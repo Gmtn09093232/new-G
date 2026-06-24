@@ -141,7 +141,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 0.85rem;
-            min-width: 600px;
+            min-width: 700px;
         }
         th {
             text-align: left;
@@ -244,7 +244,7 @@
             }
             table {
                 font-size: 0.75rem;
-                min-width: 480px;
+                min-width: 550px;
             }
             th,
             td {
@@ -306,9 +306,11 @@
     </div>
 
     <script>
-    // ================================================================
-        const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
+        // ================================================================
+        //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
+        // ================================================================
+        const SUPABASE_URL = 'https://your-project.supabase.co';
+        const SUPABASE_ANON_KEY = 'your-anon-public-key';
         // ================================================================
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -354,7 +356,7 @@
                 statsRow.style.display = 'none';
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
-                // Build query for DEPOSIT_COMPLETED events
+                // 1. Fetch DEPOSIT_COMPLETED audit logs
                 let query = supabase
                     .from('audit_logs')
                     .select('user_id, details, timestamp')
@@ -375,34 +377,55 @@
                 const { data: logs, error } = await query;
                 if (error) throw new Error('Failed to fetch deposits: ' + error.message);
 
-                // Extract details
-                const deposits = logs.map(log => {
-                    const details = log.details || {};
-                    return {
-                        userId: log.user_id || 'N/A',
-                        username: details.username || details.user || 'N/A', // some logs may have username in details
-                        amount: Number(details.amount) || 0,
-                        timestamp: log.timestamp,
-                        method: details.method || details.payment_type || 'N/A',
-                        phone: details.phone || details.receiver || '-',
-                    };
-                });
-
-                // Render
-                if (deposits.length === 0) {
+                if (!logs || logs.length === 0) {
                     tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">No completed deposits found for this period.</td></tr>';
                     loadingEl.style.display = 'none';
                     return;
                 }
 
-                // Stats
+                // 2. Collect unique user_ids
+                const userIds = [...new Set(logs.map(log => log.user_id).filter(id => id))];
+
+                // 3. Fetch usernames from users table
+                let usernameMap = {};
+                if (userIds.length > 0) {
+                    const { data: users, error: usersErr } = await supabase
+                        .from('users')
+                        .select('telegram_id, username')
+                        .in('telegram_id', userIds);
+
+                    if (usersErr) {
+                        console.warn('Could not fetch usernames:', usersErr);
+                    } else if (users) {
+                        users.forEach(u => {
+                            usernameMap[u.telegram_id] = u.username || u.telegram_id;
+                        });
+                    }
+                }
+
+                // 4. Build deposit list with enriched data
+                const deposits = logs.map(log => {
+                    const details = log.details || {};
+                    const userId = log.user_id;
+                    // Try to get phone from various possible fields
+                    const phone = details.phone || details.phone_number || details.receiver || '-';
+                    return {
+                        userId: userId || 'N/A',
+                        username: usernameMap[userId] || details.username || details.user || 'N/A',
+                        amount: Number(details.amount) || 0,
+                        timestamp: log.timestamp,
+                        method: details.method || details.payment_type || 'N/A',
+                        phone: phone,
+                    };
+                });
+
+                // 5. Render
                 const totalCount = deposits.length;
                 const totalAmount = deposits.reduce((sum, d) => sum + d.amount, 0);
                 totalCountEl.textContent = totalCount;
                 totalAmountEl.textContent = fmt(totalAmount);
                 statsRow.style.display = 'flex';
 
-                // Table rows
                 let rows = '';
                 deposits.forEach(d => {
                     rows += `<tr>
