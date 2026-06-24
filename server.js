@@ -469,6 +469,36 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
+// =============== NEW: Admin Game State for full card data ===============
+function getGameStateForAdmin() {
+  const state = {};
+  for (const stake of [10, 20, 30]) {
+    const game = games[stake];
+    const players = game.players.map(p => ({
+      telegramId: p.telegramId,
+      username: p.username,
+      card: p.card,                    // 5x5 grid
+      markedNumbers: p.markedNumbers,
+      cardNumber: p.cardNumber
+    }));
+    state[stake] = {
+      status: game.status,
+      players,
+      calledNumbers: game.calledNumbers,
+      prizePool: game.prizePool,
+      entryFee: game.entryFee,
+      takenCardNumbers: Array.from(game.takenCardNumbers)
+    };
+  }
+  return state;
+}
+
+function broadcastAdminGameState() {
+  const state = getGameStateForAdmin();
+  adminNamespace.emit('admin:gameState', state);
+}
+// =============== END NEW ===============
+
 // ---------- PUBLIC NAMESPACE ----------
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
@@ -508,6 +538,7 @@ function resetGame(stake) {
   publicNamespace.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   
   broadcastPlayerCount(stake);
+  broadcastAdminGameState(); // NEW: broadcast updated state
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
   notifyAdminClients();
@@ -533,6 +564,7 @@ async function startGame(stake) {
     game.status = 'ended';
     setTimeout(() => resetGame(stake), 3000);
     notifyAdminClients();
+    broadcastAdminGameState(); // NEW
     return;
   }
 
@@ -559,6 +591,7 @@ async function startGame(stake) {
   game.winningNumber = null;
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
+  broadcastAdminGameState(); // NEW
   startCalling(stake);
 }
 
@@ -582,6 +615,7 @@ function startCalling(stake) {
     game.calledNumbers.push(number);
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
     Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
+    broadcastAdminGameState(); // NEW: update after each draw
   }, 4000);
 }
 
@@ -675,6 +709,7 @@ async function endGameWithWinners(stake) {
   game.winners = [];
   clearTimeout(game.bingoGraceTimeout);
   game.bingoGraceTimeout = null;
+  broadcastAdminGameState(); // NEW: update after game ends
   setTimeout(() => resetGame(stake), 5000);
   notifyAdminClients();
 }
@@ -1096,6 +1131,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
+    broadcastAdminGameState(); // NEW
   });
   
   socket.on('newCardNumber', () => {
@@ -1118,6 +1154,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
+    broadcastAdminGameState(); // NEW
   });
   
   socket.on('markNumber', (number) => {
@@ -1134,6 +1171,7 @@ io.on('connection', async (socket) => {
     if (player.markedNumbers.includes(number)) return;
     player.markedNumbers.push(number);
     socket.emit('markedNumbers', player.markedNumbers);
+    broadcastAdminGameState(); // NEW
   });
   
   socket.on('claimBingo', () => {
@@ -1156,6 +1194,7 @@ io.on('connection', async (socket) => {
     game.winners.push({ telegramId: socket.userId, username: socket.username });
     Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
     socket.emit('bingoValid');
+    broadcastAdminGameState(); // NEW
     if (!game.bingoGraceTimeout && game.winners.length === 1) {
       io.to(`stake_${currentStake}`).emit('multipleBingoPossible', { stake: currentStake, message: 'Bingo claimed! Waiting for other potential winners...' });
       game.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(currentStake); }, 3000);
@@ -1188,6 +1227,9 @@ adminNamespace.on('connection', (socket) => {
       30: games[30].status
     }
   });
+  // NEW: send full game state on connection
+  socket.emit('admin:gameState', getGameStateForAdmin());
+
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
