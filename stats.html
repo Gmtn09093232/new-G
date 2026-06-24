@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard</title>
+    <title>Bingo Win Dashboard · Date Filter</title>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Supabase JS -->
@@ -23,16 +24,67 @@
         h1 {
             font-weight: 600;
             font-size: 1.8rem;
-            margin-bottom: 24px;
+            margin-bottom: 12px;
             color: #0f172a;
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
         }
         h1 small {
             font-weight: 400;
             font-size: 1rem;
             color: #64748b;
+        }
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+            background: white;
+            padding: 14px 20px;
+            border-radius: 16px;
+            border: 1px solid #e9edf4;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        }
+        .filter-bar label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #475569;
+        }
+        .filter-bar input[type="date"] {
+            padding: 6px 10px;
+            border: 1px solid #d1d9e6;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            background: #fafcff;
+        }
+        .filter-bar button {
+            padding: 6px 18px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            transition: 0.2s;
+        }
+        .filter-bar button:hover {
+            background: #1d4ed8;
+        }
+        .filter-bar button.secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .filter-bar button.secondary:hover {
+            background: #cbd5e1;
+        }
+        .filter-bar .date-range-label {
+            margin-left: 4px;
+            color: #64748b;
+            font-size: 0.8rem;
         }
         .stats-grid {
             display: grid;
@@ -156,12 +208,27 @@
         }
         @media (max-width: 768px) {
             .chart-row { grid-template-columns: 1fr; }
+            .filter-bar { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎯 Win Dashboard <small>stake_20 · real‑time analytics</small></h1>
+    <h1>
+        🎯 Win Dashboard
+        <small>stake_20 · real‑time analytics</small>
+    </h1>
+
+    <!-- Date Filter Bar -->
+    <div class="filter-bar">
+        <label for="startDate">From</label>
+        <input type="date" id="startDate" />
+        <label for="endDate">To</label>
+        <input type="date" id="endDate" />
+        <button id="applyFilterBtn">Apply</button>
+        <button id="resetFilterBtn" class="secondary">Reset</button>
+        <span class="date-range-label" id="dateRangeLabel">All time</span>
+    </div>
 
     <div id="errorContainer" class="error"></div>
     <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
@@ -200,7 +267,7 @@
             <tbody id="userTableBody"></tbody>
         </table>
     </div>
-    <footer>Data from Supabase · Updated on load</footer>
+    <footer>Data from Supabase · Filter by date range</footer>
 </div>
 
 <script>
@@ -218,10 +285,19 @@
     const userTableBody = document.getElementById('userTableBody');
     const loadingEl = document.getElementById('loadingMessage');
     const errorEl = document.getElementById('errorContainer');
+    const startDateInput = document.getElementById('startDate');
+    const endDateInput = document.getElementById('endDate');
+    const applyBtn = document.getElementById('applyFilterBtn');
+    const resetBtn = document.getElementById('resetFilterBtn');
+    const dateRangeLabel = document.getElementById('dateRangeLabel');
 
     let commissionChartInstance = null;
     let distributionChartInstance = null;
     let timelineChartInstance = null;
+
+    // Current filter state (as Date objects or null)
+    let filterStart = null;
+    let filterEnd = null;
 
     function showError(msg) {
         errorEl.textContent = msg;
@@ -232,16 +308,48 @@
     function fmt(num) { return Number(num).toFixed(1); }
 
     // ------------------------------------------------------------------
+    // Build date filter for Supabase queries
+    // ------------------------------------------------------------------
+    function buildDateFilter(query, startDate, endDate) {
+        if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0,0,0,0);
+            query = query.gte('created_at', start.toISOString());
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23,59,59,999);
+            query = query.lte('created_at', end.toISOString());
+        }
+        return query;
+    }
+
+    function buildAuditDateFilter(query, startDate, endDate) {
+        // audit_logs uses 'timestamp' column
+        if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0,0,0,0);
+            query = query.gte('timestamp', start.toISOString());
+        }
+        if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23,59,59,999);
+            query = query.lte('timestamp', end.toISOString());
+        }
+        return query;
+    }
+
+    // ------------------------------------------------------------------
     // Main fetch & render
     // ------------------------------------------------------------------
-    async function loadDashboard() {
+    async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds (for totals, timeline, distribution)
-            const { data: rounds, error: roundsErr } = await supabase
-                .from('game_rounds')
-                .select('total_entry_fees, prize_pool, house_profit, created_at')
-                .order('created_at', { ascending: true });
+            // 1. Fetch game_rounds with date filter
+            let roundsQuery = supabase.from('game_rounds').select('total_entry_fees, prize_pool, house_profit, created_at');
+            roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
+            roundsQuery = roundsQuery.order('created_at', { ascending: true });
 
+            const { data: rounds, error: roundsErr } = await roundsQuery;
             if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
             const totalRounds = rounds.length;
@@ -272,7 +380,7 @@
             `;
 
             // 2. Payout Distribution (histogram)
-            const binSize = 16; // adjust as needed
+            const binSize = 16;
             const bins = {};
             payouts.forEach(p => {
                 const bin = Math.floor(p / binSize) * binSize;
@@ -282,25 +390,19 @@
             const distLabels = sortedBins.map(b => `${b}-${Number(b)+binSize-1} ETB`);
             const distData = sortedBins.map(b => bins[b]);
 
-            // 3. User-level data from audit_logs
-            // Fetch WIN_PAID_OUT and ENTRY_FEE_PAID
-            const { data: winLogs, error: winErr } = await supabase
-                .from('audit_logs')
-                .select('user_id, details')
-                .eq('event_type', 'WIN_PAID_OUT');
-
+            // 3. User-level data from audit_logs with date filter
+            let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
+            winQuery = buildAuditDateFilter(winQuery, startDate, endDate);
+            const { data: winLogs, error: winErr } = await winQuery;
             if (winErr) throw new Error('Failed to fetch win logs: ' + winErr.message);
 
-            const { data: entryLogs, error: entryErr } = await supabase
-                .from('audit_logs')
-                .select('user_id, details')
-                .eq('event_type', 'ENTRY_FEE_PAID');
-
+            let entryQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'ENTRY_FEE_PAID');
+            entryQuery = buildAuditDateFilter(entryQuery, startDate, endDate);
+            const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
             // Aggregate per user
             const userMap = {};
-            // Wins
             winLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
@@ -308,7 +410,6 @@
                 userMap[uid].wins += 1;
                 userMap[uid].totalPayout += Number(log.details?.amount) || 0;
             });
-            // Stakes
             entryLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
@@ -345,14 +446,12 @@
                 };
             });
 
-            // Sort by commission descending for chart and table
             userSummaries.sort((a,b) => b.commission - a.commission);
 
             // --- Render Commission Chart (top 10) ---
             const topCommission = userSummaries.slice(0, 10);
             const commLabels = topCommission.map(u => u.username);
             const commData = topCommission.map(u => u.commission);
-
             renderCommissionChart(commLabels, commData);
 
             // --- Render Distribution Chart ---
@@ -373,7 +472,7 @@
                     <td>${fmt(u.avgPayout)}</td>
                 </tr>`;
             });
-            userTableBody.innerHTML = tableRows;
+            userTableBody.innerHTML = tableRows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No data for this period</td></tr>';
 
             loadingEl.style.display = 'none';
 
@@ -384,7 +483,7 @@
     }
 
     // ------------------------------------------------------------------
-    // Chart renderers
+    // Chart renderers (unchanged)
     // ------------------------------------------------------------------
     function renderCommissionChart(labels, data) {
         const ctx = document.getElementById('commissionChart').getContext('2d');
@@ -470,24 +569,70 @@
     }
 
     // ------------------------------------------------------------------
+    // Filter logic
+    // ------------------------------------------------------------------
+    function applyFilter() {
+        const startVal = startDateInput.value;
+        const endVal = endDateInput.value;
+
+        // Validate: if start > end, swap or show error?
+        if (startVal && endVal && new Date(startVal) > new Date(endVal)) {
+            showError('Start date must be before end date.');
+            return;
+        }
+
+        filterStart = startVal || null;
+        filterEnd = endVal || null;
+
+        // Update label
+        if (filterStart && filterEnd) {
+            dateRangeLabel.textContent = `📅 ${filterStart} → ${filterEnd}`;
+        } else if (filterStart) {
+            dateRangeLabel.textContent = `📅 From ${filterStart}`;
+        } else if (filterEnd) {
+            dateRangeLabel.textContent = `📅 Until ${filterEnd}`;
+        } else {
+            dateRangeLabel.textContent = '🌍 All time';
+        }
+
+        // Reload
+        loadingEl.style.display = 'block';
+        errorEl.style.display = 'none';
+        loadDashboard(filterStart, filterEnd);
+    }
+
+    function resetFilter() {
+        startDateInput.value = '';
+        endDateInput.value = '';
+        filterStart = null;
+        filterEnd = null;
+        dateRangeLabel.textContent = '🌍 All time';
+        loadingEl.style.display = 'block';
+        errorEl.style.display = 'none';
+        loadDashboard(null, null);
+    }
+
+    // ------------------------------------------------------------------
     // Init
     // ------------------------------------------------------------------
-    // Since we use time scale, we need to register the time adapter.
-    // Chart.js v4 requires the adapter for time – we'll load it via CDN.
-    // Add this script dynamically.
+    // Load chart.js time adapter
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js';
     document.head.appendChild(script);
-    // After loading, call loadDashboard
     script.onload = () => {
-        loadDashboard();
+        // Initial load (all time)
+        resetFilter();
+        // Event listeners
+        applyBtn.addEventListener('click', applyFilter);
+        resetBtn.addEventListener('click', resetFilter);
+        // Enter key on inputs triggers apply
+        startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
+        endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
     };
-    // Fallback if adapter fails
+    // Fallback if adapter fails (as before)
     setTimeout(() => {
         if (typeof window['chartjs-adapter-date-fns'] === 'undefined') {
-            // Fallback: use category scale for timeline
             console.warn('Time adapter not loaded; using category fallback.');
-            // We'll override renderTimelineChart to use category scale.
             const origRender = renderTimelineChart;
             renderTimelineChart = function(data) {
                 const labels = data.map(d => d.x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
@@ -519,10 +664,11 @@
                     }
                 });
             };
-            // re-render timeline with fallback
-            loadDashboard();
+            // Re-run with current filter
+            loadDashboard(filterStart, filterEnd);
         }
     }, 2000);
 </script>
 </body>
 </html>
+   
