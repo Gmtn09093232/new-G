@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
   <style>
-    /* (styles unchanged – same as your provided CSS) */
+    /* (your existing styles – unchanged) */
     * {
       margin: 0;
       padding: 0;
@@ -370,10 +370,11 @@
       color: #6b7a93;
       font-size: 0.7rem;
     }
-    /* new styles for extra sections */
+
+    /* ----- NEW STYLES (added without touching existing) ----- */
     .extra-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 18px;
       margin-top: 18px;
       margin-bottom: 10px;
@@ -383,6 +384,8 @@
       border-radius: 16px;
       border: 1px solid #232c38;
       padding: 14px;
+      display: flex;
+      flex-direction: column;
     }
     .extra-box h3 {
       font-size: 0.75rem;
@@ -390,6 +393,25 @@
       color: #b4bfd4;
       margin-bottom: 8px;
     }
+    .round-history-scroll {
+      max-height: 190px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .round-entry {
+      display: grid;
+      grid-template-columns: 70px 45px 50px 50px 55px;
+      gap: 4px;
+      padding: 3px 0;
+      border-bottom: 1px solid #1a212b;
+      font-size: 0.65rem;
+      color: #cbd5e1;
+    }
+    .round-entry .r-time { color: #6b7a93; }
+    .round-entry .r-stake { color: #f7c35c; }
+    .round-entry .r-players { color: #6ab0f7; }
+    .round-entry .r-prize { color: #f28b9c; }
+    .round-entry .r-profit { color: #5fcb8a; font-weight: 600; }
     .top-player-entry {
       display: flex;
       justify-content: space-between;
@@ -398,13 +420,10 @@
       font-size: 0.72rem;
       color: #dce2ec;
     }
-    .top-player-entry .name {
-      color: #9aa9c0;
-    }
-    .top-player-entry .score {
-      font-weight: 500;
-      color: #f7c35c;
-    }
+    .top-player-entry .name { color: #9aa9c0; }
+    .top-player-entry .score { font-weight: 500; color: #f7c35c; }
+    .extra-box .chart-container { height: 170px; }
+
     @media (max-width: 920px) {
       .chart-grid {
         grid-template-columns: 1fr 1fr;
@@ -417,7 +436,7 @@
         width: calc(33% - 7px);
       }
       .extra-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
       }
     }
     @media (max-width: 640px) {
@@ -425,6 +444,9 @@
         grid-template-columns: 1fr;
       }
       .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+      .extra-grid {
         grid-template-columns: 1fr;
       }
       .header h1 {
@@ -459,7 +481,7 @@
 <body>
 
   <div class="dashboard">
-    <!-- HEADER -->
+    <!-- HEADER (unchanged) -->
     <div class="header">
       <div style="display: flex; align-items: center; gap: 14px;">
         <h1>🎲 Bingo · All Cards</h1>
@@ -470,49 +492,53 @@
       </div>
     </div>
 
-    <!-- KPI CARDS -->
+    <!-- KPI CARDS (unchanged) -->
     <div class="kpi-grid" id="kpiContainer"></div>
 
-    <!-- 3-COLUMN: Rooms | PLAYERS CARDS | Called Numbers -->
+    <!-- 3-COLUMN: Rooms | PLAYERS CARDS | Called Numbers (unchanged) -->
     <div class="chart-grid">
-      <!-- Room summary (bar chart) -->
       <div class="chart-box">
         <h3>🏠 Rooms Overview</h3>
         <div class="chart-container tall"><canvas id="roomChart"></canvas></div>
       </div>
-
-      <!-- ALL PLAYERS BINGO CARDS -->
       <div class="chart-box">
         <h3>👥 Players' Cards (<span id="playerCount">0</span> total)</h3>
         <div class="player-cards-scroll" id="playerCardsList">
           <div class="no-players-msg">Waiting for players to join…</div>
         </div>
       </div>
-
-      <!-- Called Numbers Distribution -->
       <div class="chart-box">
         <h3>🔢 Called Numbers</h3>
         <div class="chart-container tall"><canvas id="calledChart"></canvas></div>
       </div>
-
-      <!-- Timeline (full width) – called numbers over time -->
       <div class="chart-box wide">
         <h3>⏳ Called Numbers Timeline</h3>
         <div class="chart-container"><canvas id="timelineChart"></canvas></div>
       </div>
     </div>
 
-    <!-- NEW EXTRA GRID: House Profit per Room + Top Players -->
+    <!-- ======== NEW EXTRA GRID ======== -->
     <div class="extra-grid">
+      <!-- 1. Past winner list / recent ended rounds -->
       <div class="extra-box">
-        <h3>📊 House Profit per Room</h3>
-        <div class="chart-container tall"><canvas id="profitChart"></canvas></div>
-      </div>
-      <div class="extra-box">
-        <h3>🏆 Top Players by Activity (marked numbers)</h3>
-        <div id="topPlayersList" style="max-height:200px; overflow-y:auto;">
-          <div class="text-muted" style="padding:10px;">No active players yet</div>
+        <h3>📜 Past Rounds (with House Profit)</h3>
+        <div class="round-history-scroll" id="roundHistoryList">
+          <div class="text-muted" style="padding:10px;">No rounds ended yet</div>
         </div>
+      </div>
+
+      <!-- 2. Most winner player list (by rounds participated) -->
+      <div class="extra-box">
+        <h3>🏆 Top Players by Rounds Played</h3>
+        <div style="max-height:190px; overflow-y:auto;" id="topRoundsPlayers">
+          <div class="text-muted" style="padding:10px;">No data yet</div>
+        </div>
+      </div>
+
+      <!-- 3. Player winning amount distribution (chart) -->
+      <div class="extra-box">
+        <h3>💰 Player Winning Distribution</h3>
+        <div class="chart-container"><canvas id="playerWinChart"></canvas></div>
       </div>
     </div>
 
@@ -537,8 +563,8 @@
     // LIVE DASHBOARD – connects to admin WebSocket
     // ============================================================
 
-    // ---- CONFIG: Admin secret ----
-    const ADMIN_SECRET = '0120705@Gizie';
+    // ---- CONFIG ----
+    const ADMIN_SECRET = '0120705@Gizie'; // change as needed
 
     // ---- State ----
     let gameState = {
@@ -546,6 +572,12 @@
       20: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 20 },
       30: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 30 }
     };
+    // Track previous status to detect ended rounds
+    let prevStatus = { 10: 'lobby', 20: 'lobby', 30: 'lobby' };
+    // Historical data
+    let roundHistory = []; // { timestamp, stake, playerCount, revenue, prizePool, profit, players: [...] }
+    let playerRoundStats = {}; // playerId -> { username, rounds, totalEstimatedWinnings }
+
     let logEntries = [];
 
     // ---- DOM refs ----
@@ -556,10 +588,11 @@
     const userSummaryBody = document.getElementById('userSummaryBody');
     const connectionStatus = document.getElementById('connectionStatus');
     const clearLogBtn = document.getElementById('clearLogBtn');
-    const topPlayersList = document.getElementById('topPlayersList');
+    const roundHistoryList = document.getElementById('roundHistoryList');
+    const topRoundsPlayers = document.getElementById('topRoundsPlayers');
 
     // ---- Charts ----
-    let roomChart, calledChart, timelineChart, profitChart;
+    let roomChart, calledChart, timelineChart, playerWinChart;
 
     function initCharts() {
       roomChart = new Chart(document.getElementById('roomChart'), {
@@ -619,24 +652,21 @@
         }
       });
 
-      profitChart = new Chart(document.getElementById('profitChart'), {
+      // NEW: Player winning distribution chart
+      playerWinChart = new Chart(document.getElementById('playerWinChart'), {
         type: 'bar',
         data: {
-          labels: ['10 ETB', '20 ETB', '30 ETB'],
-          datasets: [{
-            label: 'House Profit (ETB)',
-            data: [0, 0, 0],
-            backgroundColor: '#f7c35c',
-            borderRadius: 4
-          }]
+          labels: [],
+          datasets: [{ label: 'Est. Winnings (ETB)', data: [], backgroundColor: '#f7c35c', borderRadius: 4 }]
         },
         options: {
+          indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: { grid: { display: false }, ticks: { color: '#b4bfd4' } },
-            y: { grid: { color: '#232c38' }, ticks: { color: '#8892a8' } }
+            x: { grid: { color: '#232c38' }, ticks: { color: '#8892a8' } },
+            y: { grid: { display: false }, ticks: { color: '#b4bfd4' } }
           }
         }
       });
@@ -722,7 +752,6 @@
         { label: 'House Net', value: net, cls: net >= 0 ? 'green' : 'pink', unit: 'ETB' },
         { label: 'RTP', value: rtp, cls: 'purple', unit: '%' },
         { label: 'Avg Prize / Player', value: avgPrize, cls: '', unit: 'ETB' },
-        // New: Total House Profit (same as net, but we already have it)
       ];
 
       kpiContainer.innerHTML = cards.map(k => `
@@ -749,34 +778,53 @@
       userSummaryBody.innerHTML = html || '<div class="text-muted">No rooms active</div>';
     }
 
-    function updateTopPlayers() {
-      // Build a map of player -> total marked numbers across all rooms
-      const playerStats = {};
-      for (const stake of [10, 20, 30]) {
-        const room = gameState[stake];
-        for (const p of room.players) {
-          const id = p.telegramId || p.username;
-          if (!id) continue;
-          if (!playerStats[id]) {
-            playerStats[id] = { username: p.username || id, markedCount: 0, rooms: 0 };
-          }
-          playerStats[id].markedCount += (p.markedNumbers || []).length;
-          playerStats[id].rooms += 1;
-        }
-      }
-      const sorted = Object.values(playerStats).sort((a, b) => b.markedCount - a.markedCount);
-      if (sorted.length === 0) {
-        topPlayersList.innerHTML = `<div class="text-muted" style="padding:10px;">No active players yet</div>`;
+    // NEW: Render round history
+    function renderRoundHistory() {
+      if (roundHistory.length === 0) {
+        roundHistoryList.innerHTML = `<div class="text-muted" style="padding:10px;">No rounds ended yet</div>`;
         return;
       }
-      topPlayersList.innerHTML = sorted.slice(0, 15).map(p => `
+      // Show latest first
+      const html = roundHistory.slice().reverse().slice(0, 50).map(r => `
+        <div class="round-entry">
+          <span class="r-time">${r.time}</span>
+          <span class="r-stake">${r.stake}ETB</span>
+          <span class="r-players">${r.playerCount}p</span>
+          <span class="r-prize">${r.prizePool}</span>
+          <span class="r-profit">${r.profit >= 0 ? '+' : ''}${r.profit}</span>
+        </div>
+      `).join('');
+      roundHistoryList.innerHTML = html;
+    }
+
+    // NEW: Render top players by rounds participated
+    function renderTopPlayersByRounds() {
+      const sorted = Object.values(playerRoundStats)
+        .sort((a, b) => b.rounds - a.rounds)
+        .slice(0, 15);
+      if (sorted.length === 0) {
+        topRoundsPlayers.innerHTML = `<div class="text-muted" style="padding:10px;">No data yet</div>`;
+        return;
+      }
+      topRoundsPlayers.innerHTML = sorted.map(p => `
         <div class="top-player-entry">
           <span class="name">${p.username}</span>
-          <span class="score">${p.markedCount} marked · ${p.rooms} room${p.rooms>1?'s':''}</span>
+          <span class="score">${p.rounds} rounds · ${p.totalEstimatedWinnings.toFixed(1)} ETB</span>
         </div>
       `).join('');
     }
 
+    // NEW: Update player winning chart
+    function updatePlayerWinChart() {
+      const sorted = Object.values(playerRoundStats)
+        .sort((a, b) => b.totalEstimatedWinnings - a.totalEstimatedWinnings)
+        .slice(0, 10);
+      playerWinChart.data.labels = sorted.map(p => p.username);
+      playerWinChart.data.datasets[0].data = sorted.map(p => p.totalEstimatedWinnings);
+      playerWinChart.update();
+    }
+
+    // ---- Core chart updater (existing) ----
     function updateCharts() {
       // Room chart
       const playerCounts = [10, 20, 30].map(stake => gameState[stake].players.length);
@@ -798,7 +846,7 @@
       calledChart.data.datasets[0].data = sorted.map(n => freq[n]);
       calledChart.update();
 
-      // Timeline: last 40 called numbers across rooms
+      // Timeline
       const allCalls = [];
       for (const stake of [10, 20, 30]) {
         const room = gameState[stake];
@@ -814,19 +862,79 @@
       timelineChart.data.datasets[0].data = recent.map(c => c.num);
       timelineChart.update();
 
-      // Profit per room
-      const profits = [10, 20, 30].map(stake => {
-        const room = gameState[stake];
-        const revenue = room.players.length * room.entryFee;
-        const profit = revenue - (room.prizePool || 0);
-        return profit;
-      });
-      profitChart.data.datasets[0].data = profits;
-      profitChart.update();
+      // Profit chart (if exists) – we already have it in the new round history
     }
 
     // ---- Main update from server ----
     function updateFromServer(state) {
+      // Detect ended rounds before updating
+      for (const stake of [10, 20, 30]) {
+        if (state[stake]) {
+          const newStatus = state[stake].status;
+          const oldStatus = prevStatus[stake];
+          // If status just became 'ended'
+          if (newStatus === 'ended' && oldStatus !== 'ended') {
+            const room = state[stake];
+            const players = room.players || [];
+            const playerCount = players.length;
+            const revenue = playerCount * room.entryFee;
+            const prizePool = room.prizePool || 0;
+            const profit = revenue - prizePool;
+            const now = new Date();
+            const timeStr = formatTime(now);
+
+            // Store round
+            roundHistory.push({
+              time: timeStr,
+              stake: stake,
+              playerCount: playerCount,
+              revenue: revenue,
+              prizePool: prizePool,
+              profit: profit,
+              players: players.slice() // copy
+            });
+
+            // Update player stats (estimate winnings: split prize pool equally among players)
+            if (prizePool > 0 && playerCount > 0) {
+              const perPlayer = prizePool / playerCount;
+              for (const p of players) {
+                const id = p.telegramId || p.username;
+                if (!id) continue;
+                if (!playerRoundStats[id]) {
+                  playerRoundStats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+                }
+                playerRoundStats[id].rounds += 1;
+                playerRoundStats[id].totalEstimatedWinnings += perPlayer;
+                // Ensure username is updated
+                playerRoundStats[id].username = p.username || id;
+              }
+            } else {
+              // Still count rounds played even if prize pool is 0
+              for (const p of players) {
+                const id = p.telegramId || p.username;
+                if (!id) continue;
+                if (!playerRoundStats[id]) {
+                  playerRoundStats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+                }
+                playerRoundStats[id].rounds += 1;
+                playerRoundStats[id].username = p.username || id;
+              }
+            }
+
+            // Add log entry
+            addLog('round', `🏁 Round ${stake}ETB ended: ${playerCount} players, prize ${prizePool} ETB, profit ${profit} ETB`);
+
+            // Render new sections
+            renderRoundHistory();
+            renderTopPlayersByRounds();
+            updatePlayerWinChart();
+          }
+          // Update prevStatus
+          prevStatus[stake] = newStatus;
+        }
+      }
+
+      // Merge state
       for (const stake of [10, 20, 30]) {
         if (state[stake]) {
           gameState[stake] = {
@@ -835,13 +943,14 @@
           };
         }
       }
+
       const totalPlayers = Object.values(gameState).reduce((sum, r) => sum + r.players.length, 0);
-      addLog('round', `🔄 Update: ${totalPlayers} players across all rooms`);
+      // Avoid spamming log on every update
+      // addLog('round', `🔄 Update: ${totalPlayers} players across all rooms`);
 
       renderPlayerCards();
       updateKPIs();
       updateUserSummary();
-      updateTopPlayers();
       updateCharts();
     }
 
@@ -892,7 +1001,9 @@
       renderPlayerCards();
       updateKPIs();
       updateUserSummary();
-      updateTopPlayers();
+      renderRoundHistory();
+      renderTopPlayersByRounds();
+      updatePlayerWinChart();
     });
   </script>
 </body>
