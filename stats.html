@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎲 Live Bingo · Analytics Dashboard</title>
+  <title>🎲 Bingo · Analytics with Date Filter</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
   </script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js">
@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
   <style>
+    /* (all existing styles unchanged – we just add a small filter bar) */
     * {
       margin: 0;
       padding: 0;
@@ -86,14 +87,49 @@
       animation: pulse 1.8s infinite;
     }
     @keyframes pulse {
-      0%,
-      100% {
-        opacity: 1;
-      }
-      50% {
-        opacity: 0.4;
-      }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
+
+    /* ---- Filter bar (new) ---- */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      background: #141b24;
+      padding: 12px 18px;
+      border-radius: 14px;
+      border: 1px solid #232c38;
+      margin-bottom: 22px;
+    }
+    .filter-bar label {
+      font-size: 0.7rem;
+      color: #7b879c;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .filter-bar input[type="date"] {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #e9edf2;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-family: inherit;
+    }
+    .filter-bar .filter-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .filter-bar .btn-sm {
+      padding: 4px 14px;
+      font-size: 0.7rem;
+    }
+
+    /* (rest of existing styles unchanged) */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -126,21 +162,12 @@
       font-weight: 400;
       margin-left: 3px;
     }
-    .kpi-card.accent .kpi-value {
-      color: #f7c35c;
-    }
-    .kpi-card.green .kpi-value {
-      color: #5fcb8a;
-    }
-    .kpi-card.pink .kpi-value {
-      color: #f28b9c;
-    }
-    .kpi-card.blue .kpi-value {
-      color: #6ab0f7;
-    }
-    .kpi-card.purple .kpi-value {
-      color: #b794f4;
-    }
+    .kpi-card.accent .kpi-value { color: #f7c35c; }
+    .kpi-card.green .kpi-value { color: #5fcb8a; }
+    .kpi-card.pink .kpi-value { color: #f28b9c; }
+    .kpi-card.blue .kpi-value { color: #6ab0f7; }
+    .kpi-card.purple .kpi-value { color: #b794f4; }
+
     .chart-box {
       background: #141b24;
       border-radius: 16px;
@@ -216,26 +243,12 @@
       align-self: center;
       text-transform: uppercase;
     }
-    .log-entry .badge-event.win {
-      background: #3d2c1e;
-      color: #f7c35c;
-    }
-    .log-entry .badge-event.buy {
-      background: #1c3340;
-      color: #6ab0f7;
-    }
-    .log-entry .badge-event.round {
-      background: #2a2a3a;
-      color: #b794f4;
-    }
-    .log-entry .badge-event.bingo {
-      background: #f7c35c;
-      color: #0b0e14;
-    }
-    .log-entry .msg {
-      color: #e2e8f0;
-      flex: 1;
-    }
+    .log-entry .badge-event.win { background: #3d2c1e; color: #f7c35c; }
+    .log-entry .badge-event.buy { background: #1c3340; color: #6ab0f7; }
+    .log-entry .badge-event.round { background: #2a2a3a; color: #b794f4; }
+    .log-entry .badge-event.bingo { background: #f7c35c; color: #0b0e14; }
+    .log-entry .msg { color: #e2e8f0; flex: 1; }
+
     .user-summary-box {
       background: #141b24;
       border-radius: 16px;
@@ -263,24 +276,12 @@
       font-size: 0.72rem;
       color: #dce2ec;
     }
-    .user-row .uid {
-      color: #9aa9c0;
-    }
-    .user-row .profit {
-      font-weight: 500;
-    }
-    .user-row .profit.pos {
-      color: #5fcb8a;
-    }
-    .user-row .profit.neg {
-      color: #f28b9c;
-    }
-    .text-muted {
-      color: #6b7a93;
-      font-size: 0.7rem;
-    }
+    .user-row .uid { color: #9aa9c0; }
+    .user-row .profit { font-weight: 500; }
+    .user-row .profit.pos { color: #5fcb8a; }
+    .user-row .profit.neg { color: #f28b9c; }
+    .text-muted { color: #6b7a93; font-size: 0.7rem; }
 
-    /* Extra sections – kept from before */
     .extra-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -334,37 +335,21 @@
     .extra-box .chart-container { height: 170px; }
 
     @media (max-width: 920px) {
-      .extra-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-      .bottom-grid {
-        grid-template-columns: 1fr;
-      }
+      .extra-grid { grid-template-columns: 1fr 1fr; }
+      .bottom-grid { grid-template-columns: 1fr; }
+      .filter-bar .filter-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
     }
     @media (max-width: 640px) {
-      .extra-grid {
-        grid-template-columns: 1fr;
-      }
-      .header h1 {
-        font-size: 1.2rem;
-      }
-      .kpi-value {
-        font-size: 1.1rem;
-      }
-      body {
-        padding: 10px;
-      }
+      .extra-grid { grid-template-columns: 1fr; }
+      .header h1 { font-size: 1.2rem; }
+      .kpi-value { font-size: 1.1rem; }
+      body { padding: 10px; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-bar .filter-actions { justify-content: stretch; }
     }
-    ::-webkit-scrollbar {
-      width: 4px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #0b0e14;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #3b485a;
-      border-radius: 10px;
-    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0b0e14; }
+    ::-webkit-scrollbar-thumb { background: #3b485a; border-radius: 10px; }
   </style>
 </head>
 <body>
@@ -381,34 +366,42 @@
       </div>
     </div>
 
+    <!-- ===== DATE FILTER BAR ===== -->
+    <div class="filter-bar">
+      <label for="filterFrom">From</label>
+      <input type="date" id="filterFrom" />
+      <label for="filterTo">To</label>
+      <input type="date" id="filterTo" />
+      <div class="filter-actions">
+        <button class="btn btn-sm primary" id="applyFilterBtn">Apply</button>
+        <button class="btn btn-sm" id="clearFilterBtn">Clear</button>
+      </div>
+      <span style="font-size:0.7rem; color:#6b7a93; margin-left:auto;" id="filterInfo">Showing all data</span>
+    </div>
+
     <!-- KPI CARDS -->
     <div class="kpi-grid" id="kpiContainer"></div>
 
-    <!-- SINGLE CHART: Rooms Overview (full width) -->
+    <!-- SINGLE CHART: Rooms Overview -->
     <div class="chart-box">
       <h3>🏠 Rooms Overview</h3>
       <div class="chart-container"><canvas id="roomChart"></canvas></div>
     </div>
 
-    <!-- EXTRA GRID: Past Rounds, Top Players, Player Winning Distribution -->
+    <!-- EXTRA GRID -->
     <div class="extra-grid">
-      <!-- 1. Past winner list / recent ended rounds -->
       <div class="extra-box">
         <h3>📜 Past Rounds (with House Profit)</h3>
         <div class="round-history-scroll" id="roundHistoryList">
           <div class="text-muted" style="padding:10px;">No rounds ended yet</div>
         </div>
       </div>
-
-      <!-- 2. Most winner player list (by rounds participated) -->
       <div class="extra-box">
         <h3>🏆 Top Players by Rounds Played</h3>
         <div style="max-height:190px; overflow-y:auto;" id="topRoundsPlayers">
           <div class="text-muted" style="padding:10px;">No data yet</div>
         </div>
       </div>
-
-      <!-- 3. Player winning amount distribution (chart) -->
       <div class="extra-box">
         <h3>💰 Player Winning Distribution</h3>
         <div class="chart-container"><canvas id="playerWinChart"></canvas></div>
@@ -433,7 +426,7 @@
 
   <script>
     // ============================================================
-    // LIVE DASHBOARD – connects to admin WebSocket
+    // LIVE DASHBOARD with DATE FILTER (client-side)
     // ============================================================
 
     const ADMIN_SECRET = '0120705@Gizie'; // change as needed
@@ -445,9 +438,11 @@
       30: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 30 }
     };
     let prevStatus = { 10: 'lobby', 20: 'lobby', 30: 'lobby' };
-    let roundHistory = [];
-    let playerRoundStats = {};
+    let roundHistory = []; // each entry: { date (Date), time, stake, playerCount, revenue, prizePool, profit, players }
+    let playerRoundStats = {}; // playerId -> { username, rounds, totalEstimatedWinnings }
     let logEntries = [];
+    let filterFrom = null; // Date
+    let filterTo = null;   // Date
 
     // ---- DOM refs ----
     const kpiContainer = document.getElementById('kpiContainer');
@@ -457,6 +452,11 @@
     const clearLogBtn = document.getElementById('clearLogBtn');
     const roundHistoryList = document.getElementById('roundHistoryList');
     const topRoundsPlayers = document.getElementById('topRoundsPlayers');
+    const filterFromInput = document.getElementById('filterFrom');
+    const filterToInput = document.getElementById('filterTo');
+    const applyFilterBtn = document.getElementById('applyFilterBtn');
+    const clearFilterBtn = document.getElementById('clearFilterBtn');
+    const filterInfo = document.getElementById('filterInfo');
 
     // ---- Charts ----
     let roomChart, playerWinChart;
@@ -522,10 +522,118 @@
       `).join('');
     }
 
+    // ---- Filter helpers ----
+    function isRoundInFilter(round) {
+      if (!filterFrom && !filterTo) return true;
+      const d = round.date;
+      if (filterFrom && d < filterFrom) return false;
+      if (filterTo) {
+        const end = new Date(filterTo);
+        end.setHours(23, 59, 59, 999);
+        if (d > end) return false;
+      }
+      return true;
+    }
+
+    function getFilteredRounds() {
+      return roundHistory.filter(r => isRoundInFilter(r));
+    }
+
+    function getFilteredPlayerStats() {
+      // Rebuild player stats from filtered rounds
+      const stats = {};
+      const filtered = getFilteredRounds();
+      for (const round of filtered) {
+        const players = round.players || [];
+        const playerCount = players.length;
+        const prizePool = round.prizePool || 0;
+        if (prizePool > 0 && playerCount > 0) {
+          const perPlayer = prizePool / playerCount;
+          for (const p of players) {
+            const id = p.telegramId || p.username;
+            if (!id) continue;
+            if (!stats[id]) {
+              stats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+            }
+            stats[id].rounds += 1;
+            stats[id].totalEstimatedWinnings += perPlayer;
+            stats[id].username = p.username || id;
+          }
+        } else {
+          // still count rounds even if no prize
+          for (const p of players) {
+            const id = p.telegramId || p.username;
+            if (!id) continue;
+            if (!stats[id]) {
+              stats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+            }
+            stats[id].rounds += 1;
+            stats[id].username = p.username || id;
+          }
+        }
+      }
+      return stats;
+    }
+
+    // ---- Render functions (with filtering) ----
+    function renderRoundHistory() {
+      const filtered = getFilteredRounds();
+      if (filtered.length === 0) {
+        roundHistoryList.innerHTML = `<div class="text-muted" style="padding:10px;">No rounds match the filter</div>`;
+        return;
+      }
+      const html = filtered.slice().reverse().slice(0, 50).map(r => `
+        <div class="round-entry">
+          <span class="r-time">${r.time}</span>
+          <span class="r-stake">${r.stake}ETB</span>
+          <span class="r-players">${r.playerCount}p</span>
+          <span class="r-prize">${r.prizePool}</span>
+          <span class="r-profit">${r.profit >= 0 ? '+' : ''}${r.profit}</span>
+        </div>
+      `).join('');
+      roundHistoryList.innerHTML = html;
+    }
+
+    function renderTopPlayersByRounds() {
+      const stats = getFilteredPlayerStats();
+      const sorted = Object.values(stats)
+        .sort((a, b) => b.rounds - a.rounds)
+        .slice(0, 15);
+      if (sorted.length === 0) {
+        topRoundsPlayers.innerHTML = `<div class="text-muted" style="padding:10px;">No data for this filter</div>`;
+        return;
+      }
+      topRoundsPlayers.innerHTML = sorted.map(p => `
+        <div class="top-player-entry">
+          <span class="name">${p.username}</span>
+          <span class="score">${p.rounds} rounds · ${p.totalEstimatedWinnings.toFixed(1)} ETB</span>
+        </div>
+      `).join('');
+    }
+
+    function updatePlayerWinChart() {
+      const stats = getFilteredPlayerStats();
+      const sorted = Object.values(stats)
+        .sort((a, b) => b.totalEstimatedWinnings - a.totalEstimatedWinnings)
+        .slice(0, 10);
+      playerWinChart.data.labels = sorted.map(p => p.username);
+      playerWinChart.data.datasets[0].data = sorted.map(p => p.totalEstimatedWinnings);
+      playerWinChart.update();
+    }
+
+    function updateFilterInfo() {
+      const filteredCount = getFilteredRounds().length;
+      const totalCount = roundHistory.length;
+      if (filterFrom || filterTo) {
+        filterInfo.textContent = `Showing ${filteredCount} of ${totalCount} rounds`;
+      } else {
+        filterInfo.textContent = `Showing all ${totalCount} rounds`;
+      }
+    }
+
+    // ---- KPI and room chart (unfiltered overall) ----
     function updateKPIs() {
-      let totalPlayers = 0,
-        totalRevenue = 0,
-        totalPrize = 0;
+      let totalPlayers = 0, totalRevenue = 0, totalPrize = 0;
       for (const stake of [10, 20, 30]) {
         const room = gameState[stake];
         const count = room.players.length;
@@ -570,48 +678,6 @@
       userSummaryBody.innerHTML = html || '<div class="text-muted">No rooms active</div>';
     }
 
-    function renderRoundHistory() {
-      if (roundHistory.length === 0) {
-        roundHistoryList.innerHTML = `<div class="text-muted" style="padding:10px;">No rounds ended yet</div>`;
-        return;
-      }
-      const html = roundHistory.slice().reverse().slice(0, 50).map(r => `
-        <div class="round-entry">
-          <span class="r-time">${r.time}</span>
-          <span class="r-stake">${r.stake}ETB</span>
-          <span class="r-players">${r.playerCount}p</span>
-          <span class="r-prize">${r.prizePool}</span>
-          <span class="r-profit">${r.profit >= 0 ? '+' : ''}${r.profit}</span>
-        </div>
-      `).join('');
-      roundHistoryList.innerHTML = html;
-    }
-
-    function renderTopPlayersByRounds() {
-      const sorted = Object.values(playerRoundStats)
-        .sort((a, b) => b.rounds - a.rounds)
-        .slice(0, 15);
-      if (sorted.length === 0) {
-        topRoundsPlayers.innerHTML = `<div class="text-muted" style="padding:10px;">No data yet</div>`;
-        return;
-      }
-      topRoundsPlayers.innerHTML = sorted.map(p => `
-        <div class="top-player-entry">
-          <span class="name">${p.username}</span>
-          <span class="score">${p.rounds} rounds · ${p.totalEstimatedWinnings.toFixed(1)} ETB</span>
-        </div>
-      `).join('');
-    }
-
-    function updatePlayerWinChart() {
-      const sorted = Object.values(playerRoundStats)
-        .sort((a, b) => b.totalEstimatedWinnings - a.totalEstimatedWinnings)
-        .slice(0, 10);
-      playerWinChart.data.labels = sorted.map(p => p.username);
-      playerWinChart.data.datasets[0].data = sorted.map(p => p.totalEstimatedWinnings);
-      playerWinChart.update();
-    }
-
     function updateRoomChart() {
       const playerCounts = [10, 20, 30].map(stake => gameState[stake].players.length);
       const prizePools = [10, 20, 30].map(stake => gameState[stake].prizePool || 0);
@@ -622,7 +688,6 @@
 
     // ---- Main update from server ----
     function updateFromServer(state) {
-      // Detect ended rounds
       for (const stake of [10, 20, 30]) {
         if (state[stake]) {
           const newStatus = state[stake].status;
@@ -637,7 +702,9 @@
             const now = new Date();
             const timeStr = formatTime(now);
 
+            // Store round with date object
             roundHistory.push({
+              date: new Date(now),
               time: timeStr,
               stake: stake,
               playerCount: playerCount,
@@ -647,40 +714,18 @@
               players: players.slice()
             });
 
-            if (prizePool > 0 && playerCount > 0) {
-              const perPlayer = prizePool / playerCount;
-              for (const p of players) {
-                const id = p.telegramId || p.username;
-                if (!id) continue;
-                if (!playerRoundStats[id]) {
-                  playerRoundStats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
-                }
-                playerRoundStats[id].rounds += 1;
-                playerRoundStats[id].totalEstimatedWinnings += perPlayer;
-                playerRoundStats[id].username = p.username || id;
-              }
-            } else {
-              for (const p of players) {
-                const id = p.telegramId || p.username;
-                if (!id) continue;
-                if (!playerRoundStats[id]) {
-                  playerRoundStats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
-                }
-                playerRoundStats[id].rounds += 1;
-                playerRoundStats[id].username = p.username || id;
-              }
-            }
-
             addLog('round', `🏁 Round ${stake}ETB ended: ${playerCount} players, prize ${prizePool} ETB, profit ${profit} ETB`);
+
+            // Re-render all filtered sections
             renderRoundHistory();
             renderTopPlayersByRounds();
             updatePlayerWinChart();
+            updateFilterInfo();
           }
           prevStatus[stake] = newStatus;
         }
       }
 
-      // Merge state
       for (const stake of [10, 20, 30]) {
         if (state[stake]) {
           gameState[stake] = { ...gameState[stake], ...state[stake] };
@@ -690,6 +735,26 @@
       updateKPIs();
       updateUserSummary();
       updateRoomChart();
+    }
+
+    // ---- Filter apply/clear ----
+    function applyFilter() {
+      const fromVal = filterFromInput.value;
+      const toVal = filterToInput.value;
+      filterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+      filterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+      renderRoundHistory();
+      renderTopPlayersByRounds();
+      updatePlayerWinChart();
+      updateFilterInfo();
+    }
+
+    function clearFilter() {
+      filterFromInput.value = '';
+      filterToInput.value = '';
+      filterFrom = null;
+      filterTo = null;
+      applyFilter();
     }
 
     // ---- WebSocket ----
@@ -726,15 +791,25 @@
       renderLog();
     });
 
+    // ---- Filter event listeners ----
+    applyFilterBtn.addEventListener('click', applyFilter);
+    clearFilterBtn.addEventListener('click', clearFilter);
+
     // ---- Init ----
     document.addEventListener('DOMContentLoaded', () => {
       initCharts();
       connect();
+      // Set default filter to today
+      const today = new Date().toISOString().split('T')[0];
+      filterFromInput.value = today;
+      filterToInput.value = today;
+      applyFilter(); // apply today's filter by default
+
+      // Initial render
       updateKPIs();
       updateUserSummary();
-      renderRoundHistory();
-      renderTopPlayersByRounds();
-      updatePlayerWinChart();
+      updateRoomChart();
+      updateFilterInfo();
     });
   </script>
 </body>
