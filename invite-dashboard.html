@@ -1,309 +1,473 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bingo Invite Dashboard</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <style>
-    /* (Same styles as before, plus minor additions) */
-    * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
-    body {
-      background: linear-gradient(145deg, #0b0e14 0%, #1a1f2b 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1300px;
-      margin: 0 auto;
-      background: rgba(255,255,255,0.04);
-      backdrop-filter: blur(12px);
-      border-radius: 40px;
-      padding: 35px 30px;
-      box-shadow: 0 25px 50px -10px rgba(0,0,0,0.8);
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 30px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 20px;
-    }
-    .header-left h1 {
-      font-size: 28px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #f0b94b, #fcd34d);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .header-left p { color: #8892a8; font-size: 14px; }
-    .total-box {
-      background: rgba(255,215,0,0.08);
-      padding: 10px 24px;
-      border-radius: 60px;
-      border: 1px solid rgba(255,215,0,0.15);
-      text-align: center;
-    }
-    .total-box span { color: #aab4c9; font-size: 14px; display: block; }
-    .total-box .total-count {
-      color: #fcd34d;
-      font-size: 32px;
-      font-weight: 800;
-      line-height: 1.2;
-    }
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 25px;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .status-bar .mode-badge {
-      background: #2a3242;
-      padding: 6px 18px;
-      border-radius: 40px;
-      font-size: 13px;
-      color: #cbd5e1;
-    }
-    .refresh-btn {
-      background: transparent;
-      border: 1px solid #3a4458;
-      color: #b0bcca;
-      padding: 8px 22px;
-      border-radius: 40px;
-      cursor: pointer;
-      transition: 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .refresh-btn:hover { background: #2a3242; border-color: #fcd34d; color: #fff; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: rgba(255,255,255,0.03);
-      border-radius: 20px;
-      padding: 18px 20px 20px;
-      border: 1px solid rgba(255,255,255,0.05);
-      transition: 0.25s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .card:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,215,0,0.2); transform: translateY(-3px); }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 8px;
-    }
-    .code-badge {
-      background: #2f3b4f;
-      padding: 4px 14px;
-      border-radius: 30px;
-      font-size: 14px;
-      font-weight: 700;
-      color: #fcd34d;
-      text-transform: uppercase;
-    }
-    .stats-mini {
-      display: flex;
-      gap: 16px;
-      font-size: 13px;
-      color: #aab4c9;
-    }
-    .stats-mini span i { color: #fcd34d; margin-right: 4px; }
-    .stats-mini .num { color: #e2e8f0; font-weight: 600; }
-    .player-list {
-      max-height: 200px;
-      overflow-y: auto;
-      margin-top: 6px;
-      background: #0f141e;
-      border-radius: 12px;
-      padding: 6px 10px;
-    }
-    .player-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 4px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      font-size: 13px;
-      color: #cbd5e1;
-    }
-    .player-item:last-child { border-bottom: none; }
-    .player-item .bonus { color: #4ade80; font-weight: 600; }
-    .link-box {
-      display: flex;
-      background: #131a24;
-      border-radius: 12px;
-      padding: 4px;
-      border: 1px solid #293241;
-      margin-top: 6px;
-    }
-    .link-box input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      padding: 8px 12px;
-      color: #b9c7dd;
-      font-size: 12px;
-      outline: none;
-      font-family: 'Courier New', monospace;
-    }
-    .copy-btn {
-      background: #2a3548;
-      border: none;
-      color: #d1dbe8;
-      padding: 6px 14px;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: 0.2s;
-    }
-    .copy-btn:hover { background: #fcd34d; color: #0b0e14; }
-    .copy-btn.copied { background: #10b981; color: #fff; }
-    .no-players { color: #64748b; font-style: italic; font-size: 13px; padding: 4px 0; }
-    .total-bonus-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px solid rgba(255,255,255,0.06);
-      font-size: 14px;
-      font-weight: 600;
-      color: #fcd34d;
-    }
-    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
+    <title>Completed Deposits · Audit Logs</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js">
+    </script>
+    <style>
+        /* ---------- RESET & BASE ---------- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            background: #f5f7fc;
+            padding: 16px;
+            color: #1e293b;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-weight: 600;
+            font-size: 1.6rem;
+            margin-bottom: 16px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        h1 small {
+            font-weight: 400;
+            font-size: 0.95rem;
+            color: #64748b;
+        }
+
+        /* Filter bar */
+        .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 16px;
+            border: 1px solid #e9edf4;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+        }
+        .filter-bar label {
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: #475569;
+            margin-right: 2px;
+        }
+        .filter-bar input[type="date"] {
+            padding: 8px 10px;
+            border: 1px solid #d1d9e6;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            background: #fafcff;
+            min-height: 44px;
+            flex: 1 1 130px;
+            min-width: 120px;
+        }
+        .filter-bar button {
+            padding: 8px 16px;
+            min-height: 44px;
+            min-width: 72px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            transition: 0.15s;
+            flex: 1 1 auto;
+        }
+        .filter-bar button:hover {
+            background: #1d4ed8;
+        }
+        .filter-bar button.secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .filter-bar button.secondary:hover {
+            background: #cbd5e1;
+        }
+        .filter-bar .date-range-label {
+            margin-left: 4px;
+            color: #64748b;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        /* Stats */
+        .stats-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 16px 20px;
+            border-radius: 16px;
+            border: 1px solid #e9edf4;
+            align-items: center;
+        }
+        .stats-row .stat-item {
+            font-size: 0.95rem;
+        }
+        .stats-row .stat-item strong {
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .stats-row .stat-item .amount {
+            color: #059669;
+            font-weight: 700;
+        }
+        .stats-row .stat-item .count {
+            color: #2563eb;
+            font-weight: 700;
+        }
+
+        /* Table */
+        .table-wrapper {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e9edf4;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 0 0 4px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 600px;
+        }
+        th {
+            text-align: left;
+            padding: 12px 10px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 10px;
+            border-bottom: 1px solid #eef2f6;
+            color: #1e293b;
+        }
+        tr:hover td {
+            background: #fafcff;
+        }
+        .empty-row td {
+            text-align: center;
+            color: #94a3b8;
+            padding: 40px 10px;
+        }
+        .badge-method {
+            display: inline-block;
+            background: #eef2f6;
+            color: #334155;
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            text-transform: capitalize;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #94a3b8;
+            font-size: 0.75rem;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.2rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            h1 small {
+                font-size: 0.85rem;
+            }
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                padding: 10px 12px;
+            }
+            .filter-bar input[type="date"] {
+                flex: 1 1 auto;
+                min-width: 100%;
+                font-size: 0.8rem;
+                padding: 6px 8px;
+                min-height: 40px;
+            }
+            .filter-bar button {
+                font-size: 0.8rem;
+                padding: 6px 12px;
+                min-height: 40px;
+                min-width: 60px;
+            }
+            .filter-bar .date-range-label {
+                text-align: center;
+                width: 100%;
+            }
+            .stats-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 6px;
+                padding: 12px 14px;
+            }
+            .stats-row .stat-item {
+                font-size: 0.85rem;
+            }
+            table {
+                font-size: 0.75rem;
+                min-width: 480px;
+            }
+            th,
+            td {
+                padding: 8px 6px;
+            }
+            .badge-method {
+                font-size: 0.6rem;
+                padding: 0 6px;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="header-left">
-        <h1><i class="fas fa-gift" style="margin-right:12px; color:#fcd34d;"></i>Referral Dashboard</h1>
-        <p>@bingomkmk0120_bot · Each invite earns 10% of first deposit</p>
-      </div>
-      <div class="total-box">
-        <span>TOTAL BONUS EARNED</span>
-        <div class="total-count" id="totalBonus">0</div>
-      </div>
+    <div class="container">
+        <h1>
+            💳 Completed Deposits
+            <small>from audit logs</small>
+        </h1>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <label for="startDate">From</label>
+            <input type="date" id="startDate" />
+            <label for="endDate">To</label>
+            <input type="date" id="endDate" />
+            <button id="applyFilterBtn">Apply</button>
+            <button id="resetFilterBtn" class="secondary">Reset</button>
+            <span class="date-range-label" id="dateRangeLabel">All time</span>
+        </div>
+
+        <div id="errorContainer" class="error"></div>
+        <div id="loadingMessage" class="loading">⏳ Loading completed deposits…</div>
+
+        <!-- Stats -->
+        <div class="stats-row" id="statsRow" style="display:none;">
+            <div class="stat-item">Total deposits: <span class="count" id="totalCount">0</span></div>
+            <div class="stat-item">Total amount: <span class="amount" id="totalAmount">0.0</span> ETB</div>
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Username</th>
+                        <th>Amount (ETB)</th>
+                        <th>Time</th>
+                        <th>Method</th>
+                        <th>Phone</th>
+                    </tr>
+                </thead>
+                <tbody id="depositTableBody">
+                    <tr class="empty-row"><td colspan="6">No completed deposits found.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <footer>Data from Supabase audit_logs · DEPOSIT_COMPLETED events</footer>
     </div>
-    <div class="status-bar">
-      <div class="mode-badge"><i class="fas fa-circle" style="color:#10b981;"></i> Live</div>
-      <button class="refresh-btn" onclick="loadData()"><i class="fas fa-sync-alt"></i> Refresh</button>
-    </div>
-    <div class="grid" id="cardsContainer"></div>
-  </div>
 
-  <script>
-    const CODES = ['db', 'mk', 'hd', 'ji', 'ok', 'ghy', 'bghu', 'kil', 'hg', 'jkl', 'jkil'];
-    const BOT_USERNAME = 'bingomkmk0120_bot';
+    <script>
+        // ================================================================
+        //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
+        // ================================================================
+        const SUPABASE_URL = 'https://your-project.supabase.co';
+        const SUPABASE_ANON_KEY = 'your-anon-public-key';
+        // ================================================================
 
-    // We'll fetch both stats and details
-    const STATS_URL = '/api/invite-stats';
-    const DETAILS_URL = '/api/invite-details';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let allData = {};
+        // DOM refs
+        const tableBody = document.getElementById('depositTableBody');
+        const loadingEl = document.getElementById('loadingMessage');
+        const errorEl = document.getElementById('errorContainer');
+        const statsRow = document.getElementById('statsRow');
+        const totalCountEl = document.getElementById('totalCount');
+        const totalAmountEl = document.getElementById('totalAmount');
 
-    async function loadData() {
-      const btn = document.querySelector('.refresh-btn i');
-      btn.className = 'fas fa-spinner fa-pulse';
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const applyBtn = document.getElementById('applyFilterBtn');
+        const resetBtn = document.getElementById('resetFilterBtn');
+        const dateRangeLabel = document.getElementById('dateRangeLabel');
 
-      try {
-        // Fetch stats (total join counts)
-        const statsRes = await fetch(STATS_URL);
-        if (!statsRes.ok) throw new Error('Stats fetch failed');
-        const stats = await statsRes.json();
+        // State
+        let filterStart = null;
+        let filterEnd = null;
 
-        // Fetch details (players & bonuses)
-        const detailsRes = await fetch(DETAILS_URL);
-        if (!detailsRes.ok) throw new Error('Details fetch failed');
-        const details = await detailsRes.json();
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.style.display = 'block';
+            loadingEl.style.display = 'none';
+        }
 
-        allData = { stats, details: details.data };
-        renderCards();
-      } catch (err) {
-        console.error(err);
-        alert('Error loading data: ' + err.message);
-      } finally {
-        btn.className = 'fas fa-sync-alt';
-      }
-    }
+        function fmt(num) {
+            return Number(num).toFixed(1);
+        }
 
-    function renderCards() {
-      const container = document.getElementById('cardsContainer');
-      container.innerHTML = '';
+        function formatDate(iso) {
+            if (!iso) return '-';
+            const d = new Date(iso);
+            return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
 
-      let grandTotalBonus = 0;
+        async function loadDeposits(startDate, endDate) {
+            try {
+                loadingEl.style.display = 'block';
+                errorEl.style.display = 'none';
+                statsRow.style.display = 'none';
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
-      CODES.forEach(code => {
-        const count = allData.stats[code] || 0;
-        const detail = allData.details[code] || { players: [], totalBonus: 0, totalDeposits: 0 };
-        const totalBonus = detail.totalBonus || 0;
-        grandTotalBonus += totalBonus;
+                // Build query for DEPOSIT_COMPLETED events
+                let query = supabase
+                    .from('audit_logs')
+                    .select('user_id, details, timestamp')
+                    .eq('event_type', 'DEPOSIT_COMPLETED')
+                    .order('timestamp', { ascending: false });
 
-        const link = `https://t.me/${BOT_USERNAME}?start=${code}`;
-        const players = detail.players || [];
+                if (startDate) {
+                    const start = new Date(startDate);
+                    start.setHours(0, 0, 0, 0);
+                    query = query.gte('timestamp', start.toISOString());
+                }
+                if (endDate) {
+                    const end = new Date(endDate);
+                    end.setHours(23, 59, 59, 999);
+                    query = query.lte('timestamp', end.toISOString());
+                }
 
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div class="card-header">
-            <span class="code-badge"><i class="fas fa-hashtag"></i> ${code}</span>
-            <div class="stats-mini">
-              <span><i class="fas fa-users"></i> <span class="num">${count}</span> joined</span>
-              <span><i class="fas fa-coins"></i> <span class="num">${totalBonus.toFixed(2)}</span> bonus</span>
-            </div>
-          </div>
-          <div class="player-list">
-            ${players.length === 0 ? '<div class="no-players">No referred players with deposits yet.</div>' :
-              players.map(p => `
-                <div class="player-item">
-                  <span>${p.username || 'Anonymous'}</span>
-                  <span>Deposit: ${p.deposit.toFixed(2)} → <span class="bonus">+${p.bonus.toFixed(2)}</span></span>
-                </div>
-              `).join('')
+                const { data: logs, error } = await query;
+                if (error) throw new Error('Failed to fetch deposits: ' + error.message);
+
+                // Extract details
+                const deposits = logs.map(log => {
+                    const details = log.details || {};
+                    return {
+                        userId: log.user_id || 'N/A',
+                        username: details.username || details.user || 'N/A', // some logs may have username in details
+                        amount: Number(details.amount) || 0,
+                        timestamp: log.timestamp,
+                        method: details.method || details.payment_type || 'N/A',
+                        phone: details.phone || details.receiver || '-',
+                    };
+                });
+
+                // Render
+                if (deposits.length === 0) {
+                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">No completed deposits found for this period.</td></tr>';
+                    loadingEl.style.display = 'none';
+                    return;
+                }
+
+                // Stats
+                const totalCount = deposits.length;
+                const totalAmount = deposits.reduce((sum, d) => sum + d.amount, 0);
+                totalCountEl.textContent = totalCount;
+                totalAmountEl.textContent = fmt(totalAmount);
+                statsRow.style.display = 'flex';
+
+                // Table rows
+                let rows = '';
+                deposits.forEach(d => {
+                    rows += `<tr>
+                        <td>${d.userId}</td>
+                        <td>${d.username}</td>
+                        <td><strong>${fmt(d.amount)}</strong></td>
+                        <td>${formatDate(d.timestamp)}</td>
+                        <td><span class="badge-method">${d.method}</span></td>
+                        <td>${d.phone}</td>
+                    </tr>`;
+                });
+                tableBody.innerHTML = rows;
+                loadingEl.style.display = 'none';
+
+            } catch (err) {
+                console.error(err);
+                showError('Error loading deposits: ' + err.message);
+                tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">Error loading data</td></tr>';
             }
-          </div>
-          <div class="total-bonus-row">
-            Total Bonus: ${totalBonus.toFixed(2)} ETB
-          </div>
-          <div class="link-box">
-            <input type="text" value="${link}" readonly id="input-${code}" />
-            <button class="copy-btn" onclick="copyLink('${code}')"><i class="fas fa-copy"></i> Copy</button>
-          </div>
-        `;
-        container.appendChild(card);
-      });
+        }
 
-      document.getElementById('totalBonus').textContent = grandTotalBonus.toFixed(2);
-    }
+        // Filter logic
+        function applyFilter() {
+            const startVal = startDateInput.value;
+            const endVal = endDateInput.value;
+            if (startVal && endVal && new Date(startVal) > new Date(endVal)) {
+                showError('Start date must be before end date.');
+                return;
+            }
+            filterStart = startVal || null;
+            filterEnd = endVal || null;
 
-    function copyLink(code) {
-      const input = document.getElementById(`input-${code}`);
-      if (!input) return;
-      input.select();
-      navigator.clipboard.writeText(input.value).then(() => {
-        const btn = input.nextElementSibling;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
-      }).catch(() => {
-        document.execCommand('copy');
-      });
-    }
+            let labelText = '';
+            if (filterStart && filterEnd) {
+                labelText = `📅 ${filterStart} → ${filterEnd}`;
+            } else if (filterStart) {
+                labelText = `📅 From ${filterStart}`;
+            } else if (filterEnd) {
+                labelText = `📅 Until ${filterEnd}`;
+            } else {
+                labelText = '🌍 All time';
+            }
+            dateRangeLabel.textContent = labelText;
 
-    document.addEventListener('DOMContentLoaded', loadData);
-    setInterval(loadData, 30000);
-  </script>
+            loadDeposits(filterStart, filterEnd);
+        }
+
+        function resetFilter() {
+            startDateInput.value = '';
+            endDateInput.value = '';
+            filterStart = null;
+            filterEnd = null;
+            dateRangeLabel.textContent = '🌍 All time';
+            loadDeposits(null, null);
+        }
+
+        // Init
+        loadDeposits(null, null);
+
+        applyBtn.addEventListener('click', applyFilter);
+        resetBtn.addEventListener('click', resetFilter);
+        startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
+        endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
+    </script>
 </body>
 </html>
