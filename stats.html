@@ -113,6 +113,13 @@
             font-size: 0.75rem;
             color: #94a3b8;
         }
+        .stat-card.deposit-card {
+            border-color: #a7f3d0;
+            background: #f0fdf4;
+        }
+        .stat-card.deposit-card .value {
+            color: #059669;
+        }
         .table-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -372,19 +379,21 @@
     <!-- Filter Bar -->
     <div class="filter-bar">
         <label for="startDate">From</label>
-        <input type="date" id="startDate" />
+        <input type="date" id="startDate" value="2026-06-23" />
         <label for="endDate">To</label>
         <input type="date" id="endDate" />
         <button id="applyFilterBtn">Apply</button>
         <button id="resetFilterBtn" class="secondary">Reset</button>
-        <span class="date-range-label" id="dateRangeLabel">All time</span>
+        <span class="date-range-label" id="dateRangeLabel">From 2026-06-23</span>
     </div>
 
     <div id="errorContainer" class="error"></div>
     <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
 
+    <!-- Stats Grid -->
     <div id="statsGrid" class="stats-grid"></div>
 
+    <!-- Top Performer Tables -->
     <div class="table-grid">
         <div class="table-box">
             <h3>🏅 Top Users by Total Payout</h3>
@@ -450,7 +459,7 @@
     // ================================================================
     //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
     // ================================================================
-   const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+  const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
     // ================================================================
 
@@ -478,10 +487,8 @@
     const modalDepositBody = document.getElementById('modalDepositBody');
     const modalTotalDisplay = document.getElementById('modalTotalDisplay');
 
-    let filterStart = null;
-    let filterEnd = null;
-
-    // Store raw deposits per user for modal
+    let filterStart = startDateInput.value || null;
+    let filterEnd = endDateInput.value || null;
     let userDepositsMap = {};
 
     function showError(msg) {
@@ -491,7 +498,6 @@
     }
 
     function fmt(num) { return Number(num).toFixed(1); }
-    function fmtInt(num) { return Number(num).toFixed(0); }
 
     function formatDate(iso) {
         if (!iso) return '-';
@@ -528,7 +534,6 @@
         modalUserSub.textContent = `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
         let rows = '';
         let total = 0;
-        // Sort by time descending (newest first)
         const sorted = [...deposits].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
         sorted.forEach(d => {
             total += d.amount;
@@ -547,15 +552,9 @@
     function closeModal() {
         modal.classList.remove('active');
     }
-
-    // Click outside to close
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
-    });
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
     modalCloseBtn.addEventListener('click', closeModal);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
-    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
     // Main load function
     async function loadDashboard(startDate, endDate) {
@@ -575,15 +574,27 @@
             });
             const avgPayout = totalRounds > 0 ? totalPayout / totalRounds : 0;
 
+            // 2. Fetch total deposits (approved)
+            let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
+            depositQuery = buildDateFilter(depositQuery, startDate, endDate);
+            const { data: depositsTotal, error: depTotalErr } = await depositQuery;
+            if (depTotalErr) throw new Error('Failed to fetch deposits: ' + depTotalErr.message);
+            let totalDeposits = 0;
+            if (depositsTotal) {
+                totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
+            }
+
+            // 3. Render Stats Cards (with Total Deposits)
             statsGrid.innerHTML = `
                 <div class="stat-card"><div class="label">Total Rounds</div><div class="value">${totalRounds}</div></div>
                 <div class="stat-card"><div class="label">Total Payout</div><div class="value">${fmt(totalPayout)} ETB</div></div>
                 <div class="stat-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
                 <div class="stat-card"><div class="label">Total Stakes (implied)</div><div class="value">${fmt(totalStakes)} ETB</div></div>
                 <div class="stat-card"><div class="label">Avg Payout / Round</div><div class="value">${fmt(avgPayout)} ETB</div></div>
+                <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
             `;
 
-            // 2. User-level data from audit_logs (wins & stakes)
+            // 4. User-level data from audit_logs (wins & stakes)
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
             winQuery = buildDateFilter(winQuery, startDate, endDate, 'timestamp');
             const { data: winLogs, error: winErr } = await winQuery;
@@ -594,25 +605,27 @@
             const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
-            // 3. Deposit data (approved deposits) with full details
-            let depositQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
-            depositQuery = buildDateFilter(depositQuery, startDate, endDate);
-            const { data: deposits, error: depErr } = await depositQuery;
-            if (depErr) throw new Error('Failed to fetch deposits: ' + depErr.message);
+            // 5. Deposit data (approved deposits) with full details for modal
+            let depositDetailQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
+            depositDetailQuery = buildDateFilter(depositDetailQuery, startDate, endDate);
+            const { data: depositDetails, error: depDetailErr } = await depositDetailQuery;
+            if (depDetailErr) throw new Error('Failed to fetch deposit details: ' + depDetailErr.message);
 
             // Reset deposit map
             userDepositsMap = {};
-            deposits.forEach(d => {
-                const uid = d.telegram_id;
-                if (!uid) return;
-                if (!userDepositsMap[uid]) userDepositsMap[uid] = [];
-                userDepositsMap[uid].push({
-                    amount: Number(d.amount) || 0,
-                    created_at: d.created_at,
-                    payment_type: d.payment_type,
-                    phone: d.phone
+            if (depositDetails) {
+                depositDetails.forEach(d => {
+                    const uid = d.telegram_id;
+                    if (!uid) return;
+                    if (!userDepositsMap[uid]) userDepositsMap[uid] = [];
+                    userDepositsMap[uid].push({
+                        amount: Number(d.amount) || 0,
+                        created_at: d.created_at,
+                        payment_type: d.payment_type,
+                        phone: d.phone
+                    });
                 });
-            });
+            }
 
             // Aggregate per user
             const userMap = {};
@@ -629,7 +642,6 @@
                 if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
                 userMap[uid].totalStakes += Number(log.details?.amount) || 0;
             });
-            // Add deposit aggregates from userDepositsMap
             Object.keys(userDepositsMap).forEach(uid => {
                 if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
                 const depList = userDepositsMap[uid];
@@ -783,7 +795,12 @@
     }
 
     // Init
-    resetFilter();
+    if (startDateInput.value) {
+        filterStart = startDateInput.value;
+        dateRangeLabel.textContent = `📅 From ${filterStart}`;
+    }
+    loadDashboard(filterStart, filterEnd);
+
     applyBtn.addEventListener('click', applyFilter);
     resetBtn.addEventListener('click', resetFilter);
     startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
