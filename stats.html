@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard · Payout Focus</title>
+    <title>Bingo Win Dashboard · Win Count Focus</title>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Supabase JS -->
@@ -240,8 +240,8 @@
             <div class="chart-container"><canvas id="payoutChart"></canvas></div>
         </div>
         <div class="chart-box">
-            <h3>📊 Payout Distribution (frequency)</h3>
-            <div class="chart-container"><canvas id="distributionChart"></canvas></div>
+            <h3>🏆 Top Users by Win Count</h3>
+            <div class="chart-container"><canvas id="winsChart"></canvas></div>
         </div>
     </div>
 
@@ -291,7 +291,7 @@
     const dateRangeLabel = document.getElementById('dateRangeLabel');
 
     let payoutChartInstance = null;
-    let distributionChartInstance = null;
+    let winsChartInstance = null;
     let timelineChartInstance = null;
 
     let filterStart = null;
@@ -369,18 +369,7 @@
                 <div class="stat-card"><div class="label">Avg Payout / Round</div><div class="value">${fmt(avgPayout)} ETB</div></div>
             `;
 
-            // 2. Payout Distribution
-            const binSize = 16;
-            const bins = {};
-            payouts.forEach(p => {
-                const bin = Math.floor(p / binSize) * binSize;
-                bins[bin] = (bins[bin] || 0) + 1;
-            });
-            const sortedBins = Object.keys(bins).sort((a,b) => Number(a)-Number(b));
-            const distLabels = sortedBins.map(b => `${b}-${Number(b)+binSize-1} ETB`);
-            const distData = sortedBins.map(b => bins[b]);
-
-            // 3. User-level data
+            // 2. User-level data
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
             winQuery = buildAuditDateFilter(winQuery, startDate, endDate);
             const { data: winLogs, error: winErr } = await winQuery;
@@ -433,19 +422,24 @@
                 };
             });
 
-            // Sort by total payout descending for the top users chart
+            // --- Top Users by Total Payout (chart 1) ---
             const sortedByPayout = [...userSummaries].sort((a,b) => b.totalPayout - a.totalPayout);
             const topPayout = sortedByPayout.slice(0, 10);
             const payoutLabels = topPayout.map(u => u.username);
             const payoutData = topPayout.map(u => u.totalPayout);
-
             renderPayoutChart(payoutLabels, payoutData);
 
-            // Distribution and timeline charts (unchanged)
-            renderDistributionChart(distLabels, distData);
+            // --- Top Users by Win Count (chart 2) ---
+            const sortedByWins = [...userSummaries].sort((a,b) => b.wins - a.wins);
+            const topWins = sortedByWins.slice(0, 10);
+            const winsLabels = topWins.map(u => u.username);
+            const winsData = topWins.map(u => u.wins);
+            renderWinsChart(winsLabels, winsData);
+
+            // --- Timeline Chart ---
             renderTimelineChart(timelineData);
 
-            // Table: sort by commission (as in original design)
+            // --- Table: sorted by commission (as in original design) ---
             const sortedForTable = [...userSummaries].sort((a,b) => b.commission - a.commission);
             let tableRows = '';
             sortedForTable.forEach(u => {
@@ -498,18 +492,18 @@
         });
     }
 
-    function renderDistributionChart(labels, data) {
-        const ctx = document.getElementById('distributionChart').getContext('2d');
-        if (distributionChartInstance) distributionChartInstance.destroy();
-        distributionChartInstance = new Chart(ctx, {
+    function renderWinsChart(labels, data) {
+        const ctx = document.getElementById('winsChart').getContext('2d');
+        if (winsChartInstance) winsChartInstance.destroy();
+        winsChartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Frequency',
+                    label: 'Win Count',
                     data: data,
-                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                    borderColor: 'rgba(59, 130, 246, 1)',
+                    backgroundColor: 'rgba(255, 159, 64, 0.7)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
                     borderWidth: 1
                 }]
             },
@@ -519,7 +513,7 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                    x: { ticks: { maxRotation: 40, font: { size: 9 } } }
+                    x: { ticks: { maxRotation: 30, font: { size: 10 } } }
                 }
             }
         });
@@ -604,7 +598,7 @@
         startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
         endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
     };
-    // Fallback
+    // Fallback if time adapter fails
     setTimeout(() => {
         if (typeof window['chartjs-adapter-date-fns'] === 'undefined') {
             console.warn('Time adapter not loaded; using category fallback.');
