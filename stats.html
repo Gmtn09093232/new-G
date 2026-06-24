@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎲 Bingo · Analytics with Date Filter</title>
+  <title>🎲 Bingo · Analytics with API History</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
   </script>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js">
@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
   <style>
-    /* (all existing styles unchanged – we just add a small filter bar) */
+    /* (all styles unchanged – copy from your previous version) */
     * {
       margin: 0;
       padding: 0;
@@ -87,11 +87,14 @@
       animation: pulse 1.8s infinite;
     }
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.4;
+      }
     }
-
-    /* ---- Filter bar (new) ---- */
     .filter-bar {
       display: flex;
       flex-wrap: wrap;
@@ -128,8 +131,6 @@
       padding: 4px 14px;
       font-size: 0.7rem;
     }
-
-    /* (rest of existing styles unchanged) */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -162,12 +163,21 @@
       font-weight: 400;
       margin-left: 3px;
     }
-    .kpi-card.accent .kpi-value { color: #f7c35c; }
-    .kpi-card.green .kpi-value { color: #5fcb8a; }
-    .kpi-card.pink .kpi-value { color: #f28b9c; }
-    .kpi-card.blue .kpi-value { color: #6ab0f7; }
-    .kpi-card.purple .kpi-value { color: #b794f4; }
-
+    .kpi-card.accent .kpi-value {
+      color: #f7c35c;
+    }
+    .kpi-card.green .kpi-value {
+      color: #5fcb8a;
+    }
+    .kpi-card.pink .kpi-value {
+      color: #f28b9c;
+    }
+    .kpi-card.blue .kpi-value {
+      color: #6ab0f7;
+    }
+    .kpi-card.purple .kpi-value {
+      color: #b794f4;
+    }
     .chart-box {
       background: #141b24;
       border-radius: 16px;
@@ -243,12 +253,26 @@
       align-self: center;
       text-transform: uppercase;
     }
-    .log-entry .badge-event.win { background: #3d2c1e; color: #f7c35c; }
-    .log-entry .badge-event.buy { background: #1c3340; color: #6ab0f7; }
-    .log-entry .badge-event.round { background: #2a2a3a; color: #b794f4; }
-    .log-entry .badge-event.bingo { background: #f7c35c; color: #0b0e14; }
-    .log-entry .msg { color: #e2e8f0; flex: 1; }
-
+    .log-entry .badge-event.win {
+      background: #3d2c1e;
+      color: #f7c35c;
+    }
+    .log-entry .badge-event.buy {
+      background: #1c3340;
+      color: #6ab0f7;
+    }
+    .log-entry .badge-event.round {
+      background: #2a2a3a;
+      color: #b794f4;
+    }
+    .log-entry .badge-event.bingo {
+      background: #f7c35c;
+      color: #0b0e14;
+    }
+    .log-entry .msg {
+      color: #e2e8f0;
+      flex: 1;
+    }
     .user-summary-box {
       background: #141b24;
       border-radius: 16px;
@@ -276,12 +300,22 @@
       font-size: 0.72rem;
       color: #dce2ec;
     }
-    .user-row .uid { color: #9aa9c0; }
-    .user-row .profit { font-weight: 500; }
-    .user-row .profit.pos { color: #5fcb8a; }
-    .user-row .profit.neg { color: #f28b9c; }
-    .text-muted { color: #6b7a93; font-size: 0.7rem; }
-
+    .user-row .uid {
+      color: #9aa9c0;
+    }
+    .user-row .profit {
+      font-weight: 500;
+    }
+    .user-row .profit.pos {
+      color: #5fcb8a;
+    }
+    .user-row .profit.neg {
+      color: #f28b9c;
+    }
+    .text-muted {
+      color: #6b7a93;
+      font-size: 0.7rem;
+    }
     .extra-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -317,11 +351,22 @@
       font-size: 0.65rem;
       color: #cbd5e1;
     }
-    .round-entry .r-time { color: #6b7a93; }
-    .round-entry .r-stake { color: #f7c35c; }
-    .round-entry .r-players { color: #6ab0f7; }
-    .round-entry .r-prize { color: #f28b9c; }
-    .round-entry .r-profit { color: #5fcb8a; font-weight: 600; }
+    .round-entry .r-time {
+      color: #6b7a93;
+    }
+    .round-entry .r-stake {
+      color: #f7c35c;
+    }
+    .round-entry .r-players {
+      color: #6ab0f7;
+    }
+    .round-entry .r-prize {
+      color: #f28b9c;
+    }
+    .round-entry .r-profit {
+      color: #5fcb8a;
+      font-weight: 600;
+    }
     .top-player-entry {
       display: flex;
       justify-content: space-between;
@@ -330,26 +375,60 @@
       font-size: 0.72rem;
       color: #dce2ec;
     }
-    .top-player-entry .name { color: #9aa9c0; }
-    .top-player-entry .score { font-weight: 500; color: #f7c35c; }
-    .extra-box .chart-container { height: 170px; }
-
+    .top-player-entry .name {
+      color: #9aa9c0;
+    }
+    .top-player-entry .score {
+      font-weight: 500;
+      color: #f7c35c;
+    }
+    .extra-box .chart-container {
+      height: 170px;
+    }
     @media (max-width: 920px) {
-      .extra-grid { grid-template-columns: 1fr 1fr; }
-      .bottom-grid { grid-template-columns: 1fr; }
-      .filter-bar .filter-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
+      .extra-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+      .filter-bar .filter-actions {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-end;
+      }
     }
     @media (max-width: 640px) {
-      .extra-grid { grid-template-columns: 1fr; }
-      .header h1 { font-size: 1.2rem; }
-      .kpi-value { font-size: 1.1rem; }
-      body { padding: 10px; }
-      .filter-bar { flex-direction: column; align-items: stretch; }
-      .filter-bar .filter-actions { justify-content: stretch; }
+      .extra-grid {
+        grid-template-columns: 1fr;
+      }
+      .header h1 {
+        font-size: 1.2rem;
+      }
+      .kpi-value {
+        font-size: 1.1rem;
+      }
+      body {
+        padding: 10px;
+      }
+      .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .filter-bar .filter-actions {
+        justify-content: stretch;
+      }
     }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #0b0e14; }
-    ::-webkit-scrollbar-thumb { background: #3b485a; border-radius: 10px; }
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0e14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3b485a;
+      border-radius: 10px;
+    }
   </style>
 </head>
 <body>
@@ -366,7 +445,7 @@
       </div>
     </div>
 
-    <!-- ===== DATE FILTER BAR ===== -->
+    <!-- DATE FILTER -->
     <div class="filter-bar">
       <label for="filterFrom">From</label>
       <input type="date" id="filterFrom" />
@@ -376,30 +455,30 @@
         <button class="btn btn-sm primary" id="applyFilterBtn">Apply</button>
         <button class="btn btn-sm" id="clearFilterBtn">Clear</button>
       </div>
-      <span style="font-size:0.7rem; color:#6b7a93; margin-left:auto;" id="filterInfo">Showing all data</span>
+      <span style="font-size:0.7rem; color:#6b7a93; margin-left:auto;" id="filterInfo">Loading…</span>
     </div>
 
     <!-- KPI CARDS -->
     <div class="kpi-grid" id="kpiContainer"></div>
 
-    <!-- SINGLE CHART: Rooms Overview -->
+    <!-- ROOMS OVERVIEW -->
     <div class="chart-box">
       <h3>🏠 Rooms Overview</h3>
       <div class="chart-container"><canvas id="roomChart"></canvas></div>
     </div>
 
-    <!-- EXTRA GRID -->
+    <!-- HISTORICAL DATA GRID -->
     <div class="extra-grid">
       <div class="extra-box">
         <h3>📜 Past Rounds (with House Profit)</h3>
         <div class="round-history-scroll" id="roundHistoryList">
-          <div class="text-muted" style="padding:10px;">No rounds ended yet</div>
+          <div class="text-muted" style="padding:10px;">Loading history…</div>
         </div>
       </div>
       <div class="extra-box">
         <h3>🏆 Top Players by Rounds Played</h3>
         <div style="max-height:190px; overflow-y:auto;" id="topRoundsPlayers">
-          <div class="text-muted" style="padding:10px;">No data yet</div>
+          <div class="text-muted" style="padding:10px;">Loading history…</div>
         </div>
       </div>
       <div class="extra-box">
@@ -408,7 +487,7 @@
       </div>
     </div>
 
-    <!-- BOTTOM: LOG + USER SUMMARY -->
+    <!-- BOTTOM: LOG + SUMMARY -->
     <div class="bottom-grid">
       <div class="log-box">
         <div class="log-header">
@@ -426,10 +505,10 @@
 
   <script>
     // ============================================================
-    // LIVE DASHBOARD with DATE FILTER (client-side)
+    // DASHBOARD – API for history + WebSocket for live updates
     // ============================================================
 
-    const ADMIN_SECRET = '0120705@Gizie'; // change as needed
+    const ADMIN_SECRET = '0120705@Gizie'; // ⚠️ change to your actual secret
 
     // ---- State ----
     let gameState = {
@@ -438,11 +517,10 @@
       30: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 30 }
     };
     let prevStatus = { 10: 'lobby', 20: 'lobby', 30: 'lobby' };
-    let roundHistory = []; // each entry: { date (Date), time, stake, playerCount, revenue, prizePool, profit, players }
-    let playerRoundStats = {}; // playerId -> { username, rounds, totalEstimatedWinnings }
+    let roundHistory = []; // full history from API + new live rounds
     let logEntries = [];
-    let filterFrom = null; // Date
-    let filterTo = null;   // Date
+    let filterFrom = null;
+    let filterTo = null;
 
     // ---- DOM refs ----
     const kpiContainer = document.getElementById('kpiContainer');
@@ -501,6 +579,7 @@
       });
     }
 
+    // ---- Helpers ----
     function formatTime(d) {
       return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
@@ -540,7 +619,6 @@
     }
 
     function getFilteredPlayerStats() {
-      // Rebuild player stats from filtered rounds
       const stats = {};
       const filtered = getFilteredRounds();
       for (const round of filtered) {
@@ -550,32 +628,33 @@
         if (prizePool > 0 && playerCount > 0) {
           const perPlayer = prizePool / playerCount;
           for (const p of players) {
-            const id = p.telegramId || p.username;
+            const id = p.telegram_id || p.telegramId; // handle both
+            const name = p.username || 'Player';
             if (!id) continue;
             if (!stats[id]) {
-              stats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+              stats[id] = { username: name, rounds: 0, totalEstimatedWinnings: 0 };
             }
             stats[id].rounds += 1;
             stats[id].totalEstimatedWinnings += perPlayer;
-            stats[id].username = p.username || id;
+            stats[id].username = name;
           }
         } else {
-          // still count rounds even if no prize
           for (const p of players) {
-            const id = p.telegramId || p.username;
+            const id = p.telegram_id || p.telegramId;
+            const name = p.username || 'Player';
             if (!id) continue;
             if (!stats[id]) {
-              stats[id] = { username: p.username || id, rounds: 0, totalEstimatedWinnings: 0 };
+              stats[id] = { username: name, rounds: 0, totalEstimatedWinnings: 0 };
             }
             stats[id].rounds += 1;
-            stats[id].username = p.username || id;
+            stats[id].username = name;
           }
         }
       }
       return stats;
     }
 
-    // ---- Render functions (with filtering) ----
+    // ---- Render functions (filtered) ----
     function renderRoundHistory() {
       const filtered = getFilteredRounds();
       if (filtered.length === 0) {
@@ -631,9 +710,11 @@
       }
     }
 
-    // ---- KPI and room chart (unfiltered overall) ----
+    // ---- Live KPIs / Room Chart (unfiltered) ----
     function updateKPIs() {
-      let totalPlayers = 0, totalRevenue = 0, totalPrize = 0;
+      let totalPlayers = 0,
+        totalRevenue = 0,
+        totalPrize = 0;
       for (const stake of [10, 20, 30]) {
         const room = gameState[stake];
         const count = room.players.length;
@@ -686,83 +767,42 @@
       roomChart.update();
     }
 
-    // ---- Main update from server ----
-    function updateFromServer(state) {
-      for (const stake of [10, 20, 30]) {
-        if (state[stake]) {
-          const newStatus = state[stake].status;
-          const oldStatus = prevStatus[stake];
-          if (newStatus === 'ended' && oldStatus !== 'ended') {
-            const room = state[stake];
-            const players = room.players || [];
-            const playerCount = players.length;
-            const revenue = playerCount * room.entryFee;
-            const prizePool = room.prizePool || 0;
-            const profit = revenue - prizePool;
-            const now = new Date();
-            const timeStr = formatTime(now);
-
-            // Store round with date object
-            roundHistory.push({
-              date: new Date(now),
-              time: timeStr,
-              stake: stake,
-              playerCount: playerCount,
-              revenue: revenue,
-              prizePool: prizePool,
-              profit: profit,
-              players: players.slice()
-            });
-
-            addLog('round', `🏁 Round ${stake}ETB ended: ${playerCount} players, prize ${prizePool} ETB, profit ${profit} ETB`);
-
-            // Re-render all filtered sections
-            renderRoundHistory();
-            renderTopPlayersByRounds();
-            updatePlayerWinChart();
-            updateFilterInfo();
-          }
-          prevStatus[stake] = newStatus;
-        }
-      }
-
-      for (const stake of [10, 20, 30]) {
-        if (state[stake]) {
-          gameState[stake] = { ...gameState[stake], ...state[stake] };
-        }
-      }
-
-      updateKPIs();
-      updateUserSummary();
-      updateRoomChart();
-    }
-
-    // ---- Filter apply/clear ----
-    function applyFilter() {
+    // ---- API: fetch historical data ----
+    async function fetchHistoricalData() {
       const fromVal = filterFromInput.value;
       const toVal = filterToInput.value;
-      filterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
-      filterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+      let url = `/admin/rounds-history?secret=${ADMIN_SECRET}&limit=500`;
+      if (fromVal) url += `&from=${fromVal}T00:00:00`;
+      if (toVal) url += `&to=${toVal}T23:59:59`;
+
+      try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+        const data = await resp.json();
+        if (data.success) {
+          roundHistory = (data.rounds || []).map(r => ({
+            ...r,
+            date: new Date(r.date)
+          }));
+        } else {
+          throw new Error(data.error || 'Unknown API error');
+        }
+      } catch (err) {
+        console.error('Failed to fetch history:', err);
+        roundHistory = [];
+        addLog('round', `❌ Failed to load history: ${err.message}`);
+      }
+
+      // Rebuild everything
       renderRoundHistory();
       renderTopPlayersByRounds();
       updatePlayerWinChart();
       updateFilterInfo();
     }
 
-    function clearFilter() {
-      filterFromInput.value = '';
-      filterToInput.value = '';
-      filterFrom = null;
-      filterTo = null;
-      applyFilter();
-    }
-
-    // ---- WebSocket ----
-    function connect() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const secret = urlParams.get('secret') || ADMIN_SECRET;
-
-      const socket = io('/admin', { query: { secret } });
+    // ---- WebSocket: live updates ----
+    function connectWebSocket() {
+      const socket = io('/admin', { query: { secret: ADMIN_SECRET } });
 
       socket.on('connect', () => {
         connectionStatus.textContent = '🟢 Connected';
@@ -771,12 +811,66 @@
 
       socket.on('connect_error', (err) => {
         connectionStatus.textContent = '🔴 Connection error';
-        addLog('round', `❌ Connection error: ${err.message}`);
+        addLog('round', `❌ WebSocket error: ${err.message}`);
         console.error('Socket error:', err);
       });
 
       socket.on('admin:gameState', (state) => {
-        updateFromServer(state);
+        // Detect newly ended rounds
+        for (const stake of [10, 20, 30]) {
+          if (state[stake]) {
+            const newStatus = state[stake].status;
+            const oldStatus = prevStatus[stake];
+            if (newStatus === 'ended' && oldStatus !== 'ended') {
+              const room = state[stake];
+              const players = room.players || [];
+              const playerCount = players.length;
+              const revenue = playerCount * room.entryFee;
+              const prizePool = room.prizePool || 0;
+              const profit = revenue - prizePool;
+              const now = new Date();
+
+              // Build round object (matches API format)
+              const newRound = {
+                id: Date.now(), // temporary local id
+                stake: stake,
+                prizePool: prizePool,
+                profit: profit,
+                revenue: revenue,
+                playerCount: playerCount,
+                players: players.map(p => ({
+                  telegram_id: p.telegramId,
+                  username: p.username
+                })),
+                time: formatTime(now),
+                date: new Date(now)
+              };
+
+              // Add to history if it matches the current filter
+              roundHistory.push(newRound);
+
+              addLog('round', `🏁 New round ${stake}ETB ended: ${playerCount} players, prize ${prizePool} ETB, profit ${profit} ETB`);
+
+              // Re-render filtered sections
+              renderRoundHistory();
+              renderTopPlayersByRounds();
+              updatePlayerWinChart();
+              updateFilterInfo();
+            }
+            prevStatus[stake] = newStatus;
+          }
+        }
+
+        // Merge live state
+        for (const stake of [10, 20, 30]) {
+          if (state[stake]) {
+            gameState[stake] = { ...gameState[stake], ...state[stake] };
+          }
+        }
+
+        updateKPIs();
+        updateUserSummary();
+        updateRoomChart();
       });
 
       socket.on('disconnect', () => {
@@ -785,31 +879,51 @@
       });
     }
 
-    // ---- Clear log ----
-    clearLogBtn.addEventListener('click', () => {
-      logEntries = [];
-      renderLog();
-    });
+    // ---- Filter handlers ----
+    function applyFilter() {
+      const fromVal = filterFromInput.value;
+      const toVal = filterToInput.value;
+      filterFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+      filterTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+      // Refetch history with new filter
+      fetchHistoricalData();
+    }
 
-    // ---- Filter event listeners ----
-    applyFilterBtn.addEventListener('click', applyFilter);
-    clearFilterBtn.addEventListener('click', clearFilter);
+    function clearFilter() {
+      filterFromInput.value = '';
+      filterToInput.value = '';
+      filterFrom = null;
+      filterTo = null;
+      fetchHistoricalData();
+    }
 
     // ---- Init ----
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       initCharts();
-      connect();
+
       // Set default filter to today
       const today = new Date().toISOString().split('T')[0];
       filterFromInput.value = today;
       filterToInput.value = today;
-      applyFilter(); // apply today's filter by default
 
-      // Initial render
+      // Load historical data from API
+      await fetchHistoricalData();
+
+      // Connect WebSocket for live updates
+      connectWebSocket();
+
+      // Event listeners
+      applyFilterBtn.addEventListener('click', applyFilter);
+      clearFilterBtn.addEventListener('click', clearFilter);
+      clearLogBtn.addEventListener('click', () => {
+        logEntries = [];
+        renderLog();
+      });
+
+      // Initial render of live data
       updateKPIs();
       updateUserSummary();
       updateRoomChart();
-      updateFilterInfo();
     });
   </script>
 </body>
