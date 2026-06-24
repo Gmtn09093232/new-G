@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard · Commission Details</title>
+    <title>Bingo Win Dashboard · Audit‑based Rounds</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -291,6 +291,15 @@
             margin-bottom: 20px;
             display: none;
         }
+        .info-note {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            color: #78350f;
+        }
         footer {
             text-align: center;
             margin-top: 40px;
@@ -424,15 +433,20 @@
     <div id="errorContainer" class="error"></div>
     <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
 
+    <!-- Info note -->
+    <div class="info-note">
+        ℹ️ Round data is derived from audit logs (<code>WIN_PAID_OUT</code> events). Commission = 20% of entry fees (estimated as <code>prizePool / 0.8</code>). This may not be exact for single‑player games.
+    </div>
+
     <!-- Stats Grid -->
     <div id="statsGrid" class="stats-grid"></div>
 
-    <!-- Commission Distribution by Round -->
+    <!-- Commission Distribution by Round (from audit logs) -->
     <div class="full-width-box">
-        <h3>📊 Commission Distribution by Round</h3>
+        <h3>📊 Commission Distribution by Round (from audit logs)</h3>
         <div style="overflow-x:auto;">
             <table>
-                <thead><tr><th>#</th><th>Round Time</th><th>Total Entry Fees (ETB)</th><th>Prize Pool (ETB)</th><th>Commission (house profit)</th></tr></thead>
+                <thead><tr><th>#</th><th>Round Time</th><th>Est. Total Entry Fees (ETB)</th><th>Prize Pool (ETB)</th><th>Commission (20% of entry)</th></tr></thead>
                 <tbody id="commissionRoundTableBody"></tbody>
             </table>
         </div>
@@ -576,20 +590,6 @@
         return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
     }
 
-    function buildDateFilter(query, startDate, endDate, column = 'created_at') {
-        if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
-            query = query.gte(column, start.toISOString());
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
-            query = query.lte(column, end.toISOString());
-        }
-        return query;
-    }
-
     // ----- Deposit Modal Logic -----
     function showDepositModal(userId, username) {
         const deposits = userDepositsMap[userId] || [];
@@ -678,44 +678,72 @@
             loadingEl.style.display = 'block';
             errorEl.style.display = 'none';
 
-            // 1. Fetch game_rounds with proper date filtering
-            let roundsQuery = supabase.from('game_rounds')
-                .select('created_at, total_entry_fees, prize_pool, house_profit')
-                .order('created_at', { ascending: false })
+            // 1. Fetch WIN_PAID_OUT logs for round data
+            let roundLogsQuery = supabase
+                .from('audit_logs')
+                .select('timestamp, details')
+                .eq('event_type', 'WIN_PAID_OUT')
+                .order('timestamp', { ascending: false })
                 .limit(200);
 
-            // Apply date filter correctly
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
-                roundsQuery = roundsQuery.gte('created_at', start.toISOString());
+                start.setHours(0,0,0,0);
+                roundLogsQuery = roundLogsQuery.gte('timestamp', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
-                roundsQuery = roundsQuery.lte('created_at', end.toISOString());
+                end.setHours(23,59,59,999);
+                roundLogsQuery = roundLogsQuery.lte('timestamp', end.toISOString());
             }
 
-            const { data: roundsList, error: roundsErr } = await roundsQuery;
-            if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
+            const { data: roundLogs, error: roundLogsErr } = await roundLogsQuery;
+            if (roundLogsErr) throw new Error('Failed to fetch WIN_PAID_OUT logs: ' + roundLogsErr.message);
 
+            // Process round logs: each log gives a prizePool, compute commission
+            // We'll treat each log as a separate round entry (multiple winners per round will appear multiple times – we'll deduplicate by timestamp and prizePool)
+            // Simple approach: group by timestamp rounded to minute and prizePool to merge multiple winners
+            const roundsMap = new Map();
             let totalCommission = 0;
-            if (roundsList) {
-                roundsList.forEach(r => {
-                    totalCommission += Number(r.house_profit) || 0;
+
+            if (roundLogs && roundLogs.length > 0) {
+                roundLogs.forEach(log => {
+                    const details = log.details || {};
+                    const prizePool = Number(details.totalPrizePool) || 0;
+                    const stake = details.stake || 0;
+                    if (prizePool <= 0) return;
+                    // Estimate entry fees: prizePool / 0.8 (assuming 80/20 split)
+                    const entryFees = prizePool / 0.8;
+                    const commission = entryFees * 0.2; // 20% house profit
+                    // Use timestamp as key (round to nearest minute to merge multiple winners)
+                    const ts = new Date(log.timestamp);
+                    const key = `${ts.toISOString().slice(0,16)}-${prizePool.toFixed(1)}-${stake}`;
+                    if (!roundsMap.has(key)) {
+                        roundsMap.set(key, {
+                            timestamp: log.timestamp,
+                            prizePool: prizePool,
+                            entryFees: entryFees,
+                            commission: commission,
+                            stake: stake
+                        });
+                        totalCommission += commission;
+                    }
                 });
             }
 
-            // 2. Fetch total deposits with date filter
+            // Convert to array and sort by timestamp descending (already sorted)
+            const roundsArray = Array.from(roundsMap.values());
+
+            // 2. Fetch total deposits
             let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 depositQuery = depositQuery.gte('created_at', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 depositQuery = depositQuery.lte('created_at', end.toISOString());
             }
             const { data: depositsTotal, error: depTotalErr } = await depositQuery;
@@ -725,16 +753,16 @@
                 totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
             }
 
-            // 3. Fetch total withdrawals with date filter
+            // 3. Fetch total withdrawals
             let withdrawalTotalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 withdrawalTotalQuery = withdrawalTotalQuery.gte('created_at', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 withdrawalTotalQuery = withdrawalTotalQuery.lte('created_at', end.toISOString());
             }
             const { data: withdrawalsTotal, error: wdTotalErr } = await withdrawalTotalQuery;
@@ -751,33 +779,33 @@
                 <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
             `;
 
-            // 5. Render Commission Distribution by Round
-            if (roundsList && roundsList.length > 0) {
+            // 5. Render Commission Distribution by Round (from audit logs)
+            if (roundsArray.length > 0) {
                 let rows = '';
-                roundsList.forEach((r, idx) => {
+                roundsArray.forEach((r, idx) => {
                     rows += `<tr>
                         <td>${idx + 1}</td>
-                        <td>${formatDate(r.created_at)}</td>
-                        <td>${fmt(r.total_entry_fees)}</td>
-                        <td>${fmt(r.prize_pool)}</td>
-                        <td><strong>${fmt(r.house_profit)}</strong></td>
+                        <td>${formatDate(r.timestamp)}</td>
+                        <td>${fmt(r.entryFees)}</td>
+                        <td>${fmt(r.prizePool)}</td>
+                        <td><strong>${fmt(r.commission)}</strong></td>
                     </tr>`;
                 });
                 commissionRoundTableBody.innerHTML = rows;
             } else {
-                commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No rounds found for this period</td></tr>';
+                commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No WIN_PAID_OUT events found for this period</td></tr>';
             }
 
-            // 6. Fetch user-level data
+            // 6. Fetch user-level data for top performers and deposits/withdrawals
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 winQuery = winQuery.gte('timestamp', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 winQuery = winQuery.lte('timestamp', end.toISOString());
             }
             const { data: winLogs, error: winErr } = await winQuery;
@@ -786,12 +814,12 @@
             let entryQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'ENTRY_FEE_PAID');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 entryQuery = entryQuery.gte('timestamp', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 entryQuery = entryQuery.lte('timestamp', end.toISOString());
             }
             const { data: entryLogs, error: entryErr } = await entryQuery;
@@ -801,12 +829,12 @@
             let depositDetailQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 depositDetailQuery = depositDetailQuery.gte('created_at', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 depositDetailQuery = depositDetailQuery.lte('created_at', end.toISOString());
             }
             const { data: depositDetails, error: depDetailErr } = await depositDetailQuery;
@@ -816,12 +844,12 @@
             let withdrawalDetailQuery = supabase.from('withdrawal_requests').select('telegram_id, username, amount, created_at, withdrawal_type, phone_number, receiver_name, status').eq('status', 'approved');
             if (startDate) {
                 const start = new Date(startDate);
-                start.setHours(0, 0, 0, 0);
+                start.setHours(0,0,0,0);
                 withdrawalDetailQuery = withdrawalDetailQuery.gte('created_at', start.toISOString());
             }
             if (endDate) {
                 const end = new Date(endDate);
-                end.setHours(23, 59, 59, 999);
+                end.setHours(23,59,59,999);
                 withdrawalDetailQuery = withdrawalDetailQuery.lte('created_at', end.toISOString());
             }
             const { data: withdrawalDetails, error: wdDetailErr } = await withdrawalDetailQuery;
