@@ -413,12 +413,12 @@
     <!-- Filter Bar -->
     <div class="filter-bar">
         <label for="startDate">From</label>
-        <input type="date" id="startDate" value="2026-06-23" />
+        <input type="date" id="startDate" />
         <label for="endDate">To</label>
         <input type="date" id="endDate" />
         <button id="applyFilterBtn">Apply</button>
         <button id="resetFilterBtn" class="secondary">Reset</button>
-        <span class="date-range-label" id="dateRangeLabel">From 2026-06-23</span>
+        <span class="date-range-label" id="dateRangeLabel">All time</span>
     </div>
 
     <div id="errorContainer" class="error"></div>
@@ -542,7 +542,7 @@
     const resetBtn = document.getElementById('resetFilterBtn');
     const dateRangeLabel = document.getElementById('dateRangeLabel');
 
-    // Deposit Modal refs
+    // Modal refs
     const depositModal = document.getElementById('depositModal');
     const depositModalCloseBtn = document.getElementById('depositModalCloseBtn');
     const depositModalUserName = document.getElementById('depositModalUserName');
@@ -550,7 +550,6 @@
     const depositModalBody = document.getElementById('depositModalBody');
     const depositModalTotal = document.getElementById('depositModalTotal');
 
-    // Withdrawal Modal refs
     const withdrawalModal = document.getElementById('withdrawalModal');
     const withdrawalModalCloseBtn = document.getElementById('withdrawalModalCloseBtn');
     const withdrawalModalUserName = document.getElementById('withdrawalModalUserName');
@@ -558,8 +557,8 @@
     const withdrawalModalBody = document.getElementById('withdrawalModalBody');
     const withdrawalModalTotal = document.getElementById('withdrawalModalTotal');
 
-    let filterStart = startDateInput.value || null;
-    let filterEnd = endDateInput.value || null;
+    let filterStart = null;
+    let filterEnd = null;
     let userDepositsMap = {};
     let userWithdrawalsMap = {};
 
@@ -580,12 +579,12 @@
     function buildDateFilter(query, startDate, endDate, column = 'created_at') {
         if (startDate) {
             const start = new Date(startDate);
-            start.setHours(0,0,0,0);
+            start.setHours(0, 0, 0, 0);
             query = query.gte(column, start.toISOString());
         }
         if (endDate) {
             const end = new Date(endDate);
-            end.setHours(23,59,59,999);
+            end.setHours(23, 59, 59, 999);
             query = query.lte(column, end.toISOString());
         }
         return query;
@@ -606,7 +605,7 @@
         depositModalUserSub.textContent = `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
         let rows = '';
         let total = 0;
-        const sorted = [...deposits].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        const sorted = [...deposits].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         sorted.forEach(d => {
             total += d.amount;
             rows += `<tr>
@@ -642,7 +641,7 @@
         withdrawalModalUserSub.textContent = `${withdrawals.length} withdrawal${withdrawals.length > 1 ? 's' : ''} · Total: ${fmt(withdrawals.reduce((sum, d) => sum + d.amount, 0))} ETB`;
         let rows = '';
         let total = 0;
-        const sorted = [...withdrawals].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        const sorted = [...withdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         sorted.forEach(d => {
             total += d.amount;
             const statusClass = d.status || 'pending';
@@ -666,7 +665,6 @@
     withdrawalModal.addEventListener('click', (e) => { if (e.target === withdrawalModal) closeWithdrawalModal(); });
     withdrawalModalCloseBtn.addEventListener('click', closeWithdrawalModal);
 
-    // Keyboard close for both modals
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeDepositModal();
@@ -677,16 +675,30 @@
     // ----- Main load function -----
     async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds for commission (use house_profit directly)
+            loadingEl.style.display = 'block';
+            errorEl.style.display = 'none';
+
+            // 1. Fetch game_rounds with proper date filtering
             let roundsQuery = supabase.from('game_rounds')
                 .select('created_at, total_entry_fees, prize_pool, house_profit')
                 .order('created_at', { ascending: false })
-                .limit(100);
-            roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
+                .limit(200);
+
+            // Apply date filter correctly
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                roundsQuery = roundsQuery.gte('created_at', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                roundsQuery = roundsQuery.lte('created_at', end.toISOString());
+            }
+
             const { data: roundsList, error: roundsErr } = await roundsQuery;
             if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
-            // Sum house_profit for total commission
             let totalCommission = 0;
             if (roundsList) {
                 roundsList.forEach(r => {
@@ -694,9 +706,18 @@
                 });
             }
 
-            // 2. Fetch total deposits
+            // 2. Fetch total deposits with date filter
             let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-            depositQuery = buildDateFilter(depositQuery, startDate, endDate);
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                depositQuery = depositQuery.gte('created_at', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                depositQuery = depositQuery.lte('created_at', end.toISOString());
+            }
             const { data: depositsTotal, error: depTotalErr } = await depositQuery;
             if (depTotalErr) throw new Error('Failed to fetch deposits: ' + depTotalErr.message);
             let totalDeposits = 0;
@@ -704,9 +725,18 @@
                 totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
             }
 
-            // 3. Fetch total withdrawals
+            // 3. Fetch total withdrawals with date filter
             let withdrawalTotalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-            withdrawalTotalQuery = buildDateFilter(withdrawalTotalQuery, startDate, endDate);
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                withdrawalTotalQuery = withdrawalTotalQuery.gte('created_at', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                withdrawalTotalQuery = withdrawalTotalQuery.lte('created_at', end.toISOString());
+            }
             const { data: withdrawalsTotal, error: wdTotalErr } = await withdrawalTotalQuery;
             if (wdTotalErr) throw new Error('Failed to fetch withdrawals: ' + wdTotalErr.message);
             let totalWithdrawals = 0;
@@ -716,12 +746,12 @@
 
             // 4. Render Stats Cards
             statsGrid.innerHTML = `
-                <div class="stat-card commission-card"><div class="label">Total Commission (house profit)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
+                <div class="stat-card commission-card"><div class="label">Total Commission</div><div class="value">${fmt(totalCommission)} ETB</div></div>
                 <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
                 <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
             `;
 
-            // 5. Render Commission Distribution by Round Table (use house_profit)
+            // 5. Render Commission Distribution by Round
             if (roundsList && roundsList.length > 0) {
                 let rows = '';
                 roundsList.forEach((r, idx) => {
@@ -738,26 +768,62 @@
                 commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No rounds found for this period</td></tr>';
             }
 
-            // 6. Fetch user-level data (wins, stakes, deposits, withdrawals)
+            // 6. Fetch user-level data
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
-            winQuery = buildDateFilter(winQuery, startDate, endDate, 'timestamp');
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                winQuery = winQuery.gte('timestamp', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                winQuery = winQuery.lte('timestamp', end.toISOString());
+            }
             const { data: winLogs, error: winErr } = await winQuery;
             if (winErr) throw new Error('Failed to fetch win logs: ' + winErr.message);
 
             let entryQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'ENTRY_FEE_PAID');
-            entryQuery = buildDateFilter(entryQuery, startDate, endDate, 'timestamp');
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                entryQuery = entryQuery.gte('timestamp', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                entryQuery = entryQuery.lte('timestamp', end.toISOString());
+            }
             const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
             // 7. Fetch deposit details for modal
             let depositDetailQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
-            depositDetailQuery = buildDateFilter(depositDetailQuery, startDate, endDate);
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                depositDetailQuery = depositDetailQuery.gte('created_at', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                depositDetailQuery = depositDetailQuery.lte('created_at', end.toISOString());
+            }
             const { data: depositDetails, error: depDetailErr } = await depositDetailQuery;
             if (depDetailErr) throw new Error('Failed to fetch deposit details: ' + depDetailErr.message);
 
-            // 8. Fetch withdrawal details for modal and summary
+            // 8. Fetch withdrawal details
             let withdrawalDetailQuery = supabase.from('withdrawal_requests').select('telegram_id, username, amount, created_at, withdrawal_type, phone_number, receiver_name, status').eq('status', 'approved');
-            withdrawalDetailQuery = buildDateFilter(withdrawalDetailQuery, startDate, endDate);
+            if (startDate) {
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                withdrawalDetailQuery = withdrawalDetailQuery.gte('created_at', start.toISOString());
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                withdrawalDetailQuery = withdrawalDetailQuery.lte('created_at', end.toISOString());
+            }
             const { data: withdrawalDetails, error: wdDetailErr } = await withdrawalDetailQuery;
             if (wdDetailErr) throw new Error('Failed to fetch withdrawal details: ' + wdDetailErr.message);
 
@@ -862,12 +928,12 @@
             });
 
             // --- Top Users by Total Payout ---
-            const sortedByPayout = [...userSummaries].sort((a,b) => b.totalPayout - a.totalPayout);
+            const sortedByPayout = [...userSummaries].sort((a, b) => b.totalPayout - a.totalPayout);
             const topPayout = sortedByPayout.slice(0, 10);
             let payoutRows = '';
             topPayout.forEach((u, idx) => {
                 payoutRows += `<tr>
-                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td><span class="rank-badge">${idx + 1}</span></td>
                     <td>${u.username}</td>
                     <td>${fmt(u.totalPayout)}</td>
                 </tr>`;
@@ -875,12 +941,12 @@
             payoutTableBody.innerHTML = payoutRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
             // --- Top Users by Win Count ---
-            const sortedByWins = [...userSummaries].sort((a,b) => b.wins - a.wins);
+            const sortedByWins = [...userSummaries].sort((a, b) => b.wins - a.wins);
             const topWins = sortedByWins.slice(0, 10);
             let winsRows = '';
             topWins.forEach((u, idx) => {
                 winsRows += `<tr>
-                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td><span class="rank-badge">${idx + 1}</span></td>
                     <td>${u.username}</td>
                     <td>${u.wins}</td>
                 </tr>`;
@@ -888,15 +954,15 @@
             winsTableBody.innerHTML = winsRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
             // --- Deposit Distribution ---
-            const sortedByDeposits = [...userSummaries].sort((a,b) => b.totalDeposits - a.totalDeposits);
+            const sortedByDeposits = [...userSummaries].sort((a, b) => b.totalDeposits - a.totalDeposits);
             const topDepositors = sortedByDeposits.slice(0, 10);
             let depositRows = '';
             topDepositors.forEach((u, idx) => {
                 const hasDeposits = u.deposits > 0;
                 depositRows += `<tr>
-                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td><span class="rank-badge">${idx + 1}</span></td>
                     <td>
-                        ${hasDeposits 
+                        ${hasDeposits
                             ? `<span class="clickable-username deposit-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
                             : u.username
                         }
@@ -909,15 +975,15 @@
             depositTableBody.innerHTML = depositRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No deposit data</td></tr>';
 
             // --- Withdrawal Distribution ---
-            const sortedByWithdrawals = [...userSummaries].sort((a,b) => b.totalWithdrawn - a.totalWithdrawn);
+            const sortedByWithdrawals = [...userSummaries].sort((a, b) => b.totalWithdrawn - a.totalWithdrawn);
             const topWithdrawals = sortedByWithdrawals.slice(0, 10);
             let withdrawalRows = '';
             topWithdrawals.forEach((u, idx) => {
                 const hasWithdrawals = u.withdrawals > 0;
                 withdrawalRows += `<tr>
-                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td><span class="rank-badge">${idx + 1}</span></td>
                     <td>
-                        ${hasWithdrawals 
+                        ${hasWithdrawals
                             ? `<span class="clickable-username withdrawal-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
                             : u.username
                         }
@@ -964,17 +1030,19 @@
         }
         filterStart = startVal || null;
         filterEnd = endVal || null;
+
+        let labelText = '';
         if (filterStart && filterEnd) {
-            dateRangeLabel.textContent = `📅 ${filterStart} → ${filterEnd}`;
+            labelText = `📅 ${filterStart} → ${filterEnd}`;
         } else if (filterStart) {
-            dateRangeLabel.textContent = `📅 From ${filterStart}`;
+            labelText = `📅 From ${filterStart}`;
         } else if (filterEnd) {
-            dateRangeLabel.textContent = `📅 Until ${filterEnd}`;
+            labelText = `📅 Until ${filterEnd}`;
         } else {
-            dateRangeLabel.textContent = '🌍 All time';
+            labelText = '🌍 All time';
         }
-        loadingEl.style.display = 'block';
-        errorEl.style.display = 'none';
+        dateRangeLabel.textContent = labelText;
+
         loadDashboard(filterStart, filterEnd);
     }
 
@@ -984,17 +1052,11 @@
         filterStart = null;
         filterEnd = null;
         dateRangeLabel.textContent = '🌍 All time';
-        loadingEl.style.display = 'block';
-        errorEl.style.display = 'none';
         loadDashboard(null, null);
     }
 
-    // Init
-    if (startDateInput.value) {
-        filterStart = startDateInput.value;
-        dateRangeLabel.textContent = `📅 From ${filterStart}`;
-    }
-    loadDashboard(filterStart, filterEnd);
+    // Init - load all data
+    loadDashboard(null, null);
 
     applyBtn.addEventListener('click', applyFilter);
     resetBtn.addEventListener('click', resetFilter);
