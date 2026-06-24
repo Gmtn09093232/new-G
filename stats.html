@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard · Deposit Tables</title>
-    <!-- Supabase JS (no Chart.js needed anymore) -->
+    <title>Bingo Win Dashboard · Deposit Details</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -13,6 +12,7 @@
             background: #f5f7fc;
             padding: 24px;
             color: #1e293b;
+            position: relative;
         }
         .container {
             max-width: 1440px;
@@ -201,6 +201,16 @@
         .full-width-box tr:hover td {
             background: #fafcff;
         }
+        .clickable-username {
+            color: #2563eb;
+            cursor: pointer;
+            text-decoration: underline dotted;
+            font-weight: 500;
+        }
+        .clickable-username:hover {
+            color: #1d4ed8;
+            text-decoration: underline solid;
+        }
         .table-container {
             background: #ffffff;
             border-radius: 16px;
@@ -266,9 +276,89 @@
             color: #94a3b8;
             font-size: 0.8rem;
         }
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(3px);
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            max-width: 700px;
+            width: 95%;
+            max-height: 80vh;
+            padding: 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow-y: auto;
+            position: relative;
+        }
+        .modal-content h2 {
+            font-weight: 600;
+            font-size: 1.4rem;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+        .modal-content .subtitle {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: #94a3b8;
+            background: none;
+            border: none;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: #1e293b;
+        }
+        .modal-content table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .modal-content th {
+            text-align: left;
+            padding: 8px 6px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .modal-content td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #eef2f6;
+        }
+        .modal-content tr:hover td {
+            background: #fafcff;
+        }
+        .method-badge {
+            display: inline-block;
+            background: #eef2f6;
+            color: #334155;
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            text-transform: capitalize;
+        }
         @media (max-width: 768px) {
             .table-grid { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
+            .modal-content { padding: 20px; }
         }
     </style>
 </head>
@@ -279,7 +369,7 @@
         <small>stake_20 · real‑time analytics</small>
     </h1>
 
-    <!-- Date Filter Bar -->
+    <!-- Filter Bar -->
     <div class="filter-bar">
         <label for="startDate">From</label>
         <input type="date" id="startDate" />
@@ -312,7 +402,7 @@
         </div>
     </div>
 
-    <!-- Deposit Distribution Table (replaces timeline) -->
+    <!-- Deposit Distribution Table with clickable usernames -->
     <div class="full-width-box">
         <h3>💰 Deposit Distribution</h3>
         <table>
@@ -337,14 +427,30 @@
             <tbody id="userTableBody"></tbody>
         </table>
     </div>
-    <footer>Data from Supabase · Filter by date range</footer>
+    <footer>Data from Supabase · Click a username in Deposit Distribution to see details</footer>
+</div>
+
+<!-- Modal for deposit details -->
+<div id="depositModal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="modal-close" id="modalCloseBtn">&times;</button>
+        <h2 id="modalUserName">User Deposits</h2>
+        <div class="subtitle" id="modalUserSub">All deposits for this user</div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>Amount (ETB)</th><th>Time</th><th>Method</th><th>Phone</th></tr></thead>
+                <tbody id="modalDepositBody"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="modalTotalDisplay"></div>
+    </div>
 </div>
 
 <script>
     // ================================================================
     //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
     // ================================================================
-    const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+   const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
     // ================================================================
 
@@ -364,8 +470,19 @@
     const resetBtn = document.getElementById('resetFilterBtn');
     const dateRangeLabel = document.getElementById('dateRangeLabel');
 
+    // Modal refs
+    const modal = document.getElementById('depositModal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    const modalUserName = document.getElementById('modalUserName');
+    const modalUserSub = document.getElementById('modalUserSub');
+    const modalDepositBody = document.getElementById('modalDepositBody');
+    const modalTotalDisplay = document.getElementById('modalTotalDisplay');
+
     let filterStart = null;
     let filterEnd = null;
+
+    // Store raw deposits per user for modal
+    let userDepositsMap = {};
 
     function showError(msg) {
         errorEl.textContent = msg;
@@ -375,6 +492,12 @@
 
     function fmt(num) { return Number(num).toFixed(1); }
     function fmtInt(num) { return Number(num).toFixed(0); }
+
+    function formatDate(iso) {
+        if (!iso) return '-';
+        const d = new Date(iso);
+        return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
 
     function buildDateFilter(query, startDate, endDate, column = 'created_at') {
         if (startDate) {
@@ -390,6 +513,51 @@
         return query;
     }
 
+    // Modal logic
+    function showDepositModal(userId, username) {
+        const deposits = userDepositsMap[userId] || [];
+        if (deposits.length === 0) {
+            modalUserName.textContent = username || 'User';
+            modalUserSub.textContent = 'No deposits found for this period.';
+            modalDepositBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No records</td></tr>';
+            modalTotalDisplay.textContent = '';
+            modal.classList.add('active');
+            return;
+        }
+        modalUserName.textContent = username || userId;
+        modalUserSub.textContent = `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
+        let rows = '';
+        let total = 0;
+        // Sort by time descending (newest first)
+        const sorted = [...deposits].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        sorted.forEach(d => {
+            total += d.amount;
+            rows += `<tr>
+                <td>${fmt(d.amount)}</td>
+                <td>${formatDate(d.created_at)}</td>
+                <td><span class="method-badge">${d.payment_type || 'N/A'}</span></td>
+                <td>${d.phone || '-'}</td>
+            </tr>`;
+        });
+        modalDepositBody.innerHTML = rows;
+        modalTotalDisplay.textContent = `Total: ${fmt(total)} ETB`;
+        modal.classList.add('active');
+    }
+
+    function closeModal() {
+        modal.classList.remove('active');
+    }
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    modalCloseBtn.addEventListener('click', closeModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    // Main load function
     async function loadDashboard(startDate, endDate) {
         try {
             // 1. Fetch game_rounds for stats
@@ -426,11 +594,25 @@
             const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
-            // 3. Deposit data (approved deposits)
-            let depositQuery = supabase.from('deposit_requests').select('telegram_id, amount').eq('status', 'approved');
+            // 3. Deposit data (approved deposits) with full details
+            let depositQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
             depositQuery = buildDateFilter(depositQuery, startDate, endDate);
             const { data: deposits, error: depErr } = await depositQuery;
             if (depErr) throw new Error('Failed to fetch deposits: ' + depErr.message);
+
+            // Reset deposit map
+            userDepositsMap = {};
+            deposits.forEach(d => {
+                const uid = d.telegram_id;
+                if (!uid) return;
+                if (!userDepositsMap[uid]) userDepositsMap[uid] = [];
+                userDepositsMap[uid].push({
+                    amount: Number(d.amount) || 0,
+                    created_at: d.created_at,
+                    payment_type: d.payment_type,
+                    phone: d.phone
+                });
+            });
 
             // Aggregate per user
             const userMap = {};
@@ -447,12 +629,12 @@
                 if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
                 userMap[uid].totalStakes += Number(log.details?.amount) || 0;
             });
-            deposits.forEach(d => {
-                const uid = d.telegram_id;
-                if (!uid) return;
+            // Add deposit aggregates from userDepositsMap
+            Object.keys(userDepositsMap).forEach(uid => {
                 if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
-                userMap[uid].deposits += 1;
-                userMap[uid].totalDeposits += Number(d.amount) || 0;
+                const depList = userDepositsMap[uid];
+                userMap[uid].deposits = depList.length;
+                userMap[uid].totalDeposits = depList.reduce((sum, d) => sum + d.amount, 0);
             });
 
             const userIds = Object.keys(userMap);
@@ -512,20 +694,35 @@
             });
             winsTableBody.innerHTML = winsRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
-            // --- Deposit Distribution (table) ---
+            // --- Deposit Distribution (table) with clickable usernames ---
             const sortedByDeposits = [...userSummaries].sort((a,b) => b.totalDeposits - a.totalDeposits);
             const topDepositors = sortedByDeposits.slice(0, 10);
             let depositRows = '';
             topDepositors.forEach((u, idx) => {
+                const hasDeposits = u.deposits > 0;
                 depositRows += `<tr>
                     <td><span class="rank-badge">${idx+1}</span></td>
-                    <td>${u.username}</td>
+                    <td>
+                        ${hasDeposits 
+                            ? `<span class="clickable-username" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
+                            : u.username
+                        }
+                    </td>
                     <td>${fmt(u.totalDeposits)}</td>
                     <td>${u.deposits}</td>
                     <td>${fmt(u.avgDeposit)}</td>
                 </tr>`;
             });
             depositTableBody.innerHTML = depositRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No deposit data</td></tr>';
+
+            // Attach click handlers to clickable usernames
+            document.querySelectorAll('.clickable-username').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    const userId = this.dataset.userid;
+                    const username = this.dataset.username || userId;
+                    showDepositModal(userId, username);
+                });
+            });
 
             // --- Full Summary Table (sorted by commission) ---
             const sortedForTable = [...userSummaries].sort((a,b) => b.commission - a.commission);
@@ -550,9 +747,7 @@
         }
     }
 
-    // ------------------------------------------------------------------
     // Filter logic
-    // ------------------------------------------------------------------
     function applyFilter() {
         const startVal = startDateInput.value;
         const endVal = endDateInput.value;
@@ -587,10 +782,8 @@
         loadDashboard(null, null);
     }
 
-    // ------------------------------------------------------------------
     // Init
-    // ------------------------------------------------------------------
-    resetFilter();  // initial load
+    resetFilter();
     applyBtn.addEventListener('click', applyFilter);
     resetBtn.addEventListener('click', resetFilter);
     startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
