@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard · Deposit Details</title>
+    <title>Bingo Win Dashboard · Commission Details</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,6 +119,20 @@
         }
         .stat-card.deposit-card .value {
             color: #059669;
+        }
+        .stat-card.withdrawal-card {
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
+        .stat-card.withdrawal-card .value {
+            color: #dc2626;
+        }
+        .stat-card.commission-card {
+            border-color: #bfdbfe;
+            background: #eff6ff;
+        }
+        .stat-card.commission-card .value {
+            color: #2563eb;
         }
         .table-grid {
             display: grid;
@@ -241,14 +255,14 @@
         }
         .table-container th {
             text-align: left;
-            padding: 10px 8px;
+            padding: 8px 6px;
             background: #f8fafc;
             color: #475569;
             font-weight: 600;
             border-bottom: 2px solid #e2e8f0;
         }
         .table-container td {
-            padding: 10px 8px;
+            padding: 8px 6px;
             border-bottom: 1px solid #eef2f6;
             color: #1e293b;
         }
@@ -300,7 +314,7 @@
         .modal-content {
             background: white;
             border-radius: 20px;
-            max-width: 700px;
+            max-width: 800px;
             width: 95%;
             max-height: 80vh;
             padding: 28px;
@@ -362,6 +376,26 @@
             font-size: 0.75rem;
             text-transform: capitalize;
         }
+        .status-badge {
+            display: inline-block;
+            padding: 0 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
         @media (max-width: 768px) {
             .table-grid { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
@@ -390,8 +424,19 @@
     <div id="errorContainer" class="error"></div>
     <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
 
-    <!-- Stats Grid - only Commission and Deposits -->
+    <!-- Stats Grid -->
     <div id="statsGrid" class="stats-grid"></div>
+
+    <!-- Commission Distribution by Round -->
+    <div class="full-width-box">
+        <h3>📊 Commission Distribution by Round</h3>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>#</th><th>Round Time</th><th>Total Entry Fees (ETB)</th><th>Prize Pool (ETB)</th><th>Commission (20%)</th></tr></thead>
+                <tbody id="commissionRoundTableBody"></tbody>
+            </table>
+        </div>
+    </div>
 
     <!-- Top Performer Tables -->
     <div class="table-grid">
@@ -411,7 +456,7 @@
         </div>
     </div>
 
-    <!-- Deposit Distribution Table with clickable usernames -->
+    <!-- Deposit Distribution Table -->
     <div class="full-width-box">
         <h3>💰 Deposit Distribution</h3>
         <table>
@@ -420,38 +465,55 @@
         </table>
     </div>
 
+    <!-- Withdrawal Distribution Table -->
     <div class="table-container">
-        <h3>📋 User Performance Summary</h3>
+        <h3>💳 Withdrawal Distribution</h3>
         <table>
             <thead>
                 <tr>
-                    <th>User ID</th>
-                    <th>Wins</th>
-                    <th>Total Payout (ETB)</th>
-                    <th>Implied Stakes (ETB)</th>
-                    <th>Commission (20%)</th>
-                    <th>Avg Payout</th>
+                    <th>#</th>
+                    <th>User</th>
+                    <th>Total Withdrawn (ETB)</th>
+                    <th>Number of Withdrawals</th>
+                    <th>Average Withdrawal</th>
+                    <th>Methods Used</th>
                 </tr>
             </thead>
-            <tbody id="userTableBody"></tbody>
+            <tbody id="withdrawalTableBody"></tbody>
         </table>
     </div>
-    <footer>Data from Supabase · Click a username in Deposit Distribution to see details</footer>
+    <footer>Data from Supabase · Click a username in Deposit or Withdrawal tables to see details</footer>
 </div>
 
-<!-- Modal for deposit details -->
+<!-- Modal for Deposit Details -->
 <div id="depositModal" class="modal-overlay">
     <div class="modal-content">
-        <button class="modal-close" id="modalCloseBtn">&times;</button>
-        <h2 id="modalUserName">User Deposits</h2>
-        <div class="subtitle" id="modalUserSub">All deposits for this user</div>
+        <button class="modal-close" id="depositModalCloseBtn">&times;</button>
+        <h2 id="depositModalUserName">User Deposits</h2>
+        <div class="subtitle" id="depositModalUserSub">All deposits for this user</div>
         <div style="overflow-x:auto;">
             <table>
                 <thead><tr><th>Amount (ETB)</th><th>Time</th><th>Method</th><th>Phone</th></tr></thead>
-                <tbody id="modalDepositBody"></tbody>
+                <tbody id="depositModalBody"></tbody>
             </table>
         </div>
-        <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="modalTotalDisplay"></div>
+        <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="depositModalTotal"></div>
+    </div>
+</div>
+
+<!-- Modal for Withdrawal Details -->
+<div id="withdrawalModal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="modal-close" id="withdrawalModalCloseBtn">&times;</button>
+        <h2 id="withdrawalModalUserName">User Withdrawals</h2>
+        <div class="subtitle" id="withdrawalModalUserSub">All withdrawals for this user</div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>Amount (ETB)</th><th>Time</th><th>Method</th><th>Phone</th><th>Receiver</th><th>Status</th></tr></thead>
+                <tbody id="withdrawalModalBody"></tbody>
+            </table>
+        </div>
+        <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="withdrawalModalTotal"></div>
     </div>
 </div>
 
@@ -459,18 +521,16 @@
     // ================================================================
     //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
     // ================================================================
-    const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
-    // ================================================================
-
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
+ 
     // DOM refs
     const statsGrid = document.getElementById('statsGrid');
-    const userTableBody = document.getElementById('userTableBody');
     const payoutTableBody = document.getElementById('payoutTableBody');
     const winsTableBody = document.getElementById('winsTableBody');
     const depositTableBody = document.getElementById('depositTableBody');
+    const withdrawalTableBody = document.getElementById('withdrawalTableBody');
+    const commissionRoundTableBody = document.getElementById('commissionRoundTableBody');
     const loadingEl = document.getElementById('loadingMessage');
     const errorEl = document.getElementById('errorContainer');
     const startDateInput = document.getElementById('startDate');
@@ -479,17 +539,26 @@
     const resetBtn = document.getElementById('resetFilterBtn');
     const dateRangeLabel = document.getElementById('dateRangeLabel');
 
-    // Modal refs
-    const modal = document.getElementById('depositModal');
-    const modalCloseBtn = document.getElementById('modalCloseBtn');
-    const modalUserName = document.getElementById('modalUserName');
-    const modalUserSub = document.getElementById('modalUserSub');
-    const modalDepositBody = document.getElementById('modalDepositBody');
-    const modalTotalDisplay = document.getElementById('modalTotalDisplay');
+    // Deposit Modal refs
+    const depositModal = document.getElementById('depositModal');
+    const depositModalCloseBtn = document.getElementById('depositModalCloseBtn');
+    const depositModalUserName = document.getElementById('depositModalUserName');
+    const depositModalUserSub = document.getElementById('depositModalUserSub');
+    const depositModalBody = document.getElementById('depositModalBody');
+    const depositModalTotal = document.getElementById('depositModalTotal');
+
+    // Withdrawal Modal refs
+    const withdrawalModal = document.getElementById('withdrawalModal');
+    const withdrawalModalCloseBtn = document.getElementById('withdrawalModalCloseBtn');
+    const withdrawalModalUserName = document.getElementById('withdrawalModalUserName');
+    const withdrawalModalUserSub = document.getElementById('withdrawalModalUserSub');
+    const withdrawalModalBody = document.getElementById('withdrawalModalBody');
+    const withdrawalModalTotal = document.getElementById('withdrawalModalTotal');
 
     let filterStart = startDateInput.value || null;
     let filterEnd = endDateInput.value || null;
     let userDepositsMap = {};
+    let userWithdrawalsMap = {};
 
     function showError(msg) {
         errorEl.textContent = msg;
@@ -519,19 +588,19 @@
         return query;
     }
 
-    // Modal logic
+    // ----- Deposit Modal Logic -----
     function showDepositModal(userId, username) {
         const deposits = userDepositsMap[userId] || [];
         if (deposits.length === 0) {
-            modalUserName.textContent = username || 'User';
-            modalUserSub.textContent = 'No deposits found for this period.';
-            modalDepositBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No records</td></tr>';
-            modalTotalDisplay.textContent = '';
-            modal.classList.add('active');
+            depositModalUserName.textContent = username || 'User';
+            depositModalUserSub.textContent = 'No deposits found for this period.';
+            depositModalBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No records</td></tr>';
+            depositModalTotal.textContent = '';
+            depositModal.classList.add('active');
             return;
         }
-        modalUserName.textContent = username || userId;
-        modalUserSub.textContent = `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
+        depositModalUserName.textContent = username || userId;
+        depositModalUserSub.textContent = `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
         let rows = '';
         let total = 0;
         const sorted = [...deposits].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
@@ -544,33 +613,87 @@
                 <td>${d.phone || '-'}</td>
             </tr>`;
         });
-        modalDepositBody.innerHTML = rows;
-        modalTotalDisplay.textContent = `Total: ${fmt(total)} ETB`;
-        modal.classList.add('active');
+        depositModalBody.innerHTML = rows;
+        depositModalTotal.textContent = `Total: ${fmt(total)} ETB`;
+        depositModal.classList.add('active');
     }
 
-    function closeModal() {
-        modal.classList.remove('active');
+    function closeDepositModal() {
+        depositModal.classList.remove('active');
     }
-    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-    modalCloseBtn.addEventListener('click', closeModal);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    depositModal.addEventListener('click', (e) => { if (e.target === depositModal) closeDepositModal(); });
+    depositModalCloseBtn.addEventListener('click', closeDepositModal);
 
-    // Main load function
+    // ----- Withdrawal Modal Logic -----
+    function showWithdrawalModal(userId, username) {
+        const withdrawals = userWithdrawalsMap[userId] || [];
+        if (withdrawals.length === 0) {
+            withdrawalModalUserName.textContent = username || 'User';
+            withdrawalModalUserSub.textContent = 'No withdrawals found for this period.';
+            withdrawalModalBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No records</td></tr>';
+            withdrawalModalTotal.textContent = '';
+            withdrawalModal.classList.add('active');
+            return;
+        }
+        withdrawalModalUserName.textContent = username || userId;
+        withdrawalModalUserSub.textContent = `${withdrawals.length} withdrawal${withdrawals.length > 1 ? 's' : ''} · Total: ${fmt(withdrawals.reduce((sum, d) => sum + d.amount, 0))} ETB`;
+        let rows = '';
+        let total = 0;
+        const sorted = [...withdrawals].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+        sorted.forEach(d => {
+            total += d.amount;
+            const statusClass = d.status || 'pending';
+            rows += `<tr>
+                <td>${fmt(d.amount)}</td>
+                <td>${formatDate(d.created_at)}</td>
+                <td><span class="method-badge">${d.withdrawal_type || 'N/A'}</span></td>
+                <td>${d.phone_number || '-'}</td>
+                <td>${d.receiver_name || '-'}</td>
+                <td><span class="status-badge ${statusClass}">${statusClass}</span></td>
+            </tr>`;
+        });
+        withdrawalModalBody.innerHTML = rows;
+        withdrawalModalTotal.textContent = `Total: ${fmt(total)} ETB`;
+        withdrawalModal.classList.add('active');
+    }
+
+    function closeWithdrawalModal() {
+        withdrawalModal.classList.remove('active');
+    }
+    withdrawalModal.addEventListener('click', (e) => { if (e.target === withdrawalModal) closeWithdrawalModal(); });
+    withdrawalModalCloseBtn.addEventListener('click', closeWithdrawalModal);
+
+    // Keyboard close for both modals
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeDepositModal();
+            closeWithdrawalModal();
+        }
+    });
+
+    // ----- Main load function -----
     async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds for commission only (total_house_profit)
-            let roundsQuery = supabase.from('game_rounds').select('house_profit');
-            roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
-            const { data: rounds, error: roundsErr } = await roundsQuery;
-            if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
-
+            // 1. Fetch game_rounds for total commission & detailed list
+            let commissionSumQuery = supabase.from('game_rounds').select('house_profit');
+            commissionSumQuery = buildDateFilter(commissionSumQuery, startDate, endDate);
+            const { data: commissionData, error: commissionErr } = await commissionSumQuery;
+            if (commissionErr) throw new Error('Failed to fetch commission data: ' + commissionErr.message);
             let totalCommission = 0;
-            rounds.forEach(r => {
-                totalCommission += Number(r.house_profit) || 0;
-            });
+            if (commissionData) {
+                totalCommission = commissionData.reduce((sum, d) => sum + Number(d.house_profit), 0);
+            }
 
-            // 2. Fetch total deposits (approved)
+            // Fetch detailed rounds list for the new table
+            let roundsListQuery = supabase.from('game_rounds')
+                .select('created_at, house_profit, prize_pool, total_entry_fees')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            roundsListQuery = buildDateFilter(roundsListQuery, startDate, endDate);
+            const { data: roundsList, error: roundsListErr } = await roundsListQuery;
+            if (roundsListErr) throw new Error('Failed to fetch rounds list: ' + roundsListErr.message);
+
+            // 2. Fetch total deposits
             let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
             depositQuery = buildDateFilter(depositQuery, startDate, endDate);
             const { data: depositsTotal, error: depTotalErr } = await depositQuery;
@@ -580,13 +703,41 @@
                 totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
             }
 
-            // 3. Render Stats Cards (only Commission and Deposits)
+            // 3. Fetch total withdrawals
+            let withdrawalTotalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
+            withdrawalTotalQuery = buildDateFilter(withdrawalTotalQuery, startDate, endDate);
+            const { data: withdrawalsTotal, error: wdTotalErr } = await withdrawalTotalQuery;
+            if (wdTotalErr) throw new Error('Failed to fetch withdrawals: ' + wdTotalErr.message);
+            let totalWithdrawals = 0;
+            if (withdrawalsTotal) {
+                totalWithdrawals = withdrawalsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
+            }
+
+            // 4. Render Stats Cards
             statsGrid.innerHTML = `
-                <div class="stat-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
+                <div class="stat-card commission-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
                 <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
+                <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
             `;
 
-            // 4. User-level data from audit_logs (wins & stakes)
+            // 5. Render Commission Distribution by Round Table
+            if (roundsList && roundsList.length > 0) {
+                let rows = '';
+                roundsList.forEach((r, idx) => {
+                    rows += `<tr>
+                        <td>${idx + 1}</td>
+                        <td>${formatDate(r.created_at)}</td>
+                        <td>${fmt(r.total_entry_fees)}</td>
+                        <td>${fmt(r.prize_pool)}</td>
+                        <td><strong>${fmt(r.house_profit)}</strong></td>
+                    </tr>`;
+                });
+                commissionRoundTableBody.innerHTML = rows;
+            } else {
+                commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No rounds found for this period</td></tr>';
+            }
+
+            // 6. Fetch user-level data (wins, stakes, deposits, withdrawals)
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
             winQuery = buildDateFilter(winQuery, startDate, endDate, 'timestamp');
             const { data: winLogs, error: winErr } = await winQuery;
@@ -597,13 +748,19 @@
             const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
-            // 5. Deposit data (approved deposits) with full details for modal
+            // 7. Fetch deposit details for modal
             let depositDetailQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
             depositDetailQuery = buildDateFilter(depositDetailQuery, startDate, endDate);
             const { data: depositDetails, error: depDetailErr } = await depositDetailQuery;
             if (depDetailErr) throw new Error('Failed to fetch deposit details: ' + depDetailErr.message);
 
-            // Reset deposit map
+            // 8. Fetch withdrawal details for modal and summary
+            let withdrawalDetailQuery = supabase.from('withdrawal_requests').select('telegram_id, username, amount, created_at, withdrawal_type, phone_number, receiver_name, status').eq('status', 'approved');
+            withdrawalDetailQuery = buildDateFilter(withdrawalDetailQuery, startDate, endDate);
+            const { data: withdrawalDetails, error: wdDetailErr } = await withdrawalDetailQuery;
+            if (wdDetailErr) throw new Error('Failed to fetch withdrawal details: ' + wdDetailErr.message);
+
+            // Build maps
             userDepositsMap = {};
             if (depositDetails) {
                 depositDetails.forEach(d => {
@@ -619,26 +776,52 @@
                 });
             }
 
-            // Aggregate per user
+            userWithdrawalsMap = {};
+            if (withdrawalDetails) {
+                withdrawalDetails.forEach(w => {
+                    const uid = w.telegram_id;
+                    if (!uid) return;
+                    if (!userWithdrawalsMap[uid]) userWithdrawalsMap[uid] = [];
+                    userWithdrawalsMap[uid].push({
+                        amount: Number(w.amount) || 0,
+                        created_at: w.created_at,
+                        withdrawal_type: w.withdrawal_type,
+                        phone_number: w.phone_number,
+                        receiver_name: w.receiver_name,
+                        status: w.status
+                    });
+                });
+            }
+
+            // Aggregate user data
             const userMap = {};
             winLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
-                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
                 userMap[uid].wins += 1;
                 userMap[uid].totalPayout += Number(log.details?.amount) || 0;
             });
             entryLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
-                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
                 userMap[uid].totalStakes += Number(log.details?.amount) || 0;
             });
             Object.keys(userDepositsMap).forEach(uid => {
-                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
                 const depList = userDepositsMap[uid];
                 userMap[uid].deposits = depList.length;
                 userMap[uid].totalDeposits = depList.reduce((sum, d) => sum + d.amount, 0);
+            });
+            Object.keys(userWithdrawalsMap).forEach(uid => {
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
+                const wdList = userWithdrawalsMap[uid];
+                userMap[uid].withdrawals = wdList.length;
+                userMap[uid].totalWithdrawn = wdList.reduce((sum, w) => sum + w.amount, 0);
+                wdList.forEach(w => {
+                    if (w.withdrawal_type) userMap[uid].methods.add(w.withdrawal_type);
+                });
             });
 
             const userIds = Object.keys(userMap);
@@ -658,6 +841,7 @@
                 const commission = 0.2 * d.totalStakes;
                 const avgPayoutUser = d.wins > 0 ? d.totalPayout / d.wins : 0;
                 const avgDeposit = d.deposits > 0 ? d.totalDeposits / d.deposits : 0;
+                const avgWithdrawal = d.withdrawals > 0 ? d.totalWithdrawn / d.withdrawals : 0;
                 return {
                     userId: uid,
                     username: usernameMap[uid] || uid,
@@ -668,11 +852,15 @@
                     avgPayout: avgPayoutUser,
                     deposits: d.deposits,
                     totalDeposits: d.totalDeposits,
-                    avgDeposit: avgDeposit
+                    avgDeposit: avgDeposit,
+                    withdrawals: d.withdrawals,
+                    totalWithdrawn: d.totalWithdrawn,
+                    avgWithdrawal: avgWithdrawal,
+                    methods: Array.from(d.methods)
                 };
             });
 
-            // --- Top Users by Total Payout (table) ---
+            // --- Top Users by Total Payout ---
             const sortedByPayout = [...userSummaries].sort((a,b) => b.totalPayout - a.totalPayout);
             const topPayout = sortedByPayout.slice(0, 10);
             let payoutRows = '';
@@ -685,7 +873,7 @@
             });
             payoutTableBody.innerHTML = payoutRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
-            // --- Top Users by Win Count (table) ---
+            // --- Top Users by Win Count ---
             const sortedByWins = [...userSummaries].sort((a,b) => b.wins - a.wins);
             const topWins = sortedByWins.slice(0, 10);
             let winsRows = '';
@@ -698,7 +886,7 @@
             });
             winsTableBody.innerHTML = winsRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
-            // --- Deposit Distribution (table) with clickable usernames ---
+            // --- Deposit Distribution ---
             const sortedByDeposits = [...userSummaries].sort((a,b) => b.totalDeposits - a.totalDeposits);
             const topDepositors = sortedByDeposits.slice(0, 10);
             let depositRows = '';
@@ -708,7 +896,7 @@
                     <td><span class="rank-badge">${idx+1}</span></td>
                     <td>
                         ${hasDeposits 
-                            ? `<span class="clickable-username" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
+                            ? `<span class="clickable-username deposit-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
                             : u.username
                         }
                     </td>
@@ -719,29 +907,43 @@
             });
             depositTableBody.innerHTML = depositRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No deposit data</td></tr>';
 
-            // Attach click handlers to clickable usernames
-            document.querySelectorAll('.clickable-username').forEach(el => {
+            // --- Withdrawal Distribution ---
+            const sortedByWithdrawals = [...userSummaries].sort((a,b) => b.totalWithdrawn - a.totalWithdrawn);
+            const topWithdrawals = sortedByWithdrawals.slice(0, 10);
+            let withdrawalRows = '';
+            topWithdrawals.forEach((u, idx) => {
+                const hasWithdrawals = u.withdrawals > 0;
+                withdrawalRows += `<tr>
+                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td>
+                        ${hasWithdrawals 
+                            ? `<span class="clickable-username withdrawal-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
+                            : u.username
+                        }
+                    </td>
+                    <td>${fmt(u.totalWithdrawn)}</td>
+                    <td>${u.withdrawals}</td>
+                    <td>${fmt(u.avgWithdrawal)}</td>
+                    <td>${u.methods.join(', ') || '-'}</td>
+                </tr>`;
+            });
+            withdrawalTableBody.innerHTML = withdrawalRows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No withdrawal data</td></tr>';
+
+            // Attach click handlers
+            document.querySelectorAll('.deposit-click').forEach(el => {
                 el.addEventListener('click', function(e) {
                     const userId = this.dataset.userid;
                     const username = this.dataset.username || userId;
                     showDepositModal(userId, username);
                 });
             });
-
-            // --- Full Summary Table (sorted by commission) ---
-            const sortedForTable = [...userSummaries].sort((a,b) => b.commission - a.commission);
-            let tableRows = '';
-            sortedForTable.forEach(u => {
-                tableRows += `<tr>
-                    <td><span class="badge">${u.userId}</span></td>
-                    <td>${u.wins}</td>
-                    <td>${fmt(u.totalPayout)}</td>
-                    <td>${fmt(u.totalStakes)}</td>
-                    <td><strong>${fmt(u.commission)}</strong></td>
-                    <td>${fmt(u.avgPayout)}</td>
-                </tr>`;
+            document.querySelectorAll('.withdrawal-click').forEach(el => {
+                el.addEventListener('click', function(e) {
+                    const userId = this.dataset.userid;
+                    const username = this.dataset.username || userId;
+                    showWithdrawalModal(userId, username);
+                });
             });
-            userTableBody.innerHTML = tableRows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No data for this period</td></tr>';
 
             loadingEl.style.display = 'none';
 
