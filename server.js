@@ -14,6 +14,16 @@ INSERT INTO invite_stats (invite_code) VALUES
   ('db'), ('mk'), ('hd'), ('ji'), ('ok'), 
   ('ghy'), ('bghu'), ('kil'), ('hg'), ('jkl'), ('jkil')
 ON CONFLICT (invite_code) DO NOTHING;
+
+-- ADD THIS: Create game_rounds table if not exists
+CREATE TABLE IF NOT EXISTS game_rounds (
+  id BIGSERIAL PRIMARY KEY,
+  total_entry_fees NUMERIC DEFAULT 0,
+  prize_pool NUMERIC DEFAULT 0,
+  house_profit NUMERIC DEFAULT 0,
+  stake INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 */
 // ============================================================
 
@@ -613,6 +623,27 @@ async function endGameWithWinners(stake) {
   game.status = 'ended';
   clearInterval(game.callInterval);
 
+  // Calculate round totals regardless of winners
+  const totalEntryFees = game.players.length * game.entryFee;
+  const houseProfit = totalEntryFees - game.prizePool;
+
+  // Always insert a round record (even with no winners)
+  try {
+    const { error } = await supabase.from('game_rounds').insert({
+      total_entry_fees: totalEntryFees,
+      prize_pool: game.prizePool,
+      house_profit: houseProfit,
+      stake
+    });
+    if (error) {
+      console.error(`❌ Failed to insert game_round for stake ${stake}:`, error);
+    } else {
+      console.log(`✅ Game round recorded for stake ${stake} (entry: ${totalEntryFees}, prize: ${game.prizePool}, profit: ${houseProfit})`);
+    }
+  } catch (err) {
+    console.error(`❌ Exception inserting game_round for stake ${stake}:`, err.message);
+  }
+
   if (game.winners.length > 0) {
     const prizeEach = Math.floor(game.prizePool / game.winners.length);
     for (const w of game.winners) {
@@ -632,15 +663,6 @@ async function endGameWithWinners(stake) {
         detectRapidWins(`stake_${stake}`, w.telegramId, null);
       }
     }
-
-    const totalEntryFees = game.players.length * game.entryFee;
-    const houseProfit = totalEntryFees - game.prizePool;
-    await supabase.from('game_rounds').insert({
-      total_entry_fees: totalEntryFees,
-      prize_pool: game.prizePool,
-      house_profit: houseProfit,
-      stake
-    });
 
     const ipCounts = {};
     game.winners.forEach(w => {
@@ -1237,4 +1259,4 @@ resetGame(20);
 resetGame(30);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`)); 
+server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
