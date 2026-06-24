@@ -678,23 +678,22 @@
     async function loadDashboard(startDate, endDate) {
         try {
             // 1. Fetch game_rounds for total commission & detailed list
-            let commissionSumQuery = supabase.from('game_rounds').select('house_profit');
-            commissionSumQuery = buildDateFilter(commissionSumQuery, startDate, endDate);
-            const { data: commissionData, error: commissionErr } = await commissionSumQuery;
-            if (commissionErr) throw new Error('Failed to fetch commission data: ' + commissionErr.message);
-            let totalCommission = 0;
-            if (commissionData) {
-                totalCommission = commissionData.reduce((sum, d) => sum + Number(d.house_profit), 0);
-            }
-
-            // Fetch detailed rounds list for the new table
-            let roundsListQuery = supabase.from('game_rounds')
-                .select('created_at, house_profit, prize_pool, total_entry_fees')
+            let roundsQuery = supabase.from('game_rounds')
+                .select('created_at, total_entry_fees, prize_pool, house_profit')
                 .order('created_at', { ascending: false })
                 .limit(100);
-            roundsListQuery = buildDateFilter(roundsListQuery, startDate, endDate);
-            const { data: roundsList, error: roundsListErr } = await roundsListQuery;
-            if (roundsListErr) throw new Error('Failed to fetch rounds list: ' + roundsListErr.message);
+            roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
+            const { data: roundsList, error: roundsErr } = await roundsQuery;
+            if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
+
+            // Calculate total commission as 20% of total_entry_fees
+            let totalCommission = 0;
+            if (roundsList) {
+                roundsList.forEach(r => {
+                    const entryFees = Number(r.total_entry_fees) || 0;
+                    totalCommission += entryFees * 0.2;
+                });
+            }
 
             // 2. Fetch total deposits
             let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
@@ -723,16 +722,18 @@
                 <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
             `;
 
-            // 5. Render Commission Distribution by Round Table
+            // 5. Render Commission Distribution by Round Table (calculate 20% of entry fees)
             if (roundsList && roundsList.length > 0) {
                 let rows = '';
                 roundsList.forEach((r, idx) => {
+                    const entryFees = Number(r.total_entry_fees) || 0;
+                    const commission = entryFees * 0.2;
                     rows += `<tr>
                         <td>${idx + 1}</td>
                         <td>${formatDate(r.created_at)}</td>
-                        <td>${fmt(r.total_entry_fees)}</td>
+                        <td>${fmt(entryFees)}</td>
                         <td>${fmt(r.prize_pool)}</td>
-                        <td><strong>${fmt(r.house_profit)}</strong></td>
+                        <td><strong>${fmt(commission)}</strong></td>
                     </tr>`;
                 });
                 commissionRoundTableBody.innerHTML = rows;
