@@ -435,7 +435,7 @@
 
     <!-- Info note -->
     <div class="info-note">
-        ℹ️ Round data is derived from audit logs (<code>WIN_PAID_OUT</code> events). Commission = 20% of entry fees (estimated as <code>prizePool / 0.8</code>). This may not be exact for single‑player games.
+        ℹ️ Round data is derived from audit logs (<code>WIN_PAID_OUT</code> events). Single‑player games (prize pool ≤ stake) are excluded from commission calculations.
     </div>
 
     <!-- Stats Grid -->
@@ -535,7 +535,7 @@
     // ================================================================
     //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
     // ================================================================
-    const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
+   const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
     // ================================================================
 
@@ -700,9 +700,7 @@
             const { data: roundLogs, error: roundLogsErr } = await roundLogsQuery;
             if (roundLogsErr) throw new Error('Failed to fetch WIN_PAID_OUT logs: ' + roundLogsErr.message);
 
-            // Process round logs: each log gives a prizePool, compute commission
-            // We'll treat each log as a separate round entry (multiple winners per round will appear multiple times – we'll deduplicate by timestamp and prizePool)
-            // Simple approach: group by timestamp rounded to minute and prizePool to merge multiple winners
+            // Process round logs: skip single-player games (prizePool <= stake)
             const roundsMap = new Map();
             let totalCommission = 0;
 
@@ -711,7 +709,8 @@
                     const details = log.details || {};
                     const prizePool = Number(details.totalPrizePool) || 0;
                     const stake = details.stake || 0;
-                    if (prizePool <= 0) return;
+                    // Skip single-player games: if prizePool is less than or equal to stake, it's a single player (no commission)
+                    if (prizePool <= stake || prizePool <= 0) return;
                     // Estimate entry fees: prizePool / 0.8 (assuming 80/20 split)
                     const entryFees = prizePool / 0.8;
                     const commission = entryFees * 0.2; // 20% house profit
@@ -793,7 +792,7 @@
                 });
                 commissionRoundTableBody.innerHTML = rows;
             } else {
-                commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No WIN_PAID_OUT events found for this period</td></tr>';
+                commissionRoundTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No valid WIN_PAID_OUT events found (single‑player games excluded)</td></tr>';
             }
 
             // 6. Fetch user-level data for top performers and deposits/withdrawals
