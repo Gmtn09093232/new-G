@@ -2,34 +2,18 @@
 //  REQUIRED SQL MIGRATIONS (run in Supabase SQL editor)
 // ============================================================
 /*
--- 1. Add referral columns to users (if not exist)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_amount NUMERIC DEFAULT 0;
 
--- 2. Create invite_stats table
 CREATE TABLE IF NOT EXISTS invite_stats (
   invite_code TEXT PRIMARY KEY,
   count INTEGER DEFAULT 0
 );
 
--- Insert default invite codes
 INSERT INTO invite_stats (invite_code) VALUES 
   ('db'), ('mk'), ('hd'), ('ji'), ('ok'), 
   ('ghy'), ('bghu'), ('kil'), ('hg'), ('jkl'), ('jkil')
 ON CONFLICT (invite_code) DO NOTHING;
-
--- 3. IMPORTANT: Ensure game_rounds has a created_at column
-ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
-
--- 4. Create round_participants table to store players per ended round
-CREATE TABLE IF NOT EXISTS round_participants (
-  id BIGSERIAL PRIMARY KEY,
-  round_id BIGINT NOT NULL REFERENCES game_rounds(id) ON DELETE CASCADE,
-  telegram_id TEXT NOT NULL,
-  username TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_round_participants_round_id ON round_participants(round_id);
 */
 // ============================================================
 
@@ -485,36 +469,6 @@ function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', data);
 }
 
-// =============== NEW: Admin Game State for full card data ===============
-function getGameStateForAdmin() {
-  const state = {};
-  for (const stake of [10, 20, 30]) {
-    const game = games[stake];
-    const players = game.players.map(p => ({
-      telegramId: p.telegramId,
-      username: p.username,
-      card: p.card,                    // 5x5 grid
-      markedNumbers: p.markedNumbers,
-      cardNumber: p.cardNumber
-    }));
-    state[stake] = {
-      status: game.status,
-      players,
-      calledNumbers: game.calledNumbers,
-      prizePool: game.prizePool,
-      entryFee: game.entryFee,
-      takenCardNumbers: Array.from(game.takenCardNumbers)
-    };
-  }
-  return state;
-}
-
-function broadcastAdminGameState() {
-  const state = getGameStateForAdmin();
-  adminNamespace.emit('admin:gameState', state);
-}
-// =============== END NEW ===============
-
 // ---------- PUBLIC NAMESPACE ----------
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
@@ -554,7 +508,6 @@ function resetGame(stake) {
   publicNamespace.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
   
   broadcastPlayerCount(stake);
-  broadcastAdminGameState(); // NEW: broadcast updated state
   
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
   notifyAdminClients();
@@ -580,7 +533,6 @@ async function startGame(stake) {
     game.status = 'ended';
     setTimeout(() => resetGame(stake), 3000);
     notifyAdminClients();
-    broadcastAdminGameState(); // NEW
     return;
   }
 
@@ -607,7 +559,6 @@ async function startGame(stake) {
   game.winningNumber = null;
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
-  broadcastAdminGameState(); // NEW
   startCalling(stake);
 }
 
@@ -631,7 +582,6 @@ function startCalling(stake) {
     game.calledNumbers.push(number);
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
     Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
-    broadcastAdminGameState(); // NEW: update after each draw
   }, 4000);
 }
 
@@ -685,39 +635,12 @@ async function endGameWithWinners(stake) {
 
     const totalEntryFees = game.players.length * game.entryFee;
     const houseProfit = totalEntryFees - game.prizePool;
-
-    // --- UPDATED: Insert round and participants ---
-    // Insert the round and get its ID
-    const { data: roundData, error: roundError } = await supabase
-      .from('game_rounds')
-      .insert({
-        total_entry_fees: totalEntryFees,
-        prize_pool: game.prizePool,
-        house_profit: houseProfit,
-        stake
-      })
-      .select('id')
-      .single();
-
-    if (roundError) {
-      console.error('❌ Failed to insert game round:', roundError.message);
-    } else if (roundData) {
-      // Insert all participants for this round
-      const participants = game.players.map(p => ({
-        round_id: roundData.id,
-        telegram_id: p.telegramId,
-        username: p.username
-      }));
-      if (participants.length > 0) {
-        const { error: partError } = await supabase
-          .from('round_participants')
-          .insert(participants);
-        if (partError) {
-          console.error('❌ Failed to insert round participants:', partError.message);
-        }
-      }
-    }
-    // --- END UPDATE ---
+    await supabase.from('game_rounds').insert({
+      total_entry_fees: totalEntryFees,
+      prize_pool: game.prizePool,
+      house_profit: houseProfit,
+      stake
+    });
 
     const ipCounts = {};
     game.winners.forEach(w => {
@@ -752,7 +675,6 @@ async function endGameWithWinners(stake) {
   game.winners = [];
   clearTimeout(game.bingoGraceTimeout);
   game.bingoGraceTimeout = null;
-  broadcastAdminGameState(); // NEW: update after game ends
   setTimeout(() => resetGame(stake), 5000);
   notifyAdminClients();
 }
@@ -1001,83 +923,6 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- IMPROVED Round history API endpoint (with detailed error logging) ----------
-app.get('/admin/rounds-history', async (req, res) => {
-  const { secret, from, to, limit = 500 } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  try {
-    let query = supabase
-      .from('game_rounds')
-      .select(`
-        id,
-        stake,
-        prize_pool,
-        house_profit,
-        total_entry_fees,
-        created_at,
-        round_participants ( telegram_id, username )
-      `)
-      .order('created_at', { ascending: false })
-      .limit(parseInt(limit));
-
-    if (from) {
-      const fromDate = new Date(from);
-      if (!isNaN(fromDate)) {
-        query = query.gte('created_at', fromDate.toISOString());
-      }
-    }
-    if (to) {
-      const toDate = new Date(to);
-      if (!isNaN(toDate)) {
-        query = query.lte('created_at', toDate.toISOString());
-      }
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      // Log full error details to server console
-      console.error('❌ Supabase query error:', JSON.stringify(error, null, 2));
-      // Return detailed error to client for debugging
-      return res.status(500).json({
-        success: false,
-        error: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-    }
-
-    const rounds = (data || []).map(row => ({
-      id: row.id,
-      stake: row.stake,
-      prizePool: row.prize_pool,
-      profit: row.house_profit,
-      revenue: row.total_entry_fees,
-      playerCount: row.round_participants?.length || 0,
-      players: row.round_participants || [],
-      time: new Date(row.created_at).toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }),
-      date: new Date(row.created_at)
-    }));
-
-    res.json({ success: true, rounds });
-  } catch (err) {
-    console.error('❌ Unexpected error in /admin/rounds-history:', err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-  }
-});
-
 // ---------- REFERRAL ENDPOINTS ----------
 app.get('/api/invite-stats', async (req, res) => {
   const { secret } = req.query;
@@ -1251,7 +1096,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    broadcastAdminGameState(); // NEW
   });
   
   socket.on('newCardNumber', () => {
@@ -1274,7 +1118,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    broadcastAdminGameState(); // NEW
   });
   
   socket.on('markNumber', (number) => {
@@ -1291,7 +1134,6 @@ io.on('connection', async (socket) => {
     if (player.markedNumbers.includes(number)) return;
     player.markedNumbers.push(number);
     socket.emit('markedNumbers', player.markedNumbers);
-    broadcastAdminGameState(); // NEW
   });
   
   socket.on('claimBingo', () => {
@@ -1314,7 +1156,6 @@ io.on('connection', async (socket) => {
     game.winners.push({ telegramId: socket.userId, username: socket.username });
     Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
     socket.emit('bingoValid');
-    broadcastAdminGameState(); // NEW
     if (!game.bingoGraceTimeout && game.winners.length === 1) {
       io.to(`stake_${currentStake}`).emit('multipleBingoPossible', { stake: currentStake, message: 'Bingo claimed! Waiting for other potential winners...' });
       game.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(currentStake); }, 3000);
@@ -1347,9 +1188,6 @@ adminNamespace.on('connection', (socket) => {
       30: games[30].status
     }
   });
-  // NEW: send full game state on connection
-  socket.emit('admin:gameState', getGameStateForAdmin());
-
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
@@ -1399,4 +1237,4 @@ resetGame(20);
 resetGame(30);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
+server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`)); 
