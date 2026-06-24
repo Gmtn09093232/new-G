@@ -4,115 +4,791 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎲 Live Bingo · All Players' Cards</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+  </script>
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js">
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
-    body { background: #0b0e14; color: #e9edf2; padding: 20px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #2a313c; padding-bottom: 12px; }
-    .header h1 { background: linear-gradient(135deg, #f0b94b, #f7d875); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .status { color: #6ab0f7; font-size: 0.9rem; }
-    .stake-section { margin-bottom: 30px; }
-    .stake-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 10px; color: #b4bfd4; }
-    .stake-title span { background: #1f2937; padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; }
-    .card-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-    .player-card { background: #141b24; border-radius: 12px; padding: 8px; border: 1px solid #232c38; width: 180px; }
-    .player-card .pname { font-size: 0.7rem; font-weight: 600; color: #b4bfd4; text-align: center; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mini-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; }
-    .mini-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; font-weight: 600; background: #1f2937; border-radius: 4px; color: #6b7a93; }
-    .mini-cell.free { background: #2a3342; color: #f7c35c; font-size: 0.45rem; }
-    .mini-cell.called { background: #3d6b4a; color: #e2f0e6; }
-    .mini-cell.bingo-highlight { background: #f7c35c; color: #0b0e14; font-weight: 700; }
-    .no-players { color: #6b7a93; padding: 10px 0; }
-    .called-numbers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    .called-num { background: #1f2937; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; color: #b4bfd4; }
-    .status-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.6rem; font-weight: 600; }
-    .status-badge.lobby { background: #374151; color: #9ca3af; }
-    .status-badge.running { background: #065f46; color: #6ee7b7; }
-    .status-badge.ended { background: #78350f; color: #fcd34d; }
-    .error-msg { color: #f28b9c; padding: 20px; text-align: center; }
+    /* (styles unchanged – same as your provided CSS) */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      background: #0b0e14;
+      color: #e9edf2;
+      padding: 18px;
+      min-height: 100vh;
+    }
+    .dashboard {
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+      border-bottom: 1px solid #2a313c;
+      padding-bottom: 14px;
+    }
+    .header h1 {
+      font-weight: 600;
+      font-size: 1.8rem;
+      letter-spacing: -0.01em;
+      background: linear-gradient(135deg, #f0b94b, #f7d875);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #1f2937;
+      border: 1px solid #374151;
+      color: #d1d9e6;
+      padding: 5px 16px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .btn:hover {
+      background: #2d3a4b;
+      border-color: #5a6a7e;
+    }
+    .btn.primary {
+      background: #f7c35c;
+      border-color: #f7c35c;
+      color: #0b0e14;
+    }
+    .btn.primary:hover {
+      background: #fad073;
+      border-color: #fad073;
+    }
+    .live-badge {
+      background: #dc2626;
+      color: white;
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 40px;
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.4;
+      }
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #141b24;
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1px solid #232c38;
+    }
+    .kpi-label {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #7b879c;
+      font-weight: 600;
+    }
+    .kpi-value {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-top: 2px;
+      letter-spacing: -0.02em;
+      color: #f0f4fa;
+    }
+    .kpi-value .unit {
+      font-size: 0.85rem;
+      color: #8892a8;
+      font-weight: 400;
+      margin-left: 3px;
+    }
+    .kpi-card.accent .kpi-value {
+      color: #f7c35c;
+    }
+    .kpi-card.green .kpi-value {
+      color: #5fcb8a;
+    }
+    .kpi-card.pink .kpi-value {
+      color: #f28b9c;
+    }
+    .kpi-card.blue .kpi-value {
+      color: #6ab0f7;
+    }
+    .kpi-card.purple .kpi-value {
+      color: #b794f4;
+    }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .chart-box {
+      background: #141b24;
+      border-radius: 16px;
+      padding: 16px 14px 12px;
+      border: 1px solid #232c38;
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-box h3 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #b4bfd4;
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+    }
+    .chart-box.wide {
+      grid-column: 1 / -1;
+    }
+    .chart-container {
+      position: relative;
+      height: 180px;
+      flex: 1;
+    }
+    .chart-container.tall {
+      height: 200px;
+    }
+    .player-cards-scroll {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      overflow-y: auto;
+      padding: 4px 2px;
+      max-height: 220px;
+      align-content: flex-start;
+      flex: 1;
+    }
+    .player-mini-card {
+      background: #11181f;
+      border-radius: 10px;
+      padding: 6px 8px 8px;
+      border: 1px solid #2a3342;
+      width: calc(50% - 5px);
+      min-width: 100px;
+      flex: 0 0 calc(50% - 5px);
+      transition: 0.2s;
+    }
+    .player-mini-card.bingo-win {
+      border-color: #f7c35c;
+      background: #2a2416;
+      box-shadow: 0 0 20px rgba(247, 195, 92, 0.25);
+    }
+    .player-mini-card .pname {
+      font-size: 0.6rem;
+      font-weight: 600;
+      color: #b4bfd4;
+      text-align: center;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 2px;
+    }
+    .mini-cell {
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.5rem;
+      font-weight: 600;
+      background: #1f2937;
+      border-radius: 4px;
+      color: #6b7a93;
+      transition: 0.1s;
+    }
+    .mini-cell.free {
+      background: #2a3342;
+      color: #f7c35c;
+      font-size: 0.4rem;
+    }
+    .mini-cell.called {
+      background: #3d6b4a;
+      border-color: #5fcb8a;
+      color: #e2f0e6;
+    }
+    .mini-cell.bingo-highlight {
+      background: #f7c35c;
+      color: #0b0e14;
+      font-weight: 700;
+    }
+    .no-players-msg {
+      color: #6b7a93;
+      font-size: 0.8rem;
+      text-align: center;
+      width: 100%;
+      padding: 20px 0;
+    }
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+      margin-top: 6px;
+    }
+    .log-box {
+      background: #141b24;
+      border-radius: 16px;
+      border: 1px solid #232c38;
+      padding: 12px 14px 10px;
+      height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .log-box .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .log-box .log-header h3 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #b4bfd4;
+    }
+    .log-box .log-body {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.75rem;
+      font-family: 'Inter', monospace;
+      padding-right: 4px;
+    }
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #1a212b;
+      color: #cbd5e1;
+      display: flex;
+      gap: 6px;
+    }
+    .log-entry .time {
+      color: #6b7a93;
+      min-width: 56px;
+    }
+    .log-entry .badge-event {
+      font-weight: 500;
+      padding: 0 6px;
+      border-radius: 12px;
+      font-size: 0.55rem;
+      background: #2a3342;
+      color: #b0bed6;
+      align-self: center;
+      text-transform: uppercase;
+    }
+    .log-entry .badge-event.win {
+      background: #3d2c1e;
+      color: #f7c35c;
+    }
+    .log-entry .badge-event.buy {
+      background: #1c3340;
+      color: #6ab0f7;
+    }
+    .log-entry .badge-event.round {
+      background: #2a2a3a;
+      color: #b794f4;
+    }
+    .log-entry .badge-event.bingo {
+      background: #f7c35c;
+      color: #0b0e14;
+    }
+    .log-entry .msg {
+      color: #e2e8f0;
+      flex: 1;
+    }
+    .user-summary-box {
+      background: #141b24;
+      border-radius: 16px;
+      border: 1px solid #232c38;
+      padding: 12px 14px 10px;
+      height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .user-summary-box h3 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #b4bfd4;
+      margin-bottom: 8px;
+    }
+    .user-summary-box .scroll-wrap {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .user-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid #1a212b;
+      font-size: 0.72rem;
+      color: #dce2ec;
+    }
+    .user-row .uid {
+      color: #9aa9c0;
+    }
+    .user-row .profit {
+      font-weight: 500;
+    }
+    .user-row .profit.pos {
+      color: #5fcb8a;
+    }
+    .user-row .profit.neg {
+      color: #f28b9c;
+    }
+    .text-muted {
+      color: #6b7a93;
+      font-size: 0.7rem;
+    }
+    @media (max-width: 920px) {
+      .chart-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+      .chart-box.wide {
+        grid-column: 1 / -1;
+      }
+      .player-mini-card {
+        flex: 0 0 calc(33% - 7px);
+        width: calc(33% - 7px);
+      }
+    }
+    @media (max-width: 640px) {
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+      .bottom-grid {
+        grid-template-columns: 1fr;
+      }
+      .header h1 {
+        font-size: 1.2rem;
+      }
+      .kpi-value {
+        font-size: 1.1rem;
+      }
+      body {
+        padding: 10px;
+      }
+      .player-mini-card {
+        flex: 0 0 calc(50% - 5px);
+        width: calc(50% - 5px);
+      }
+      .mini-cell {
+        font-size: 0.4rem;
+      }
+    }
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0e14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #3b485a;
+      border-radius: 10px;
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🎲 Live Bingo · All Cards</h1>
-    <div class="status">🟢 Connected to <span id="roomStatus">—</span></div>
+
+  <div class="dashboard">
+    <!-- HEADER -->
+    <div class="header">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <h1>🎲 Bingo · All Cards</h1>
+        <span class="live-badge">● LIVE</span>
+      </div>
+      <div class="header-actions">
+        <span class="text-muted" id="connectionStatus">Connecting…</span>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="kpi-grid" id="kpiContainer"></div>
+
+    <!-- 3-COLUMN: Rooms | PLAYERS CARDS | Called Numbers -->
+    <div class="chart-grid">
+      <!-- Room summary (bar chart) -->
+      <div class="chart-box">
+        <h3>🏠 Rooms Overview</h3>
+        <div class="chart-container tall"><canvas id="roomChart"></canvas></div>
+      </div>
+
+      <!-- ALL PLAYERS BINGO CARDS -->
+      <div class="chart-box">
+        <h3>👥 Players' Cards (<span id="playerCount">0</span> total)</h3>
+        <div class="player-cards-scroll" id="playerCardsList">
+          <div class="no-players-msg">Waiting for players to join…</div>
+        </div>
+      </div>
+
+      <!-- Called Numbers Distribution -->
+      <div class="chart-box">
+        <h3>🔢 Called Numbers</h3>
+        <div class="chart-container tall"><canvas id="calledChart"></canvas></div>
+      </div>
+
+      <!-- Timeline (full width) – we can show called numbers over time or room activity -->
+      <div class="chart-box wide">
+        <h3>⏳ Called Numbers Timeline</h3>
+        <div class="chart-container"><canvas id="timelineChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- BOTTOM: LOG + USER SUMMARY (optional – we can repurpose) -->
+    <div class="bottom-grid">
+      <div class="log-box">
+        <div class="log-header">
+          <h3>📋 Live Activity Log</h3>
+          <button class="btn" id="clearLogBtn" style="padding:2px 10px; font-size:0.65rem;">Clear</button>
+        </div>
+        <div class="log-body" id="logBody"></div>
+      </div>
+      <div class="user-summary-box">
+        <h3>👥 Room Player Counts</h3>
+        <div class="scroll-wrap" id="userSummaryBody"></div>
+      </div>
+    </div>
   </div>
-  <div id="container"></div>
 
   <script>
-    // ---- Get admin secret from URL ----
-    const urlParams = new URLSearchParams(window.location.search);
-    const secret = urlParams.get('secret');
-    if (!secret) {
-      document.getElementById('container').innerHTML = `<div class="error-msg">⚠️ Missing admin secret. Use ?secret=YOUR_SECRET</div>`;
-      throw new Error('Missing secret');
-    }
+    // ============================================================
+    // LIVE DASHBOARD – connects to admin WebSocket
+    // ============================================================
 
-    // ---- Connect to admin namespace ----
-    const socket = io('/admin', {
-      query: { secret }
-    });
+    // ---- CONFIG: Admin secret (set your own) ----
+    const ADMIN_SECRET = 'your-admin-secret'; // ⚠️ CHANGE THIS or pass ?secret=... in URL
 
-    const container = document.getElementById('container');
-    const roomStatus = document.getElementById('roomStatus');
+    // ---- State ----
+    let gameState = {
+      10: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 10 },
+      20: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 20 },
+      30: { players: [], calledNumbers: [], status: 'lobby', prizePool: 0, entryFee: 30 }
+    };
+    let calledHistory = []; // for timeline
+    let logEntries = [];
 
-    socket.on('connect', () => {
-      roomStatus.textContent = 'Admin connected';
-    });
+    // ---- DOM refs ----
+    const kpiContainer = document.getElementById('kpiContainer');
+    const playerCardsList = document.getElementById('playerCardsList');
+    const playerCountSpan = document.getElementById('playerCount');
+    const logBody = document.getElementById('logBody');
+    const userSummaryBody = document.getElementById('userSummaryBody');
+    const connectionStatus = document.getElementById('connectionStatus');
+    const clearLogBtn = document.getElementById('clearLogBtn');
 
-    socket.on('connect_error', (err) => {
-      container.innerHTML = `<div class="error-msg">❌ Connection failed: ${err.message}</div>`;
-    });
+    // ---- Charts ----
+    let roomChart, calledChart, timelineChart;
 
-    socket.on('admin:gameState', (state) => {
-      renderState(state);
-    });
-
-    // ---- Render function ----
-    function renderState(state) {
-      let html = '';
-      for (const stake of [10, 20, 30]) {
-        const room = state[stake];
-        if (!room) continue;
-        const players = room.players || [];
-        const called = room.calledNumbers || [];
-        const status = room.status || 'unknown';
-        const statusClass = status === 'lobby' ? 'lobby' : status === 'running' ? 'running' : 'ended';
-
-        html += `<div class="stake-section">
-          <div class="stake-title">🎯 ${stake} ETB <span class="status-badge ${statusClass}">${status.toUpperCase()}</span> <span style="font-weight:normal;font-size:0.8rem;color:#7b879c;">${players.length} players</span></div>
-          <div class="called-numbers">${called.map(n => `<span class="called-num">${n}</span>`).join('')}</div>
-          <div class="card-grid">`;
-
-        if (players.length === 0) {
-          html += `<div class="no-players">No players yet</div>`;
-        } else {
-          for (const p of players) {
-            const card = p.card;
-            if (!card) continue;
-            const marked = p.markedNumbers || [];
-            html += `<div class="player-card">
-              <div class="pname">${p.username || p.telegramId}</div>
-              <div class="mini-grid">`;
-            for (let row = 0; row < 5; row++) {
-              for (let col = 0; col < 5; col++) {
-                const val = card[col][row];
-                let cls = 'mini-cell';
-                if (val === 'FREE') cls += ' free';
-                else if (marked.includes(val)) cls += ' called';
-                // Optional bingo highlight if we detect bingo (we don't have that info, but could add)
-                const display = val === 'FREE' ? '★' : val;
-                html += `<div class="${cls}">${display}</div>`;
-              }
-            }
-            html += `</div></div>`;
+    function initCharts() {
+      roomChart = new Chart(document.getElementById('roomChart'), {
+        type: 'bar',
+        data: {
+          labels: ['10 ETB', '20 ETB', '30 ETB'],
+          datasets: [
+            { label: 'Players', data: [0, 0, 0], backgroundColor: '#6ab0f7', borderRadius: 4 },
+            { label: 'Prize Pool (ETB)', data: [0, 0, 0], backgroundColor: '#f7c35c', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#b4bfd4', boxWidth: 12 } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#b4bfd4' } },
+            y: { grid: { color: '#232c38' }, ticks: { color: '#8892a8' } }
           }
         }
+      });
 
-        html += `</div></div>`;
-      }
-      container.innerHTML = html;
+      calledChart = new Chart(document.getElementById('calledChart'), {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{ label: 'Frequency', data: [], backgroundColor: '#5fcb8a', borderRadius: 4 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#b4bfd4', maxTicksLimit: 20 } },
+            y: { grid: { color: '#232c38' }, ticks: { color: '#8892a8', stepSize: 1 } }
+          }
+        }
+      });
+
+      timelineChart = new Chart(document.getElementById('timelineChart'), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Called Numbers', data: [], borderColor: '#f28b9c', backgroundColor: 'rgba(242,139,156,0.1)',
+              fill: true, tension: 0.2, pointRadius: 1 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#8892a8', maxTicksLimit: 20, maxRotation: 30 } },
+            y: { grid: { color: '#232c38' }, ticks: { color: '#8892a8' } }
+          }
+        }
+      });
     }
+
+    // ---- Helpers ----
+    function formatTime(d) {
+      return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function addLog(type, msg) {
+      const entry = { time: new Date(), type, msg, label: formatTime(new Date()) };
+      logEntries.unshift(entry);
+      if (logEntries.length > 200) logEntries.pop();
+      renderLog();
+    }
+
+    // ---- Render functions ----
+    function renderPlayerCards() {
+      let totalPlayers = 0;
+      let html = '';
+      for (const stake of [10, 20, 30]) {
+        const room = gameState[stake];
+        const players = room.players || [];
+        totalPlayers += players.length;
+        for (const p of players) {
+          const card = p.card;
+          if (!card) continue;
+          const marked = p.markedNumbers || [];
+          html += `<div class="player-mini-card">
+            <div class="pname">${p.username || p.telegramId}</div>
+            <div class="mini-grid">`;
+          for (let row = 0; row < 5; row++) {
+            for (let col = 0; col < 5; col++) {
+              const val = card[col][row];
+              let cls = 'mini-cell';
+              if (val === 'FREE') cls += ' free';
+              else if (marked.includes(val)) cls += ' called';
+              const display = val === 'FREE' ? '★' : val;
+              html += `<div class="${cls}">${display}</div>`;
+            }
+          }
+          html += `</div></div>`;
+        }
+      }
+      playerCountSpan.textContent = totalPlayers;
+      if (totalPlayers === 0) {
+        playerCardsList.innerHTML = `<div class="no-players-msg">Waiting for players to join…</div>`;
+      } else {
+        playerCardsList.innerHTML = html;
+      }
+    }
+
+    function renderLog() {
+      logBody.innerHTML = logEntries.slice(0, 60).map(e => `
+        <div class="log-entry">
+          <span class="time">${e.label}</span>
+          <span class="badge-event ${e.type}">${e.type}</span>
+          <span class="msg">${e.msg}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateKPIs() {
+      let totalPlayers = 0,
+        totalRevenue = 0,
+        totalPrize = 0;
+      for (const stake of [10, 20, 30]) {
+        const room = gameState[stake];
+        const count = room.players.length;
+        totalPlayers += count;
+        totalRevenue += count * room.entryFee;
+        totalPrize += room.prizePool || 0;
+      }
+      const net = totalRevenue - totalPrize;
+      const rtp = totalRevenue > 0 ? (totalPrize / totalRevenue) * 100 : 0;
+      const avgPrize = totalPlayers > 0 ? totalPrize / totalPlayers : 0;
+
+      const cards = [
+        { label: 'Total Players', value: totalPlayers, cls: 'blue', unit: '' },
+        { label: 'Total Revenue', value: totalRevenue, cls: 'accent', unit: 'ETB' },
+        { label: 'Total Prize Pool', value: totalPrize, cls: 'pink', unit: 'ETB' },
+        { label: 'House Net', value: net, cls: net >= 0 ? 'green' : 'pink', unit: 'ETB' },
+        { label: 'RTP', value: rtp, cls: 'purple', unit: '%' },
+        { label: 'Avg Prize / Player', value: avgPrize, cls: '', unit: 'ETB' },
+      ];
+
+      kpiContainer.innerHTML = cards.map(k => `
+        <div class="kpi-card ${k.cls}">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-value">${k.value % 1 === 0 ? k.value : k.value.toFixed(1)} <span class="unit">${k.unit}</span></div>
+        </div>
+      `).join('');
+    }
+
+    function updateUserSummary() {
+      const rooms = [10, 20, 30];
+      let html = rooms.map(stake => {
+        const room = gameState[stake];
+        const count = room.players.length;
+        const status = room.status || 'lobby';
+        const emoji = status === 'running' ? '🟢' : status === 'ended' ? '🔴' : '🟡';
+        return `<div class="user-row">
+          <span class="uid">${stake} ETB ${emoji}</span>
+          <span class="profit pos">${count} players</span>
+          <span class="text-muted">${status}</span>
+        </div>`;
+      }).join('');
+      userSummaryBody.innerHTML = html || '<div class="text-muted">No rooms active</div>';
+    }
+
+    function updateCharts() {
+      // Room chart
+      const playerCounts = [10, 20, 30].map(stake => gameState[stake].players.length);
+      const prizePools = [10, 20, 30].map(stake => gameState[stake].prizePool || 0);
+      roomChart.data.datasets[0].data = playerCounts;
+      roomChart.data.datasets[1].data = prizePools;
+      roomChart.update();
+
+      // Called numbers distribution (aggregate across rooms)
+      const allCalled = [];
+      for (const stake of [10, 20, 30]) {
+        const room = gameState[stake];
+        if (room.calledNumbers) allCalled.push(...room.calledNumbers);
+      }
+      const freq = {};
+      allCalled.forEach(n => { freq[n] = (freq[n] || 0) + 1; });
+      const sorted = Object.keys(freq).map(Number).sort((a, b) => a - b);
+      calledChart.data.labels = sorted.map(n => n);
+      calledChart.data.datasets[0].data = sorted.map(n => freq[n]);
+      calledChart.update();
+
+      // Timeline: track called numbers over time (we use the latest called numbers per room, but we'll just push a new point when we get updates)
+      // We'll store last called in state; we can show total called count per update.
+      // For simplicity, we'll show the cumulative count of called numbers over time.
+      // Instead, we can just show the sequence of called numbers as a scatter.
+      // Let's rebuild timeline data on each update.
+      const allCalls = [];
+      for (const stake of [10, 20, 30]) {
+        const room = gameState[stake];
+        if (room.calledNumbers) {
+          room.calledNumbers.forEach((num, idx) => {
+            allCalls.push({ stake, num, idx });
+          });
+        }
+      }
+      // Sort by call order (we don't have timestamps per call, but we can use the order in the array)
+      // We'll just take the last 40 calls across all rooms.
+      const sortedCalls = allCalls.sort((a, b) => a.idx - b.idx);
+      const recent = sortedCalls.slice(-40);
+      timelineChart.data.labels = recent.map((c, i) => `${c.stake}ETB`);
+      timelineChart.data.datasets[0].data = recent.map(c => c.num);
+      timelineChart.update();
+    }
+
+    // ---- Main update from server ----
+    function updateFromServer(state) {
+      // Merge with existing state (preserve some keys if needed)
+      for (const stake of [10, 20, 30]) {
+        if (state[stake]) {
+          gameState[stake] = {
+            ...gameState[stake],
+            ...state[stake]
+          };
+        }
+      }
+      // Log major events
+      const totalPlayers = Object.values(gameState).reduce((sum, r) => sum + r.players.length, 0);
+      addLog('round', `🔄 Update: ${totalPlayers} players across all rooms`);
+
+      renderPlayerCards();
+      updateKPIs();
+      updateUserSummary();
+      updateCharts();
+    }
+
+    // ---- WebSocket connection ----
+    function connect() {
+      // Determine secret: use URL param if present, else hardcoded
+      const urlParams = new URLSearchParams(window.location.search);
+      const secret = urlParams.get('secret') || ADMIN_SECRET;
+
+      const socket = io('/admin', {
+        query: { secret }
+      });
+
+      socket.on('connect', () => {
+        connectionStatus.textContent = '🟢 Connected';
+        addLog('round', '✅ Connected to admin namespace');
+      });
+
+      socket.on('connect_error', (err) => {
+        connectionStatus.textContent = '🔴 Connection error';
+        addLog('round', `❌ Connection error: ${err.message}`);
+        console.error('Socket error:', err);
+      });
+
+      socket.on('admin:gameState', (state) => {
+        updateFromServer(state);
+      });
+
+      // Also handle initial state if sent
+      socket.on('admin:playersList', (data) => {
+        // We might not need this, but we can use it for extra info
+        console.log('admin:playersList', data);
+      });
+
+      // Keep connection alive
+      socket.on('disconnect', () => {
+        connectionStatus.textContent = '🔴 Disconnected';
+        addLog('round', '⚠️ Disconnected from server');
+      });
+    }
+
+    // ---- Clear log ----
+    clearLogBtn.addEventListener('click', () => {
+      logEntries = [];
+      renderLog();
+    });
+
+    // ---- Init ----
+    document.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+      connect();
+      // Initial empty render
+      renderPlayerCards();
+      updateKPIs();
+      updateUserSummary();
+    });
   </script>
 </body>
 </html>
