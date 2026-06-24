@@ -14,6 +14,16 @@ INSERT INTO invite_stats (invite_code) VALUES
   ('db'), ('mk'), ('hd'), ('ji'), ('ok'), 
   ('ghy'), ('bghu'), ('kil'), ('hg'), ('jkl'), ('jkil')
 ON CONFLICT (invite_code) DO NOTHING;
+
+-- NEW: Table to store participants per ended round
+CREATE TABLE IF NOT EXISTS round_participants (
+  id BIGSERIAL PRIMARY KEY,
+  round_id BIGINT NOT NULL REFERENCES game_rounds(id) ON DELETE CASCADE,
+  telegram_id TEXT NOT NULL,
+  username TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_round_participants_round_id ON round_participants(round_id);
 */
 // ============================================================
 
@@ -669,12 +679,39 @@ async function endGameWithWinners(stake) {
 
     const totalEntryFees = game.players.length * game.entryFee;
     const houseProfit = totalEntryFees - game.prizePool;
-    await supabase.from('game_rounds').insert({
-      total_entry_fees: totalEntryFees,
-      prize_pool: game.prizePool,
-      house_profit: houseProfit,
-      stake
-    });
+
+    // --- UPDATED: Insert round and participants ---
+    // Insert the round and get its ID
+    const { data: roundData, error: roundError } = await supabase
+      .from('game_rounds')
+      .insert({
+        total_entry_fees: totalEntryFees,
+        prize_pool: game.prizePool,
+        house_profit: houseProfit,
+        stake
+      })
+      .select('id')
+      .single();
+
+    if (roundError) {
+      console.error('❌ Failed to insert game round:', roundError.message);
+    } else if (roundData) {
+      // Insert all participants for this round
+      const participants = game.players.map(p => ({
+        round_id: roundData.id,
+        telegram_id: p.telegramId,
+        username: p.username
+      }));
+      if (participants.length > 0) {
+        const { error: partError } = await supabase
+          .from('round_participants')
+          .insert(participants);
+        if (partError) {
+          console.error('❌ Failed to insert round participants:', partError.message);
+        }
+      }
+    }
+    // --- END UPDATE ---
 
     const ipCounts = {};
     game.winners.forEach(w => {
@@ -954,6 +991,68 @@ app.get('/admin/stats-summary', async (req, res) => {
     });
   } catch (err) {
     console.error('Stats error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- NEW: Round history API endpoint ----------
+app.get('/admin/rounds-history', async (req, res) => {
+  const { secret, from, to, limit = 500 } = req.query;
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    let query = supabase
+      .from('game_rounds')
+      .select(`
+        id,
+        stake,
+        prize_pool,
+        house_profit,
+        total_entry_fees,
+        created_at,
+        round_participants ( telegram_id, username )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
+
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate)) {
+        query = query.gte('created_at', fromDate.toISOString());
+      }
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate)) {
+        query = query.lte('created_at', toDate.toISOString());
+      }
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const rounds = (data || []).map(row => ({
+      id: row.id,
+      stake: row.stake,
+      prizePool: row.prize_pool,
+      profit: row.house_profit,
+      revenue: row.total_entry_fees,
+      playerCount: row.round_participants?.length || 0,
+      players: row.round_participants || [],
+      time: new Date(row.created_at).toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }),
+      date: new Date(row.created_at)
+    }));
+
+    res.json({ success: true, rounds });
+  } catch (err) {
+    console.error('❌ Error fetching round history:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
