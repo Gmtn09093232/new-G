@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bingo Win Dashboard · Win Count Focus</title>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Supabase JS -->
+    <title>Bingo Win Dashboard · Deposit Tables</title>
+    <!-- Supabase JS (no Chart.js needed anymore) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,20 +113,20 @@
             font-size: 0.75rem;
             color: #94a3b8;
         }
-        .chart-row {
+        .table-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
             margin-bottom: 28px;
         }
-        .chart-box {
+        .table-box {
             background: #ffffff;
             border-radius: 16px;
             padding: 20px;
             border: 1px solid #e9edf4;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
-        .chart-box h3 {
+        .table-box h3 {
             font-weight: 500;
             font-size: 1rem;
             color: #334155;
@@ -136,9 +134,72 @@
             border-bottom: 1px solid #eef2f6;
             padding-bottom: 10px;
         }
-        .chart-container {
-            position: relative;
-            height: 260px;
+        .table-box table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .table-box th {
+            text-align: left;
+            padding: 8px 6px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .table-box td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #eef2f6;
+            color: #1e293b;
+        }
+        .table-box tr:hover td {
+            background: #fafcff;
+        }
+        .rank-badge {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1e4c8e;
+            border-radius: 20px;
+            padding: 0 8px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        .full-width-box {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9edf4;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin-bottom: 28px;
+        }
+        .full-width-box h3 {
+            font-weight: 500;
+            font-size: 1rem;
+            color: #334155;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 10px;
+        }
+        .full-width-box table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .full-width-box th {
+            text-align: left;
+            padding: 8px 6px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .full-width-box td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #eef2f6;
+            color: #1e293b;
+        }
+        .full-width-box tr:hover td {
+            background: #fafcff;
         }
         .table-container {
             background: #ffffff;
@@ -156,12 +217,12 @@
             border-bottom: 1px solid #eef2f6;
             padding-bottom: 10px;
         }
-        table {
+        .table-container table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9rem;
         }
-        th {
+        .table-container th {
             text-align: left;
             padding: 10px 8px;
             background: #f8fafc;
@@ -169,12 +230,12 @@
             font-weight: 600;
             border-bottom: 2px solid #e2e8f0;
         }
-        td {
+        .table-container td {
             padding: 10px 8px;
             border-bottom: 1px solid #eef2f6;
             color: #1e293b;
         }
-        tr:hover td {
+        .table-container tr:hover td {
             background: #fafcff;
         }
         .badge {
@@ -206,7 +267,7 @@
             font-size: 0.8rem;
         }
         @media (max-width: 768px) {
-            .chart-row { grid-template-columns: 1fr; }
+            .table-grid { grid-template-columns: 1fr; }
             .filter-bar { flex-direction: column; align-items: stretch; }
         }
     </style>
@@ -234,20 +295,30 @@
 
     <div id="statsGrid" class="stats-grid"></div>
 
-    <div class="chart-row">
-        <div class="chart-box">
+    <div class="table-grid">
+        <div class="table-box">
             <h3>🏅 Top Users by Total Payout</h3>
-            <div class="chart-container"><canvas id="payoutChart"></canvas></div>
+            <table>
+                <thead><tr><th>#</th><th>User</th><th>Total Payout (ETB)</th></tr></thead>
+                <tbody id="payoutTableBody"></tbody>
+            </table>
         </div>
-        <div class="chart-box">
+        <div class="table-box">
             <h3>🏆 Top Users by Win Count</h3>
-            <div class="chart-container"><canvas id="winsChart"></canvas></div>
+            <table>
+                <thead><tr><th>#</th><th>User</th><th>Wins</th></tr></thead>
+                <tbody id="winsTableBody"></tbody>
+            </table>
         </div>
     </div>
 
-    <div class="chart-box" style="margin-bottom:28px;">
-        <h3>⏳ Payout Timeline (over time)</h3>
-        <div class="chart-container" style="height:220px;"><canvas id="timelineChart"></canvas></div>
+    <!-- Deposit Distribution Table (replaces timeline) -->
+    <div class="full-width-box">
+        <h3>💰 Deposit Distribution</h3>
+        <table>
+            <thead><tr><th>#</th><th>User</th><th>Total Deposits (ETB)</th><th>Number of Deposits</th><th>Average Deposit</th></tr></thead>
+            <tbody id="depositTableBody"></tbody>
+        </table>
     </div>
 
     <div class="table-container">
@@ -282,6 +353,9 @@
     // DOM refs
     const statsGrid = document.getElementById('statsGrid');
     const userTableBody = document.getElementById('userTableBody');
+    const payoutTableBody = document.getElementById('payoutTableBody');
+    const winsTableBody = document.getElementById('winsTableBody');
+    const depositTableBody = document.getElementById('depositTableBody');
     const loadingEl = document.getElementById('loadingMessage');
     const errorEl = document.getElementById('errorContainer');
     const startDateInput = document.getElementById('startDate');
@@ -289,10 +363,6 @@
     const applyBtn = document.getElementById('applyFilterBtn');
     const resetBtn = document.getElementById('resetFilterBtn');
     const dateRangeLabel = document.getElementById('dateRangeLabel');
-
-    let payoutChartInstance = null;
-    let winsChartInstance = null;
-    let timelineChartInstance = null;
 
     let filterStart = null;
     let filterEnd = null;
@@ -304,61 +374,37 @@
     }
 
     function fmt(num) { return Number(num).toFixed(1); }
+    function fmtInt(num) { return Number(num).toFixed(0); }
 
-    function buildDateFilter(query, startDate, endDate) {
+    function buildDateFilter(query, startDate, endDate, column = 'created_at') {
         if (startDate) {
             const start = new Date(startDate);
             start.setHours(0,0,0,0);
-            query = query.gte('created_at', start.toISOString());
+            query = query.gte(column, start.toISOString());
         }
         if (endDate) {
             const end = new Date(endDate);
             end.setHours(23,59,59,999);
-            query = query.lte('created_at', end.toISOString());
-        }
-        return query;
-    }
-
-    function buildAuditDateFilter(query, startDate, endDate) {
-        if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0,0,0,0);
-            query = query.gte('timestamp', start.toISOString());
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23,59,59,999);
-            query = query.lte('timestamp', end.toISOString());
+            query = query.lte(column, end.toISOString());
         }
         return query;
     }
 
     async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds
-            let roundsQuery = supabase.from('game_rounds').select('total_entry_fees, prize_pool, house_profit, created_at');
+            // 1. Fetch game_rounds for stats
+            let roundsQuery = supabase.from('game_rounds').select('total_entry_fees, prize_pool, house_profit');
             roundsQuery = buildDateFilter(roundsQuery, startDate, endDate);
-            roundsQuery = roundsQuery.order('created_at', { ascending: true });
-
             const { data: rounds, error: roundsErr } = await roundsQuery;
             if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
             const totalRounds = rounds.length;
             let totalPayout = 0, totalStakes = 0, totalCommission = 0;
-            const payouts = [];
-            const timelineData = [];
-
             rounds.forEach(r => {
-                const payout = Number(r.prize_pool) || 0;
-                const entry = Number(r.total_entry_fees) || 0;
-                const commission = Number(r.house_profit) || 0;
-                totalPayout += payout;
-                totalStakes += entry;
-                totalCommission += commission;
-                payouts.push(payout);
-                timelineData.push({ x: new Date(r.created_at), y: payout });
+                totalPayout += Number(r.prize_pool) || 0;
+                totalStakes += Number(r.total_entry_fees) || 0;
+                totalCommission += Number(r.house_profit) || 0;
             });
-
             const avgPayout = totalRounds > 0 ? totalPayout / totalRounds : 0;
 
             statsGrid.innerHTML = `
@@ -369,30 +415,44 @@
                 <div class="stat-card"><div class="label">Avg Payout / Round</div><div class="value">${fmt(avgPayout)} ETB</div></div>
             `;
 
-            // 2. User-level data
+            // 2. User-level data from audit_logs (wins & stakes)
             let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
-            winQuery = buildAuditDateFilter(winQuery, startDate, endDate);
+            winQuery = buildDateFilter(winQuery, startDate, endDate, 'timestamp');
             const { data: winLogs, error: winErr } = await winQuery;
             if (winErr) throw new Error('Failed to fetch win logs: ' + winErr.message);
 
             let entryQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'ENTRY_FEE_PAID');
-            entryQuery = buildAuditDateFilter(entryQuery, startDate, endDate);
+            entryQuery = buildDateFilter(entryQuery, startDate, endDate, 'timestamp');
             const { data: entryLogs, error: entryErr } = await entryQuery;
             if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
+            // 3. Deposit data (approved deposits)
+            let depositQuery = supabase.from('deposit_requests').select('telegram_id, amount').eq('status', 'approved');
+            depositQuery = buildDateFilter(depositQuery, startDate, endDate);
+            const { data: deposits, error: depErr } = await depositQuery;
+            if (depErr) throw new Error('Failed to fetch deposits: ' + depErr.message);
+
+            // Aggregate per user
             const userMap = {};
             winLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
-                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0 };
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
                 userMap[uid].wins += 1;
                 userMap[uid].totalPayout += Number(log.details?.amount) || 0;
             });
             entryLogs.forEach(log => {
                 const uid = log.user_id;
                 if (!uid) return;
-                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0 };
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
                 userMap[uid].totalStakes += Number(log.details?.amount) || 0;
+            });
+            deposits.forEach(d => {
+                const uid = d.telegram_id;
+                if (!uid) return;
+                if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0 };
+                userMap[uid].deposits += 1;
+                userMap[uid].totalDeposits += Number(d.amount) || 0;
             });
 
             const userIds = Object.keys(userMap);
@@ -411,6 +471,7 @@
                 const d = userMap[uid];
                 const commission = 0.2 * d.totalStakes;
                 const avgPayoutUser = d.wins > 0 ? d.totalPayout / d.wins : 0;
+                const avgDeposit = d.deposits > 0 ? d.totalDeposits / d.deposits : 0;
                 return {
                     userId: uid,
                     username: usernameMap[uid] || uid,
@@ -418,28 +479,55 @@
                     totalPayout: d.totalPayout,
                     totalStakes: d.totalStakes,
                     commission: commission,
-                    avgPayout: avgPayoutUser
+                    avgPayout: avgPayoutUser,
+                    deposits: d.deposits,
+                    totalDeposits: d.totalDeposits,
+                    avgDeposit: avgDeposit
                 };
             });
 
-            // --- Top Users by Total Payout (chart 1) ---
+            // --- Top Users by Total Payout (table) ---
             const sortedByPayout = [...userSummaries].sort((a,b) => b.totalPayout - a.totalPayout);
             const topPayout = sortedByPayout.slice(0, 10);
-            const payoutLabels = topPayout.map(u => u.username);
-            const payoutData = topPayout.map(u => u.totalPayout);
-            renderPayoutChart(payoutLabels, payoutData);
+            let payoutRows = '';
+            topPayout.forEach((u, idx) => {
+                payoutRows += `<tr>
+                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td>${u.username}</td>
+                    <td>${fmt(u.totalPayout)}</td>
+                </tr>`;
+            });
+            payoutTableBody.innerHTML = payoutRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
-            // --- Top Users by Win Count (chart 2) ---
+            // --- Top Users by Win Count (table) ---
             const sortedByWins = [...userSummaries].sort((a,b) => b.wins - a.wins);
             const topWins = sortedByWins.slice(0, 10);
-            const winsLabels = topWins.map(u => u.username);
-            const winsData = topWins.map(u => u.wins);
-            renderWinsChart(winsLabels, winsData);
+            let winsRows = '';
+            topWins.forEach((u, idx) => {
+                winsRows += `<tr>
+                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td>${u.username}</td>
+                    <td>${u.wins}</td>
+                </tr>`;
+            });
+            winsTableBody.innerHTML = winsRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
 
-            // --- Timeline Chart ---
-            renderTimelineChart(timelineData);
+            // --- Deposit Distribution (table) ---
+            const sortedByDeposits = [...userSummaries].sort((a,b) => b.totalDeposits - a.totalDeposits);
+            const topDepositors = sortedByDeposits.slice(0, 10);
+            let depositRows = '';
+            topDepositors.forEach((u, idx) => {
+                depositRows += `<tr>
+                    <td><span class="rank-badge">${idx+1}</span></td>
+                    <td>${u.username}</td>
+                    <td>${fmt(u.totalDeposits)}</td>
+                    <td>${u.deposits}</td>
+                    <td>${fmt(u.avgDeposit)}</td>
+                </tr>`;
+            });
+            depositTableBody.innerHTML = depositRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No deposit data</td></tr>';
 
-            // --- Table: sorted by commission (as in original design) ---
+            // --- Full Summary Table (sorted by commission) ---
             const sortedForTable = [...userSummaries].sort((a,b) => b.commission - a.commission);
             let tableRows = '';
             sortedForTable.forEach(u => {
@@ -460,92 +548,6 @@
             console.error(err);
             showError('Error loading dashboard: ' + err.message);
         }
-    }
-
-    // ------------------------------------------------------------------
-    // Chart renderers
-    // ------------------------------------------------------------------
-    function renderPayoutChart(labels, data) {
-        const ctx = document.getElementById('payoutChart').getContext('2d');
-        if (payoutChartInstance) payoutChartInstance.destroy();
-        payoutChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Total Payout (ETB)',
-                    data: data,
-                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
-                    borderColor: 'rgba(16, 185, 129, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } },
-                    x: { ticks: { maxRotation: 30, font: { size: 10 } } }
-                }
-            }
-        });
-    }
-
-    function renderWinsChart(labels, data) {
-        const ctx = document.getElementById('winsChart').getContext('2d');
-        if (winsChartInstance) winsChartInstance.destroy();
-        winsChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Win Count',
-                    data: data,
-                    backgroundColor: 'rgba(255, 159, 64, 0.7)',
-                    borderColor: 'rgba(255, 159, 64, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                    x: { ticks: { maxRotation: 30, font: { size: 10 } } }
-                }
-            }
-        });
-    }
-
-    function renderTimelineChart(data) {
-        const ctx = document.getElementById('timelineChart').getContext('2d');
-        if (timelineChartInstance) timelineChartInstance.destroy();
-        timelineChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                datasets: [{
-                    label: 'Payout per Round (ETB)',
-                    data: data.map(d => ({ x: d.x, y: d.y })),
-                    borderColor: 'rgba(139, 92, 246, 1)',
-                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                    fill: true,
-                    tension: 0.2,
-                    pointRadius: 2,
-                    pointBackgroundColor: 'rgba(139, 92, 246, 1)'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, ticks: { maxRotation: 30, font: { size: 9 } } },
-                    y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } }
-                }
-            }
-        });
     }
 
     // ------------------------------------------------------------------
@@ -588,54 +590,11 @@
     // ------------------------------------------------------------------
     // Init
     // ------------------------------------------------------------------
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js';
-    document.head.appendChild(script);
-    script.onload = () => {
-        resetFilter();
-        applyBtn.addEventListener('click', applyFilter);
-        resetBtn.addEventListener('click', resetFilter);
-        startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
-        endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
-    };
-    // Fallback if time adapter fails
-    setTimeout(() => {
-        if (typeof window['chartjs-adapter-date-fns'] === 'undefined') {
-            console.warn('Time adapter not loaded; using category fallback.');
-            const origRender = renderTimelineChart;
-            renderTimelineChart = function(data) {
-                const labels = data.map(d => d.x.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}));
-                const values = data.map(d => d.y);
-                const ctx = document.getElementById('timelineChart').getContext('2d');
-                if (timelineChartInstance) timelineChartInstance.destroy();
-                timelineChartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Payout per Round (ETB)',
-                            data: values,
-                            borderColor: 'rgba(139, 92, 246, 1)',
-                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                            fill: true,
-                            tension: 0.2,
-                            pointRadius: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: { ticks: { maxRotation: 40, font: { size: 8 } } },
-                            y: { beginAtZero: true, ticks: { callback: v => v + ' ETB' } }
-                        }
-                    }
-                });
-            };
-            loadDashboard(filterStart, filterEnd);
-        }
-    }, 2000);
+    resetFilter();  // initial load
+    applyBtn.addEventListener('click', applyFilter);
+    resetBtn.addEventListener('click', resetFilter);
+    startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
+    endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
 </script>
 </body>
 </html>
