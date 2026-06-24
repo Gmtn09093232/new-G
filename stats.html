@@ -40,12 +40,17 @@
   <div id="container"></div>
 
   <script>
-    // ---- 🔒 Replace this with your actual admin secret ----
-    const ADMIN_SECRET = 'your-admin-secret';  // <-- CHANGE THIS
+    // ---- Get admin secret from URL ----
+    const urlParams = new URLSearchParams(window.location.search);
+    const secret = urlParams.get('secret');
+    if (!secret) {
+      document.getElementById('container').innerHTML = `<div class="error-msg">⚠️ Missing admin secret. Use ?secret=YOUR_SECRET</div>`;
+      throw new Error('Missing secret');
+    }
 
-    // ---- Connect to admin namespace with the fixed secret ----
+    // ---- Connect to admin namespace ----
     const socket = io('/admin', {
-      query: { secret: ADMIN_SECRET }
+      query: { secret }
     });
 
     const container = document.getElementById('container');
@@ -95,6 +100,7 @@
                 let cls = 'mini-cell';
                 if (val === 'FREE') cls += ' free';
                 else if (marked.includes(val)) cls += ' called';
+                // Optional bingo highlight if we detect bingo (we don't have that info, but could add)
                 const display = val === 'FREE' ? '★' : val;
                 html += `<div class="${cls}">${display}</div>`;
               }
