@@ -432,7 +432,7 @@
         <h3>📊 Commission Distribution by Round</h3>
         <div style="overflow-x:auto;">
             <table>
-                <thead><tr><th>#</th><th>Round Time</th><th>Total Entry Fees (ETB)</th><th>Prize Pool (ETB)</th><th>Commission (20%)</th></tr></thead>
+                <thead><tr><th>#</th><th>Round Time</th><th>Total Entry Fees (ETB)</th><th>Prize Pool (ETB)</th><th>Commission (house profit)</th></tr></thead>
                 <tbody id="commissionRoundTableBody"></tbody>
             </table>
         </div>
@@ -677,7 +677,7 @@
     // ----- Main load function -----
     async function loadDashboard(startDate, endDate) {
         try {
-            // 1. Fetch game_rounds for total commission & detailed list
+            // 1. Fetch game_rounds for commission (use house_profit directly)
             let roundsQuery = supabase.from('game_rounds')
                 .select('created_at, total_entry_fees, prize_pool, house_profit')
                 .order('created_at', { ascending: false })
@@ -686,12 +686,11 @@
             const { data: roundsList, error: roundsErr } = await roundsQuery;
             if (roundsErr) throw new Error('Failed to fetch rounds: ' + roundsErr.message);
 
-            // Calculate total commission as 20% of total_entry_fees
+            // Sum house_profit for total commission
             let totalCommission = 0;
             if (roundsList) {
                 roundsList.forEach(r => {
-                    const entryFees = Number(r.total_entry_fees) || 0;
-                    totalCommission += entryFees * 0.2;
+                    totalCommission += Number(r.house_profit) || 0;
                 });
             }
 
@@ -717,23 +716,21 @@
 
             // 4. Render Stats Cards
             statsGrid.innerHTML = `
-                <div class="stat-card commission-card"><div class="label">Total Commission (20%)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
+                <div class="stat-card commission-card"><div class="label">Total Commission (house profit)</div><div class="value">${fmt(totalCommission)} ETB</div></div>
                 <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
                 <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
             `;
 
-            // 5. Render Commission Distribution by Round Table (calculate 20% of entry fees)
+            // 5. Render Commission Distribution by Round Table (use house_profit)
             if (roundsList && roundsList.length > 0) {
                 let rows = '';
                 roundsList.forEach((r, idx) => {
-                    const entryFees = Number(r.total_entry_fees) || 0;
-                    const commission = entryFees * 0.2;
                     rows += `<tr>
                         <td>${idx + 1}</td>
                         <td>${formatDate(r.created_at)}</td>
-                        <td>${fmt(entryFees)}</td>
+                        <td>${fmt(r.total_entry_fees)}</td>
                         <td>${fmt(r.prize_pool)}</td>
-                        <td><strong>${fmt(commission)}</strong></td>
+                        <td><strong>${fmt(r.house_profit)}</strong></td>
                     </tr>`;
                 });
                 commissionRoundTableBody.innerHTML = rows;
