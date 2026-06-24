@@ -2,20 +2,26 @@
 //  REQUIRED SQL MIGRATIONS (run in Supabase SQL editor)
 // ============================================================
 /*
+-- 1. Add referral columns to users (if not exist)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_amount NUMERIC DEFAULT 0;
 
+-- 2. Create invite_stats table
 CREATE TABLE IF NOT EXISTS invite_stats (
   invite_code TEXT PRIMARY KEY,
   count INTEGER DEFAULT 0
 );
 
+-- Insert default invite codes
 INSERT INTO invite_stats (invite_code) VALUES 
   ('db'), ('mk'), ('hd'), ('ji'), ('ok'), 
   ('ghy'), ('bghu'), ('kil'), ('hg'), ('jkl'), ('jkil')
 ON CONFLICT (invite_code) DO NOTHING;
 
--- NEW: Table to store participants per ended round
+-- 3. IMPORTANT: Ensure game_rounds has a created_at column
+ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT now();
+
+-- 4. Create round_participants table to store players per ended round
 CREATE TABLE IF NOT EXISTS round_participants (
   id BIGSERIAL PRIMARY KEY,
   round_id BIGINT NOT NULL REFERENCES game_rounds(id) ON DELETE CASCADE,
@@ -995,7 +1001,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- NEW: Round history API endpoint ----------
+// ---------- IMPROVED Round history API endpoint (with detailed error logging) ----------
 app.get('/admin/rounds-history', async (req, res) => {
   const { secret, from, to, limit = 500 } = req.query;
   if (secret !== process.env.ADMIN_SECRET) {
@@ -1031,7 +1037,18 @@ app.get('/admin/rounds-history', async (req, res) => {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      // Log full error details to server console
+      console.error('❌ Supabase query error:', JSON.stringify(error, null, 2));
+      // Return detailed error to client for debugging
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+    }
 
     const rounds = (data || []).map(row => ({
       id: row.id,
@@ -1052,8 +1069,12 @@ app.get('/admin/rounds-history', async (req, res) => {
 
     res.json({ success: true, rounds });
   } catch (err) {
-    console.error('❌ Error fetching round history:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+    console.error('❌ Unexpected error in /admin/rounds-history:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
