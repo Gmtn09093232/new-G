@@ -1,1525 +1,1861 @@
 <!DOCTYPE html>
-<html lang="am">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0">
-    <title>✨ DOT BINGO ·ዶት ቢንጎ ✨</title>
-    <script src="https://telegram.org/js/telegram-web-app.js">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+    <title>QC Inspection | Amhara Metal Industry</title>
+    <script src="https://cdn.tailwindcss.com">
     </script>
-    <script src="/socket.io/socket.io.js">
+    <script src="https://unpkg.com/@supabase/supabase-js@2">
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    
+    <!-- Three.js for 3D background -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
     <style>
-        /* (all your existing styles – unchanged) */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            min-height: 100vh;
-            background: #f5f3f0;
-            background-image: radial-gradient(circle at 20% 30%, rgba(0, 0, 0, 0.02) 2%, transparent 2.5%);
-            background-size: 40px 40px;
-            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-            padding: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .page {
-            max-width: 600px;
-            width: 100%;
-            margin: 0 auto;
-            background: rgba(255, 255, 248, 0.96);
-            border-radius: 48px;
-            padding: 20px 18px 24px;
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            backdrop-filter: blur(2px);
-        }
-        .hidden {
-            display: none !important;
-        }
-        .lang-toggle {
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            background: #f97316;
-            color: white;
-            border: none;
-            border-radius: 40px;
-            padding: 8px 16px;
-            font-weight: bold;
-            cursor: pointer;
-            z-index: 1000;
-            font-size: 0.8rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-        @media (max-width: 550px) {
-            .lang-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 12px;
-                font-size: 0.7rem;
+        /* ──────────── existing print & form styles ──────────── */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #inspectionForm,
+            #inspectionForm * {
+                visibility: visible;
+            }
+            #inspectionForm {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            .no-print {
+                display: none;
             }
         }
-        .card-container {
-            margin: 20px 0 16px;
-            display: flex;
-            justify-content: center;
-            background: #fef7ef;
-            border-radius: 40px;
-            padding: 14px 8px;
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            overflow-x: auto;
-            min-height: 200px;
+        .rating-select {
+            min-width: 100px;
         }
-        .card-container table {
-            border-collapse: separate;
-            border-spacing: 10px;
-            margin: 0 auto;
-        }
-        .card-container thead tr th {
-            font-family: 'Inter', monospace;
-            font-size: 1.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #ea580c, #f97316);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-shadow: none;
-            padding: 8px 0;
-            text-align: center;
-            width: 58px;
-        }
-        .card-container td {
-            width: 58px;
-            height: 58px;
-            background: white;
-            border-radius: 24px;
-            text-align: center;
-            vertical-align: middle;
-            font-weight: 700;
-            font-size: 1.2rem;
-            font-family: 'Inter', monospace;
-            color: #1e293b;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-            border: 1px solid #fed7aa;
-            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-            cursor: pointer;
-        }
-        .card-container td.free {
-            background: #fff3e6;
-            color: #ea580c;
-            font-size: 1.5rem;
-            border-color: #fdba74;
-        }
-        .card-container td.marked {
-            background: linear-gradient(135deg, #f97316, #ea580c);
-            color: white;
-            box-shadow: 0 0 0 2px #ffedd5, inset 0 1px 2px rgba(0, 0, 0, 0.1);
-            border-color: #fbbf24;
-            transform: scale(0.94);
-        }
-        .last-call-area {
-            background: #1e1e24;
-            border-radius: 60px;
-            padding: 14px 18px;
-            margin: 12px 0 18px;
-            text-align: center;
-            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 12px 25px -10px rgba(0, 0, 0, 0.2);
-            border: 1px solid #2d2d35;
-        }
-        .last-call-label {
-            font-size: 0.7rem;
-            letter-spacing: 3px;
-            font-weight: 600;
-            color: #facc15;
-            text-transform: uppercase;
-            background: #0a0a0c;
-            display: inline-block;
-            padding: 5px 18px;
-            border-radius: 40px;
-        }
-        .last-call-number {
-            font-size: 2.7rem;
-            font-weight: 800;
-            font-family: 'Inter', monospace;
-            color: #fef08a;
-            text-shadow: 0 0 6px #f97316;
-            letter-spacing: 5px;
-            margin: 8px 0 5px;
-            background: #0a0a0c;
-            border-radius: 60px;
-            padding: 6px;
-        }
-        .called-history {
-            background: #0a0a0c;
-            border-radius: 48px;
-            font-size: 0.7rem;
-            color: #fcd34d;
-            font-weight: 500;
-            overflow-x: auto;
-            white-space: nowrap;
-            font-family: monospace;
-            text-align: center;
-            margin-top: 8px;
-            border: 1px solid #2d2d35;
-            padding: 8px 14px;
-            scroll-behavior: smooth;
-        }
-        .balance-top,
-        .game-top-bar {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            background: #ffffffdd;
-            backdrop-filter: blur(4px);
-            padding: 6px 12px;
-            border-radius: 60px;
-            margin-bottom: 16px;
-            border: 1px solid #fed7aa;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-        }
-        .game-top-bar div:first-child {
+        .cause-checkbox-group label {
+            margin-right: 12px;
             font-size: 0.8rem;
-            font-weight: 600;
-            background: #fef3c7;
-            padding: 4px 8px;
-            border-radius: 40px;
         }
-        .players-badge {
-            background: #f97316;
-            padding: 6px 18px;
-            border-radius: 40px;
+        table th,
+        table td {
+            vertical-align: top;
+            padding: 8px 6px;
+        }
+        datalist option {
+            font-size: 0.9rem;
+        }
+        .camera-btn {
+            cursor: pointer;
+            margin-left: 8px;
+            color: #3b82f6;
+        }
+        .single-scan-btn {
+            background-color: #3b82f6;
             color: white;
-            font-weight: 600;
-            font-size: 0.75rem;
-            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.2);
-        }
-        .timer-badge {
-            font-size: 1.3rem;
-            font-weight: 700;
-            font-family: monospace;
-            color: #ea580c;
-            background: #fef3c7;
-            padding: 4px 18px;
-            border-radius: 50px;
-            letter-spacing: 1px;
-            border: 1px solid #fde68a;
-        }
-        .grid-100 {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 8px;
-            margin: 20px 0;
-            background: #fef9f0;
-            padding: 14px;
-            border-radius: 40px;
-            box-shadow: inset 0 0 0 1px #fff6e5, 0 4px 12px rgba(0, 0, 0, 0.02);
-        }
-        .grid-cell {
-            background: white;
-            border-radius: 20px;
-            aspect-ratio: 1 / 1;
-            display: flex;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: inline-flex;
             align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.75rem;
-            color: #334155;
-            border: 1px solid #fed7aa;
-            cursor: pointer;
-            transition: 0.1s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-        }
-        .grid-cell.taken {
-            background: #19b105;
-            color: white;
-            border-color: #2ecc71;
-            cursor: not-allowed;
-        }
-        .grid-cell.own-card {
-            background: #e74c3c;
-            color: white;
-            border-color: #f39c12;
-            box-shadow: 0 0 0 2px #fef3c7;
-            cursor: not-allowed;
-        }
-        .grid-cell.selected {
-            background: #e74c3c;
-            color: white;
-            box-shadow: 0 0 0 2px #fef3c7;
-            border-color: #f39c12;
-            transform: scale(0.96);
-        }
-        button {
-            min-height: 44px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            transition: all 0.1s ease;
-            cursor: pointer;
-        }
-        button:active {
-            transform: scale(0.96);
-        }
-        button:disabled {
-            opacity: 0.6;
-            transform: none;
-            cursor: not-allowed;
-        }
-        #bingoBtn {
-            display: block;
-            width: 90%;
-            max-width: 340px;
-            margin: 24px auto 20px;
-            background: linear-gradient(105deg, #f97316, #ea580c);
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 800;
-            padding: 14px 12px;
-            border-radius: 80px;
-            border: none;
-            box-shadow: 0 10px 0 #9a3412, 0 0 20px rgba(249, 115, 22, 0.4);
-            letter-spacing: 2px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-            transition: 0.08s linear;
-        }
-        #bingoBtn:active {
-            transform: translateY(5px);
-            box-shadow: 0 5px 0 #9a3412;
-        }
-        .tab-bar {
-            display: flex;
-            background: #ffffffcc;
-            backdrop-filter: blur(8px);
-            border-radius: 100px;
-            margin-top: 20px;
-            padding: 6px 8px;
-            gap: 8px;
-            border: 1px solid #fed7aa;
-        }
-        .tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            padding: 10px 0;
-            border-radius: 80px;
-            font-weight: 600;
-            font-size: 0.8rem;
-            color: #7c2d12;
-            cursor: pointer;
-            transition: 0.1s;
-        }
-        .tab-btn.active {
-            background: #f97316;
-            color: white;
-            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
-        }
-        .prize-pool {
-            background: #fef3c7;
-            border-radius: 40px;
-            text-align: center;
-            padding: 6px 12px;
-            margin: 6px 0 12px;
-            border: 1px solid #fed7aa;
-        }
-        .prize-pool span {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #b45309;
-            letter-spacing: 0.5px;
-        }
-        .prize-pool div {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: #ea580c;
-            line-height: 1.3;
-        }
-        .winner-modal,
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            backdrop-filter: blur(16px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            visibility: hidden;
-            opacity: 0;
-            transition: visibility 0.2s, opacity 0.2s;
-        }
-        .winner-modal.active,
-        .modal.active {
-            visibility: visible;
-            opacity: 1;
-        }
-        .winner-card,
-        .modal-content {
-            background: rgba(255, 255, 245, 0.98);
-            backdrop-filter: blur(12px);
-            border-radius: 64px;
-            padding: 28px 24px;
-            text-align: center;
-            width: 88%;
-            max-width: 340px;
-            box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.8);
-            border: 2px solid rgba(249, 115, 22, 0.5);
-            animation: winnerPop 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
-        }
-        @keyframes winnerPop {
-            0% {
-                transform: scale(0.85);
-                opacity: 0;
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-        .winner-trophy {
-            font-size: 4rem;
-            filter: drop-shadow(0 8px 12px rgba(249, 115, 22, 0.4));
+            gap: 6px;
             margin-bottom: 8px;
-            animation: floatTrophy 1.2s infinite alternate;
         }
-        @keyframes floatTrophy {
-            0% {
-                transform: translateY(0px);
-            }
-            100% {
-                transform: translateY(-8px);
-            }
+        .incoming-table th,
+        .incoming-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            font-size: 0.75rem;
+            vertical-align: top;
         }
-        .winner-title {
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #f97316, #ea580c);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 12px;
-        }
-        .winners-avatars {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin: 16px 0;
-            max-height: 140px;
-            overflow-y: auto;
-            padding: 8px;
-            background: rgba(255, 237, 213, 0.4);
-            border-radius: 48px;
-        }
-        .winner-badge {
-            background: #f97316;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .winner-badge::before {
-            content: "👑";
-        }
-        .prize-amount {
-            background: linear-gradient(105deg, #fef3c7, #ffedd5);
-            border-radius: 60px;
-            padding: 12px;
-            margin: 18px 0 16px;
-            border: 1px solid #fed7aa;
-        }
-        .prize-number {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #ea580c;
-        }
-        .celebrate-btn {
-            background: #f97316;
+        .incoming-table input,
+        .incoming-table select {
+            width: 100%;
+            min-width: 80px;
             border: none;
-            width: 80%;
-            padding: 14px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1rem;
-            color: white;
-            margin-top: 8px;
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
-            transition: 0.1s;
+            background: transparent;
+            font-size: 0.75rem;
         }
-        .confetti {
+
+        /* ──────────── 3D background canvas ──────────── */
+        #three-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            overflow: hidden;
-        }
-        .confetti-piece {
-            position: absolute;
-            width: 8px;
-            height: 16px;
-            background: #f97316;
-            top: -20px;
-            opacity: 0.8;
-            animation: fall 4s linear forwards;
-        }
-        @keyframes fall {
-            to {
-                transform: translateY(100vh) rotate(360deg);
-                opacity: 0;
-            }
-        }
-        .mute-btn {
-            background: #334155 !important;
-            font-size: 1rem !important;
-            padding: 4px 10px !important;
-            min-width: 44px;
-        }
-        .modal-content {
-            background: #ffffff;
-            border-radius: 48px;
-            padding: 24px;
-            max-width: 92%;
-            width: 380px;
-            border: 1px solid #fed7aa;
-        }
-        .bank-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ffedd5;
-            padding-bottom: 12px;
-        }
-        .account-card {
-            background: #f8fafc;
-            border-radius: 28px;
-            padding: 14px;
-            margin: 14px 0;
-            border-left: 4px solid #f97316;
-        }
-        .copy-number {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #f1f5f9;
-            padding: 6px 12px;
-            border-radius: 40px;
-            cursor: pointer;
-            transition: 0.1s;
-            font-weight: 600;
-            color: #1e293b;
-            margin-top: 6px;
-            width: fit-content;
-        }
-        .copy-number:active {
-            background: #e2e8f0;
-            transform: scale(0.96);
-        }
-        .input-group {
-            margin: 14px 0;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 60px;
-            border: 1px solid #e2e8f0;
-            background: #ffffff;
-            font-size: 0.85rem;
-        }
-        .transaction-summary {
-            background: #fef9e6;
-            border-radius: 28px;
-            padding: 12px;
-            font-size: 0.75rem;
-            color: #92400e;
-            margin: 12px 0;
-            text-align: center;
-        }
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 20px;
-        }
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 60px;
-            font-weight: 700;
-            border: none;
-        }
-        .btn-primary {
-            background: #f97316;
-            color: white;
-        }
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #1e293b;
-        }
-        .type-btn {
-            background: #f1f5f9;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            border-radius: 60px;
-            margin: 8px 0;
-            font-weight: 600;
-            border: 1px solid #e2e8f0;
-            width: 100%;
-            cursor: pointer;
-        }
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .back-btn {
-            background: #f1f5f9;
-            border: 1px solid #fed7aa;
-            padding: 8px 20px;
-            border-radius: 40px;
-            color: #7c2d12;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .profile-stat {
-            background: #fef9f0;
-            border-radius: 32px;
-            padding: 16px;
-            text-align: center;
-            margin: 12px 0;
-            border: 1px solid #fed7aa;
-        }
-        .stake-page-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin: 30px 0;
-            flex-wrap: wrap;
-        }
-        .stake-option {
-            background: #fef9f0;
-            border: 1px solid #fed7aa;
-            padding: 16px 24px;
-            border-radius: 60px;
-            font-size: 1.6rem;
-            font-weight: 800;
-            color: #ea580c;
-            box-shadow: 0 6px 0 #fed7aa;
-            cursor: pointer;
-            width: 150px;
-            text-align: center;
-            transition: 0.1s;
-            position: relative;
-        }
-        .stake-option:active {
-            transform: scale(0.96);
-        }
-        .player-count-badge {
+            z-index: 0;
             display: block;
-            font-size: 0.7rem;
-            font-weight: normal;
-            color: #facc15;
-            margin-top: 6px;
-            background: #1e2a36;
-            padding: 2px 8px;
-            border-radius: 40px;
         }
-        .rules-text {
-            background: #fef9f0;
-            border-radius: 32px;
-            padding: 18px;
-            margin-top: 20px;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: #1e293b;
+
+        /* ──────────── secret overlay ──────────── */
+        #secretOverlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            background: rgba(11, 11, 26, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            transition: opacity 0.6s ease, visibility 0.6s ease;
         }
-        .history-card {
-            background: #fef9f0;
+        #secretOverlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        #secretOverlay .card {
+            background: rgba(10, 10, 30, 0.85);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 28px;
+            padding: 40px 44px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.8), 0 0 60px rgba(74, 222, 128, 0.04);
+            animation: fadeUp 0.7s ease-out;
+        }
+        #secretOverlay .card h2 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #eef3ff;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
+        }
+        #secretOverlay .card .sub {
+            color: #7a86a8;
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+        }
+        #secretOverlay .card input {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #eef3ff;
+            font-size: 1.1rem;
+            text-align: center;
+            letter-spacing: 4px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        #secretOverlay .card input:focus {
+            border-color: #4ade80;
+            box-shadow: 0 0 24px rgba(74, 222, 128, 0.12);
+        }
+        #secretOverlay .card input::placeholder {
+            color: #4a5580;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+        #secretOverlay .card .btn-submit {
+            width: 100%;
+            margin-top: 16px;
             padding: 14px;
-            margin-bottom: 12px;
-            border-left: 5px solid #f97316;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #4ade80, #22d3ee);
+            color: #0b0b1a;
+            font-weight: 700;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.3s;
+            box-shadow: 0 4px 24px rgba(74, 222, 128, 0.2);
         }
-        .history-card strong {
-            color: #ea580c;
+        #secretOverlay .card .btn-submit:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 32px rgba(74, 222, 128, 0.35);
         }
-        @media (max-width: 550px) {
-            .card-container td {
-                width: 48px;
-                height: 48px;
-                border-radius: 18px;
-                font-size: 1rem;
+        #secretOverlay .card .btn-submit:active {
+            transform: scale(0.97);
+        }
+        #secretOverlay .card .error {
+            color: #f87171;
+            font-size: 0.85rem;
+            margin-top: 12px;
+            min-height: 24px;
+        }
+        #secretOverlay .card .gear-icon {
+            font-size: 3.2rem;
+            margin-bottom: 4px;
+            display: block;
+            color: #4ade80;
+            opacity: 0.6;
+            animation: spin-slow 8s linear infinite;
+        }
+        @keyframes spin-slow {
+            to {
+                transform: rotate(360deg);
             }
-            .card-container thead tr th {
-                width: 48px;
-                font-size: 1.2rem;
+        }
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.96);
             }
-            .grid-100 {
-                gap: 5px;
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
             }
-            #bingoBtn {
+        }
+
+        /* ──────────── main content ──────────── */
+        #mainContent {
+            position: relative;
+            z-index: 1;
+            display: none;
+            min-height: 100vh;
+            background: rgba(241, 245, 249, 0.92);
+            backdrop-filter: blur(2px);
+            padding: 0 0 20px 0;
+        }
+        #mainContent.visible {
+            display: block;
+        }
+
+        /* ──────────── bottom HUD (3D info) ──────────── */
+        .hud-3d {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 30, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 10px 22px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            color: #7a86a8;
+            font-size: 11px;
+            letter-spacing: 0.3px;
+            user-select: none;
+            pointer-events: none;
+            z-index: 20;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .hud-3d .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4ade80;
+            display: inline-block;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        .hud-3d .label {
+            color: #4a5580;
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.8px;
+        }
+        .hud-3d .value {
+            color: #c8d0e0;
+            font-weight: 500;
+        }
+        .hud-3d .divider {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.06);
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.3;
+                transform: scale(0.7);
+            }
+        }
+        @media (max-width: 700px) {
+            .hud-3d {
+                padding: 8px 14px;
+                gap: 10px;
+                font-size: 10px;
+                bottom: 12px;
+                width: calc(100% - 24px);
+            }
+            .hud-3d .divider {
+                display: none;
+            }
+            #secretOverlay .card {
+                padding: 28px 20px;
+            }
+            #secretOverlay .card h2 {
                 font-size: 1.3rem;
-            }
-            .stake-option {
-                width: 130px;
-                font-size: 1.2rem;
-                padding: 12px 16px;
-            }
-            .player-count-badge {
-                font-size: 0.6rem;
             }
         }
     </style>
 </head>
 <body>
-    <button id="langToggleBtn" class="lang-toggle">🌐 English</button>
 
-    <!-- MODALS (unchanged) -->
-    <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;"><span data-key="cancel">Cancel</span></button></div></div>
-    <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div><div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div><div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div><div class="transaction-summary" data-key="depositHint">💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.</div><div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
-    <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
-    <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div><div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
-    <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
-    <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
+    <!-- ─── 3D CANVAS (background) ─── -->
+    <div id="three-canvas"></div>
 
-    <!-- STAKE PAGE -->
-    <div id="stakePage" class="page">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
-            <div class="players-badge">DOT BINGO</div>
-        </div>
-        <h3 style="text-align:center; margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
-        <div class="stake-page-buttons">
-            <div style="text-align:center;">
-                <button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button>
-                <div class="player-count-badge" id="stake10Count">👥 0 players</div>
-            </div>
-            <div style="text-align:center;">
-                <button id="stake20Btn" class="stake-option" data-stake="20">20 ETB</button>
-                <div class="player-count-badge" id="stake20Count">👥 0 players</div>
-            </div>
-            <div style="text-align:center;">
-                <button id="stake30Btn" class="stake-option" data-stake="30">30 ETB</button>
-                <div class="player-count-badge" id="stake30Count">👥 0 players</div>
-            </div>
-        </div>
-        <div class="rules-text">
-            <p><strong data-key="entryFeeLabelShort">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
-            <p><strong data-key="prizeLabelShort">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
-            <p><strong data-key="winLabelShort">🎯 ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
-            <p><strong data-key="claimLabelShort">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው “CLAIM BINGO!”</span></p>
+    <!-- ─── 3D HUD (info overlay) ─── -->
+    <div class="hud-3d" id="hud3d">
+        <span><span class="dot"></span> <span class="value">Live</span></span>
+        <span class="divider"></span>
+        <span><span class="label">Gear 1</span> <span class="value" id="hud-teeth1">24t</span> <span class="value" id="hud-rpm1">30 RPM</span></span>
+        <span class="divider"></span>
+        <span><span class="label">Gear 2</span> <span class="value" id="hud-teeth2">16t</span> <span class="value" id="hud-rpm2">45 RPM</span></span>
+        <span class="divider"></span>
+        <span><span class="label">Drag</span> <span class="value">to orbit</span></span>
+    </div>
+
+    <!-- ─── SECRET OVERLAY ─── -->
+    <div id="secretOverlay">
+        <div class="card">
+            <span class="gear-icon">⚙️</span>
+            <h2>🔐 Secure Access</h2>
+            <p class="sub">Enter the secret code to continue</p>
+            <input type="password" id="secretInput" placeholder="•••••" autofocus />
+            <button class="btn-submit" onclick="checkSecret()">Unlock <i class="fa-solid fa-arrow-right"></i></button>
+            <div id="secretError" class="error"></div>
         </div>
     </div>
 
-    <!-- LOBBY PAGE -->
-    <div id="lobbyPage" class="page hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div></div>
-            <div class="players-badge">👥 <span id="playersCount">0</span></div>
-        </div>
-        <div class="balance-top">
-            <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance">0</span> ETB</div>
-            <div style="display: flex; gap: 8px;">
-                <button id="depositBtn" style="background:#f97316; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="deposit">+Deposit</span></button>
-                <button id="withdrawBtn" style="background:#334155; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="withdraw">-Withdraw</span></button>
-                <button id="backToStakeBtn" style="background:#6c757d; border:none; border-radius:40px; padding:6px 14px; color:white;"><span data-key="stakeBtn">↺ Stake</span></button>
+    <!-- ─── MAIN CONTENT ─── -->
+    <div id="mainContent">
+        <div class="max-w-7xl mx-auto p-4 md:p-6">
+
+            <!-- Header -->
+            <div class="bg-white rounded-t-xl shadow p-4 mb-2 flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-bold text-blue-900">Amhara Metal Industry & Machine Technology Development Enterprise</h1>
+                    <p class="text-sm font-semibold">Quality Assurance Directorate – Inspection Checklist</p>
+                </div>
+                <div class="text-right text-sm text-gray-600"><i class="fas fa-cloud-upload-alt"></i></div>
             </div>
-            <div class="timer-badge" id="lobbyTimer">30s</div>
+
+            <!-- Inspection Form -->
+            <form id="inspectionForm" class="bg-white shadow-lg rounded-b-xl p-6 space-y-6">
+                <input type="hidden" id="editId" value="" />
+                <input type="hidden" id="isEditMode" value="false" />
+
+                <!-- Process Type Selector -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
+                    <div>
+                        <label class="font-bold">Process Type *</label>
+                        <select id="processType" class="w-full border p-2 rounded" onchange="switchProcess()">
+                            <option value="Incoming">Incoming inspection (revised format)</option>
+                            <option value="Punching">Punching Process</option>
+                            <option value="Rolling">Rolling Process</option>
+                            <option value="Bending">Bending Process</option>
+                            <option value="Welding">Welding Process</option>
+                            <option value="Pressing">Pressing Process</option>
+                            <option value="Milling">Milling Process</option>
+                            <option value="Casting">Casting Process</option>
+                            <option value="PatternCore">Pattern & Core Making</option>
+                            <option value="Assembling">Assembling Process</option>
+                            <option value="Testing">Testing Process</option>
+                            <option value="Painting">Painting Process</option>
+                            <option value="Packaging">Packaging Process</option>
+                            <option value="Shearing">Shearing Operation</option>
+                            <option value="Lathe">Lathe Operation</option>
+                            <option value="Drilling">Drilling Process</option>
+                            <option value="BoringHoning">Boring & Honing</option>
+                            <option value="Grinding">Grinding Process</option>
+                            <option value="Forging">Forging Process</option>
+                            <option value="Molding">Molding Process</option>
+                            <option value="Polishing">Polishing & Finishing</option>
+                            <option value="GasCutting">Gas Cutting Process</option>
+                            <option value="FastenersAssembly">Assembling (Fasteners)</option>
+                            <option value="Hardening">Hardening Process</option>
+                            <option value="Tempering">Tempering Process</option>
+                            <option value="Coating">Coating Process</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-bold">QC Engineer Name *</label>
+                        <input type="text" id="qcEngineerName" class="w-full border p-2 rounded" placeholder="e.g. Abebech Alemu" required />
+                    </div>
+                </div>
+
+                <!-- Source, Document, Shift, Time -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
+                    <div>
+                        <label class="font-bold">Source of Process Inspection</label>
+                        <div class="flex gap-4 mt-1">
+                            <label><input type="radio" name="sourceType" value="Outsource" required /> Outsource</label>
+                            <label><input type="radio" name="sourceType" value="Insource" /> Insource</label>
+                        </div>
+                        <input type="text" id="outsourceInstitute" placeholder="Outsource Institute name" class="w-full border rounded p-1 mt-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="font-bold">Document Availability</label>
+                        <div class="flex gap-6">
+                            <label><input type="checkbox" id="designAvail" /> Design</label>
+                            <label><input type="checkbox" id="mppAvail" /> MPP</label>
+                        </div>
+                        <label class="font-bold mt-2 block">Operation Condition</label>
+                        <select id="operationStatus" class="w-full border p-1 rounded">
+                            <option value="Holdup">Holdup</option>
+                            <option value="Continue">Continue</option>
+                            <option value="Ending">Ending</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-4">
+                    <div>
+                        <label class="font-bold">Shift Number</label>
+                        <div class="flex gap-4">
+                            <label><input type="radio" name="shift" value="1" /> Shift 1</label>
+                            <label><input type="radio" name="shift" value="2" /> Shift 2</label>
+                            <label><input type="radio" name="shift" value="3" /> Shift 3</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-bold">Operator Name</label>
+                        <input type="text" id="operatorName" class="w-full border p-1 rounded" />
+                    </div>
+                    <div>
+                        <label class="font-bold">Inspection Time</label>
+                        <div class="flex gap-2 text-sm">
+                            <input type="time" id="startTime" class="border p-1 rounded w-1/2" />
+                            <input type="time" id="endTime" class="border p-1 rounded w-1/2" />
+                        </div>
+                        <span id="totalTimeDisplay" class="text-xs text-gray-600">Total: -- min</span>
+                    </div>
+                </div>
+
+                <!-- Dynamic fields container -->
+                <div id="dynamicFieldsContainer"><div class="text-gray-500 text-center py-4">Loading inspection table...</div></div>
+
+                <!-- Quantity summary -->
+                <div id="quantitySummary" class="grid grid-cols-2 md:grid-cols-5 gap-2 bg-gray-50 p-3 rounded mt-4">
+                    <div><label class="font-bold">Delivered Qty</label><input type="number" id="deliveredQty" class="border p-1 rounded w-full bg-gray-100" readonly /></div>
+                    <div><label class="font-bold">Accepted Qty</label><input type="number" id="acceptedQty" class="border p-1 rounded w-full" /></div>
+                    <div><label class="font-bold">Rework Qty</label><input type="number" id="reworkQty" class="border p-1 rounded w-full" /></div>
+                    <div><label class="font-bold">Reject Qty</label><input type="number" id="rejectQty" class="border p-1 rounded w-full" /></div>
+                    <div><label class="font-bold">Conditional Accept</label><input type="number" id="conditionalAcceptQty" class="border p-1 rounded w-full" /></div>
+                </div>
+
+                <!-- Internal Failure Costs -->
+                <div class="border p-4 rounded-md">
+                    <h3 class="font-bold text-lg">Internal Failure Costs</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                        <div><label>Defected Material Cost (ETB)</label> <input type="number" step="0.01" id="defectedMaterialCost" class="border p-1 rounded w-full" /></div>
+                        <div><label>Labor Hours</label> <input type="number" step="0.5" id="laborHours" class="border p-1 rounded w-full" /></div>
+                        <div><label class="block">Level</label><select id="levelSelect" class="border p-1 rounded w-full"><option value="">-- Select --</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="custom">Custom</option></select></div>
+                        <div><label>Salary per Hour (ETB)</label><input type="number" step="0.001" id="salaryPerHour" class="border p-1 rounded w-full" /></div>
+                        <div><label class="font-bold">Machine Description (Master Data)</label><select id="machineDescriptionSelect" class="border p-1 rounded w-full"><option value="">-- Select Machine --</option></select><p class="text-xs text-gray-500 mt-1">Select machine to auto-fill Machining Cost/Hr</p></div>
+                        <div><label>Machining Hours</label><input type="number" step="0.5" id="machiningHours" class="border p-1 rounded w-full" /></div>
+                        <div><label>Machining Cost per Hr (ETB)</label><input type="number" step="0.01" id="machiningCostPerHr" class="border p-1 rounded w-full" /></div>
+                    </div>
+                    <div class="mt-3 p-2 bg-gray-100 rounded"><span class="font-bold">Total Internal Failure Cost (ETB):</span> <span id="totalFailureCostDisplay">0.00</span><input type="hidden" id="totalInternalFailureCost" /></div>
+                </div>
+
+                <!-- Most frequent defects -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                    <div><label class="font-bold">N.B The Most Frequent Defects</label><textarea id="mostFrequentDefects" rows="2" class="border p-1 w-full"></textarea></div>
+                    <div><label class="font-bold">Defect Correction Transfer Slip</label><input type="text" id="defectCorrectionSlip" class="border p-1 w-full" /></div>
+                    <div class="md:col-span-2"><label class="font-bold">Cause of Defects (detailed)</label><textarea id="causeOfDefectsDetail" rows="2" class="border p-1 w-full"></textarea></div>
+                </div>
+
+                <!-- Suggested Next Operation -->
+                <div class="mt-4 border-t pt-4">
+                    <label class="font-bold">Suggested Next Operation</label>
+                    <input type="text" id="suggestedNextOp" list="suggestedNextList" class="border p-1 w-full rounded" placeholder="Type or select a suggestion..." />
+                    <datalist id="suggestedNextList"></datalist>
+                </div>
+
+                <div class="flex justify-end gap-4 no-print">
+                    <button type="button" onclick="resetForm()" class="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded">Reset</button>
+                    <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded hidden">Cancel Edit</button>
+                    <button type="button" id="saveBtn" onclick="saveToBackend()" class="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded font-bold">✔ Save to Cloud</button>
+                </div>
+                <div id="formMessage" class="text-center text-sm mt-2"></div>
+            </form>
+
+            <!-- Previous Inspections -->
+            <div class="mt-8 bg-white shadow rounded p-4 no-print">
+                <div class="flex justify-between items-center"><h3 class="font-bold text-lg">📋 Previous Inspections</h3><button onclick="loadHistory()" class="text-blue-600 text-sm underline">Refresh</button></div>
+                <div id="inspectionHistory" class="max-h-60 overflow-y-auto text-sm mt-2"></div>
+            </div>
         </div>
-        <div style="display:flex; justify-content:space-between; margin:12px 0;"><span data-key="pickCard">🎴 Pick card ID:</span><span><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c; border:none; border-radius:40px; padding:6px 16px; color:white;" data-key="randomCard">✨ Random Card</button></div>
-        <div id="numberGrid" class="grid-100"></div>
-        <div data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
-        <div id="lobbyCardPreview" class="card-container"></div>
-        <div class="tab-bar"><button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
-        <button id="rulesBtn" style="width:100%; background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa;" data-key="rulesBtn">📜 Game Rules</button>
-        <div class="telegram-links" style="text-align:center; margin-top:20px; font-size:0.7rem;">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- HISTORY, WALLET, PROFILE -->
-    <div id="historyPage" class="page hidden"><div class="page-header"><h2 data-key="gameHistory">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div><div><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
-    <div id="walletPage" class="page hidden"><div class="page-header"><h2 data-key="myWallet">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="currentBalance">Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw">- Withdraw</button></div></div>
-    <div id="profilePage" class="page hidden"><div class="page-header"><h2 data-key="myProfile">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div></div>
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <!-- THREE.JS GEAR ENGINE                               -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <script type="module">
+        // ─── imports ───
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    <!-- GAME PAGE -->
-    <div id="gamePage" class="page hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div></div>
-            <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
-        </div>
-        <div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="deposit">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="withdraw">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;" data-key="rulesBtn">📜 Rules</button></div><div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
-    </div>
+        // ─── DOM refs for HUD ───
+        const teeth1El = document.getElementById('hud-teeth1');
+        const rpm1El = document.getElementById('hud-rpm1');
+        const teeth2El = document.getElementById('hud-teeth2');
+        const rpm2El = document.getElementById('hud-rpm2');
 
-    <script>
-        // ========== DOM ELEMENTS ==========
-        const lobbyBalanceEl = document.getElementById('lobbyBalance');
-        const lobbyTimerEl = document.getElementById('lobbyTimer');
-        const playersCountEl = document.getElementById('playersCount');
-        const gamePlayersCountEl = document.getElementById('gamePlayersCount');
-        const winningBalanceEl = document.getElementById('winningBalance');
-        const currentCallEl = document.getElementById('currentCall');
-        const calledListEl = document.getElementById('calledList');
-        const selectedNumberEl = document.getElementById('selectedNumber');
-        const numberGrid = document.getElementById('numberGrid');
+        // ─── scene ───
+        const container = document.getElementById('three-canvas');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0b0b1a);
 
-        const stake10CountEl = document.getElementById('stake10Count');
-        const stake20CountEl = document.getElementById('stake20Count');
-        const stake30CountEl = document.getElementById('stake30Count');
+        const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 50);
+        camera.position.set(5, 4, 9);
+        camera.lookAt(0, 0, 0);
 
-        // ---- GLOBAL PLAYER-COUNT SOCKET (public) ----
-        const stakeCountSocket = io('/public');
-        stakeCountSocket.on('playersCount', (data) => {
-            if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
-            if (data.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${data.count} players`;
-            if (data.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${data.count} players`;
-        });
-        stakeCountSocket.on('lobbyState', (state) => {
-            if (state.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${state.playersCount} players`;
-            if (state.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${state.playersCount} players`;
-            if (state.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${state.playersCount} players`;
-        });
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
 
-        function copyToClipboard(text) { if (!text) return; navigator.clipboard.writeText(text).then(() => alert(
-            "✅ Phone number copied to clipboard!")).catch(() => alert("❌ Could not copy.")); }
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.07;
+        controls.minDistance = 3;
+        controls.maxDistance = 18;
+        controls.target.set(0, 0, 0);
+        controls.update();
 
-        function scrollCalledHistoryToEnd() { if (calledListEl) calledListEl.scrollLeft = calledListEl.scrollWidth; }
+        // ─── lighting ───
+        const ambient = new THREE.AmbientLight(0x40406b, 0.6);
+        scene.add(ambient);
 
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        let socket, userCard = [],
-            markedNumbers = [],
-            isGameActive = false,
-            lobbyTimerInterval = null,
-            selectedCardNumber = null;
-        let depositAccounts = {},
-            selectedDepositType = null,
-            selectedWithdrawType = null;
-        let serverTakenNumbers = new Set();
-        let displayTakenNumbers = new Set();
-        let currentBalance = 0,
-            totalGames = 0,
-            totalWins = 0,
-            totalEarned = 0,
-            recentGames = [],
-            currentGameId = null;
-        let currentMainPage = 'lobby',
-            currentTimerSeconds = 30;
-        let currentUtterance = null,
-            soundMuted = false,
-            speechUnlocked = false;
-        let pendingSelection = null,
-            pendingRandom = false;
-        let currentStake = null;
-        try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
+        const key = new THREE.DirectionalLight(0xffeedd, 3.5);
+        key.position.set(5, 12, 6);
+        key.castShadow = true;
+        key.shadow.mapSize.width = 1024;
+        key.shadow.mapSize.height = 1024;
+        key.shadow.radius = 5;
+        key.shadow.bias = -0.001;
+        scene.add(key);
 
-        // ========== LANGUAGE SUPPORT — ONLY AMHARIC OR ENGLISH, NEVER BOTH ==========
-        let currentLang = 'en'; // default to English
-        const langToggleBtn = document.getElementById('langToggleBtn');
-        const langData = {
-            am: {
-                depositTitle: "ተቀማጭ",
-                chooseMethod: "የክፍያ ዘዴ ይምረጡ",
-                cancel: "ይቅር",
-                sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
-                recipientLabel: "📞 ተቀባይ አካውንት (ለመቅዳት ይንኩ)",
-                accountName: "የአካውንት ስም",
-                yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
-                amountLabel: "💰 መጠን (ETB)",
-                depositHint: "💡 ክፍያ ከላኩ በኋላ ይህን ቅጽ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ያረጋግጣል እና ገንዘብ ይጨምራል።",
-                requestDeposit: "✔ ተቀማጭ ጠይቅ",
-                back: "← ተመለስ",
-                withdrawTitle: "ገንዘብ አውጣ",
-                selectMethod: "የማውጫ ዘዴ ይምረጡ",
-                yourDetails: "የአካውንትዎ ዝርዝሮች",
-                fullName: "👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)",
-                accountNumber: "📞 አካውንት / ስልክ ቁጥር",
-                amountWithdraw: "💰 መጠን (ETB) - ዝቅተኛ 20 ETB",
-                withdrawHint: "⏱️ ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።",
-                requestWithdrawal: "✔ ገንዘብ ማውጣት ጠይቅ",
-                rulesTitle: "የቢንጎ ሕጎች",
-                rulesSub: "75-ኳስ ክላሲክ",
-                entryFeeLabel: "💰 የመግቢያ ክፍያ፦",
-                entryFeeValue: "10/20/30 ብር (እንደ ምርጫዎ)",
-                prizeLabel: "🏆 የሽልማት ገንዘብ፦",
-                prizeValue: "80% (1 ተጫዋች ከሆነ 100%)",
-                winLabel: "🎯 ማሸነፍ፦",
-                winValue: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
-                claimLabel: "⏱️ የይገባኛል ጥያቄ፦",
-                claimValue: "ወዲያው “CLAIM BINGO!”",
-                gotIt: "ገባኝ",
-                congrats: "እንኳን ደስ ያለዎት!",
-                winningPrize: "🎁 የሽልማት ገንዘብ",
-                amazing: "🎉 ደስ ያለኝ! 🎉",
-                chooseStake: "የመግቢያ ክፍያ ይምረጡ",
-                bal: "ቀሪ ሂሳብ",
-                deposit: "+ተቀማጭ",
-                withdraw: "-ማውጣት",
-                stakeBtn: "↺ ውርርድ",
-                pickCard: "🎴 የካርድ መለያ ይምረጡ:",
-                selected: "የተመረጠው:",
-                randomCard: "✨ በዘፈቀደ ካርድ",
-                yourCardPreview: "🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
-                gameTab: "🎮 ጨዋታ",
-                historyTab: "📜 ታሪክ",
-                walletTab: "💰 ቦርሳ",
-                profileTab: "👤 መገለጫ",
-                rulesBtn: "📜 የጨዋታ ሕጎች",
-                gameHistory: "📜 የጨዋታ ታሪክ",
-                totalGamesLabel: "ጠቅላላ ጨዋታዎች:",
-                myWallet: "💰 ቦርሳዬ",
-                currentBalance: "አሁን ያለው ቀሪ ሂሳብ",
-                myProfile: "👤 መገለጫዬ",
-                usernameLabel: "የተጠቃሚ ስም",
-                balanceLabel: "💰 ቀሪ ሂሳብ",
-                prizePoolLabel: "🏆 የሽልማት ገንዘብ",
-                lastCall: "🎲 የመጨረሻ ጥሪ",
-                calledPrefix: "የተጠሩ:",
-                claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆",
-                entryFeeLabelShort: "💰 የመግቢያ ክፍያ፦",
-                entryFeeValues: "10/20/30 ብር (እንደ ምርጫዎ)",
-                prizeLabelShort: "🏆 የሽልማት ገንዘብ፦",
-                prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
-                winLabelShort: "🎯 ማሸነፍ፦",
-                winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
-                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦",
-                claimValueShort: "ወዲያው “CLAIM BINGO!”"
-            },
-            en: {
-                depositTitle: "Deposit",
-                chooseMethod: "Choose payment method",
-                cancel: "Cancel",
-                sendPayment: "Send payment to the number below",
-                recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)",
-                accountName: "ACCOUNT NAME",
-                yourPhone: "📞 Your Phone Number (for verification)",
-                amountLabel: "💰 Amount (ETB)",
-                depositHint: "💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.",
-                requestDeposit: "✔ Request Deposit",
-                back: "← Back",
-                withdrawTitle: "Withdraw Funds",
-                selectMethod: "Select withdrawal method",
-                yourDetails: "Your account details",
-                fullName: "👤 Full Name (as per bank/mobile money)",
-                accountNumber: "📞 Account / Phone Number",
-                amountWithdraw: "💰 Amount (ETB) - Min 20 ETB",
-                withdrawHint: "⏱️ Withdrawals processed within moment.",
-                requestWithdrawal: "✔ Request Withdrawal",
-                rulesTitle: "Bingo Rules",
-                rulesSub: "75-ball Classic",
-                entryFeeLabel: "💰 Entry Fee:",
-                entryFeeValue: "10/20/30 Birr (as per your choice)",
-                prizeLabel: "🏆 Prize Money:",
-                prizeValue: "80% (100% if 1 player)",
-                winLabel: "🎯 Winning:",
-                winValue: "Row, Column, Diagonal or 4 Corners",
-                claimLabel: "⏱️ Claim:",
-                claimValue: "Immediately 'CLAIM BINGO!'",
-                gotIt: "Got it",
-                congrats: "Congratulations!",
-                winningPrize: "🎁 WINNING PRIZE",
-                amazing: "🎉 Amazing! 🎉",
-                chooseStake: "Choose Your Stake",
-                bal: "BAL",
-                deposit: "+Deposit",
-                withdraw: "-Withdraw",
-                stakeBtn: "↺ Stake",
-                pickCard: "🎴 Pick card ID:",
-                selected: "Selected:",
-                randomCard: "✨ Random Card",
-                yourCardPreview: "🎴 Your Bingo Card Preview",
-                gameTab: "🎮 Game",
-                historyTab: "📜 History",
-                walletTab: "💰 Wallet",
-                profileTab: "👤 Profile",
-                rulesBtn: "📜 Game Rules",
-                gameHistory: "📜 Game History",
-                totalGamesLabel: "Total Games:",
-                myWallet: "💰 My Wallet",
-                currentBalance: "Current Balance",
-                myProfile: "👤 My Profile",
-                usernameLabel: "Username",
-                balanceLabel: "💰 Balance",
-                prizePoolLabel: "🏆 PRIZE POOL",
-                lastCall: "🎲 LAST CALL",
-                calledPrefix: "Called:",
-                claimBingo: "🏆 CLAIM BINGO! 🏆",
-                entryFeeLabelShort: "💰 Entry Fee:",
-                entryFeeValues: "10/20/30 Birr (as per your choice)",
-                prizeLabelShort: "🏆 Prize Money:",
-                prizeValueShort: "80% (100% if 1 player)",
-                winLabelShort: "🎯 Winning:",
-                winValueShort: "Row, Column, Diagonal or 4 Corners",
-                claimLabelShort: "⏱️ Claim:",
-                claimValueShort: "Immediately 'CLAIM BINGO!'"
+        const fill = new THREE.DirectionalLight(0x8899ff, 0.8);
+        fill.position.set(-5, 3, -5);
+        scene.add(fill);
+
+        const rim = new THREE.DirectionalLight(0x44ddff, 0.5);
+        rim.position.set(-2, -2, 6);
+        scene.add(rim);
+
+        const spot = new THREE.SpotLight(0x4466ff, 1.0, 20, Math.PI / 3, 0.5, 1);
+        spot.position.set(0, 10, 0);
+        spot.target.position.set(0, 0, 0);
+        scene.add(spot);
+        scene.add(spot.target);
+
+        scene.fog = new THREE.FogExp2(0x0b0b1a, 0.028);
+
+        // ─── gear generator ───
+        function generateGearPoints(numTeeth, innerRadius, outerRadius, toothWidth = 0.52, segmentsPerTooth = 22) {
+            const points = [];
+            const angleStep = (2 * Math.PI) / numTeeth;
+            const halfTooth = (angleStep * toothWidth) / 2;
+            const halfGap = (angleStep * (1 - toothWidth)) / 2;
+            const segTooth = Math.max(4, Math.floor(segmentsPerTooth * toothWidth));
+            const segGap = Math.max(2, Math.floor(segmentsPerTooth * (1 - toothWidth)));
+
+            for (let i = 0; i < numTeeth; i++) {
+                const center = i * angleStep;
+                const gapStart = center - halfTooth - halfGap;
+                const gapEnd = center - halfTooth;
+                for (let j = 0; j < segGap; j++) {
+                    const t = j / segGap;
+                    const a = gapStart + t * (gapEnd - gapStart);
+                    points.push(new THREE.Vector2(innerRadius * Math.cos(a), innerRadius * Math.sin(a)));
+                }
+                const riseStart = gapEnd;
+                const riseEnd = center - halfTooth * 0.55;
+                const segRise = Math.max(3, Math.floor(segTooth * 0.3));
+                for (let j = 0; j <= segRise; j++) {
+                    const t = j / segRise;
+                    const a = riseStart + t * (riseEnd - riseStart);
+                    const r = innerRadius + (outerRadius - innerRadius) * Math.pow(t, 0.7);
+                    points.push(new THREE.Vector2(r * Math.cos(a), r * Math.sin(a)));
+                }
+                const topStart = riseEnd;
+                const topEnd = center + halfTooth * 0.55;
+                const segTop = Math.max(3, Math.floor(segTooth * 0.4));
+                for (let j = 0; j <= segTop; j++) {
+                    const t = j / segTop;
+                    const a = topStart + t * (topEnd - topStart);
+                    points.push(new THREE.Vector2(outerRadius * Math.cos(a), outerRadius * Math.sin(a)));
+                }
+                const fallStart = topEnd;
+                const fallEnd = center + halfTooth;
+                const segFall = Math.max(3, Math.floor(segTooth * 0.3));
+                for (let j = 0; j <= segFall; j++) {
+                    const t = j / segFall;
+                    const a = fallStart + t * (fallEnd - fallStart);
+                    const r = outerRadius - (outerRadius - innerRadius) * Math.pow(t, 0.7);
+                    points.push(new THREE.Vector2(r * Math.cos(a), r * Math.sin(a)));
+                }
             }
+            points.push(points[0].clone());
+            return points;
+        }
+
+        function createGearMesh({ numTeeth, innerRadius, outerRadius, thickness, holeRadius, color, metalness = 0.85,
+            roughness = 0.28, toothWidth = 0.52 }) {
+            const pts = generateGearPoints(numTeeth, innerRadius, outerRadius, toothWidth, 22);
+            const shape = new THREE.Shape();
+            shape.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].y);
+
+            const holePath = new THREE.Path();
+            const segs = 32;
+            for (let i = 0; i <= segs; i++) {
+                const a = (i / segs) * 2 * Math.PI;
+                const x = holeRadius * Math.cos(a);
+                const y = holeRadius * Math.sin(a);
+                if (i === 0) holePath.moveTo(x, y);
+                else holePath.lineTo(x, y);
+            }
+            shape.holes.push(holePath);
+
+            const extrudeSettings = { depth: thickness, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.05,
+                bevelOffset: 0, bevelSegments: 6, steps: 1 };
+            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            geometry.computeVertexNormals();
+            const box = new THREE.Box3().setFromObject(new THREE.Mesh(geometry));
+            const center = box.getCenter(new THREE.Vector3());
+            geometry.translate(-center.x, -center.y, -center.z + thickness / 2);
+
+            const material = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color(color),
+                metalness,
+                roughness,
+                clearcoat: 0.1,
+                clearcoatRoughness: 0.3,
+                envMapIntensity: 1.2,
+                emissive: new THREE.Color(color).multiplyScalar(0.06),
+                emissiveIntensity: 0.1,
+            });
+
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            const hubGeo = new THREE.TorusGeometry(holeRadius * 1.4, 0.08, 10, 28);
+            const hubMat = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color(color).offsetHSL(0, 0.1, 0.15),
+                metalness: 0.9,
+                roughness: 0.2,
+                emissive: new THREE.Color(color).multiplyScalar(0.1),
+                emissiveIntensity: 0.15,
+            });
+            const hubRing = new THREE.Mesh(hubGeo, hubMat);
+            hubRing.position.z = 0;
+            hubRing.rotation.x = Math.PI / 2;
+            hubRing.scale.set(1, 1, 0.4);
+            mesh.add(hubRing);
+
+            const ringMat = new THREE.MeshPhysicalMaterial({
+                color: new THREE.Color(color).offsetHSL(0, 0.1, 0.2),
+                metalness: 0.6,
+                roughness: 0.3,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.DoubleSide,
+            });
+            const ringGeo = new THREE.TorusGeometry(outerRadius * 0.95, 0.03, 8, 48);
+            const ringTop = new THREE.Mesh(ringGeo, ringMat);
+            ringTop.position.z = thickness / 2 + 0.01;
+            ringTop.rotation.x = Math.PI / 2;
+            mesh.add(ringTop);
+            const ringBottom = ringTop.clone();
+            ringBottom.position.z = -thickness / 2 - 0.01;
+            mesh.add(ringBottom);
+
+            return mesh;
+        }
+
+        // ─── build gears ───
+        const N1 = 24,
+            N2 = 16;
+        const R_inner1 = 1.5,
+            R_outer1 = 2.4,
+            thick1 = 0.7,
+            hole1 = 0.5,
+            color1 = 0x7a9ddb;
+        const scaleRatio = N2 / N1;
+        const R_inner2 = R_inner1 * scaleRatio,
+            R_outer2 = R_outer1 * scaleRatio,
+            thick2 = thick1,
+            hole2 = hole1 * scaleRatio,
+            color2 = 0xdba87a;
+
+        const gear1 = createGearMesh({ numTeeth: N1, innerRadius: R_inner1, outerRadius: R_outer1, thickness: thick1,
+            holeRadius: hole1, color: color1 });
+        const gear2 = createGearMesh({ numTeeth: N2, innerRadius: R_inner2, outerRadius: R_outer2, thickness: thick2,
+            holeRadius: hole2, color: color2 });
+
+        const dist = R_outer1 + R_outer2;
+        gear1.position.set(-dist / 2, 0, 0);
+        gear2.position.set(dist / 2, 0, 0);
+        gear1.rotation.z = 0;
+        gear2.rotation.z = Math.PI - Math.PI / N2;
+        scene.add(gear1);
+        scene.add(gear2);
+
+        // ─── shafts ───
+        const shaftMat = new THREE.MeshPhysicalMaterial({ color: 0x445577, metalness: 0.8, roughness: 0.3 });
+        const shaftGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.5, 10);
+        const shaft1 = new THREE.Mesh(shaftGeo, shaftMat);
+        shaft1.position.copy(gear1.position);
+        shaft1.position.y = -1.2;
+        shaft1.castShadow = true;
+        scene.add(shaft1);
+        const shaft2 = new THREE.Mesh(shaftGeo.clone(), shaftMat);
+        shaft2.position.copy(gear2.position);
+        shaft2.position.y = -1.2;
+        shaft2.castShadow = true;
+        scene.add(shaft2);
+
+        // ─── ground ───
+        const groundGeo = new THREE.CircleGeometry(6, 64);
+        const groundMat = new THREE.MeshPhysicalMaterial({ color: 0x111122, metalness: 0.9, roughness: 0.4,
+            transparent: true, opacity: 0.45, side: THREE.DoubleSide, envMapIntensity: 0.5 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -1.3;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const gridHelper = new THREE.GridHelper(10, 20, 0x334466, 0x223355);
+        gridHelper.position.y = -1.25;
+        gridHelper.material.transparent = true;
+        gridHelper.material.opacity = 0.2;
+        scene.add(gridHelper);
+
+        // ─── sky ───
+        const skyGeo = new THREE.SphereGeometry(45, 32, 32);
+        const skyMat = new THREE.ShaderMaterial({
+            side: THREE.BackSide,
+            uniforms: { uColor1: { value: new THREE.Color(0x0b0b1a) }, uColor2: { value: new THREE.Color(0x1a1a3a) } },
+            vertexShader: `varying vec3 vPos; void main() { vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `uniform vec3 uColor1; uniform vec3 uColor2; varying vec3 vPos; void main() { float h = normalize(vPos).y * 0.5 + 0.5; gl_FragColor = vec4(mix(uColor1, uColor2, h), 1.0); }`,
+        });
+        const sky = new THREE.Mesh(skyGeo, skyMat);
+        scene.add(sky);
+
+        // ─── stars ───
+        const starsGeo = new THREE.BufferGeometry();
+        const starCount = 900;
+        const pos = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            const theta = Math.random() * 2 * Math.PI,
+                phi = Math.acos(2 * Math.random() - 1),
+                r = 30 + Math.random() * 10;
+            pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+            pos[i * 3 + 1] = r * Math.cos(phi);
+            pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+        }
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        const starsMat = new THREE.PointsMaterial({ color: 0x8899dd, size: 0.08, transparent: true, opacity: 0.5,
+            blending: THREE.AdditiveBlending, sizeAttenuation: true });
+        const stars = new THREE.Points(starsGeo, starsMat);
+        scene.add(stars);
+
+        // ─── HUD update ───
+        teeth1El.textContent = `${N1}t`;
+        teeth2El.textContent = `${N2}t`;
+        const RPM1 = 2,
+            RPM2 = -RPM1 * (N1 / N2);
+        const omega1 = (RPM1 / 60) * 2 * Math.PI,
+            omega2 = (RPM2 / 60) * 2 * Math.PI;
+        rpm1El.textContent = `${RPM1} RPM`;
+        rpm2El.textContent = `${Math.round(Math.abs(RPM2))} RPM`;
+
+        // ─── animation ───
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = 0.016;
+            time += delta;
+            gear1.rotation.z += omega1 * delta;
+            gear2.rotation.z += omega2 * delta;
+            gear1.position.y = Math.sin(time * 0.5 + 0.2) * 0.04;
+            gear2.position.y = Math.sin(time * 0.5 + 0.2) * 0.04;
+            stars.rotation.y += delta * 0.006;
+            stars.rotation.x += delta * 0.002;
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ─── resize ───
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth,
+                h = window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        });
+
+        // ─── key: R reset view ───
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                camera.position.set(5, 4, 9);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+        });
+
+        console.log('⚙️ 3D Gear background running.');
+    </script>
+
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <!-- QC INSPECTION JAVASCRIPT                         -->
+    <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+    <script>
+        // ─── SECURITY ───
+        const CORRECT_SECRET = "12345";
+
+        // Check if already unlocked
+        if (sessionStorage.getItem('secretUnlocked') === 'true') {
+            document.getElementById('secretOverlay').classList.add('hidden');
+            document.getElementById('mainContent').classList.add('visible');
+            initApp();
+        }
+
+        function checkSecret() {
+            const entered = document.getElementById('secretInput').value;
+            const errorEl = document.getElementById('secretError');
+            if (entered === CORRECT_SECRET) {
+                sessionStorage.setItem('secretUnlocked', 'true');
+                document.getElementById('secretOverlay').classList.add('hidden');
+                document.getElementById('mainContent').classList.add('visible');
+                errorEl.textContent = '';
+                initApp();
+            } else {
+                errorEl.textContent = '❌ Wrong secret number!';
+                document.getElementById('secretInput').value = '';
+                document.getElementById('secretInput').focus();
+                document.getElementById('secretInput').style.borderColor = '#f87171';
+                setTimeout(() => { document.getElementById('secretInput').style.borderColor = ''; }, 800);
+            }
+        }
+
+        // Enter key on secret input
+        document.getElementById('secretInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') checkSecret();
+        });
+
+        // ─── APP INIT ───
+        let allClientNames = new Set();
+        let allProjectTitles = new Set();
+        let allSubtitles = new Set();
+        let clientTitleMap = new Map();
+        let clientSubtitleMap = new Map();
+        let currentProcess = document.getElementById("processType").value;
+        let isEditMode = false,
+            editId = null;
+        let currentEngineer = '';
+        const engineerFromUrl = new URLSearchParams(window.location.search).get('engineer');
+        if (engineerFromUrl) {
+            currentEngineer = decodeURIComponent(engineerFromUrl);
+            const f = document.getElementById('qcEngineerName');
+            f.value = currentEngineer;
+            f.readOnly = true;
+            f.classList.add('bg-gray-100');
+        }
+
+        function initApp() {
+            renderDynamicFields();
+            loadHistory();
+            populateMachineDropdown();
+            populateSuggestedNextOps();
+            attachQuantityListeners();
+            updateDeliveredQty();
+            const clientInput = document.getElementById('extra_Customer_Name');
+            if (clientInput) {
+                clientInput.removeEventListener('input', filterSuggestionsByCurrentClient);
+                clientInput.addEventListener('input', filterSuggestionsByCurrentClient);
+            }
+        }
+
+        // ─── datalist helpers ───
+        function updateSuggestionsFromInspections(inspections) {
+            allClientNames.clear();
+            allProjectTitles.clear();
+            allSubtitles.clear();
+            clientTitleMap.clear();
+            clientSubtitleMap.clear();
+            for (const insp of inspections) {
+                const extra = insp.extra_fields || {};
+                const client = extra["Customer Name"]?.trim();
+                const title = extra["Project Name"]?.trim();
+                const subtitle = extra["Subtitle"]?.trim();
+                if (client) {
+                    allClientNames.add(client);
+                    if (title) {
+                        allProjectTitles.add(title);
+                        if (!clientTitleMap.has(client)) clientTitleMap.set(client, new Set());
+                        clientTitleMap.get(client).add(title);
+                    }
+                    if (subtitle) {
+                        allSubtitles.add(subtitle);
+                        if (!clientSubtitleMap.has(client)) clientSubtitleMap.set(client, new Set());
+                        clientSubtitleMap.get(client).add(subtitle);
+                    }
+                }
+            }
+            refreshDatalistOptions();
+        }
+
+        function refreshDatalistOptions(clientFilter) {
+            const filter = (clientFilter && clientFilter.trim() !== '') ? clientFilter.trim() : null;
+            const clientDL = document.getElementById("customerNameDatalist");
+            if (clientDL) {
+                clientDL.innerHTML = "";
+                Array.from(allClientNames).sort().forEach(n => {
+                    let o = document.createElement("option");
+                    o.value = n;
+                    clientDL.appendChild(o);
+                });
+            }
+            const titleDL = document.getElementById("projectNameDatalist");
+            if (titleDL) {
+                titleDL.innerHTML = "";
+                let titles;
+                if (filter && clientTitleMap.has(filter)) titles = Array.from(clientTitleMap.get(filter));
+                else if (filter) titles = [];
+                else titles = Array.from(allProjectTitles);
+                titles.sort().forEach(n => {
+                    let o = document.createElement("option");
+                    o.value = n;
+                    titleDL.appendChild(o);
+                });
+            }
+            const subtitleDL = document.getElementById("subtitleDatalist");
+            if (subtitleDL) {
+                subtitleDL.innerHTML = "";
+                let subtitles;
+                if (filter && clientSubtitleMap.has(filter)) subtitles = Array.from(clientSubtitleMap.get(filter));
+                else if (filter) subtitles = [];
+                else subtitles = Array.from(allSubtitles);
+                subtitles.sort().forEach(n => {
+                    let o = document.createElement("option");
+                    o.value = n;
+                    subtitleDL.appendChild(o);
+                });
+            }
+        }
+
+        function filterSuggestionsByCurrentClient() {
+            const clientInput = document.getElementById('extra_Customer_Name');
+            if (clientInput) {
+                const val = clientInput.value.trim();
+                refreshDatalistOptions(val || null);
+            }
+        }
+
+        // ─── quantity ───
+        function updateDeliveredQty() {
+            const accepted = parseFloat(document.getElementById('acceptedQty').value) || 0;
+            const rework = parseFloat(document.getElementById('reworkQty').value) || 0;
+            const reject = parseFloat(document.getElementById('rejectQty').value) || 0;
+            const conditional = parseFloat(document.getElementById('conditionalAcceptQty').value) || 0;
+            const total = accepted + rework + reject + conditional;
+            document.getElementById('deliveredQty').value = total;
+            return total;
+        }
+
+        function attachQuantityListeners() {
+            ['acceptedQty', 'reworkQty', 'rejectQty', 'conditionalAcceptQty'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.removeEventListener('input', updateDeliveredQty);
+                    el.addEventListener('input', updateDeliveredQty);
+                }
+            });
+        }
+
+        // ─── OCR ───
+        async function scanDocumentAndFill() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.capture = 'environment';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+            fileInput.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) { document.body.removeChild(fileInput); return; }
+                const msgDiv = document.getElementById('formMessage');
+                msgDiv.innerHTML = '<span class="text-blue-600">📸 Scanning...</span>';
+                try {
+                    const { data: { text } } = await Tesseract.recognize(file, 'eng', { logger: m => console.log(m) });
+                    const extracted = parseFieldsFromText(text);
+                    const clientInput = document.getElementById("extra_Customer_Name");
+                    const titleInput = document.getElementById("extra_Project_Name");
+                    const drawingInput = document.getElementById("extra_Drawing_No_");
+                    const partInput = document.getElementById("extra_Part_Name");
+                    if (clientInput && extracted.clientName) {
+                        clientInput.value = extracted.clientName;
+                        refreshDatalistOptions(extracted.clientName.trim());
+                    }
+                    if (titleInput && extracted.projectTitle) titleInput.value = extracted.projectTitle;
+                    if (drawingInput && extracted.drawingNo) drawingInput.value = extracted.drawingNo;
+                    if (partInput && extracted.partName) partInput.value = extracted.partName;
+                    msgDiv.innerHTML = '<span class="text-green-600">✅ Document scanned!</span>';
+                    setTimeout(() => { if (msgDiv.innerHTML.includes('✅')) msgDiv.innerHTML = ''; }, 3000);
+                } catch (err) {
+                    console.error(err);
+                    msgDiv.innerHTML = '<span class="text-red-600">❌ OCR failed.</span>';
+                    setTimeout(() => { if (msgDiv.innerHTML.includes('❌')) msgDiv.innerHTML = ''; }, 3000);
+                } finally { document.body.removeChild(fileInput); }
+            };
+            fileInput.click();
+        }
+
+        function parseFieldsFromText(fullText) {
+            const result = { clientName: '', projectTitle: '', drawingNo: '', partName: '' };
+            const lines = fullText.split(/\r?\n/);
+            const patterns = {
+                clientName: [/Client\s*Name\s*[:;]\s*(.+)/i, /Customer\s*Name\s*[:;]\s*(.+)/i, /Client\s*[:;]\s*(.+)/i],
+                projectTitle: [/Title\s*[:;]\s*(.+)/i, /Project\s*Title\s*[:;]\s*(.+)/i, /Project\s*Name\s*[:;]\s*(.+)/i,
+                    /Project\s*[:;]\s*(.+)/i
+                ],
+                drawingNo: [/DWG\s*No\.?\s*[:;]\s*(.+)/i, /Drawing\s*No\.?\s*[:;]\s*(.+)/i, /Drawing\s*Number\s*[:;]\s*(.+)/i,
+                    /Drawing\s*[:;]\s*(.+)/i
+                ],
+                partName: [/Part\s*Name\s*[:;]\s*(.+)/i, /Part\s*[:;]\s*(.+)/i, /Part\s*No\.?\s*[:;]\s*(.+)/i]
+            };
+            for (const line of lines) {
+                const trimmed = line.trim();
+                for (const [key, regexes] of Object.entries(patterns)) {
+                    if (result[key]) continue;
+                    for (const regex of regexes) {
+                        const match = trimmed.match(regex);
+                        if (match && match[1]) { result[key] = match[1].trim(); break; }
+                    }
+                }
+            }
+            return result;
+        }
+
+        // ─── machinery master ───
+        const machineryMaster = [
+            { desc: "Power hack saw", rate: (1693.44 + 24876.46) / 1767 },
+            { desc: "Medium duty lathe machine, Conventional", rate: (13539.12 + 52982.93) / 1767 },
+            { desc: "CNC precision lathe machine", rate: (26705.6 + 73136.89) / 1767 },
+            { desc: "CNC heavy duty precision lathe machine", rate: (78431.06 + 171904.99) / 1767 },
+            { desc: "Double column VTC", rate: (89255.26 + 223282.18) / 1522 },
+            { desc: "Universal milling machine, conventional", rate: (7718.89 + 34658.23) / 1522 },
+            { desc: "CNC universal milling machine", rate: (43119.34 + 77600.85) / 1522 },
+            { desc: "Hydraulic vertical slotting machine", rate: (43917.85 + 78121.05) / 1522 },
+            { desc: "NC Horizontal milling machine", rate: (62954.94 + 91573.22) / 1522 },
+            { desc: "Electrical discharge machine EDM", rate: (17389.69 + 24547.62) / 736 },
+            { desc: "CNC wire cutting EDM Machine", rate: (13308.44 + 22588.04) / 736 },
+            { desc: "Pedestal grinding machine", rate: (310.53 + 7844.46) / 1227 },
+            { desc: "Universal cylindrical grinding m/c", rate: (17922.03 + 44474.64) / 1522 },
+            { desc: "Surface grinding machine", rate: (12070.58 + 37225.39) / 1522 },
+            { desc: "CNC horizontal surface grinder", rate: (33714.71 + 53078.12) / 1522 },
+            { desc: "CNC external grinder machine", rate: (41522.33 + 48115.07) / 1522 },
+            { desc: "CNC Cylindrical inside grinder machine", rate: (50572.06 + 84805.11) / 1522 },
+            { desc: "5-axis CNC tool grinding machine", rate: (102031.36 + 124842.37) / 1522 },
+            { desc: "Radial drilling machine", rate: (24842.42 + 63559.86) / 1620 },
+            { desc: "Deep hole drilling & boring", rate: (90980.03 + 278946.66) / 1620 },
+            { desc: "Three axis gun and BTA drilling", rate: (208498.86 + 473226.13) / 1620 },
+            { desc: "Deep hole honing", rate: (54249.66 + 106996.73) / 1620 },
+            { desc: "Vertical honing machine", rate: (5305.63 + 25910.68) / 1620 },
+            { desc: "Pneumatic spot welding machine", rate: (5850.57 + 71953.92) / 1424 },
+            { desc: "MIG welding machine (CEMONT)", rate: (360.04 + 44543.16) / 1816 },
+            { desc: "TIG welding machine (KLYUE)", rate: (360.04 + 36391.32) / 1816 },
+            { desc: "Arc welding machine (CEMONT)", rate: (360.04 + 70974.89) / 1816 },
+            { desc: "Submerged arc welding machine", rate: (6075.59 + 144254.31) / 1816 },
+            { desc: "Heavy duty hydraulic shear machine", rate: (11977.59 + 40764.97) / 1669 },
+            { desc: "Hydraulic sheet metal bending machine", rate: (55249.54 + 165016.83) / 1620 },
+            { desc: "CNC Hydraulic four roller Plate rolling", rate: (35773.08 + 47918.73) / 1620 },
+            { desc: "Hydraulic combination shearing and punching machine", rate: (5678.27 + 14469.1) / 1424 },
+            { desc: "Automatic pipe bending machine", rate: (60615.5 + 80514.84) / 1620 },
+            { desc: "Automatic profile bending machine", rate: (25140.53 + 36569.87) / 1424 },
+            { desc: "Automatic tube pipe hole flame cutter", rate: (1987.39 + 17146.02) / 1424 },
+            { desc: "Gantry type CNC plasma metal cutting machine", rate: (95394.88 + 275812.66) / 1424 },
+            { desc: "Hydraulic plate bending machine", rate: (109704.12 + 321687.29) / 1620 },
+            { desc: "CNC laser cutting machine", rate: (113494.36 + 86076.62) / 1227 },
+            { desc: "Hydraulic CNC turret punch machine", rate: (65822.47 + 90240.45) / 1227 },
+            { desc: "Pneumatic forging hammer machine", rate: (15615.23 + 71572.02) / 1620 },
+            { desc: "Forging hydraulic press machine", rate: (37164.26 + 56125.88) / 1424 },
+            { desc: "Portable polishing machine", rate: (39.93 + 4618.04) / 491 },
+            { desc: "Hydraulic press", rate: (2040.63 + 7884.41) / 491 },
+            { desc: "High pressure water jet cleaning machine", rate: (621.06 + 9713.98) / 491 },
+            { desc: "Automatic hose crimping machine", rate: (3482.2 + 5093.5) / 491 },
+            { desc: "Name plate printing machine", rate: (6558.4 + 6206.5) / 491 },
+            { desc: "Floor drilling machine", rate: (4400.66 + 14162.03) / 1227 },
+            { desc: "CNC hydraulic Guillotine shear", rate: (6444.75 + 88123.03) / 1620 },
+            { desc: "100T Punching Machine", rate: (3069.23 + 30869.16) / 1473 },
+            { desc: "160T punching Machine", rate: (5780.15 + 39306.75) / 1375 },
+            { desc: "Electrical Furnace and Annealing", rate: (54733.08 + 2398165.57) / 1767 },
+            { desc: "80T punching Machine", rate: (1732.78 + 21649.59) / 1473 },
+            { desc: "400T four column hydraulic press", rate: (4220.52 + 45234.71) / 1080 },
+            { desc: "Blast and painting equipment", rate: (23020.03 + 228189) / 1620 },
+            { desc: "150kg pneumatic hammer", rate: (2250.24 + 47102.48) / 1473 },
+            { desc: "400kg pneumatic hammer", rate: (6812.61 + 88803.68) / 1375 },
+            { desc: "300T friction screw press", rate: (7379.28 + 40806.48) / 933 },
+            { desc: "630T forge rolling machine", rate: (44958.07 + 135050.87) / 933 },
+            { desc: "100T friction screw press", rate: (3560.69 + 18387.16) / 1080 },
+            { desc: "3m3 air press machine", rate: (2516.21 + 30506.58) / 835 },
+            { desc: "Polish machine", rate: (144.01 + 6236.55) / 1080 },
+            { desc: "Edging machine", rate: (144.01 + 7080.27) / 1227 },
+            { desc: "Ferrous sand casting plant", rate: (-707583.02 + 9712306.76) / 1767 },
+            { desc: "Non-ferrous sand casting plant", rate: (-640918.65 + 5694741.95) / 1767 },
+            { desc: "gear hobbing", rate: (27291.17 + 62811.27) / 1620 },
+            { desc: "CNC hand bench drill", rate: (11925.78 + 133416.96) / 1620 },
+            { desc: "Abrasive water jet cutting machine", rate: (38157.59 + 109927.35) / 1080 },
+            { desc: "Pantograph Engraving Machine", rate: (1658.05 + 5337.33) / 1227 },
+            { desc: "Tank End (dish head) Making Machine", rate: (74492.47 + 73296.73) / 1375 }
+        ];
+
+        function getRelevantMachinesForProcess(processType) {
+            const keywords = {
+                "Lathe": ["lathe", "turning"],
+                "Milling": ["milling", "mill"],
+                "Drilling": ["drill", "drilling"],
+                "Grinding": ["grind", "grinding"],
+                "Punching": ["punch", "punching", "turret punch"],
+                "Shearing": ["shear", "shearing", "guillotine"],
+                "Bending": ["bend", "bending", "press brake"],
+                "Welding": ["weld", "welding", "mig", "tig", "arc", "spot"],
+                "Rolling": ["roll", "rolling", "plate roll"],
+                "Pressing": ["press", "hydraulic press", "friction screw"],
+                "Casting": ["casting", "furnace", "sand casting"],
+                "Forging": ["forge", "forging", "hammer"],
+                "Assembling": ["assembly", "crimping", "hose"],
+                "Testing": ["test", "measurement"],
+                "Painting": ["paint", "blast", "coating"],
+                "Packaging": ["pack", "label", "print"],
+                "Polishing": ["polish", "edging"],
+                "GasCutting": ["cut", "plasma", "laser", "water jet", "flame"],
+                "Hardening": ["furnace", "annealing", "heat treat"],
+                "Tempering": ["furnace", "annealing", "heat treat"],
+                "Coating": ["paint", "blast", "coating"],
+                "BoringHoning": ["bore", "hone", "deep hole"],
+                "PatternCore": ["pattern", "core"],
+                "Molding": ["mold", "casting"],
+                "FastenersAssembly": ["fastener", "crimp", "hose"]
+            };
+            let kw = keywords[processType] || [];
+            if (kw.length === 0) return machineryMaster;
+            return machineryMaster.filter(m => kw.some(k => m.desc.toLowerCase().includes(k.toLowerCase())));
+        }
+
+        function populateMachineDropdown(selectedValue) {
+            const selectEl = document.getElementById("machineDescriptionSelect");
+            if (!selectEl) return;
+            const current = document.getElementById("processType").value;
+            let relevant = getRelevantMachinesForProcess(current);
+            if (relevant.length === 0) relevant = machineryMaster;
+            let options = '<option value="">-- Select Machine --</option>';
+            relevant.forEach(m => options += `<option value="${m.rate.toFixed(4)}">${escapeHtml(m.desc)}</option>`);
+            selectEl.innerHTML = options;
+            if (selectedValue !== undefined && selectedValue !== null) selectEl.value = selectedValue;
+            selectEl.onchange = function() {
+                const rate = parseFloat(this.value);
+                if (!isNaN(rate) && this.value) {
+                    document.getElementById("machiningCostPerHr").value = rate.toFixed(2);
+                    computeFailureCost();
+                }
+            };
+        }
+
+        // ─── work station ───
+        function getWorkStationOptionsForProcess(processType) {
+            const map = {
+                "Lathe": ["machine shop"],
+                "Milling": ["machine shop"],
+                "Drilling": ["machine shop"],
+                "Grinding": ["machine shop"],
+                "BoringHoning": ["machine shop"],
+                "Turning": ["machine shop"],
+                "Punching": ["fabrication"],
+                "Shearing": ["fabrication"],
+                "Bending": ["fabrication"],
+                "Welding": ["fabrication"],
+                "Rolling": ["fabrication"],
+                "Pressing": ["fabrication"],
+                "GasCutting": ["fabrication"],
+                "Assembling": ["assembling"],
+                "FastenersAssembly": ["assembling"],
+                "Forging": ["forging"],
+                "Casting": ["foundry"],
+                "PatternCore": ["foundry"],
+                "Molding": ["foundry"],
+                "Polishing": ["finishing"],
+                "Painting": ["finishing"],
+                "Coating": ["finishing"],
+                "Hardening": ["heat treatment"],
+                "Tempering": ["heat treatment"],
+                "Testing": ["testing lab"],
+                "Packaging": ["packaging"],
+                "Incoming": ["warehouse"]
+            };
+            return map[processType] || ["general"];
+        }
+
+        function getWorkStationHtml(currentProcess, savedValue) {
+            const opts = getWorkStationOptionsForProcess(currentProcess);
+            const all = [...opts, "other"];
+            let html =
+                `<div><label class="font-bold text-sm">Work Station</label><select id="extra_Work_Station" class="w-full border p-1 rounded text-sm">`;
+            all.forEach(opt => {
+                const sel = (savedValue === opt) ? 'selected' : '';
+                html += `<option value="${opt}" ${sel}>${opt.charAt(0).toUpperCase() + opt.slice(1)}</option>`;
+            });
+            html += `</select></div>`;
+            return html;
+        }
+
+        // ─── process definitions ───
+        const baseExtraFields = ["Customer Name", "Project Name", "Subtitle", "Sub Sub Assembly", "Drawing No.", "Part Name",
+            "Tag No.", "Work Station", "Location"
+        ];
+        const ratingOpts = ["Accepted", "Conditional Accept", "Rework", "Reject"];
+        const causeFields = ["Machine", "Design", "Operator", "Methods", "Material"];
+        const processDefinitions = {
+            Punching: { parameters: ["Material as Per Design", "Condition of Cracking", "Surface uniformity",
+                    "Dimensional accuracy as per Design", "Condition of Wrinkle", "Finishing Appearance without Burs"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Rolling: { parameters: ["Material used as Per Design", "Dimensional accuracy as per Design",
+                    "Sharpness as per Design", "Shining of the work piece"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Bending: { parameters: ["Material as per Design", "Surface uniformity", "Condition of Cracking",
+                    "Condition of Wrinkle", "Dimensional Accuracy as per design"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Welding: { parameters: ["Material used as Per Design", "Condition of weld overlap",
+                    "Condition of weld crack & Under Cut", "Lack of welding bead uniformity",
+                    "Condition of Slag inclusion", "Condition of thermal distortion"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Pressing: { parameters: ["Material used as per Design", "wrinkling", "Earing", "Tearing",
+                    "surface Scratches", "Dimensional accuracy as per Design"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Milling: { parameters: ["Material used as Per Design", "Dimensional accuracy as per Design",
+                    "Exact Sharpens of the Corners", "Shining of the work piece", "Finishing Appearance without Burs"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Casting: { parameters: ["Material used as Per Design", "Blow Hole & warpage", "Sand fusion",
+                    "Shrinkage porosity", "Misrun & Cold Shut", "Metal Penetration", "Slage Inclusion",
+                    "Hot Tear & Flashes", "Cut and washes"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            PatternCore: { parameters: ["Material", "Condition of surface & color coding",
+                    "Removal of Sharping Edge"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Assembling: { parameters: ["Material used as Per Design", "All assembly dimensions as per design",
+                    "Rigidity of welding assembly", "alignment for all part components", "Condition of ergonomics",
+                    "Availability of name plating"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Testing: { parameters: ["Condition of all parts assembled & alignments",
+                    "Function ability of the technology", "condition of test with & without load",
+                    "condition of Safety and hazardous"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Painting: { parameters: ["Condition of surface finish before painting",
+                    "Selection of Color Paint as per Design", "layer of painting as per design", "Bleeding & Blistering",
+                    "Lifting & Running", "Water Spotting", "Flaking & Crawling", "Wrinkling"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Packaging: { parameters: ["Condition and types of packaging systems",
+                    "Writing of Name, logo, Address of the Manufacturer & Brand",
+                    "Writing of Overall Size of the product and Package", "Writing Risky & hazardous Symbols",
+                    "Writing Qty, Net & gross weight of the product on packaging"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Shearing: { parameters: ["Material as per Design", "Dimensional accuracy as per Design",
+                    "Edge condition (no burrs)"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Lathe: { parameters: ["Material as per Design", "Dimensional accuracy (diameter, length)",
+                    "Surface finish", "Concentricity / roundness"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Drilling: { parameters: ["Material used as Per Design", "Proper drilling sequence",
+                    "Dimensional accuracy as per Design", "Finishing Appearance without Burs"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            BoringHoning: { parameters: ["Material as per Design", "Internal diameter accuracy",
+                    "Surface finish (bore)", "Roundness / cylindricity"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Grinding: { parameters: ["Material as per Design", "Surface finish (Ra value)",
+                    "Dimensional accuracy", "Absence of burn marks"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Forging: { parameters: ["Material grade as per Design", "Dimensional accuracy (length, width, height)",
+                    "Surface condition (no cracks or scale)", "Grain flow direction"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Molding: { parameters: ["Material mix as per specification", "Dimensional accuracy of mould",
+                    "Surface smoothness", "No porosity / voids"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Polishing: { parameters: ["Surface roughness (Ra) before polishing", "Final surface gloss / mirror finish",
+                    "No scratches / pitting", "Consistency over whole surface"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            GasCutting: { parameters: ["Material used as Per Design", "Dimensional accuracy as per Design",
+                    "Finishing Appearance without slag"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            FastenersAssembly: { parameters: ["Condition of part dimensions as per design",
+                    "Condition of sub & Overall assembly dimensions as per design", "Condition of fit & tolerance",
+                    "Condition proper electrical installation", "Condition inspect & test electrical equipment",
+                    "Condition of Rigidity & vibration", "Condition of availability of Name plating",
+                    "Condition of ergonomics"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Hardening: { parameters: ["Material grade", "Heating temperature uniformity", "Soaking time",
+                    "Hardness after quenching", "Decarburization layer"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Tempering: { parameters: ["Tempering temperature", "Holding time", "Final hardness", "Toughness",
+                    "Distortion"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields },
+            Coating: { parameters: ["Surface cleanliness before coating", "Coating thickness uniformity",
+                    "Adhesion strength", "Corrosion resistance", "Appearance (color, gloss)"
+                ], ratingOptions: ratingOpts, causeFields: causeFields, extraFields: baseExtraFields }
         };
 
-        function applyLanguage() {
-            // Display ONLY the selected language (no bilingual)
-            document.querySelectorAll('[data-key]').forEach(el => {
-                const key = el.getAttribute('data-key');
-                if (currentLang === 'am') {
-                    el.innerText = langData.am[key] || langData.en[key] || '';
-                } else {
-                    el.innerText = langData.en[key] || '';
-                }
-            });
-            // Update toggle button text: show the OTHER language (what you switch to)
-            if (currentLang === 'am') {
-                langToggleBtn.textContent = '🌐 English';
-            } else {
-                langToggleBtn.textContent = '🌐 አማርኛ';
-            }
+        function getCurrentDef() { return processDefinitions[currentProcess] || processDefinitions.Rolling; }
+
+        // ─── incoming form ───
+        function renderIncomingForm() {
+            return `
+            <div class="border rounded-md p-5 bg-white shadow-sm space-y-5">
+                <div class="text-center font-bold text-xl">INCOMING MATERIAL INSPECTION REPORT</div>
+                <div class="text-right text-sm">Document No. QAD/001</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label class="font-bold">1. Source of Item</label><div class="flex gap-4"><label><input type="radio" name="sourceItem" value="Local"> Local</label><label><input type="radio" name="sourceItem" value="Foreign"> Foreign</label></div><div><label class="text-sm">Address:</label><input type="text" id="sourceAddress" class="w-full border p-1 rounded"></div></div>
+                    <div><label class="font-bold">2. Procurement type</label><div class="flex flex-wrap gap-3"><label><input type="radio" name="procType" value="Direct"> Direct</label><label><input type="radio" name="procType" value="Proforma"> Proforma</label><label><input type="radio" name="procType" value="Bid"> Bid</label><label><input type="radio" name="procType" value="Other"> Other</label><input type="text" id="procTypeOther" placeholder="Specify" class="border p-1 rounded w-32"></div><label class="text-sm">Method of Inspection:</label><input type="text" id="methodInspection" class="w-full border p-1 rounded" placeholder="visual inspection etc."></div>
+                    <div><label class="font-bold">3. The PR is Requested by</label><div class="flex gap-3"><label><input type="radio" name="prRequestedBy" value="PR Form"> PR Form</label><label><input type="radio" name="prRequestedBy" value="Letter"> Letter</label><label><input type="radio" name="prRequestedBy" value="System"> System</label><label><input type="radio" name="prRequestedBy" value="Other"> Other</label><input type="text" id="prRequestOther" placeholder="Specify" class="border p-1 rounded w-32"></div></div>
+                    <div><label class="font-bold">4. Final Reference Document for Specification</label><div class="grid grid-cols-2 gap-2"><label><input type="checkbox" value="PR"> PR</label><label><input type="checkbox" value="Proforma Invoice"> Proforma Invoice</label><label><input type="checkbox" value="Agreement"> Agreement</label><label><input type="checkbox" value="Other"> Other</label><input type="text" id="refDocOther" placeholder="Specify" class="border p-1 rounded"></div><div class="grid grid-cols-3 gap-2 mt-1"><span>No. of Page (PR):</span><input type="number" id="refPagePR" class="border p-1 w-16"><span>No. of Page (Proforma):</span><input type="number" id="refPageProforma" class="border p-1 w-16"><span>No. of Page (Agreement):</span><input type="number" id="refPageAgreement" class="border p-1 w-16"></div></div>
+                </div>
+                <div class="mt-4"><label class="font-bold text-lg">5. List of Items</label><div class="overflow-x-auto"><table class="min-w-full text-xs border incoming-table" id="incomingItemsTable"><thead class="bg-gray-100"><tr><th>Specification as per requester</th><th>Supplied Material Description</th><th>Actual Supplied Specification</th><th>Model</th><th>Brand</th><th>Origin</th><th>Colour</th><th>Serial No.</th><th>Unit</th><th>Delivered Qty</th><th>Accepted Qty</th><th>Rejected Qty</th><th>Conditional Accepted Qty</th><th>Supplier</th><th>Remark</th><th class="w-8"></th></tr></thead><tbody id="incomingItemsBody"></tbody></table></div><button type="button" onclick="addIncomingItemRow()" class="mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm">+ Add Item</button></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"><div><label class="font-bold">Reason For Reject</label><textarea id="reasonReject" rows="2" class="w-full border p-1 rounded"></textarea></div><div><label class="font-bold">Reason for Conditional Accepted</label><textarea id="reasonConditional" rows="2" class="w-full border p-1 rounded"></textarea></div></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2 border-t pt-3"><div><label class="font-bold">Inspected By</label><input type="text" id="inspectedBy" class="w-full border p-1 rounded"><label>SIGNATURE</label><input type="text" id="inspectedSign" class="w-full border p-1 rounded"><label>DATE</label><input type="date" id="inspectedDate" class="w-full border p-1 rounded"></div><div><label class="font-bold">Collaborated By</label><input type="text" id="collabBy" class="w-full border p-1 rounded"><label>Signature</label><input type="text" id="collabSign" class="w-full border p-1 rounded"><label>Date</label><input type="date" id="collabDate" class="w-full border p-1 rounded"></div><div><label class="font-bold">Approved By</label><input type="text" id="approvedBy" class="w-full border p-1 rounded"><label>Signature</label><input type="text" id="approvedSign" class="w-full border p-1 rounded"><label>DATE</label><input type="date" id="approvedDate" class="w-full border p-1 rounded"></div></div>
+                <div><label class="font-bold">REMARK</label><textarea id="generalRemark" rows="2" class="w-full border p-1 rounded"></textarea></div>
+                <div class="text-xs text-gray-500 italic">Note: Please attach the final reference Document for specification. Form Modification Is not Allowed.</div>
+            </div>`;
         }
 
-        function toggleLanguage() {
-            // Toggle ONLY between 'am' and 'en' — never bilingual
-            if (currentLang === 'am') {
-                currentLang = 'en';
-            } else {
-                currentLang = 'am';
-            }
-            applyLanguage();
-            localStorage.setItem('dot_bingo_lang', currentLang);
+        function addIncomingItemRow(data) {
+            const tbody = document.getElementById("incomingItemsBody");
+            if (!tbody) return;
+            const row = document.createElement("tr");
+            row.className = "border-b";
+            const fields = ["specReq", "suppliedDesc", "actualSpec", "model", "brand", "origin", "colour", "serialNo",
+                "unit", "deliveredQty", "acceptedQty", "rejectedQty", "condAcceptedQty", "supplier", "remark"
+            ];
+            fields.forEach(f => {
+                const td = document.createElement("td");
+                td.className = "border p-1";
+                const input = document.createElement("input");
+                input.type = f.includes("Qty") ? "number" : "text";
+                input.className = "w-full border-none p-0 text-xs";
+                input.placeholder = f;
+                if (data && data[f] !== undefined) input.value = data[f];
+                td.appendChild(input);
+                row.appendChild(td);
+            });
+            const delTd = document.createElement("td");
+            delTd.className = "text-center";
+            const delBtn = document.createElement("button");
+            delBtn.innerHTML = "❌";
+            delBtn.className = "text-red-500 text-xs";
+            delBtn.onclick = () => row.remove();
+            delTd.appendChild(delBtn);
+            row.appendChild(delTd);
+            tbody.appendChild(row);
         }
 
-        // Load saved language, default to 'en' if saved is 'bilingual' or invalid
-        const savedLang = localStorage.getItem('dot_bingo_lang');
-        if (savedLang === 'am' || savedLang === 'en') {
-            currentLang = savedLang;
-        } else {
-            currentLang = 'en';
-            localStorage.setItem('dot_bingo_lang', 'en');
-        }
-        applyLanguage();
-
-        langToggleBtn.addEventListener('click', toggleLanguage);
-
-        // ---------- AUTO-RECONNECT ON PAGE LOAD ----------
-        function restoreGameSession() {
-            const savedStake = localStorage.getItem('dot_bingo_stake');
-            if (savedStake) {
-                const stake = parseInt(savedStake);
-                if ([10, 20, 30].includes(stake)) {
-                    console.log(`🔄 Auto-joining stake ${stake} from saved session`);
-                    setTimeout(() => {
-                        if (!socket) {
-                            connectToGame(stake);
-                        } else {
-                            socket.emit('joinLobby', { stake });
-                        }
-                    }, 500);
-                }
-            }
+        function getIncomingItemsData() {
+            const rows = document.querySelectorAll("#incomingItemsBody tr");
+            const items = [];
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll("input");
+                if (inputs.length === 15) items.push({
+                    specReq: inputs[0].value,
+                    suppliedDesc: inputs[1].value,
+                    actualSpec: inputs[2].value,
+                    model: inputs[3].value,
+                    brand: inputs[4].value,
+                    origin: inputs[5].value,
+                    colour: inputs[6].value,
+                    serialNo: inputs[7].value,
+                    unit: inputs[8].value,
+                    deliveredQty: inputs[9].value,
+                    acceptedQty: inputs[10].value,
+                    rejectedQty: inputs[11].value,
+                    condAcceptedQty: inputs[12].value,
+                    supplier: inputs[13].value,
+                    remark: inputs[14].value
+                });
+            });
+            return items;
         }
 
-        async function connectToGame(stake) {
-            currentStake = stake;
-            localStorage.setItem('dot_bingo_stake', stake);
-
-            const initData = tg.initData;
-            if (!initData) { alert('Open inside Telegram'); return; }
-            try {
-                const res = await fetch('/api/telegram-miniapp-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData }) });
-                const data = await res.json();
-                if (!data.success) { alert('Auth failed'); return; }
-                document.getElementById('profileUsername').innerText = data.username || 'Player';
-            } catch (e) { alert('Network error'); return; }
-            if (socket) socket.disconnect();
-            socket = io();
-            socket.on('connect', () => {
-                socket.emit('joinLobby', { stake: currentStake });
-            });
-            socket.on('balanceUpdate', syncBalance);
-            socket.on('lobbyState', state => {
-                if (state.stake === currentStake) {
-                    selectedCardNumber = null;
-                    selectedNumberEl.textContent = '-';
-                    showLobby(state.startsIn);
-                    if (state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers);
-                    updatePlayerCountFromServer(state.playersCount);
-                }
-            });
-            socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true);
-                else renderCard(card, 'lobbyCardPreview', false); });
-            socket.on('cardTaken', data => {
-                if (data.stake !== currentStake) return;
-                const newServerSet = new Set(data.takenNumbers);
-                serverTakenNumbers = newServerSet;
-                const newDisplaySet = new Set(data.takenNumbers);
-                if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
-                displayTakenNumbers = newDisplaySet;
-                buildNumberGrid();
-                updatePlayerCountFromServer(serverTakenNumbers.size);
-                if (pendingSelection && data.number === pendingSelection) {
-                    selectedCardNumber = data.number;
-                    selectedNumberEl.textContent = data.number;
-                    pendingSelection = null;
-                    buildNumberGrid();
-                }
-                if (pendingRandom && data.number) {
-                    selectedCardNumber = data.number;
-                    selectedNumberEl.textContent = data.number;
-                    pendingRandom = false;
-                    buildNumberGrid();
-                }
-            });
-            socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null; if (
-                        selectedCardNumber) { selectedCardNumber = null;
-                        selectedNumberEl.textContent = '-';
-                        buildNumberGrid(); } } if (pendingRandom) pendingRandom = false; });
-            socket.on('playersCount', (data) => {
-                const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
-                'dot_bingo_stake'));
-                if (data.stake === stake) {
-                    updatePlayerCountFromServer(data.count);
-                }
-                if (stake && winningBalanceEl && !isGameActive) {
-                    const prize = Math.floor(data.count * stake * 0.8);
-                    winningBalanceEl.innerText = prize;
-                }
-            });
-            socket.on('gameStarted', data => {
-                if (data.stake !== currentStake) return;
-                if (data?.prizePool) winningBalanceEl.innerText = data.prizePool;
-                if (data?.playersCount) updatePlayerCountFromServer(data.playersCount);
-                showGame();
-                currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
-            });
-            socket.on('numberCalled', data => { if (data.stake !== currentStake) return; const num = data.number;
-                currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || [];
-                const historyCalled = fullCalled.slice(0, -1);
-                calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n))
-                    .join(', ') : '—');
-                scrollCalledHistoryToEnd();
-                speakAmharicNumberWithLetter(num); });
-            socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(
-                    userCard, 'gameCard', true);
-                else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
-            socket.on('gameEnded', data => { if (data.stake !== currentStake) return; if (data.winningNumber)
-                    currentCallEl.innerText = formatCall(data.winningNumber);
-                showWinnerOverlay(data);
-                currentGameId = null;
-                markedNumbers = [];
-                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
-            socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
-            socket.on('depositStatus', data => alert(data.status === 'approved' ? `✅ Deposit +${data.amount} ETB approved!` :
-                '❌ Deposit rejected.'));
-            socket.on('withdrawStatus', data => alert(data.status === 'approved' ?
-                `✅ Withdrawal -${data.amount} ETB processed.` : '❌ Withdrawal rejected.'));
+        function setIncomingItemsData(items) {
+            const tbody = document.getElementById("incomingItemsBody");
+            if (tbody) tbody.innerHTML = "";
+            if (items && items.length) items.forEach(item => addIncomingItemRow(item));
+            else addIncomingItemRow();
         }
 
-        // ========== REST OF ORIGINAL FUNCTIONS ==========
-        function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent =
-                soundMuted ? '🔇' : '🔊';
-                btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
-
-        function unlockSpeech() { if (speechUnlocked) return;
-            speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' ');
-            dummy.volume = 0;
-            window.speechSynthesis.speak(dummy);
-            setTimeout(() => window.speechSynthesis.cancel(), 100); }
-
-        function toggleMute() { soundMuted = !soundMuted;
-            localStorage.setItem('dot_bingo_sound_muted', soundMuted);
-            updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel();
-                currentUtterance = null; }
-            unlockSpeech(); }
-
-        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45)
-                return "ኤን"; if (num <= 60) return "ጂ"; return "ኦ"; }
-
-        function getAmharicNumberWord(n) { const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት",
-                "ስምንት", "ዘጠኝ"
-            ]; const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"]; if (n <= 10) { if (n ===
-                    10) return "አስር"; return ones[n]; } if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]); let ten =
-                Math.floor(n / 10),
-                unit = n % 10; if (unit === 0) return tens[ten]; return tens[ten] + " " + ones[unit]; }
-
-        function speakAmharicNumberWithLetter(number) { if (soundMuted || number < 1 || number > 75) return; if (!
-                speechUnlocked) { unlockSpeech();
-                setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; } const fullText =
-                getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number); if (window.speechSynthesis) { if (
-                    currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(
-                    fullText);
-                utterance.lang = 'am-ET';
-                utterance.rate = 0.85; const voices = window.speechSynthesis.getVoices(); const amharicVoice = voices
-                    .find(v => v.lang === 'am-ET' || v.lang.startsWith('am')); if (amharicVoice) utterance.voice =
-                    amharicVoice;
-                currentUtterance = utterance;
-                window.speechSynthesis.speak(utterance); } }
-
-        function updatePlayerCountFromServer(count) {
-            const c = count !== undefined ? count : serverTakenNumbers.size;
-            if (playersCountEl) playersCountEl.innerText = c;
-            if (gamePlayersCountEl) gamePlayersCountEl.innerText = c;
-        }
-
-        function loadStats() { try { totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
-                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
-                totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0'); let stored = JSON
-                    .parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
-                recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake,
-                    playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0),
-                    winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber ||
-                        null })); } catch (e) { recentGames = []; }
-            updateStatsUI(); }
-
-        function saveStats() { localStorage.setItem('dot_bingo_total_games', totalGames);
-            localStorage.setItem('dot_bingo_total_wins', totalWins);
-            localStorage.setItem('dot_bingo_total_earned', totalEarned);
-            localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10))); }
-
-        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++;
-            if (win) { totalWins++;
-                totalEarned += playerPrize; }
-            recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake,
-                playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber ||
-                null });
-            if (recentGames.length > 10) recentGames.pop();
-            saveStats();
-            updateStatsUI(); }
-
-        function updateStatsUI() { document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv =
-                document.getElementById('recentGamesList'); if (recentDiv) { if (recentGames.length) { recentDiv
-                        .innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList
-                            .length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const
-                            lastNumberDisplay = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15)
-                                l = 'I'; if (g.winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (
-                                    g.winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—';
-                            const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ?
-                                `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return (
-                                `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`
-                                ); }).join(''); } else recentDiv.innerHTML =
-                    '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
-
-        function syncBalance(v) { currentBalance = v;
-            lobbyBalanceEl.innerText = v; if (document.getElementById('walletBalancePage')) document.getElementById(
-                    'walletBalancePage').innerText = v; if (document.getElementById('profileBalancePage')) document
-                .getElementById('profileBalancePage').innerText = v; if (document.getElementById('gameBalanceDisplay'))
-                document.getElementById('gameBalanceDisplay').innerText = v; }
-
-        function renderCard(card, containerId, clickable) { const cont = document.getElementById(containerId); if (!cont)
+        // ─── render dynamic fields ───
+        function renderDynamicFields() {
+            const container = document.getElementById("dynamicFieldsContainer");
+            if (!container) return;
+            if (currentProcess === "Incoming") {
+                container.innerHTML = renderIncomingForm();
+                if (document.getElementById("incomingItemsBody") && document.getElementById("incomingItemsBody").children
+                    .length === 0) addIncomingItemRow();
+                document.getElementById("quantitySummary").style.display = "none";
                 return;
-            cont.innerHTML = ''; if (!card || !Array.isArray(card) || card.length === 0) { cont.innerHTML =
-                    '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>';
-                return; } const table = document.createElement('table');
-            table.style.borderCollapse = 'separate';
-            table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document
-                .createElement('tr');
-            ['B', 'I', 'N', 'G', 'O'].forEach(l => { let th = document.createElement('th');
-                th.textContent = l;
-                hr.appendChild(th); });
-            thead.appendChild(hr);
-            table.appendChild(thead); const tbody = document.createElement('tbody'); for (let r = 0; r < 5; r++) { const
-                    tr = document.createElement('tr'); for (let c = 0; c < 5; c++) { const val = card[r][c]; const td =
-                        document.createElement('td');
-                    td.textContent = val === 'FREE' ? '★' : val; if (val === 'FREE') td.classList.add('free'); if (
-                        markedNumbers.includes(val)) td.classList.add('marked'); if (clickable && val !== 'FREE') { td
-                            .style.cursor = 'pointer';
-                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); }; }
-                    tr.appendChild(td); }
-                tbody.appendChild(tr); }
-            table.appendChild(tbody);
-            cont.appendChild(table); }
+            } else {
+                document.getElementById("quantitySummary").style.display = "grid";
+                const def = getCurrentDef();
+                let html =
+                    `<div class="mb-3"><button type="button" class="single-scan-btn" onclick="scanDocumentAndFill()"><i class="fas fa-camera"></i> Scan Document</button></div>`;
+                if (def.extraFields && def.extraFields.length) {
+                    html += `<div class="grid grid-cols-2 md:grid-cols-4 gap-3 border-b pb-4 mb-4">`;
+                    def.extraFields.forEach(field => {
+                        const safeId = "extra_" + field.replace(/[^a-zA-Z0-9]/g, '_');
+                        if (field === "Work Station") {
+                            html += getWorkStationHtml(currentProcess, "");
+                        } else if (field === "Location") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Location</label><select id="${safeId}" class="w-full border p-1 rounded text-sm"><option value="">-- Select Location --</option><option value="bahir dar flexible">Bahir Dar Flexible</option><option value="kombolcha">Kombolcha</option><option value="transformer">Transformer</option><option value="other">Other</option></select></div>`;
+                        } else if (field === "Customer Name") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Client Name</label><input type="text" id="${safeId}" list="customerNameDatalist" class="w-full border p-1 rounded text-sm" placeholder="Auto-filled after scan"><datalist id="customerNameDatalist"></datalist></div>`;
+                        } else if (field === "Project Name") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Title</label><input type="text" id="${safeId}" list="projectNameDatalist" class="w-full border p-1 rounded text-sm" placeholder="Auto-filled after scan"><datalist id="projectNameDatalist"></datalist></div>`;
+                        } else if (field === "Subtitle") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Subtitle</label><input type="text" id="${safeId}" list="subtitleDatalist" class="w-full border p-1 rounded text-sm" placeholder="e.g. Phase 1, Revision A"><datalist id="subtitleDatalist"></datalist></div>`;
+                        } else if (field === "Sub Sub Assembly") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Sub Sub Assembly</label><input type="text" id="${safeId}" class="w-full border p-1 rounded text-sm" placeholder="e.g. Sub-assembly 1.1"></div>`;
+                        } else if (field === "Drawing No.") {
+                            html +=
+                                `<div><label class="font-bold text-sm">DWG No.</label><input type="text" id="${safeId}" class="w-full border p-1 rounded text-sm" placeholder="Auto-filled after scan"></div>`;
+                        } else if (field === "Part Name") {
+                            html +=
+                                `<div><label class="font-bold text-sm">Part Name</label><input type="text" id="${safeId}" class="w-full border p-1 rounded text-sm" placeholder="Auto-filled after scan"></div>`;
+                        } else if (field !== "Work Station") {
+                            html +=
+                                `<div><label class="font-bold text-sm">${field}</label><input type="text" id="${safeId}" class="w-full border p-1 rounded text-sm"></div>`;
+                        }
+                    });
+                    html += `</div>`;
+                }
+                html +=
+                    `<div class="overflow-x-auto border rounded-md"><table class="min-w-full text-sm"><thead class="bg-gray-200"><tr><th class="p-2 border">Inspection Parameters</th><th class="p-2 border">Acceptance Conditions</th><th class="p-2 border">Cause of Defects</th></tr></thead><tbody>`;
+                def.parameters.forEach((param, idx) => {
+                    const paramId = `p_${idx}`;
+                    html +=
+                        `<tr><td class="border p-2 font-medium">${param}</td><td class="border"><select id="rating_${paramId}" class="w-full p-1 border rounded">${def.ratingOptions.map(opt => `<option value="${opt}">${opt}</option>`).join('')}</select></td><td class="border"><div class="flex flex-wrap gap-2">${causeFields.map(cause => `<label><input type="checkbox" class="cause-check" data-param="${paramId}" value="${cause}"> ${cause}</label>`).join('')}</div></td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+                container.innerHTML = html;
 
-        function buildNumberGrid() { if (!numberGrid) return;
-            numberGrid.innerHTML = ''; for (let i = 1; i <= 100; i++) { const cell = document.createElement('div');
-                cell.className = 'grid-cell';
-                cell.dataset.number = i;
-                cell.textContent = i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber ===
-                    i); if (isTaken && !isOwn) { cell.classList.add('taken');
-                    cell.onclick = null; } else if (isOwn) { cell.classList.add('own-card');
-                    cell.onclick = null; } else { cell.onclick = () => { if (!isGameActive && socket && !displayTakenNumbers
-                            .has(i) && !serverTakenNumbers.has(i)) { if (selectedCardNumber !== null &&
-                                selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber);
-                                displayTakenNumbers.delete(selectedCardNumber); }
-                            pendingSelection = i;
-                            selectedCardNumber = i;
-                            selectedNumberEl.textContent = i;
-                            buildNumberGrid();
-                            socket.emit('selectCardNumber', i); } }; }
-                numberGrid.appendChild(cell); } }
-
-        function updateGridWithTakenNumbers(takenArray) { const newServerSet = new Set(takenArray);
-            serverTakenNumbers = newServerSet; const newDisplaySet = new Set(takenArray); if (selectedCardNumber !== null)
-                newDisplaySet.delete(selectedCardNumber);
-            displayTakenNumbers = newDisplaySet;
-            buildNumberGrid();
-            updatePlayerCountFromServer(serverTakenNumbers.size); }
-
-        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60)
-                l = 'O'; return `${l}-${n}`; }
-
-        function showLobby(sec) {
-            currentMainPage = 'lobby';
-            currentTimerSeconds = sec;
-            stakePage.classList.add('hidden');
-            lobbyPage.classList.remove('hidden');
-            gamePage.classList.add('hidden');
-            historyPage.classList.add('hidden');
-            walletPage.classList.add('hidden');
-            profilePage.classList.add('hidden');
-            isGameActive = false;
-            markedNumbers = [];
-            if (socket) socket.emit('getBalance');
-            startTimer(sec);
-            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
-            updateStatsUI();
+                refreshDatalistOptions();
+                const clientInput = document.getElementById('extra_Customer_Name');
+                if (clientInput) {
+                    clientInput.removeEventListener('input', filterSuggestionsByCurrentClient);
+                    clientInput.addEventListener('input', filterSuggestionsByCurrentClient);
+                    if (clientInput.value.trim()) refreshDatalistOptions(clientInput.value.trim());
+                }
+                attachQuantityListeners();
+                updateDeliveredQty();
+            }
         }
 
-        function showGame() {
-            currentMainPage = 'game';
-            stakePage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            gamePage.classList.remove('hidden');
-            historyPage.classList.add('hidden');
-            walletPage.classList.add('hidden');
-            profilePage.classList.add('hidden');
-            isGameActive = true;
-            clearInterval(lobbyTimerInterval);
-            if (socket) socket.emit('getBalance');
-            if (userCard.length) renderCard(userCard, 'gameCard', true);
+        function switchProcess() {
+            currentProcess = document.getElementById("processType").value;
+            renderDynamicFields();
+            populateMachineDropdown();
+            populateSuggestedNextOps();
         }
 
-        function startTimer(sec) { let left = sec;
-            lobbyTimerEl.textContent = left + 's';
-            clearInterval(lobbyTimerInterval);
-            lobbyTimerInterval = setInterval(() => { left--;
-                currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval);
-                    showGame(); } else lobbyTimerEl.textContent = left + 's'; }, 1000); }
+        // ─── get/set extra fields ───
+        function getExtraFields() {
+            if (currentProcess === "Incoming") {
+                return {
+                    incoming_items: getIncomingItemsData(),
+                    sourceAddress: document.getElementById("sourceAddress")?.value || "",
+                    procType: document.querySelector('input[name="procType"]:checked')?.value || "",
+                    methodInspection: document.getElementById("methodInspection")?.value || "",
+                    reasonReject: document.getElementById("reasonReject")?.value || "",
+                    reasonConditional: document.getElementById("reasonConditional")?.value || "",
+                    inspectedBy: document.getElementById("inspectedBy")?.value || "",
+                    approvedBy: document.getElementById("approvedBy")?.value || "",
+                    generalRemark: document.getElementById("generalRemark")?.value || "",
+                    sourceItem: document.querySelector('input[name="sourceItem"]:checked')?.value || "",
+                    prRequestedBy: document.querySelector('input[name="prRequestedBy"]:checked')?.value || "",
+                    refDocs: { pr: document.getElementById("refPagePR")?.value, proforma: document.getElementById(
+                            "refPageProforma")?.value, agreement: document.getElementById("refPageAgreement")
+                            ?.value }
+                };
+            }
+            const def = getCurrentDef();
+            const extra = {};
+            if (def.extraFields) {
+                def.extraFields.forEach(field => {
+                    const id = "extra_" + field.replace(/[^a-zA-Z0-9]/g, '_');
+                    const el = document.getElementById(id);
+                    if (el) extra[field] = el.value;
+                });
+            }
+            return extra;
+        }
 
-        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ?
-                    currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else {
-                showLobby(30); } }
+        function setExtraFields(extra) {
+            if (currentProcess === "Incoming") {
+                if (extra && extra.incoming_items) setIncomingItemsData(extra.incoming_items);
+                if (extra.sourceAddress) document.getElementById("sourceAddress").value = extra.sourceAddress;
+                if (extra.methodInspection) document.getElementById("methodInspection").value = extra.methodInspection;
+                if (extra.reasonReject) document.getElementById("reasonReject").value = extra.reasonReject;
+                if (extra.reasonConditional) document.getElementById("reasonConditional").value = extra.reasonConditional;
+                if (extra.inspectedBy) document.getElementById("inspectedBy").value = extra.inspectedBy;
+                if (extra.approvedBy) document.getElementById("approvedBy").value = extra.approvedBy;
+                if (extra.generalRemark) document.getElementById("generalRemark").value = extra.generalRemark;
+                if (extra.procType) {
+                    const radio = document.querySelector(`input[name="procType"][value="${extra.procType}"]`);
+                    if (radio) radio.checked = true;
+                }
+                if (extra.sourceItem) {
+                    const radio = document.querySelector(`input[name="sourceItem"][value="${extra.sourceItem}"]`);
+                    if (radio) radio.checked = true;
+                }
+                if (extra.prRequestedBy) {
+                    const radio = document.querySelector(`input[name="prRequestedBy"][value="${extra.prRequestedBy}"]`);
+                    if (radio) radio.checked = true;
+                }
+                return;
+            }
+            const def = getCurrentDef();
+            if (def.extraFields) {
+                def.extraFields.forEach(field => {
+                    const id = "extra_" + field.replace(/[^a-zA-Z0-9]/g, '_');
+                    const el = document.getElementById(id);
+                    if (el && extra[field] !== undefined) el.value = extra[field];
+                });
+            }
+        }
 
-        function goToStakeSelection() { if (socket) { socket.disconnect();
-                socket = null; }
-            isGameActive = false;
-            userCard = [];
-            markedNumbers = [];
-            selectedCardNumber = null;
-            serverTakenNumbers.clear();
-            displayTakenNumbers.clear();
-            currentStake = null;
-            localStorage.removeItem('dot_bingo_stake'); if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
-            lobbyPage.classList.add('hidden');
-            gamePage.classList.add('hidden');
-            stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-';
-            pendingSelection = null;
-            pendingRandom = false;
-            currentGameId = null;
-            unlockSpeech(); }
+        function getAcceptanceData() {
+            if (currentProcess === "Incoming") return {};
+            const def = getCurrentDef();
+            const data = {};
+            for (let i = 0; i < def.parameters.length; i++) {
+                const paramId = `p_${i}`;
+                const rating = document.getElementById(`rating_${paramId}`)?.value || '';
+                const causes = Array.from(document.querySelectorAll(
+                    `.cause-check[data-param="${paramId}"]:checked`)).map(cb => cb.value);
+                data[paramId] = { parameter: def.parameters[i], rating, causes };
+            }
+            return data;
+        }
 
-        async function loadDepositAccounts() { try { const res = await fetch('/api/deposit-accounts');
-                depositAccounts = await res.json(); } catch (e) {} }
+        function setAcceptanceData(acceptance) {
+            if (currentProcess === "Incoming") return;
+            const def = getCurrentDef();
+            for (let i = 0; i < def.parameters.length; i++) {
+                const paramId = `p_${i}`;
+                const data = acceptance[paramId];
+                if (data) {
+                    const ratingSelect = document.getElementById(`rating_${paramId}`);
+                    if (ratingSelect) ratingSelect.value = data.rating;
+                    document.querySelectorAll(`.cause-check[data-param="${paramId}"]`).forEach(cb => {
+                        cb.checked = data.causes && data.causes.includes(cb.value);
+                    });
+                }
+            }
+        }
 
-        function openDepositTypeModal() { document.getElementById('depositTypeModal').classList.add('active');
-            unlockSpeech(); }
+        // ─── costs ───
+        function computeFailureCost() {
+            const mat = +document.getElementById("defectedMaterialCost").value || 0;
+            const lab = +document.getElementById("laborHours").value || 0;
+            const sal = +document.getElementById("salaryPerHour").value || 0;
+            const machH = +document.getElementById("machiningHours").value || 0;
+            const machR = +document.getElementById("machiningCostPerHr").value || 0;
+            const rework = +document.getElementById("reworkQty").value || 0;
+            const reject = +document.getElementById("rejectQty").value || 0;
+            const mult = (rework + reject) || 1;
+            const total = (mat + lab * sal + machH * machR) * mult;
+            document.getElementById("totalFailureCostDisplay").innerText = total.toFixed(2);
+            document.getElementById("totalInternalFailureCost").value = total.toFixed(2);
+            return total;
+        }
 
-        function closeDepositTypeModal() { document.getElementById('depositTypeModal').classList.remove('active'); }
+        function updateTotalTime() {
+            const s = document.getElementById("startTime").value,
+                e = document.getElementById("endTime").value;
+            if (s && e) {
+                let [sh, sm] = s.split(":").map(Number),
+                    [eh, em] = e.split(":").map(Number);
+                let min = (eh * 60 + em) - (sh * 60 + sm);
+                if (min < 0) min += 1440;
+                document.getElementById("totalTimeDisplay").innerText = `Total: ${min} min (${(min/60).toFixed(1)} hr)`;
+                return min;
+            }
+            return 0;
+        }
 
-        function openDepositDetailsModal(type) { selectedDepositType = type; let acc = '',
-                title = '',
-                hint = ''; if (type === 'telebirr') { title = 'Telebirr';
-                acc = depositAccounts.telebirr || '0924839730';
-                hint = '09xxxxxxxx'; } else if (type === 'cbebirr') { title = 'CBE Birr';
-                acc = depositAccounts.cbebirr || '1000123456789';
-                hint = '09xxxxxxxx'; } else { title = 'M-Pesa';
-                acc = depositAccounts.mpesa || '0712345678';
-                hint = '07xxxxxxxx'; } document.getElementById('depositDetailsTitle').innerHTML =
-                `Deposit via ${title}`; const copyDiv = document.getElementById('depositAccountNumber'); if (copyDiv)
-                copyDiv.innerHTML = `📋 ${acc}`;
-            copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`);
-            document.getElementById('depositPlayerPhone').placeholder = hint;
-            document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmount').value = '';
-            document.getElementById('depositDetailsModal').classList.add('active');
-            closeDepositTypeModal();
-            unlockSpeech(); }
-        let isSubmittingDeposit = false;
+        // ─── reset ───
+        function resetForm() {
+            document.getElementById("inspectionForm").reset();
+            renderDynamicFields();
+            computeFailureCost();
+            isEditMode = false;
+            editId = null;
+            document.getElementById("processType").disabled = false;
+            document.getElementById("saveBtn").innerHTML = "✔ Save to Cloud";
+            document.getElementById("cancelEditBtn").classList.add("hidden");
+            if (engineerFromUrl) document.getElementById('qcEngineerName').value = currentEngineer;
+            populateMachineDropdown();
+            attachQuantityListeners();
+            updateDeliveredQty();
+            refreshDatalistOptions();
+            populateSuggestedNextOps();
+            document.getElementById('suggestedNextOp').value = '';
+        }
 
-        async function submitDepositRequest() { if (isSubmittingDeposit) return; const phone = document.getElementById(
-                'depositPlayerPhone').value.trim(); const amount = document.getElementById('depositAmount').value
-            .trim(); if (!phone.match(/^(09|07)\d{8}$/)) { alert('Invalid phone number.'); return; } if (!amount ||
-                isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit 10 ETB'); return; }
-            isSubmittingDeposit = true; const submitBtn = document.getElementById('submitDepositBtn'); const
-                originalText = submitBtn.innerText;
-            submitBtn.disabled = true;
-            submitBtn.innerText = '⏳ Sending...'; try { const response = await fetch('/api/request-deposit', { method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, amount, payment_type: selectedDepositType }) }); const result =
-                    await response.json(); if (result.success) { alert('✅ Deposit request submitted!');
-                    document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert(
-                        '❌ Error: ' + (result.error || 'Submission failed')); } } catch (err) { alert(
-                    '⚠️ Network error.'); } finally { isSubmittingDeposit = false;
-                submitBtn.disabled = false;
-                submitBtn.innerText = originalText;
-                unlockSpeech(); } }
+        function cancelEdit() { resetForm();
+            loadHistory(); }
 
-        function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active');
-            unlockSpeech(); }
+        // ─── delete ───
+        async function deleteInspection(id) {
+            if (!confirm('Are you sure you want to delete this inspection record? This action cannot be undone.')) return;
+            try {
+                const resp = await fetch(`/api/inspections/${id}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error((await resp.text()) || 'Delete failed');
+                document.getElementById('formMessage').innerHTML = '<span class="text-green-600">✅ Record deleted.</span>';
+                loadHistory();
+            } catch (err) {
+                document.getElementById('formMessage').innerHTML = `<span class="text-red-600">Error: ${err.message}</span>`;
+            }
+        }
 
-        function openWithdrawDetailsModal(type) { selectedWithdrawType = type; let title = type === 'telebirr' ?
-                'Telebirr' : type === 'cbebirr' ? 'CBE Birr' : 'M-Pesa'; let hint = type === 'mpesa' ?
-                '07xxxxxxxx' : '09xxxxxxxx'; document.getElementById('withdrawDetailsTitle').innerHTML =
-                `Withdraw via ${title}`;
-            document.getElementById('withdrawReceiver').placeholder = hint;
-            document.getElementById('withdrawReceiver').value = '';
-            document.getElementById('withdrawAmount').value = '';
-            document.getElementById('withdrawName').value = '';
-            document.getElementById('withdrawDetailsModal').classList.add('active');
-            document.getElementById('withdrawTypeModal').classList.remove('active');
-            unlockSpeech(); }
-        let isSubmittingWithdraw = false;
+        // ─── save ───
+        async function saveToBackend() {
+            const delivered = updateDeliveredQty();
+            let engineerName = document.getElementById("qcEngineerName").value.trim();
+            if (!engineerName) { document.getElementById("formMessage").innerHTML =
+                '<span class="text-red-600">Please enter QC Engineer Name</span>'; return; }
+            const sourceType = document.querySelector('input[name="sourceType"]:checked')?.value;
+            if (!sourceType) { document.getElementById("formMessage").innerHTML =
+                '<span class="text-red-600">Please select Source</span>'; return; }
+            const processTypeText = document.getElementById("processType").options[document.getElementById("processType")
+                .selectedIndex].text;
+            const acceptanceData = getAcceptanceData();
+            const extraFields = getExtraFields();
+            const payload = {
+                process_type: processTypeText,
+                username: engineerName,
+                source_type: sourceType,
+                outsource_institute: document.getElementById("outsourceInstitute").value,
+                design_available: document.getElementById("designAvail").checked,
+                mpp_available: document.getElementById("mppAvail").checked,
+                operation_status: document.getElementById("operationStatus").value,
+                shift: parseInt(document.querySelector('input[name="shift"]:checked')?.value) || null,
+                operator_name: document.getElementById("operatorName").value,
+                start_time: document.getElementById("startTime").value || null,
+                end_time: document.getElementById("endTime").value || null,
+                total_minutes: updateTotalTime(),
+                acceptance_data: acceptanceData,
+                extra_fields: extraFields,
+                most_frequent_defects: document.getElementById("mostFrequentDefects").value,
+                defect_correction_slip: document.getElementById("defectCorrectionSlip").value,
+                cause_of_defects: document.getElementById("causeOfDefectsDetail").value,
+                defected_material_cost: +document.getElementById("defectedMaterialCost").value || 0,
+                labor_hours: +document.getElementById("laborHours").value || 0,
+                salary_per_hour: +document.getElementById("salaryPerHour").value || 0,
+                level: document.getElementById("levelSelect").value,
+                machining_hours: +document.getElementById("machiningHours").value || 0,
+                machining_cost_per_hr: +document.getElementById("machiningCostPerHr").value || 0,
+                total_internal_failure_cost: computeFailureCost(),
+                delivered_qty: delivered,
+                accepted_qty: +document.getElementById("acceptedQty").value || 0,
+                rework_qty: +document.getElementById("reworkQty").value || 0,
+                reject_qty: +document.getElementById("rejectQty").value || 0,
+                conditional_accept_qty: +document.getElementById("conditionalAcceptQty").value || 0,
+                suggested_next_operation: document.getElementById("suggestedNextOp").value || null
+            };
+            try {
+                let url = '/api/inspections',
+                    method = 'POST';
+                if (isEditMode && editId) { url = `/api/inspections/${editId}`;
+                    method = 'PUT'; }
+                const resp = await fetch(url, { method, headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) });
+                if (!resp.ok) throw new Error((await resp.json()).error || 'Unknown error');
+                document.getElementById("formMessage").innerHTML =
+                    `<span class="text-green-600">✓ Inspection ${isEditMode?'updated':'saved'} to cloud!</span>`;
+                resetForm();
+                loadHistory();
+            } catch (err) { document.getElementById("formMessage").innerHTML =
+                    `<span class="text-red-600">Error: ${err.message}</span>`; }
+        }
 
-        async function submitWithdrawRequest() { if (isSubmittingWithdraw) return; const receiver = document
-                .getElementById('withdrawReceiver').value.trim(); const amount = document.getElementById('withdrawAmount')
-                .value.trim(); const name = document.getElementById('withdrawName').value.trim(); if (!name) { alert(
-                    "Full name required"); return; } if (!amount || isNaN(amount) || Number(amount) < 20) { alert(
-                    'Min 20 ETB'); return; } if (!receiver.match(/^(09|07)\d{8}$/)) { alert(
-                    `Invalid ${selectedWithdrawType} number`); return; }
-            isSubmittingWithdraw = true; const submitBtn = document.getElementById('submitWithdrawBtn'); const
-                originalText = submitBtn.innerText;
-            submitBtn.disabled = true;
-            submitBtn.innerText = '⏳ Processing...'; try { const response = await fetch('/api/request-withdraw', { method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount, phone: receiver, withdrawal_type: selectedWithdrawType, name }) });
-                const result = await response.json(); if (result.success) { alert('✅ Withdrawal request submitted!');
-                    document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert(
-                        '❌ Error: ' + (result.error || 'Submission failed')); } } catch (err) { alert(
-                    '⚠️ Network error.'); } finally { isSubmittingWithdraw = false;
-                submitBtn.disabled = false;
-                submitBtn.innerText = originalText;
-                unlockSpeech(); } }
+        // ─── load history ───
+        async function loadHistory() {
+            try {
+                const resp = await fetch('/api/inspections');
+                if (!resp.ok) throw new Error();
+                let allData = await resp.json();
+                updateSuggestionsFromInspections(allData);
+                let displayData = allData;
+                if (engineerFromUrl) displayData = displayData.filter(row => row.username === currentEngineer);
+                const histDiv = document.getElementById("inspectionHistory");
+                if (!displayData.length) histDiv.innerHTML = "<p class='text-gray-500'>No inspections found.</p>";
+                else histDiv.innerHTML = displayData.map(row =>
+                    `<div class="border-b py-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="font-semibold">${new Date(row.submitted_at).toLocaleString()}</span><br>
+                                <span class="text-sm">Process: ${row.process_type||'Rolling'}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="editInspection(${row.id})" class="text-blue-600 text-sm underline">Edit</button>
+                                <button onclick="deleteInspection(${row.id})" class="text-red-600 text-sm underline" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                    </div>`
+                ).join("");
+            } catch (err) { document.getElementById("inspectionHistory").innerHTML =
+                "<p class='text-red-500'>Error loading history</p>"; }
+        }
 
-        function showWinnerOverlay(data) { if (data.noWinner) { if (currentGameId) addGameRecord(false, 0,
-                    currentGameId, currentStake, [], null, 0);
-                alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(
-                Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const
-                playerPrize = data.prizeEach || 0; const title = winnersList.length > 1 ? `${winnersList.length} WINNERS!` :
-                '🎉 BINGO! 🎉';
-            document.getElementById('winTitle').innerHTML = title;
-            document.getElementById('winListContainer').innerHTML = winnersList.map(w =>
-                `<span class="winner-badge">${w}</span>`).join('');
-            document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>';
-            document.getElementById('winnerOverlay').classList.add('active'); const confDiv = document.createElement(
-                'div');
-            confDiv.className = 'confetti'; for (let i = 0; i < 120; i++) { let p = document.createElement('div');
-                p.className = 'confetti-piece';
-                p.style.left = Math.random() * 100 + '%';
-                p.style.animationDuration = (Math.random() * 3 + 2) + 's';
-                p.style.backgroundColor = `hsl(${Math.random()*30+20},90%,60%)`;
-                confDiv.appendChild(p); }
-            document.body.appendChild(confDiv);
-            setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize,
-                currentGameId, currentStake, winnersList, winningNumber, totalPrize);
-            unlockSpeech(); }
+        // ─── edit ───
+        async function editInspection(id) {
+            try {
+                const resp = await fetch(`/api/inspections/${id}`);
+                if (!resp.ok) throw new Error();
+                const insp = await resp.json();
+                populateFormForEdit(insp);
+            } catch (err) { document.getElementById("formMessage").innerHTML =
+                `<span class="text-red-600">Error: ${err.message}</span>`; }
+        }
 
-        // ========== EVENT LISTENERS ==========
-        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected');
-            loadStats();
-            connectToGame(10);
-            showLobby(30);
-            unlockSpeech(); });
-        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected');
-            loadStats();
-            connectToGame(20);
-            showLobby(30);
-            unlockSpeech(); });
-        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected');
-            loadStats();
-            connectToGame(30);
-            showLobby(30);
-            unlockSpeech(); });
-        document.getElementById('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) {
-                pendingRandom = true;
-                socket.emit('newCardNumber');
-                selectedCardNumber = null;
-                selectedNumberEl.textContent = '⚡ ...';
-                buildNumberGrid(); }
-            unlockSpeech(); });
-        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket
-                .emit('claimBingo');
-            unlockSpeech(); });
-        document.getElementById('muteToggleBtn')?.addEventListener('click', toggleMute);
-        document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
+        function populateFormForEdit(inspection) {
+            document.getElementById("qcEngineerName").value = inspection.username || "";
+            document.getElementById("outsourceInstitute").value = inspection.outsource_institute || "";
+            document.getElementById("designAvail").checked = inspection.design_available || false;
+            document.getElementById("mppAvail").checked = inspection.mpp_available || false;
+            document.getElementById("operationStatus").value = inspection.operation_status || "Holdup";
+            const sourceRadio = document.querySelector(`input[name="sourceType"][value="${inspection.source_type}"]`);
+            if (sourceRadio) sourceRadio.checked = true;
+            const shiftRadio = document.querySelector(`input[name="shift"][value="${inspection.shift}"]`);
+            if (shiftRadio) shiftRadio.checked = true;
+            document.getElementById("operatorName").value = inspection.operator_name || "";
+            document.getElementById("startTime").value = inspection.start_time || "";
+            document.getElementById("endTime").value = inspection.end_time || "";
+            updateTotalTime();
+            document.getElementById("acceptedQty").value = inspection.accepted_qty || 0;
+            document.getElementById("reworkQty").value = inspection.rework_qty || 0;
+            document.getElementById("rejectQty").value = inspection.reject_qty || 0;
+            document.getElementById("conditionalAcceptQty").value = inspection.conditional_accept_qty || 0;
+            updateDeliveredQty();
+            document.getElementById("defectedMaterialCost").value = inspection.defected_material_cost ?? 0;
+            document.getElementById("laborHours").value = inspection.labor_hours ?? 0;
+            document.getElementById("salaryPerHour").value = inspection.salary_per_hour ?? 0;
+            document.getElementById("machiningHours").value = inspection.machining_hours ?? 0;
+            document.getElementById("machiningCostPerHr").value = inspection.machining_cost_per_hr ?? 0;
+            document.getElementById("levelSelect").value = inspection.level || "";
+            computeFailureCost();
+            document.getElementById("mostFrequentDefects").value = inspection.most_frequent_defects || "";
+            document.getElementById("defectCorrectionSlip").value = inspection.defect_correction_slip || "";
+            document.getElementById("causeOfDefectsDetail").value = inspection.cause_of_defects || "";
+            setExtraFields(inspection.extra_fields || {});
+            setAcceptanceData(inspection.acceptance_data || {});
+            const opt = Array.from(document.getElementById("processType").options).find(o => o.text === inspection
+            .process_type);
+            if (opt) { document.getElementById("processType").value = opt.value;
+                switchProcess(); }
+            document.getElementById("processType").disabled = true;
+            isEditMode = true;
+            editId = inspection.id;
+            document.getElementById("editId").value = inspection.id;
+            document.getElementById("isEditMode").value = "true";
+            document.getElementById("saveBtn").innerHTML = "✔ Update to Cloud";
+            document.getElementById("cancelEditBtn").classList.remove("hidden");
+            const rateToRestore = inspection.machining_cost_per_hr ? (inspection.machining_cost_per_hr).toFixed(4) : "";
+            populateMachineDropdown(rateToRestore);
+            const savedWorkStation = inspection.extra_fields?.["Work Station"];
+            if (savedWorkStation) {
+                const wsSelect = document.getElementById("extra_Work_Station");
+                if (wsSelect) wsSelect.value = savedWorkStation;
+            }
+            attachQuantityListeners();
+            const clientInput = document.getElementById('extra_Customer_Name');
+            if (clientInput && clientInput.value.trim()) refreshDatalistOptions(clientInput.value.trim());
+            else refreshDatalistOptions();
+            const suggestedInput = document.getElementById('suggestedNextOp');
+            if (inspection.suggested_next_operation) suggestedInput.value = inspection.suggested_next_operation;
+        }
 
-        document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('click', () => { const page = btn
-                    .getAttribute('data-page');
-                clearInterval(lobbyTimerInterval); if (page === 'lobby') { if (currentMainPage === 'lobby')
-                    showLobby(currentTimerSeconds);
-                    else showGame(); } else { if (currentMainPage === 'lobby') lobbyPage.classList.add('hidden');
-                    else gamePage.classList.add('hidden'); if (page === 'history') historyPage.classList.remove(
-                        'hidden');
-                    else if (page === 'wallet') { walletPage.classList.remove('hidden');
-                        syncBalance(currentBalance); } else if (page === 'profile') { profilePage.classList
-                            .remove('hidden');
-                        syncBalance(currentBalance);
-                        updateStatsUI(); } }
-                unlockSpeech(); }); });
+        // ─── suggested next ops ───
+        const PROCESS_ORDER = [
+            "Incoming", "Punching", "Rolling", "Bending", "Welding", "Pressing",
+            "Milling", "Casting", "PatternCore", "Assembling", "Testing",
+            "Painting", "Packaging", "Shearing", "Lathe", "Drilling",
+            "BoringHoning", "Grinding", "Forging", "Molding", "Polishing",
+            "GasCutting", "FastenersAssembly", "Hardening", "Tempering", "Coating"
+        ];
 
-        document.getElementById('backFromHistoryBtn')?.addEventListener('click', goBackToMain);
-        document.getElementById('backFromWalletBtn')?.addEventListener('click', goBackToMain);
-        document.getElementById('backFromProfileBtn')?.addEventListener('click', goBackToMain);
+        function populateSuggestedNextOps() {
+            const current = document.getElementById("processType").value;
+            const datalist = document.getElementById("suggestedNextList");
+            if (!datalist) return;
+            datalist.innerHTML = '';
+            const idx = PROCESS_ORDER.indexOf(current);
+            if (idx === -1) return;
+            for (let i = idx + 1; i < PROCESS_ORDER.length; i++) {
+                const opt = document.createElement('option');
+                opt.value = PROCESS_ORDER[i];
+                datalist.appendChild(opt);
+            }
+        }
 
-        document.getElementById('depositFromWalletBtn')?.addEventListener('click', openDepositTypeModal);
-        document.getElementById('withdrawFromWalletBtn')?.addEventListener('click', openWithdrawTypeModal);
-        document.getElementById('depositBtn')?.addEventListener('click', openDepositTypeModal);
-        document.getElementById('withdrawBtn')?.addEventListener('click', openWithdrawTypeModal);
-        document.querySelectorAll('#depositTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click',
-            () => openDepositDetailsModal(btn.dataset.type)));
-        document.getElementById('closeDepositTypeBtn')?.addEventListener('click', closeDepositTypeModal);
-        document.getElementById('backDepositBtn')?.addEventListener('click', () => { document.getElementById(
-                    'depositDetailsModal').classList.remove('active');
-            openDepositTypeModal(); });
-        document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
-        document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click',
-            () => openWithdrawDetailsModal(btn.dataset.type)));
-        document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click', () => document.getElementById(
-            'withdrawTypeModal').classList.remove('active'));
-        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => { document.getElementById(
-                    'withdrawDetailsModal').classList.remove('active');
-            openWithdrawTypeModal(); });
-        document.getElementById('submitWithdrawBtn')?.addEventListener('click', submitWithdrawRequest);
-        const rulesModal = document.getElementById('rulesModal'),
-            closeRules = document.getElementById('closeRulesBtn');
-        document.getElementById('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
-        document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
-        closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
+        // ─── level select ───
+        document.getElementById("levelSelect").addEventListener("change", function(e) {
+            const lvl = e.target.value;
+            const salField = document.getElementById("salaryPerHour");
+            if (lvl === "12") salField.value = 87.125;
+            else if (lvl === "13") salField.value = 90.1;
+            else if (lvl === "14") salField.value = 96.6;
+            else if (lvl === "custom") salField.value = "";
+            else salField.value = "";
+            computeFailureCost();
+        });
 
-        // ---------- INIT ----------
-        loadDepositAccounts();
-        buildNumberGrid();
-        loadStats();
-        updateMuteButton();
-        window.speechSynthesis.getVoices();
+        // ─── cost listeners ───
+        ["defectedMaterialCost", "laborHours", "salaryPerHour", "machiningHours", "machiningCostPerHr", "reworkQty",
+            "rejectQty"
+        ].forEach(id => document.getElementById(id)?.addEventListener("input", computeFailureCost));
+        document.getElementById("startTime")?.addEventListener("change", updateTotalTime);
+        document.getElementById("endTime")?.addEventListener("change", updateTotalTime);
 
-        stakePage.classList.remove('hidden');
+        // ─── utils ───
+        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;',
+                '>': '&gt;' } [m])); }
 
-        // Auto-reconnect after page load
-        restoreGameSession();
+        console.log('🔐 QC Inspection ready.');
+        console.log('   Secret: 12345');
     </script>
 </body>
 </html>
