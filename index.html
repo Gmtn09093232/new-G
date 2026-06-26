@@ -91,7 +91,7 @@
     </style>
 </head>
 <body>
-    <button id="langToggleBtn" class="lang-toggle">🌐 አማርኛ/English</button>
+    <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
 
     <!-- MODALS (unchanged) -->
     <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;"><span data-key="cancel">Cancel</span></button></div></div>
@@ -212,9 +212,10 @@
         let currentStake = null;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
 
-        // ========== LANGUAGE SUPPORT ==========
-        let currentLang = 'bilingual';
+        // ========== LANGUAGE SUPPORT (single language only) ==========
+        let currentLang = 'am'; // default: Amharic
         const langToggleBtn = document.getElementById('langToggleBtn');
+
         const langData = {
             am: {
                 depositTitle: "ተቀማጭ", chooseMethod: "የክፍያ ዘዴ ይምረጡ", cancel: "ይቅር", sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
@@ -231,7 +232,11 @@
                 gameTab: "🎮 ጨዋታ", historyTab: "📜 ታሪክ", walletTab: "💰 ቦርሳ", profileTab: "👤 መገለጫ", rulesBtn: "📜 የጨዋታ ሕጎች",
                 gameHistory: "📜 የጨዋታ ታሪክ", totalGamesLabel: "ጠቅላላ ጨዋታዎች:", myWallet: "💰 ቦርሳዬ", currentBalance: "አሁን ያለው ቀሪ ሂሳብ",
                 myProfile: "👤 መገለጫዬ", usernameLabel: "የተጠቃሚ ስም", balanceLabel: "💰 ቀሪ ሂሳብ", prizePoolLabel: "🏆 የሽልማት ገንዘብ",
-                lastCall: "🎲 የመጨረሻ ጥሪ", calledPrefix: "የተጠሩ:", claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆"
+                lastCall: "🎲 የመጨረሻ ጥሪ", calledPrefix: "የተጠሩ:", claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆",
+                entryFeeLabelShort: "💰 የመግቢያ ክፍያ፦", entryFeeValues: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabelShort: "🏆 የሽልማት ገንዘብ፦", prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
+                winLabelShort: "🎯 ማሸነፍ፦", winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦", claimValueShort: "ወዲያው “CLAIM BINGO!”"
             },
             en: {
                 depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel", sendPayment: "Send payment to the number below",
@@ -248,36 +253,50 @@
                 gameTab: "🎮 Game", historyTab: "📜 History", walletTab: "💰 Wallet", profileTab: "👤 Profile", rulesBtn: "📜 Game Rules",
                 gameHistory: "📜 Game History", totalGamesLabel: "Total Games:", myWallet: "💰 My Wallet", currentBalance: "Current Balance",
                 myProfile: "👤 My Profile", usernameLabel: "Username", balanceLabel: "💰 Balance", prizePoolLabel: "🏆 PRIZE POOL",
-                lastCall: "🎲 LAST CALL", calledPrefix: "Called:", claimBingo: "🏆 CLAIM BINGO! 🏆"
+                lastCall: "🎲 LAST CALL", calledPrefix: "Called:", claimBingo: "🏆 CLAIM BINGO! 🏆",
+                entryFeeLabelShort: "💰 Entry Fee:", entryFeeValues: "10/20/30 Birr (as per your choice)",
+                prizeLabelShort: "🏆 Prize Money:", prizeValueShort: "80% (100% if 1 player)",
+                winLabelShort: "🎯 Winning:", winValueShort: "Row, Column, Diagonal or 4 Corners",
+                claimLabelShort: "⏱️ Claim:", claimValueShort: "Immediately 'CLAIM BINGO!'"
             }
         };
 
         function applyLanguage() {
             document.querySelectorAll('[data-key]').forEach(el => {
                 const key = el.getAttribute('data-key');
-                if (currentLang === 'bilingual') {
-                    const amText = langData.am[key] || '';
-                    const enText = langData.en[key] || '';
-                    el.innerText = `${amText} ${amText && enText ? '(' + enText + ')' : enText}`;
-                } else if (currentLang === 'am') {
+                if (currentLang === 'am') {
                     el.innerText = langData.am[key] || langData.en[key] || '';
                 } else {
                     el.innerText = langData.en[key] || '';
                 }
             });
+            updateLangButton();
+        }
+
+        function updateLangButton() {
+            if (currentLang === 'am') {
+                langToggleBtn.textContent = '🇬🇧 English';
+            } else {
+                langToggleBtn.textContent = '🇪🇹 አማርኛ';
+            }
         }
 
         function toggleLanguage() {
-            if (currentLang === 'bilingual') currentLang = 'am';
-            else if (currentLang === 'am') currentLang = 'en';
-            else currentLang = 'bilingual';
+            if (currentLang === 'am') currentLang = 'en';
+            else currentLang = 'am';
             applyLanguage();
             localStorage.setItem('dot_bingo_lang', currentLang);
         }
 
         langToggleBtn.addEventListener('click', toggleLanguage);
-        const savedLang = localStorage.getItem('dot_bingo_lang');
-        if (savedLang && ['bilingual', 'am', 'en'].includes(savedLang)) currentLang = savedLang;
+
+        // init language: load saved, but never use 'bilingual'
+        let savedLang = localStorage.getItem('dot_bingo_lang');
+        if (savedLang === 'am' || savedLang === 'en') {
+            currentLang = savedLang;
+        } else {
+            currentLang = 'am'; // default
+        }
         applyLanguage();
 
         // ---------- AUTO-RECONNECT ON PAGE LOAD ----------
@@ -415,7 +434,7 @@
         }
         function showGame(){ 
             currentMainPage = 'game'; 
-            stakePage.classList.add('hidden'); // 👈 FIX: hide stake page
+            stakePage.classList.add('hidden');
             lobbyPage.classList.add('hidden'); 
             gamePage.classList.remove('hidden'); 
             historyPage.classList.add('hidden'); 
