@@ -428,7 +428,8 @@ app.post('/admin/delete-user', async (req, res) => {
     const { error: delErr } = await supabase.from('users').delete().eq('telegram_id', strId);
     if (delErr) throw delErr;
 
-    for (const stake of [10, 20, 30]) {
+    // Updated stakes: 100, 20, 30
+    for (const stake of [100, 20, 30]) {
       const game = games[stake];
       if (!game) continue;
       const playerIndex = game.players.findIndex(p => p.telegramId === strId);
@@ -501,8 +502,9 @@ function createGameState(entryFee) {
   };
 }
 
+// Updated stakes: 100, 20, 30
 const games = {
-  10: createGameState(10),
+  100: createGameState(100),
   20: createGameState(20),
   30: createGameState(30)
 };
@@ -513,7 +515,7 @@ function getGame(stake) {
 
 function getAllPlayersList() {
   const allPlayers = [];
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [100, 20, 30]) {
     const game = games[stake];
     game.players.forEach(p => {
       const user = users[p.telegramId];
@@ -533,7 +535,7 @@ function notifyAdminClients() {
   const data = {
     players: getAllPlayersList(),
     gameStatus: {
-      10: games[10].status,
+      100: games[100].status,
       20: games[20].status,
       30: games[30].status
     }
@@ -544,7 +546,7 @@ function notifyAdminClients() {
 // ---------- PUBLIC NAMESPACE ----------
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [100, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
@@ -1130,13 +1132,13 @@ io.on('connection', async (socket) => {
   
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
 
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [100, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
   
   socket.on('joinLobby', ({ stake }) => {
-    if (![10, 20, 30].includes(stake)) return;
+    if (![100, 20, 30].includes(stake)) return;
     currentStake = stake;
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
@@ -1267,7 +1269,7 @@ adminNamespace.on('connection', (socket) => {
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
     gameStatus: {
-      10: games[10].status,
+      100: games[100].status,
       20: games[20].status,
       30: games[30].status
     }
@@ -1276,7 +1278,7 @@ adminNamespace.on('connection', (socket) => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
       gameStatus: {
-        10: games[10].status,
+        100: games[100].status,
         20: games[20].status,
         30: games[30].status
       }
@@ -1315,8 +1317,8 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// Start all three stakes
-resetGame(10);
+// Start all three stakes (100, 20, 30)
+resetGame(100);
 resetGame(20);
 resetGame(30);
 
