@@ -15,7 +15,7 @@
     .total-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
     .stats-bar { background: #2c3e50; border-radius: 40px; padding: 10px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
     .players-table-wrapper { background: #0f1724; border-radius: 24px; padding: 4px; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 500px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 600px; }
     th { text-align: left; padding: 12px 8px; background: #0f1724; color: #f39c12; font-weight: bold; border-bottom: 2px solid #f39c12; }
     td { padding: 12px 8px; border-bottom: 1px solid #2c3e50; vertical-align: middle; }
     .handle { color: #2ecc71; font-family: monospace; }
@@ -25,6 +25,7 @@
     .balance-negative { color: #e74c3c; font-weight: bold; }
     button { background: #f39c12; border: none; padding: 10px 20px; border-radius: 48px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.1s; }
     .delete-btn { background: #e74c3c; color: white; padding: 4px 12px; font-size: 0.75rem; }
+    .edit-balance-btn { background: #3498db; color: white; padding: 4px 12px; font-size: 0.75rem; margin-right: 6px; }
     .refresh-btn { background: #3498db; color: white; margin-bottom: 20px; width: auto; display: inline-block; }
     button:active { transform: scale(0.97); }
     .empty-message { text-align: center; padding: 32px 20px; color: #95a5a6; font-style: italic; }
@@ -49,10 +50,10 @@
   <div class="players-table-wrapper">
     <table id="usersTable">
       <thead>
-        <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th><th>Actions</th></tr>
+        <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th><th>✏️ Balance</th><th>Actions</th></tr>
       </thead>
       <tbody id="usersTableBody">
-        <tr><td colspan="5" class="empty-message">Loading users…</td></tr>
+        <tr><td colspan="6" class="empty-message">Loading users…</td></tr>
       </tbody>
     </table>
   </div>
@@ -78,8 +79,35 @@
     });
     adminSocket.on('connect_error', (err) => {
       console.error('Socket error:', err);
-      document.getElementById('usersTableBody').innerHTML = '<td><td colspan="5" class="empty-message">❌ WebSocket error – check secret and server.</td></tr>';
+      document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="empty-message">❌ WebSocket error – check secret and server.</td></tr>';
     });
+  }
+
+  async function editBalance(telegramId) {
+    const newBalance = prompt(`Enter new balance (ETB) for user ${telegramId}:`, '0');
+    if (newBalance === null) return; // cancelled
+    const num = parseFloat(newBalance);
+    if (isNaN(num) || num < 0) {
+      alert('Please enter a valid non‑negative number.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/admin/set-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, userId: telegramId, newBalance: num })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✅ Balance for ${telegramId} updated to ${num} ETB.`);
+        // Refresh the list via socket
+        if (adminSocket) adminSocket.emit('admin:getAllRegisteredPlayers');
+      } else {
+        alert(`❌ Error: ${data.error || 'Update failed'}`);
+      }
+    } catch (err) {
+      alert(`⚠️ Network error: ${err.message}`);
+    }
   }
 
   function renderUsersTable(users) {
@@ -94,7 +122,7 @@
     document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
 
     if (!users || users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-message">📭 No registered users found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-message">📭 No registered users found.</td></tr>';
       return;
     }
 
@@ -117,17 +145,29 @@
           <td><span class="telegram-id">${telegramId}</span></td>
           <td>📱 ${username}</td>
           <td><span class="${balanceClass}">${formattedBalance}</span></td>
+          <td><button class="edit-balance-btn" data-id="${telegramId}">✏️ Edit</button></td>
           <td><button class="delete-btn" data-id="${telegramId}" style="background:#e74c3c; padding:4px 12px;">🗑️ Delete</button></td>
         </tr>
       `;
     });
     tbody.innerHTML = html;
 
+    // Attach edit event listeners
+    document.querySelectorAll('.edit-balance-btn').forEach(btn => {
+      btn.removeEventListener('click', handleEdit);
+      btn.addEventListener('click', handleEdit);
+    });
+
     // Attach delete event listeners
     document.querySelectorAll('.delete-btn').forEach(btn => {
       btn.removeEventListener('click', handleDelete);
       btn.addEventListener('click', handleDelete);
     });
+  }
+
+  async function handleEdit(e) {
+    const telegramId = e.currentTarget.getAttribute('data-id');
+    await editBalance(telegramId);
   }
 
   async function handleDelete(e) {
@@ -143,7 +183,6 @@
       alert(data.success ? `User ${telegramId} deleted.` : `Error: ${data.error}`);
       if (data.success && adminSocket) {
         adminSocket.emit('admin:getAllRegisteredPlayers');
-        // Also refresh financial stats in main admin panel if needed – but this page doesn't show them.
       }
     } catch (err) {
       alert(`Delete failed: ${err.message}`);
