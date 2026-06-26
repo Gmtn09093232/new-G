@@ -348,6 +348,68 @@ app.post('/admin/add-balance', async (req, res) => {
   }
 });
 
+// ============================================================
+//  NEW ENDPOINT: Admin set balance (exact value)
+// ============================================================
+app.post('/admin/set-balance', async (req, res) => {
+  const { secret, userId, newBalance } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+
+  const strId = String(userId);
+  const newBal = Number(newBalance);
+  if (isNaN(newBal) || newBal < 0) {
+    return res.status(400).json({ error: 'Balance must be a non-negative number' });
+  }
+
+  try {
+    // Load existing user (without creating a new one if missing)
+    const { data: existing, error: fetchErr } = await supabase
+      .from('users')
+      .select('*')
+      .eq('telegram_id', strId)
+      .maybeSingle();
+
+    if (fetchErr || !existing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Update balance
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ balance: newBal })
+      .eq('telegram_id', strId);
+
+    if (updateErr) throw updateErr;
+
+    // Update cache
+    if (users[strId]) {
+      users[strId].balance = newBal;
+    } else {
+      // If not in cache, load it (will use fresh DB)
+      await loadUser(strId, existing.username, existing.telegram_handle, null, true);
+    }
+
+    // Log admin action
+    await Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, {
+      targetUserId: strId,
+      oldBalance: existing.balance,
+      newBalance: newBal
+    });
+
+    // Notify the player if online
+    const playerSocket = await getSocketByUserId(strId);
+    if (playerSocket) {
+      playerSocket.emit('balanceUpdate', newBal);
+    }
+
+    res.json({ success: true, newBalance: newBal });
+  } catch (err) {
+    console.error('Error in admin/set-balance:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+// ============================================================
+
 // ---------- DELETE USER ----------
 app.post('/admin/delete-user', async (req, res) => {
   const { secret, telegramId } = req.body;
