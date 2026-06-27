@@ -1500,14 +1500,22 @@
             const parseResult = parseSmsProof(smsProof, selectedDepositType);
             let parsedAmount = parseResult.amount;
 
-            // If parsed amount differs significantly, warn
+            // ---- BLOCK if amount mismatch ----
             const enteredAmount = Number(amount);
-            if (parsedAmount && Math.abs(parsedAmount - enteredAmount) > 1) {
-                if (!confirm(`⚠️ SMS shows amount ${parsedAmount.toFixed(2)} ETB but you entered ${enteredAmount.toFixed(2)} ETB. Continue anyway?`)) {
-                    return;
+            if (parsedAmount !== null && parsedAmount !== undefined) {
+                if (Math.abs(parsedAmount - enteredAmount) > 0.01) {
+                    const errorMsg = `❌ Amount mismatch: the SMS shows ${parsedAmount.toFixed(2)} ETB, but you entered ${enteredAmount.toFixed(2)} ETB. Please correct the amount.`;
+                    // Display error in the SMS parse result area
+                    const resultContainer = document.getElementById('smsParseResult');
+                    resultContainer.className = 'sms-parse-result visible';
+                    resultContainer.innerHTML = `<div style="color:#dc2626; font-weight:bold;">${errorMsg}</div>`;
+                    // Also show an alert for immediate feedback
+                    alert(errorMsg);
+                    return; // Block submission
                 }
             }
 
+            // Proceed with deposit request
             isSubmittingDeposit = true;
             const submitBtn = document.getElementById('submitDepositBtn');
             const originalText = submitBtn.innerText;
