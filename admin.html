@@ -7,7 +7,6 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
-    /* (all existing styles – unchanged) */
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
     .container { max-width: 1100px; margin: 0 auto; }
@@ -129,13 +128,14 @@
       margin-bottom: 6px;
     }
     .sms-box .sms-link {
-      margin-top: 8px;
+      margin-top: 10px;
       display: inline-block;
       background: #2d3748;
-      padding: 4px 12px;
+      padding: 6px 16px;
       border-radius: 40px;
       font-family: system-ui;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      border: 1px solid #3498db;
     }
     .sms-box .sms-link a {
       color: #3498db;
@@ -144,6 +144,13 @@
     }
     .sms-box .sms-link a:hover {
       text-decoration: underline;
+    }
+    .sms-box .sms-link .ref-code {
+      background: #0a0f1c;
+      padding: 2px 8px;
+      border-radius: 12px;
+      color: #facc15;
+      font-weight: 700;
     }
 
     .verification-grid {
@@ -344,7 +351,7 @@
 
   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
-  // ---- QR/OCR functions ----
+  // ---- QR/OCR functions (unchanged) ----
   function extractRefFromQR(imageSrc) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -397,17 +404,19 @@
     }
   }
 
-  // ---- Extract transaction reference from SMS text ----
+  // ---- IMPROVED: Extract transaction reference from SMS text ----
   function extractTxnFromSms(text) {
     if (!text) return null;
-    // Look for typical reference patterns: alphanumeric, 6-20 chars, often starting with letters
+    // Normalize whitespace
+    const clean = text.replace(/\s+/g, ' ').trim();
+    // Common patterns
     const patterns = [
+      /(?:transaction|txn|ref|receipt|id|number)\s*(?:id|no|number|#)?\s*[:.]?\s*([A-Z0-9]{6,20})/i,
       /\b([A-Z0-9]{8,16})\b/,
-      /\b(?:TXN|REF|TRX|ID)[\s:]*([A-Z0-9]{6,16})/i,
-      /\b([A-Z]{2,}[0-9]{4,}[A-Z0-9]*)\b/
+      /\b([A-Z]{2,}[0-9]{4,}[A-Z0-9]*)\b/,
     ];
     for (const pattern of patterns) {
-      const match = text.match(pattern);
+      const match = clean.match(pattern);
       if (match) {
         const ref = match[1].replace(/[^A-Z0-9]/g, '');
         if (ref.length >= 6) return ref;
@@ -599,20 +608,27 @@
     document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
     const body = document.getElementById('modalBody');
 
-    // SMS proof display
+    // ---- SMS proof with clickable link ----
     let smsHtml = '';
     const hasSms = req.sms_proof && req.sms_proof.length > 5;
     if (hasSms) {
-      // Try to extract reference from SMS
+      // Try to extract reference from SMS, fallback to parsed_txn
       let txnRef = req.parsed_txn || extractTxnFromSms(req.sms_proof);
       let linkHtml = '';
       if (txnRef) {
         const verifyLink = getVerificationLink(req.payment_type, txnRef);
         if (verifyLink) {
-          linkHtml = `<div class="sms-link">🔗 <a href="${verifyLink}" target="_blank">Open Receipt (${txnRef})</a></div>`;
+          linkHtml = `
+            <div class="sms-link">
+              🔗 <a href="${verifyLink}" target="_blank">Open Receipt</a>
+              <span class="ref-code">${txnRef}</span>
+            </div>
+          `;
         } else {
           linkHtml = `<div class="sms-link">ℹ️ Reference found: <strong>${txnRef}</strong> (no direct link available)</div>`;
         }
+      } else {
+        linkHtml = `<div class="sms-link" style="border-color:#94a3b8;">⚠️ No transaction reference detected in SMS.</div>`;
       }
       smsHtml = `
         <div class="sms-box">
@@ -625,7 +641,7 @@
       smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
     }
 
-    // Parsed data comparison
+    // ---- Parsed data comparison (unchanged) ----
     let verificationHtml = '';
     if (req.parsed_amount || req.parsed_txn || req.parsed_method) {
       const amountMatch = req.parsed_amount ? (Math.abs(req.parsed_amount - req.amount) < 1) : false;
@@ -667,15 +683,11 @@
         </div>
       `;
     } else {
-      verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS. The user may not have provided an SMS proof.</p>`;
+      verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS.</p>`;
     }
 
-    // Proof image
+    // ---- Proof image and QR/OCR extraction (unchanged) ----
     const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` : '<p style="color:#94a3b8;">No proof image</p>';
-
-    // Verification link from parsed txn (already shown in SMS box)
-    const extraLink = req.parsed_txn ? getVerificationLink(req.payment_type, req.parsed_txn) : null;
-    const extraLinkHtml = extraLink ? `<p><a href="${extraLink}" target="_blank" style="color:#3498db;">🔗 Verify on ${req.payment_type} site</a></p>` : '';
 
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
@@ -684,7 +696,6 @@
       <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
       <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.payment_type || 'Unknown'}</span></div>
       <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
-      ${extraLinkHtml}
       ${smsHtml}
       ${verificationHtml}
       <div class="detail-row" style="flex-direction:column; padding:12px 0;">
@@ -703,7 +714,7 @@
     document.getElementById('modalApproveBtn').onclick = () => processDeposit(req.id, 'approve');
     document.getElementById('modalRejectBtn').onclick = () => processDeposit(req.id, 'reject');
 
-    // Scan image for reference
+    // Scan image for reference (unchanged)
     if (req.proof_path) {
       getReferenceFromProof(req.proof_path).then(result => {
         const display = document.getElementById('extractedRefDisplay');
