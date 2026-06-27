@@ -1,641 +1,1240 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-  <title>🎰 Admin Panel – Deposits & Withdrawals</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    h1 { text-align: center; color: #f39c12; font-size: 1.8rem; margin: 0 0 12px; }
-    .back-link { display: inline-block; margin-bottom: 16px; color: #3498db; text-decoration: none; font-weight: bold; }
-    .back-link:hover { text-decoration: underline; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+    <title>🎰 Admin Panel – Deposits & Withdrawals</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
+    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0f1c;
+            color: #eee;
+            padding: 12px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #f39c12;
+            font-size: 1.8rem;
+            margin: 0 0 12px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
 
-    .stats-section { background: #16202a; border-radius: 24px; padding: 16px; margin-bottom: 24px; }
-    .date-range { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; background: #1e2a36; padding: 10px 14px; border-radius: 48px; }
-    .date-range label { font-size: 0.75rem; color: #94a3b8; }
-    .date-range input { background: #0a0f1c; border: 1px solid #334455; color: #eee; padding: 6px 12px; border-radius: 40px; flex: 1; min-width: 100px; }
-    .date-range button { background: #3498db; border: none; color: #fff; padding: 6px 16px; border-radius: 40px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+        .stats-section {
+            background: #16202a;
+            border-radius: 24px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .date-range {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 16px;
+            background: #1e2a36;
+            padding: 10px 14px;
+            border-radius: 48px;
+        }
+        .date-range label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+        .date-range input {
+            background: #0a0f1c;
+            border: 1px solid #334455;
+            color: #eee;
+            padding: 6px 12px;
+            border-radius: 40px;
+            flex: 1;
+            min-width: 100px;
+        }
+        .date-range button {
+            background: #3498db;
+            border: none;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
 
-    .stats-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 8px 0;
-    }
-    .stat-card {
-      background: #1e2a36;
-      border-radius: 12px;
-      padding: 4px 8px;
-      flex: 1 1 80px;
-      text-align: center;
-      min-width: 60px;
-    }
-    .stat-card .label {
-      font-size: 0.5rem;
-      text-transform: uppercase;
-      color: #94a3b8;
-      letter-spacing: 0.2px;
-    }
-    .stat-card .value {
-      font-size: 0.9rem;
-      font-weight: 800;
-      margin-top: 1px;
-    }
-    .stat-card .value.deposit-color { color: #2ecc71; }
-    .stat-card .value.withdraw-color { color: #e74c3c; }
-    .stat-card .value.profit-color { color: #f39c12; }
-    .stat-card .value.pending-deposit-color { color: #3498db; }
-    .stat-card .value.pending-withdraw-color { color: #e67e22; }
-    .stat-error { color: #e74c3c; font-size: 0.55rem; }
+        .stats-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .stat-card {
+            background: #1e2a36;
+            border-radius: 12px;
+            padding: 4px 8px;
+            flex: 1 1 80px;
+            text-align: center;
+            min-width: 60px;
+        }
+        .stat-card .label {
+            font-size: 0.5rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            letter-spacing: 0.2px;
+        }
+        .stat-card .value {
+            font-size: 0.9rem;
+            font-weight: 800;
+            margin-top: 1px;
+        }
+        .stat-card .value.deposit-color {
+            color: #2ecc71;
+        }
+        .stat-card .value.withdraw-color {
+            color: #e74c3c;
+        }
+        .stat-card .value.profit-color {
+            color: #f39c12;
+        }
+        .stat-card .value.pending-deposit-color {
+            color: #3498db;
+        }
+        .stat-card .value.pending-withdraw-color {
+            color: #e67e22;
+        }
+        .stat-error {
+            color: #e74c3c;
+            font-size: 0.55rem;
+        }
 
-    .method-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
-    .method-card { background: #1e2a36; border-radius: 10px; padding: 4px 10px; flex: 1 1 90px; text-align: center; }
-    .method-card .method-label { font-size: 0.55rem; text-transform: uppercase; color: #94a3b8; }
-    .method-card .method-value { font-size: 0.85rem; font-weight: 700; color: #facc15; margin-top: 1px; }
+        .method-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 6px 0;
+        }
+        .method-card {
+            background: #1e2a36;
+            border-radius: 10px;
+            padding: 4px 10px;
+            flex: 1 1 90px;
+            text-align: center;
+        }
+        .method-card .method-label {
+            font-size: 0.55rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+        .method-card .method-value {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #facc15;
+            margin-top: 1px;
+        }
 
-    .tabs { display: flex; gap: 4px; margin: 16px 0 12px; background: #16202a; border-radius: 48px; padding: 4px; }
-    .tab-btn { flex: 1; background: transparent; border: none; padding: 10px 12px; border-radius: 40px; font-weight: 700; font-size: 0.95rem; color: #94a3b8; cursor: pointer; transition: 0.2s; }
-    .tab-btn.active { background: #f39c12; color: #0a0f1c; }
-    .tab-btn:hover:not(.active) { background: #1e2a36; color: #eee; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin: 16px 0 12px;
+            background: #16202a;
+            border-radius: 48px;
+            padding: 4px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .tab-btn.active {
+            background: #f39c12;
+            color: #0a0f1c;
+        }
+        .tab-btn:hover:not(.active) {
+            background: #1e2a36;
+            color: #eee;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
 
-    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
-    .filter-row select { background: #1e2a36; border: 1px solid #334455; color: #eee; padding: 8px 14px; border-radius: 40px; flex: 1; min-width: 120px; font-size: 0.9rem; }
-    .filter-row .refresh-btn { background: #3498db; border: none; color: #fff; padding: 8px 16px; border-radius: 40px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .filter-row select {
+            background: #1e2a36;
+            border: 1px solid #334455;
+            color: #eee;
+            padding: 8px 14px;
+            border-radius: 40px;
+            flex: 1;
+            min-width: 120px;
+            font-size: 0.9rem;
+        }
+        .filter-row .refresh-btn {
+            background: #3498db;
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
 
-    .request-card { background: #1e2a36; border-radius: 16px; margin: 8px 0; padding: 10px 14px; cursor: pointer; transition: 0.2s; }
-    .request-card:hover { background: #253647; }
-    .request-card .summary { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
-    .request-card .summary .info { flex: 2; min-width: 160px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
-    .request-card .summary .info .main { font-weight: 600; font-size: 0.9rem; }
-    .request-card .summary .info .detail { font-size: 0.8rem; color: #94a3b8; }
-    .request-card .summary .info .phone { font-size: 0.8rem; color: #94a3b8; }
-    .request-card .summary .badge { background: #f39c12; color: #0a0f1c; padding: 2px 10px; border-radius: 40px; font-weight: bold; font-size: 0.7rem; white-space: nowrap; }
-    .proof-thumb { max-height: 40px; border-radius: 6px; border: 1px solid #f39c12; cursor: pointer; vertical-align: middle; }
+        .request-card {
+            background: #1e2a36;
+            border-radius: 16px;
+            margin: 8px 0;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .request-card:hover {
+            background: #253647;
+        }
+        .request-card .summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .request-card .summary .info {
+            flex: 2;
+            min-width: 160px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            align-items: baseline;
+        }
+        .request-card .summary .info .main {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .request-card .summary .info .detail {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+        .request-card .summary .info .phone {
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+        .request-card .summary .badge {
+            background: #f39c12;
+            color: #0a0f1c;
+            padding: 2px 10px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        .proof-thumb {
+            max-height: 40px;
+            border-radius: 6px;
+            border: 1px solid #f39c12;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        .sms-badge {
+            background: #2d3748;
+            color: #facc15;
+            font-size: 0.6rem;
+            padding: 2px 10px;
+            border-radius: 40px;
+            border: 1px solid #facc15;
+            font-weight: 600;
+            display: inline-block;
+        }
+        .sms-badge.has-sms {
+            border-color: #2ecc71;
+            color: #2ecc71;
+        }
+        .sms-badge.no-sms {
+            border-color: #94a3b8;
+            color: #94a3b8;
+        }
 
-    .action-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-    .action-buttons button { padding: 6px 16px; border: none; border-radius: 40px; font-weight: bold; cursor: pointer; flex: 1; font-size: 0.85rem; }
-    .action-buttons button.approve { background: #2ecc71; color: #000; }
-    .action-buttons button.reject { background: #e74c3c; color: #fff; }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .action-buttons button {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+            font-size: 0.85rem;
+        }
+        .action-buttons button.approve {
+            background: #2ecc71;
+            color: #000;
+        }
+        .action-buttons button.reject {
+            background: #e74c3c;
+            color: #fff;
+        }
 
-    .manual-section { background: #16202a; border-radius: 24px; padding: 16px; margin-top: 24px; }
-    .manual-section h2 { color: #f39c12; margin-top: 0; }
-    .manual-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-    .manual-grid input { background: #1e2a36; border: 1px solid #334455; color: #eee; padding: 10px 16px; border-radius: 48px; flex: 1; min-width: 140px; font-size: 0.9rem; }
-    .manual-grid .add-btn { background: #f39c12; border: none; color: #0a0f1c; padding: 10px 24px; border-radius: 48px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
-    .manual-grid .add-btn:hover { background: #e67e22; }
+        .manual-section {
+            background: #16202a;
+            border-radius: 24px;
+            padding: 16px;
+            margin-top: 24px;
+        }
+        .manual-section h2 {
+            color: #f39c12;
+            margin-top: 0;
+        }
+        .manual-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .manual-grid input {
+            background: #1e2a36;
+            border: 1px solid #334455;
+            color: #eee;
+            padding: 10px 16px;
+            border-radius: 48px;
+            flex: 1;
+            min-width: 140px;
+            font-size: 0.9rem;
+        }
+        .manual-grid .add-btn {
+            background: #f39c12;
+            border: none;
+            color: #0a0f1c;
+            padding: 10px 24px;
+            border-radius: 48px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .manual-grid .add-btn:hover {
+            background: #e67e22;
+        }
 
-    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; padding: 20px; }
-    .modal-overlay.active { display: flex; }
-    .modal-content { background: #16202a; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 24px; border-radius: 32px; position: relative; }
-    .modal-content .close-modal { background: #e74c3c; color: #fff; border: none; border-radius: 40px; padding: 8px 20px; font-weight: bold; cursor: pointer; float: right; }
-    .modal-content .detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #2a3a4a; }
-    .modal-content .detail-label { font-weight: 600; width: 160px; color: #94a3b8; flex-shrink: 0; }
-    .modal-content .detail-value { flex: 1; word-break: break-word; }
-    .modal-content .proof-full { max-width: 100%; max-height: 400px; border-radius: 12px; border: 2px solid #f39c12; margin: 12px 0; }
-    .modal-content .extracted-box { background: #0f1a24; padding: 12px; border-radius: 16px; font-family: monospace; margin: 12px 0; }
-    .match { color: #2ecc71; font-weight: bold; }
-    .mismatch { color: #e74c3c; font-weight: bold; }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #16202a;
+            max-width: 800px;
+            width: 100%;
+            max-height: 92vh;
+            overflow-y: auto;
+            padding: 24px;
+            border-radius: 32px;
+            position: relative;
+        }
+        .modal-content .close-modal {
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 20px;
+            font-weight: bold;
+            cursor: pointer;
+            float: right;
+        }
+        .modal-content .detail-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #2a3a4a;
+        }
+        .modal-content .detail-label {
+            font-weight: 600;
+            width: 160px;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .modal-content .detail-value {
+            flex: 1;
+            word-break: break-word;
+        }
+        .modal-content .proof-full {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 12px;
+            border: 2px solid #f39c12;
+            margin: 12px 0;
+        }
+        .modal-content .extracted-box {
+            background: #0f1a24;
+            padding: 12px;
+            border-radius: 16px;
+            font-family: monospace;
+            margin: 12px 0;
+        }
+        .match {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+        .mismatch {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .sms-box {
+            background: #0f1a24;
+            border-radius: 16px;
+            padding: 14px;
+            margin: 10px 0;
+            border-left: 4px solid #f39c12;
+            font-family: monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .sms-box .sms-label {
+            font-family: system-ui;
+            font-weight: 700;
+            color: #facc15;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .verification-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .verification-item {
+            background: #0f1a24;
+            padding: 8px 12px;
+            border-radius: 12px;
+        }
+        .verification-item .vlabel {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+        .verification-item .vvalue {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-top: 2px;
+        }
+        .verification-item .vvalue.match {
+            color: #2ecc71;
+        }
+        .verification-item .vvalue.mismatch {
+            color: #e74c3c;
+        }
+        .verification-item .vvalue.partial {
+            color: #f39c12;
+        }
 
-    /* ===== SUPER COMPACT MOBILE ===== */
-    @media (max-width: 640px) {
-      .modal-content .detail-row { flex-direction: column; padding: 12px 0; }
-      .modal-content .detail-label { width: 100%; margin-bottom: 4px; }
-      .request-card .summary { flex-direction: column; align-items: stretch; }
-      .request-card .summary .info { flex-direction: column; align-items: stretch; gap: 4px; }
-      .action-buttons button { flex: 1; }
-      .tabs { flex-direction: column; border-radius: 20px; }
-      .tab-btn { width: 100%; }
-      .date-range { flex-direction: column; align-items: stretch; }
-      .date-range input { width: 100%; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .status-badge.verified {
+            background: #2ecc71;
+            color: #000;
+        }
+        .status-badge.partial {
+            background: #f39c12;
+            color: #000;
+        }
+        .status-badge.unverified {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .status-badge.no-sms {
+            background: #94a3b8;
+            color: #000;
+        }
 
-      /* ---- Stat cards: 2‑column grid, super compact ---- */
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;  /* 2 columns */
-        gap: 4px;
-        margin: 6px 0;
-      }
-      .stat-card {
-        padding: 3px 4px;               /* minimal padding */
-        border-radius: 8px;
-        min-width: 0;
-        flex: none;
-        width: 100%;
-      }
-      .stat-card .label {
-        font-size: 0.4rem;              /* tiny label */
-        letter-spacing: 0.1px;
-      }
-      .stat-card .value {
-        font-size: 0.7rem;              /* small value */
-        margin-top: 0;
-      }
-      .stat-error {
-        font-size: 0.45rem;
-      }
+        /* ===== SUPER COMPACT MOBILE ===== */
+        @media (max-width: 640px) {
+            .modal-content .detail-row {
+                flex-direction: column;
+                padding: 12px 0;
+            }
+            .modal-content .detail-label {
+                width: 100%;
+                margin-bottom: 4px;
+            }
+            .request-card .summary {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .request-card .summary .info {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 4px;
+            }
+            .action-buttons button {
+                flex: 1;
+            }
+            .tabs {
+                flex-direction: column;
+                border-radius: 20px;
+            }
+            .tab-btn {
+                width: 100%;
+            }
+            .date-range {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .date-range input {
+                width: 100%;
+            }
 
-      /* Method cards stay 2‑column */
-      .method-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 4px;
-        margin: 4px 0;
-      }
-      .method-card { padding: 4px 6px; }
-      .method-card .method-value { font-size: 0.7rem; }
+            .stats-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 4px;
+                margin: 6px 0;
+            }
+            .stat-card {
+                padding: 3px 4px;
+                border-radius: 8px;
+                min-width: 0;
+                flex: none;
+                width: 100%;
+            }
+            .stat-card .label {
+                font-size: 0.4rem;
+                letter-spacing: 0.1px;
+            }
+            .stat-card .value {
+                font-size: 0.7rem;
+                margin-top: 0;
+            }
+            .stat-error {
+                font-size: 0.45rem;
+            }
 
-      .manual-grid { flex-direction: column; align-items: stretch; }
-      .manual-grid input { width: 100%; }
-      .manual-grid .add-btn { width: 100%; }
+            .method-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 4px;
+                margin: 4px 0;
+            }
+            .method-card {
+                padding: 4px 6px;
+            }
+            .method-card .method-value {
+                font-size: 0.7rem;
+            }
 
-      /* Reduce stats-section padding on mobile */
-      .stats-section { padding: 10px; }
-    }
+            .manual-grid {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .manual-grid input {
+                width: 100%;
+            }
+            .manual-grid .add-btn {
+                width: 100%;
+            }
+            .stats-section {
+                padding: 10px;
+            }
+            .verification-grid {
+                grid-template-columns: 1fr;
+            }
+        }
 
-    @media (max-width: 480px) {
-      .stat-card { padding: 2px 3px; }
-      .stat-card .label { font-size: 0.35rem; }
-      .stat-card .value { font-size: 0.65rem; }
-      .stats-grid { gap: 3px; }
-      .method-grid { gap: 3px; }
-      .method-card .method-label { font-size: 0.45rem; }
-      .method-card .method-value { font-size: 0.65rem; }
-    }
-  </style>
+        @media (max-width: 480px) {
+            .stat-card {
+                padding: 2px 3px;
+            }
+            .stat-card .label {
+                font-size: 0.35rem;
+            }
+            .stat-card .value {
+                font-size: 0.65rem;
+            }
+            .stats-grid {
+                gap: 3px;
+            }
+            .method-grid {
+                gap: 3px;
+            }
+            .method-card .method-label {
+                font-size: 0.45rem;
+            }
+            .method-card .method-value {
+                font-size: 0.65rem;
+            }
+            .sms-box {
+                font-size: 0.7rem;
+                max-height: 150px;
+            }
+        }
+    </style>
 </head>
 <body>
-<div class="container">
-  <h1>🎰 Admin Panel</h1>
+    <div class="container">
+        <h1>🎰 Admin Panel</h1>
 
-  <!-- Stats -->
-  <div class="stats-section">
-    <div class="date-range">
-      <label>📅 From:</label>
-      <input type="date" id="startDate" value="2026-01-01">
-      <label>To:</label>
-      <input type="date" id="endDate" value="2026-12-31">
-      <button id="applyStatsBtn">Apply</button>
-      <button id="refreshStatsBtn" style="background:#f39c12;">🔄</button>
-    </div>
+        <!-- Stats -->
+        <div class="stats-section">
+            <div class="date-range">
+                <label>📅 From:</label>
+                <input type="date" id="startDate" value="2026-01-01">
+                <label>To:</label>
+                <input type="date" id="endDate" value="2026-12-31">
+                <button id="applyStatsBtn">Apply</button>
+                <button id="refreshStatsBtn" style="background:#f39c12;">🔄</button>
+            </div>
 
-    <!-- 2‑column grid on mobile -->
-    <div class="stats-grid">
-      <div class="stat-card"><div class="label">💰 Total Deposits</div><div class="value deposit-color" id="totalDeposits">0</div><div id="depositStatsError" class="stat-error"></div></div>
-      <div class="stat-card"><div class="label">💸 Total Withdrawals</div><div class="value withdraw-color" id="totalWithdrawals">0</div><div id="withdrawStatsError" class="stat-error"></div></div>
-      <div class="stat-card"><div class="label">🏦 House Profit</div><div class="value profit-color" id="houseProfit">0</div><div id="profitStatsError" class="stat-error"></div></div>
-      <div class="stat-card"><div class="label">📥 Pending Deposits</div><div class="value pending-deposit-color" id="pendingDeposits">0</div></div>
-      <div class="stat-card"><div class="label">📤 Pending Withdrawals</div><div class="value pending-withdraw-color" id="pendingWithdrawals">0</div></div>
-    </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="label">💰 Total Deposits</div><div class="value deposit-color" id="totalDeposits">0</div><div id="depositStatsError" class="stat-error"></div></div>
+                <div class="stat-card"><div class="label">💸 Total Withdrawals</div><div class="value withdraw-color" id="totalWithdrawals">0</div><div id="withdrawStatsError" class="stat-error"></div></div>
+                <div class="stat-card"><div class="label">🏦 House Profit</div><div class="value profit-color" id="houseProfit">0</div><div id="profitStatsError" class="stat-error"></div></div>
+                <div class="stat-card"><div class="label">📥 Pending Deposits</div><div class="value pending-deposit-color" id="pendingDeposits">0</div></div>
+                <div class="stat-card"><div class="label">📤 Pending Withdrawals</div><div class="value pending-withdraw-color" id="pendingWithdrawals">0</div></div>
+            </div>
 
-    <div style="margin: 6px 0 4px; font-size:0.7rem; color:#94a3b8;">📥 Deposits by Method</div>
-    <div class="method-grid">
-      <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaDeposit">0</div></div>
-      <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualDeposit">0</div></div>
-    </div>
+            <div style="margin: 6px 0 4px; font-size:0.7rem; color:#94a3b8;">📥 Deposits by Method</div>
+            <div class="method-grid">
+                <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrDeposit">0</div></div>
+                <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrDeposit">0</div></div>
+                <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaDeposit">0</div></div>
+                <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualDeposit">0</div></div>
+            </div>
 
-    <div style="margin: 6px 0 4px; font-size:0.7rem; color:#94a3b8;">📤 Withdrawals by Method</div>
-    <div class="method-grid">
-      <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaWithdraw">0</div></div>
-      <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualWithdraw">0</div></div>
-    </div>
-  </div>
-
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="deposits">📥 Deposits</button>
-    <button class="tab-btn" data-tab="withdrawals">📤 Withdrawals</button>
-  </div>
-
-  <!-- Deposits Tab -->
-  <div id="tab-deposits" class="tab-content active">
-    <div class="filter-row">
-      <label for="depositFilter">Filter:</label>
-      <select id="depositFilter">
-        <option value="all">All</option>
-        <option value="telebirr">Telebirr</option>
-        <option value="cbebirr">CBE Birr</option>
-        <option value="mpesa">M‑Pesa</option>
-      </select>
-      <button class="refresh-btn" id="refreshDepositsBtn">🔄 Refresh</button>
-    </div>
-    <div id="depositList">Loading...</div>
-  </div>
-
-  <!-- Withdrawals Tab -->
-  <div id="tab-withdrawals" class="tab-content">
-    <div class="filter-row">
-      <label for="withdrawFilter">Filter:</label>
-      <select id="withdrawFilter">
-        <option value="all">All</option>
-        <option value="telebirr">Telebirr</option>
-        <option value="cbebirr">CBE Birr</option>
-        <option value="mpesa">M‑Pesa</option>
-      </select>
-      <button class="refresh-btn" id="refreshWithdrawalsBtn">🔄 Refresh</button>
-    </div>
-    <div id="withdrawList">Loading...</div>
-  </div>
-
-  <!-- ===== MANUAL DEPOSIT SECTION ===== -->
-  <div class="manual-section">
-    <h2>➕ Manual Balance Add</h2>
-    <div class="manual-grid">
-      <input type="text" id="manualUserId" placeholder="Telegram ID (numeric)" inputmode="numeric">
-      <input type="number" id="manualAmount" placeholder="Amount (ETB)" step="1" min="1">
-      <button class="add-btn" id="manualAddBtn">Add Balance</button>
-    </div>
-    <div id="manualFeedback" style="margin-top:12px; font-size:0.9rem;"></div>
-  </div>
-</div>
-
-<!-- Detail Modal -->
-<div class="modal-overlay" id="detailModal">
-  <div class="modal-content">
-    <button class="close-modal" id="closeModalBtn">✕ Close</button>
-    <h2 style="color:#f39c12; margin-top:0;" id="modalTitle">Details</h2>
-    <div id="modalBody"></div>
-  </div>
-</div>
-
-<script>
-  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
-  const API_BASE = '';
-
-  let depositData = [], withdrawalData = [];
-
-  function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
-
-  // ---- QR/OCR functions ----
-  function extractRefFromQR(imageSrc) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = imageSrc;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-        if (qrCode && qrCode.data) {
-          const data = qrCode.data;
-          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) resolve(match[1]);
-          else { const refMatch = data.match(/^([A-Z0-9]{8,})$/); resolve(refMatch ? refMatch[1] : null); }
-        } else resolve(null);
-      };
-      img.onerror = () => reject('Failed to load image for QR scan');
-    });
-  }
-  async function extractRefFromOCR(imageUrl) {
-    try {
-      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
-      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      if (match && match[1]) return match[1].trim();
-      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
-      return fallback ? fallback[0] : null;
-    } catch { return null; }
-  }
-  async function getReferenceFromProof(imagePath) {
-    try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' }; } catch (e) { console.warn('QR failed'); }
-    const ocrRef = await extractRefFromOCR(imagePath);
-    if (ocrRef) return { ref: ocrRef, method: 'OCR' };
-    return null;
-  }
-  function getVerificationLink(paymentType, ref) {
-    const encoded = encodeURIComponent(ref);
-    switch (paymentType) {
-      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${encoded}`;
-      case 'cbebirr': return `https://cbebirr.com/verify?txn=${encoded}`;
-      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${encoded}`;
-      default: return null;
-    }
-  }
-
-  // ---- Tab switching ----
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      const tab = this.dataset.tab;
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + tab).classList.add('active');
-    });
-  });
-
-  // ---- Fetch Stats ----
-  async function fetchStats() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    let url = `${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`;
-    if (startDate) url += `&from=${startDate}`;
-    if (endDate) url += `&to=${endDate}`;
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
-        document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
-        document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
-        document.getElementById('depositStatsError').innerText = '';
-        document.getElementById('withdrawStatsError').innerText = '';
-        document.getElementById('profitStatsError').innerText = '';
-
-        const depByMethod = data.depositsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
-        document.getElementById('telebirrDeposit').innerText = (depByMethod.telebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('cbebirrDeposit').innerText = (depByMethod.cbebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('mpesaDeposit').innerText = (depByMethod.mpesa || 0).toLocaleString() + ' ETB';
-        document.getElementById('manualDeposit').innerText = (depByMethod.manual || 0).toLocaleString() + ' ETB';
-
-        const wdByMethod = data.withdrawalsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
-        document.getElementById('telebirrWithdraw').innerText = (wdByMethod.telebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('cbebirrWithdraw').innerText = (wdByMethod.cbebirr || 0).toLocaleString() + ' ETB';
-        document.getElementById('mpesaWithdraw').innerText = (wdByMethod.mpesa || 0).toLocaleString() + ' ETB';
-        document.getElementById('manualWithdraw').innerText = (wdByMethod.manual || 0).toLocaleString() + ' ETB';
-      } else throw new Error(data.error || 'Unknown stats error');
-    } catch (err) {
-      console.error('Stats error:', err);
-      document.getElementById('depositStatsError').innerText = `⚠️ ${err.message}`;
-      document.getElementById('withdrawStatsError').innerText = '⚠️ Could not load totals';
-      document.getElementById('profitStatsError').innerText = '⚠️ Could not load totals';
-      document.getElementById('totalDeposits').innerText = '?';
-      document.getElementById('totalWithdrawals').innerText = '?';
-      document.getElementById('houseProfit').innerText = '?';
-      document.getElementById('telebirrDeposit').innerText = '?';
-      document.getElementById('cbebirrDeposit').innerText = '?';
-      document.getElementById('mpesaDeposit').innerText = '?';
-      document.getElementById('manualDeposit').innerText = '?';
-      document.getElementById('telebirrWithdraw').innerText = '?';
-      document.getElementById('cbebirrWithdraw').innerText = '?';
-      document.getElementById('mpesaWithdraw').innerText = '?';
-      document.getElementById('manualWithdraw').innerText = '?';
-    }
-  }
-
-  // ---- Fetch Deposits ----
-  async function fetchDeposits() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      depositData = data.requests || [];
-      document.getElementById('pendingDeposits').innerText = depositData.length;
-      renderDeposits();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>';
-    }
-  }
-
-  function renderDeposits() {
-    const filter = document.getElementById('depositFilter').value;
-    const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
-    const container = document.getElementById('depositList');
-    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending deposits.</p>'; return; }
-    container.innerHTML = '';
-    filtered.forEach((req) => {
-      const card = document.createElement('div');
-      card.className = 'request-card';
-      card.dataset.id = req.id;
-      const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-thumb" onclick="event.stopPropagation(); window.open(this.src)">` : '';
-      card.innerHTML = `
-        <div class="summary">
-          <div class="info">
-            <span class="main">#${req.id} – ${escapeHtml(req.username)}</span>
-            <span class="detail">${req.amount} ETB via ${req.payment_type || 'Unknown'}</span>
-            <span class="phone">${req.phone || 'N/A'} ${proofHtml}</span>
-          </div>
-          <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
+            <div style="margin: 6px 0 4px; font-size:0.7rem; color:#94a3b8;">📤 Withdrawals by Method</div>
+            <div class="method-grid">
+                <div class="method-card"><div class="method-label">📱 Telebirr</div><div class="method-value" id="telebirrWithdraw">0</div></div>
+                <div class="method-card"><div class="method-label">🏦 CBE Birr</div><div class="method-value" id="cbebirrWithdraw">0</div></div>
+                <div class="method-card"><div class="method-label">📲 M‑Pesa</div><div class="method-value" id="mpesaWithdraw">0</div></div>
+                <div class="method-card"><div class="method-label">✍️ Manual</div><div class="method-value" id="manualWithdraw">0</div></div>
+            </div>
         </div>
-        <div class="action-buttons">
-          <button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button>
-          <button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="deposits">📥 Deposits</button>
+            <button class="tab-btn" data-tab="withdrawals">📤 Withdrawals</button>
         </div>
-      `;
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('button') || e.target.closest('img')) return;
-        openDepositDetail(req.id);
-      });
-      container.appendChild(card);
-      card.querySelectorAll('.approve, .reject').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const action = btn.dataset.action;
-          processDeposit(parseInt(btn.dataset.id), action);
+
+        <!-- Deposits Tab -->
+        <div id="tab-deposits" class="tab-content active">
+            <div class="filter-row">
+                <label for="depositFilter">Filter:</label>
+                <select id="depositFilter">
+                    <option value="all">All</option>
+                    <option value="telebirr">Telebirr</option>
+                    <option value="cbebirr">CBE Birr</option>
+                    <option value="mpesa">M‑Pesa</option>
+                </select>
+                <button class="refresh-btn" id="refreshDepositsBtn">🔄 Refresh</button>
+            </div>
+            <div id="depositList">Loading...</div>
+        </div>
+
+        <!-- Withdrawals Tab -->
+        <div id="tab-withdrawals" class="tab-content">
+            <div class="filter-row">
+                <label for="withdrawFilter">Filter:</label>
+                <select id="withdrawFilter">
+                    <option value="all">All</option>
+                    <option value="telebirr">Telebirr</option>
+                    <option value="cbebirr">CBE Birr</option>
+                    <option value="mpesa">M‑Pesa</option>
+                </select>
+                <button class="refresh-btn" id="refreshWithdrawalsBtn">🔄 Refresh</button>
+            </div>
+            <div id="withdrawList">Loading...</div>
+        </div>
+
+        <!-- ===== MANUAL DEPOSIT SECTION ===== -->
+        <div class="manual-section">
+            <h2>➕ Manual Balance Add</h2>
+            <div class="manual-grid">
+                <input type="text" id="manualUserId" placeholder="Telegram ID (numeric)" inputmode="numeric">
+                <input type="number" id="manualAmount" placeholder="Amount (ETB)" step="1" min="1">
+                <button class="add-btn" id="manualAddBtn">Add Balance</button>
+            </div>
+            <div id="manualFeedback" style="margin-top:12px; font-size:0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content">
+            <button class="close-modal" id="closeModalBtn">✕ Close</button>
+            <h2 style="color:#f39c12; margin-top:0;" id="modalTitle">Details</h2>
+            <div id="modalBody"></div>
+            <div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;" id="modalActions">
+                <button class="approve" id="modalApproveBtn" style="flex:1; background:#2ecc71; color:#000; border:none; border-radius:40px; padding:10px 20px; font-weight:bold; cursor:pointer;">✅ Approve</button>
+                <button class="reject" id="modalRejectBtn" style="flex:1; background:#e74c3c; color:#fff; border:none; border-radius:40px; padding:10px 20px; font-weight:bold; cursor:pointer;">❌ Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
+        const API_BASE = '';
+
+        let depositData = [],
+            withdrawalData = [];
+        let currentModalId = null;
+        let currentModalType = null; // 'deposit' or 'withdrawal'
+
+        function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ?
+                '&lt;' : '&gt;')); }
+
+        // ---- QR/OCR functions ----
+        function extractRefFromQR(imageSrc) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'Anonymous';
+                img.src = imageSrc;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
+                    if (qrCode && qrCode.data) {
+                        const data = qrCode.data;
+                        const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
+                        if (match) resolve(match[1]);
+                        else { const refMatch = data.match(/^([A-Z0-9]{8,})$/);
+                            resolve(refMatch ? refMatch[1] : null); }
+                    } else resolve(null);
+                };
+                img.onerror = () => reject('Failed to load image for QR scan');
+            });
+        }
+
+        async function extractRefFromOCR(imageUrl) {
+            try {
+                const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
+                const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
+                if (match && match[1]) return match[1].trim();
+                const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
+                return fallback ? fallback[0] : null;
+            } catch { return null; }
+        }
+
+        async function getReferenceFromProof(imagePath) {
+            try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' }; } catch (e) { console
+                    .warn('QR failed'); }
+            const ocrRef = await extractRefFromOCR(imagePath);
+            if (ocrRef) return { ref: ocrRef, method: 'OCR' };
+            return null;
+        }
+
+        function getVerificationLink(paymentType, ref) {
+            const encoded = encodeURIComponent(ref);
+            switch (paymentType) {
+                case 'telebirr':
+                    return `https://transactioninfo.ethiotelecom.et/receipt/${encoded}`;
+                case 'cbebirr':
+                    return `https://cbebirr.com/verify?txn=${encoded}`;
+                case 'mpesa':
+                    return `https://mpesa.ethiotelecom.et/transaction/${encoded}`;
+                default:
+                    return null;
+            }
+        }
+
+        // ---- Tab switching ----
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+                document.getElementById('tab-' + tab).classList.add('active');
+            });
         });
-      });
-    });
-  }
 
-  // ---- Fetch Withdrawals ----
-  async function fetchWithdrawals() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
-      const data = await res.json();
-      withdrawalData = data.requests || [];
-      document.getElementById('pendingWithdrawals').innerText = withdrawalData.length;
-      renderWithdrawals();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>';
-    }
-  }
+        // ---- Fetch Stats ----
+        async function fetchStats() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            let url = `${API_BASE}/admin/stats-summary?secret=${ADMIN_SECRET}`;
+            if (startDate) url += `&from=${startDate}`;
+            if (endDate) url += `&to=${endDate}`;
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('totalDeposits').innerText = (data.totalDeposits || 0).toLocaleString();
+                    document.getElementById('totalWithdrawals').innerText = (data.totalWithdrawals || 0).toLocaleString();
+                    document.getElementById('houseProfit').innerText = (data.totalHouseProfit || 0).toLocaleString();
+                    document.getElementById('depositStatsError').innerText = '';
+                    document.getElementById('withdrawStatsError').innerText = '';
+                    document.getElementById('profitStatsError').innerText = '';
 
-  function renderWithdrawals() {
-    const filter = document.getElementById('withdrawFilter').value;
-    const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
-    const container = document.getElementById('withdrawList');
-    if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
-    container.innerHTML = '';
-    filtered.forEach((req) => {
-      const card = document.createElement('div');
-      card.className = 'request-card';
-      card.dataset.id = req.id;
-      card.innerHTML = `
-        <div class="summary">
-          <div class="info">
-            <span class="main">#${req.id} – ${escapeHtml(req.username)}</span>
-            <span class="detail">${req.amount} ETB via ${req.withdrawal_type || 'Unknown'}</span>
-            <span class="phone">📱 ${escapeHtml(req.phone_number)}</span>
-          </div>
-          <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
-        </div>
-        <div class="action-buttons">
-          <button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button>
-          <button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button>
-        </div>
-      `;
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('button')) return;
-        openWithdrawDetail(req.id);
-      });
-      container.appendChild(card);
-      card.querySelectorAll('.approve, .reject').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const action = btn.dataset.action;
-          processWithdrawal(parseInt(btn.dataset.id), action);
+                    const depByMethod = data.depositsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+                    document.getElementById('telebirrDeposit').innerText = (depByMethod.telebirr || 0).toLocaleString() +
+                        ' ETB';
+                    document.getElementById('cbebirrDeposit').innerText = (depByMethod.cbebirr || 0).toLocaleString() +
+                        ' ETB';
+                    document.getElementById('mpesaDeposit').innerText = (depByMethod.mpesa || 0).toLocaleString() + ' ETB';
+                    document.getElementById('manualDeposit').innerText = (depByMethod.manual || 0).toLocaleString() +
+                        ' ETB';
+
+                    const wdByMethod = data.withdrawalsByMethod || { telebirr: 0, cbebirr: 0, mpesa: 0, manual: 0 };
+                    document.getElementById('telebirrWithdraw').innerText = (wdByMethod.telebirr || 0).toLocaleString() +
+                        ' ETB';
+                    document.getElementById('cbebirrWithdraw').innerText = (wdByMethod.cbebirr || 0).toLocaleString() +
+                        ' ETB';
+                    document.getElementById('mpesaWithdraw').innerText = (wdByMethod.mpesa || 0).toLocaleString() + ' ETB';
+                    document.getElementById('manualWithdraw').innerText = (wdByMethod.manual || 0).toLocaleString() +
+                        ' ETB';
+                } else throw new Error(data.error || 'Unknown stats error');
+            } catch (err) {
+                console.error('Stats error:', err);
+                document.getElementById('depositStatsError').innerText = `⚠️ ${err.message}`;
+                document.getElementById('withdrawStatsError').innerText = '⚠️ Could not load totals';
+                document.getElementById('profitStatsError').innerText = '⚠️ Could not load totals';
+                document.getElementById('totalDeposits').innerText = '?';
+                document.getElementById('totalWithdrawals').innerText = '?';
+                document.getElementById('houseProfit').innerText = '?';
+                document.getElementById('telebirrDeposit').innerText = '?';
+                document.getElementById('cbebirrDeposit').innerText = '?';
+                document.getElementById('mpesaDeposit').innerText = '?';
+                document.getElementById('manualDeposit').innerText = '?';
+                document.getElementById('telebirrWithdraw').innerText = '?';
+                document.getElementById('cbebirrWithdraw').innerText = '?';
+                document.getElementById('mpesaWithdraw').innerText = '?';
+                document.getElementById('manualWithdraw').innerText = '?';
+            }
+        }
+
+        // ---- Fetch Deposits ----
+        async function fetchDeposits() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
+                const data = await res.json();
+                depositData = data.requests || [];
+                document.getElementById('pendingDeposits').innerText = depositData.length;
+                renderDeposits();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('depositList').innerHTML = '<p>❌ Error loading deposits</p>';
+            }
+        }
+
+        function renderDeposits() {
+            const filter = document.getElementById('depositFilter').value;
+            const filtered = filter === 'all' ? depositData : depositData.filter(req => req.payment_type === filter);
+            const container = document.getElementById('depositList');
+            if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending deposits.</p>'; return; }
+            container.innerHTML = '';
+            filtered.forEach((req) => {
+                const card = document.createElement('div');
+                card.className = 'request-card';
+                card.dataset.id = req.id;
+                const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-thumb" onclick="event.stopPropagation(); window.open(this.src)">` :
+                    '';
+                const hasSms = req.sms_proof && req.sms_proof.length > 5;
+                const smsBadge = hasSms ?
+                    `<span class="sms-badge has-sms">📱 SMS Proof</span>` :
+                    `<span class="sms-badge no-sms">📱 No SMS</span>`;
+                const parsedInfo = req.parsed_amount ? `📊 ${req.parsed_amount} ETB` : '';
+                const matchStatus = req.parsed_amount && req.amount ? (Math.abs(req.parsed_amount - req.amount) < 1 ?
+                    '✅' : '⚠️') : '';
+                card.innerHTML = `
+                    <div class="summary">
+                        <div class="info">
+                            <span class="main">#${req.id} – ${escapeHtml(req.username)}</span>
+                            <span class="detail">${req.amount} ETB via ${req.payment_type || 'Unknown'}</span>
+                            <span class="phone">${req.phone || 'N/A'} ${proofHtml}</span>
+                            ${smsBadge}
+                            ${parsedInfo ? `<span class="detail">${parsedInfo} ${matchStatus}</span>` : ''}
+                        </div>
+                        <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button>
+                        <button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button>
+                    </div>
+                `;
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('button') || e.target.closest('img')) return;
+                    openDepositDetail(req.id);
+                });
+                container.appendChild(card);
+                card.querySelectorAll('.approve, .reject').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const action = btn.dataset.action;
+                        processDeposit(parseInt(btn.dataset.id), action);
+                    });
+                });
+            });
+        }
+
+        // ---- Fetch Withdrawals ----
+        async function fetchWithdrawals() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
+                const data = await res.json();
+                withdrawalData = data.requests || [];
+                document.getElementById('pendingWithdrawals').innerText = withdrawalData.length;
+                renderWithdrawals();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('withdrawList').innerHTML = '<p>❌ Error loading withdrawals</p>';
+            }
+        }
+
+        function renderWithdrawals() {
+            const filter = document.getElementById('withdrawFilter').value;
+            const filtered = filter === 'all' ? withdrawalData : withdrawalData.filter(req => req.withdrawal_type === filter);
+            const container = document.getElementById('withdrawList');
+            if (filtered.length === 0) { container.innerHTML = '<p>✅ No pending withdrawals.</p>'; return; }
+            container.innerHTML = '';
+            filtered.forEach((req) => {
+                const card = document.createElement('div');
+                card.className = 'request-card';
+                card.dataset.id = req.id;
+                card.innerHTML = `
+                    <div class="summary">
+                        <div class="info">
+                            <span class="main">#${req.id} – ${escapeHtml(req.username)}</span>
+                            <span class="detail">${req.amount} ETB via ${req.withdrawal_type || 'Unknown'}</span>
+                            <span class="phone">📱 ${escapeHtml(req.phone_number)}</span>
+                        </div>
+                        <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="approve" data-id="${req.id}" data-action="approve">✅ Approve</button>
+                        <button class="reject" data-id="${req.id}" data-action="reject">❌ Reject</button>
+                    </div>
+                `;
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('button')) return;
+                    openWithdrawDetail(req.id);
+                });
+                container.appendChild(card);
+                card.querySelectorAll('.approve, .reject').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const action = btn.dataset.action;
+                        processWithdrawal(parseInt(btn.dataset.id), action);
+                    });
+                });
+            });
+        }
+
+        // ---- Detail modals ----
+        function openDepositDetail(id) {
+            const req = depositData.find(r => r.id === id);
+            if (!req) { alert('Request not found'); return; }
+            currentModalId = id;
+            currentModalType = 'deposit';
+            document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
+            const body = document.getElementById('modalBody');
+
+            // SMS proof display
+            let smsHtml = '';
+            const hasSms = req.sms_proof && req.sms_proof.length > 5;
+            if (hasSms) {
+                smsHtml = `
+                    <div class="sms-box">
+                        <span class="sms-label">📱 SMS Proof (raw)</span>
+                        ${escapeHtml(req.sms_proof)}
+                    </div>
+                `;
+            } else {
+                smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
+            }
+
+            // Parsed data comparison
+            let verificationHtml = '';
+            if (req.parsed_amount || req.parsed_txn || req.parsed_method) {
+                const amountMatch = req.parsed_amount ? (Math.abs(req.parsed_amount - req.amount) < 1) : false;
+                const methodMatch = req.parsed_method ? (req.parsed_method === req.payment_type) : false;
+                const txnDisplay = req.parsed_txn || '—';
+
+                verificationHtml = `
+                    <div style="margin:10px 0;">
+                        <div style="font-weight:700; color:#facc15; font-size:0.8rem; margin-bottom:6px;">🔍 SMS Parsed Data</div>
+                        <div class="verification-grid">
+                            <div class="verification-item">
+                                <div class="vlabel">💰 Amount</div>
+                                <div class="vvalue ${amountMatch ? 'match' : (req.parsed_amount ? 'mismatch' : '')}">
+                                    ${req.parsed_amount ? req.parsed_amount + ' ETB' : '—'}
+                                    ${amountMatch ? '✅' : (req.parsed_amount ? '❌' : '')}
+                                    ${!req.parsed_amount ? '(not detected)' : ''}
+                                </div>
+                            </div>
+                            <div class="verification-item">
+                                <div class="vlabel">📌 Method</div>
+                                <div class="vvalue ${methodMatch ? 'match' : (req.parsed_method ? 'mismatch' : '')}">
+                                    ${req.parsed_method || '—'}
+                                    ${methodMatch ? '✅' : (req.parsed_method ? '❌' : '')}
+                                    ${!req.parsed_method ? '(not detected)' : ''}
+                                </div>
+                            </div>
+                            <div class="verification-item">
+                                <div class="vlabel">🆔 Transaction ID</div>
+                                <div class="vvalue">${txnDisplay}</div>
+                            </div>
+                            <div class="verification-item" style="grid-column: span 2;">
+                                <div class="vlabel">📊 Overall Verification Status</div>
+                                <div class="vvalue ${(amountMatch && methodMatch) ? 'match' : (req.parsed_amount || req.parsed_method ? 'partial' : '')}">
+                                    ${(amountMatch && methodMatch) ? '✅ Fully Verified' : 
+                                      (req.parsed_amount || req.parsed_method ? '⚠️ Partial Match' : '❌ No Data')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                verificationHtml =
+                    `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS. The user may not have provided an SMS proof.</p>`;
+            }
+
+            // QR/OCR extraction
+            const proofHtml = req.proof_path ?
+                `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` :
+                '<p style="color:#94a3b8;">No proof image</p>';
+
+            const verifyLink = req.parsed_txn ? getVerificationLink(req.payment_type, req.parsed_txn) : null;
+            const verifyLinkHtml = verifyLink ?
+                `<p><a href="${verifyLink}" target="_blank" style="color:#3498db;">🔗 Verify on ${req.payment_type} site</a></p>` :
+                '';
+
+            body.innerHTML = `
+                <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
+                <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
+                <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${req.phone || 'N/A'}</span></div>
+                <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
+                <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.payment_type || 'Unknown'}</span></div>
+                <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
+                ${verifyLinkHtml}
+                ${smsHtml}
+                ${verificationHtml}
+                <div class="detail-row" style="flex-direction:column; padding:12px 0;">
+                    <span class="detail-label" style="width:100%;">🖼️ Proof Image</span>
+                    <span class="detail-value">${proofHtml}</span>
+                    <div id="extractedRefDisplay" style="margin-top:8px; font-size:0.85rem; color:#94a3b8;">⏳ Scanning image for reference...</div>
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.add('active');
+
+            // Show modal action buttons for deposit
+            document.getElementById('modalActions').style.display = 'flex';
+            document.getElementById('modalApproveBtn').style.display = 'block';
+            document.getElementById('modalRejectBtn').style.display = 'block';
+            document.getElementById('modalApproveBtn').onclick = () => processDeposit(req.id, 'approve');
+            document.getElementById('modalRejectBtn').onclick = () => processDeposit(req.id, 'reject');
+
+            // Scan image for reference
+            if (req.proof_path) {
+                getReferenceFromProof(req.proof_path).then(result => {
+                    const display = document.getElementById('extractedRefDisplay');
+                    if (result) {
+                        const ref = result.ref;
+                        const receiptUrl =
+                            `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
+                        const submittedRef = req.parsed_txn || '';
+                        let matchHtml = '';
+                        if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
+                            matchHtml = '<span class="match">✅ Matches SMS parsed TXN</span>';
+                        } else if (submittedRef) {
+                            matchHtml = `<span class="mismatch">❌ Does NOT match SMS parsed TXN (${submittedRef})</span>`;
+                        } else {
+                            matchHtml = '<span style="color:#f39c12;">ℹ️ No SMS TXN to compare</span>';
+                        }
+                        display.innerHTML =
+                            `<strong>📸 Extracted from image: ${ref}</strong> (via ${result.method}) ${matchHtml}<br><a href="${receiptUrl}" target="_blank" style="color:#3498db;">📄 Official receipt link</a>`;
+                    } else {
+                        display.textContent = '❌ Could not extract reference from image.';
+                    }
+                }).catch(() => {
+                    document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.';
+                });
+            } else {
+                document.getElementById('extractedRefDisplay').textContent = 'No proof image to scan.';
+            }
+        }
+
+        function openWithdrawDetail(id) {
+            const req = withdrawalData.find(r => r.id === id);
+            if (!req) { alert('Request not found'); return; }
+            currentModalId = id;
+            currentModalType = 'withdrawal';
+            document.getElementById('modalTitle').innerText = `Withdrawal Request #${req.id}`;
+            const body = document.getElementById('modalBody');
+
+            body.innerHTML = `
+                <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
+                <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
+                <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(req.phone_number)}</span></div>
+                <div class="detail-row"><span class="detail-label">Account Holder</span><span class="detail-value">${escapeHtml(req.receiver_name) || 'N/A'}</span></div>
+                <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
+                <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.withdrawal_type || 'N/A'}</span></div>
+                <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
+            `;
+
+            document.getElementById('detailModal').classList.add('active');
+
+            // Show modal action buttons for withdrawal
+            document.getElementById('modalActions').style.display = 'flex';
+            document.getElementById('modalApproveBtn').style.display = 'block';
+            document.getElementById('modalRejectBtn').style.display = 'block';
+            document.getElementById('modalApproveBtn').onclick = () => processWithdrawal(req.id, 'approve');
+            document.getElementById('modalRejectBtn').onclick = () => processWithdrawal(req.id, 'reject');
+        }
+
+        // ---- Process actions ----
+        async function processDeposit(requestId, action) {
+            if (!confirm(`Are you sure to ${action} this deposit?`)) return;
+            try {
+                const res = await fetch(`${API_BASE}/admin/process-deposit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+                });
+                const data = await res.json();
+                alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
+                if (data.success) { await fetchDeposits();
+                    await fetchStats();
+                    document.getElementById('detailModal').classList.remove('active'); }
+            } catch (err) { alert(err.message); }
+        }
+
+        async function processWithdrawal(requestId, action) {
+            if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
+            try {
+                const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
+                });
+                const data = await res.json();
+                alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
+                if (data.success) { await fetchWithdrawals();
+                    await fetchStats();
+                    document.getElementById('detailModal').classList.remove('active'); }
+            } catch (err) { alert(err.message); }
+        }
+
+        // ---- Manual balance add ----
+        document.getElementById('manualAddBtn').addEventListener('click', async () => {
+            const telegramId = document.getElementById('manualUserId').value.trim();
+            const amount = document.getElementById('manualAmount').value.trim();
+            const feedback = document.getElementById('manualFeedback');
+
+            if (!telegramId || !amount) {
+                feedback.innerHTML = '<span style="color:#e74c3c;">❌ Please fill both fields.</span>';
+                return;
+            }
+            if (!/^\d+$/.test(telegramId)) {
+                feedback.innerHTML = '<span style="color:#e74c3c;">❌ Telegram ID must be numeric.</span>';
+                return;
+            }
+            if (isNaN(amount) || Number(amount) <= 0) {
+                feedback.innerHTML = '<span style="color:#e74c3c;">❌ Amount must be a positive number.</span>';
+                return;
+            }
+
+            feedback.innerHTML = '⏳ Processing...';
+            try {
+                const res = await fetch(`${API_BASE}/admin/add-balance`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    feedback.innerHTML =
+                        `<span style="color:#2ecc71;">✅ Added ${amount} ETB to user ${telegramId}. New balance: ${data.newBalance}</span>`;
+                    document.getElementById('manualUserId').value = '';
+                    document.getElementById('manualAmount').value = '';
+                    await fetchStats();
+                } else {
+                    feedback.innerHTML = `<span style="color:#e74c3c;">❌ ${data.error || 'Unknown error'}</span>`;
+                }
+            } catch (err) {
+                feedback.innerHTML = `<span style="color:#e74c3c;">⚠️ Network error: ${err.message}</span>`;
+            }
         });
-      });
-    });
-  }
 
-  // ---- Detail modals ----
-  async function openDepositDetail(id) {
-    const req = depositData.find(r => r.id === id);
-    if (!req) { alert('Request not found'); return; }
-    document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
-    const body = document.getElementById('modalBody');
-    const submittedRef = req.reference_number || '';
-    const verifyLink = submittedRef ? getVerificationLink(req.payment_type, submittedRef) : null;
-    const verifyLinkHtml = verifyLink ? `<p><a href="${verifyLink}" target="_blank">🔗 Verify on ${req.payment_type} site</a></p>` : '';
-    const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` : '<p>No proof image</p>';
-    body.innerHTML = `
-      <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
-      <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
-      <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${req.phone || 'N/A'}</span></div>
-      <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
-      <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.payment_type || 'Unknown'}</span></div>
-      <div class="detail-row"><span class="detail-label">Submitted Ref</span><span class="detail-value">${submittedRef || 'N/A'}</span></div>
-      <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
-      <div class="detail-row"><span class="detail-label">Verification</span><span class="detail-value">${verifyLinkHtml || 'N/A'}</span></div>
-      <div class="detail-row"><span class="detail-label">Proof</span><span class="detail-value">${proofHtml}</span></div>
-      <div class="detail-row"><span class="detail-label">Extracted Reference</span><span class="detail-value" id="extractedRefDisplay">⏳ Scanning...</span></div>
-    `;
-    document.getElementById('detailModal').classList.add('active');
-    if (req.proof_path) {
-      try {
-        const result = await getReferenceFromProof(req.proof_path);
-        const display = document.getElementById('extractedRefDisplay');
-        if (result) {
-          const ref = result.ref;
-          const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
-          let matchHtml = '';
-          if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) matchHtml = '<span class="match">✅ Matches submitted ref</span>';
-          else if (submittedRef) matchHtml = `<span class="mismatch">❌ Does NOT match submitted</span>`;
-          display.innerHTML = `<strong>${ref}</strong> (via ${result.method}) ${matchHtml}<br><a href="${receiptUrl}" target="_blank">📄 Official receipt</a>`;
-        } else { display.textContent = '❌ Could not extract reference from image.'; }
-      } catch (e) { document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.'; }
-    } else { document.getElementById('extractedRefDisplay').textContent = 'No proof image to scan.'; }
-  }
+        // ---- Modal close ----
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            document.getElementById('detailModal').classList.remove('active');
+        });
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) document.getElementById('detailModal').classList.remove('active');
+        });
 
-  function openWithdrawDetail(id) {
-    const req = withdrawalData.find(r => r.id === id);
-    if (!req) { alert('Request not found'); return; }
-    document.getElementById('modalTitle').innerText = `Withdrawal Request #${req.id}`;
-    const body = document.getElementById('modalBody');
-    body.innerHTML = `
-      <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
-      <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
-      <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(req.phone_number)}</span></div>
-      <div class="detail-row"><span class="detail-label">Account Holder</span><span class="detail-value">${escapeHtml(req.receiver_name) || 'N/A'}</span></div>
-      <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
-      <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.withdrawal_type || 'N/A'}</span></div>
-      <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
-    `;
-    document.getElementById('detailModal').classList.add('active');
-  }
+        // ---- Refresh & filter ----
+        document.getElementById('refreshDepositsBtn').addEventListener('click', fetchDeposits);
+        document.getElementById('depositFilter').addEventListener('change', renderDeposits);
+        document.getElementById('refreshWithdrawalsBtn').addEventListener('click', fetchWithdrawals);
+        document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
+        document.getElementById('applyStatsBtn').addEventListener('click', fetchStats);
+        document.getElementById('refreshStatsBtn').addEventListener('click', fetchStats);
 
-  // ---- Process actions ----
-  async function processDeposit(requestId, action) {
-    if (!confirm(`Are you sure to ${action} this deposit?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-deposit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
-      });
-      const data = await res.json();
-      alert(data.success ? `Deposit ${action}d successfully!` : (data.error || 'Error'));
-      if (data.success) { await fetchDeposits(); await fetchStats(); document.getElementById('detailModal').classList.remove('active'); }
-    } catch (err) { alert(err.message); }
-  }
-
-  async function processWithdrawal(requestId, action) {
-    if (!confirm(`Are you sure to ${action} this withdrawal?`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/admin/process-withdrawal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, requestId, action })
-      });
-      const data = await res.json();
-      alert(data.success ? `Withdrawal ${action}d successfully!` : (data.error || 'Error'));
-      if (data.success) { await fetchWithdrawals(); await fetchStats(); document.getElementById('detailModal').classList.remove('active'); }
-    } catch (err) { alert(err.message); }
-  }
-
-  // ---- Manual balance add ----
-  document.getElementById('manualAddBtn').addEventListener('click', async () => {
-    const telegramId = document.getElementById('manualUserId').value.trim();
-    const amount = document.getElementById('manualAmount').value.trim();
-    const feedback = document.getElementById('manualFeedback');
-
-    if (!telegramId || !amount) {
-      feedback.innerHTML = '<span style="color:#e74c3c;">❌ Please fill both fields.</span>';
-      return;
-    }
-    if (!/^\d+$/.test(telegramId)) {
-      feedback.innerHTML = '<span style="color:#e74c3c;">❌ Telegram ID must be numeric.</span>';
-      return;
-    }
-    if (isNaN(amount) || Number(amount) <= 0) {
-      feedback.innerHTML = '<span style="color:#e74c3c;">❌ Amount must be a positive number.</span>';
-      return;
-    }
-
-    feedback.innerHTML = '⏳ Processing...';
-    try {
-      const res = await fetch(`${API_BASE}/admin/add-balance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId, amount: Number(amount) })
-      });
-      const data = await res.json();
-      if (data.success) {
-        feedback.innerHTML = `<span style="color:#2ecc71;">✅ Added ${amount} ETB to user ${telegramId}. New balance: ${data.newBalance}</span>`;
-        document.getElementById('manualUserId').value = '';
-        document.getElementById('manualAmount').value = '';
-        await fetchStats();
-      } else {
-        feedback.innerHTML = `<span style="color:#e74c3c;">❌ ${data.error || 'Unknown error'}</span>`;
-      }
-    } catch (err) {
-      feedback.innerHTML = `<span style="color:#e74c3c;">⚠️ Network error: ${err.message}</span>`;
-    }
-  });
-
-  // ---- Modal close ----
-  document.getElementById('closeModalBtn').addEventListener('click', () => {
-    document.getElementById('detailModal').classList.remove('active');
-  });
-  document.getElementById('detailModal').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) document.getElementById('detailModal').classList.remove('active');
-  });
-
-  // ---- Refresh & filter ----
-  document.getElementById('refreshDepositsBtn').addEventListener('click', fetchDeposits);
-  document.getElementById('depositFilter').addEventListener('change', renderDeposits);
-  document.getElementById('refreshWithdrawalsBtn').addEventListener('click', fetchWithdrawals);
-  document.getElementById('withdrawFilter').addEventListener('change', renderWithdrawals);
-  document.getElementById('applyStatsBtn').addEventListener('click', fetchStats);
-  document.getElementById('refreshStatsBtn').addEventListener('click', fetchStats);
-
-  // ---- Initial load ----
-  fetchStats();
-  fetchDeposits();
-  fetchWithdrawals();
-</script>
+        // ---- Initial load ----
+        fetchStats();
+        fetchDeposits();
+        fetchWithdrawals();
+    </script>
 </body>
 </html>
