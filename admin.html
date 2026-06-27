@@ -495,7 +495,7 @@
     });
   }
 
-  // ---- Detail modals (removed Open Receipt link and Proof Image) ----
+  // ---- Detail modals (with clickable receipt link) ----
   function openDepositDetail(id) {
     const req = depositData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -504,7 +504,7 @@
     document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
     const body = document.getElementById('modalBody');
 
-    // ---- SMS proof display (raw SMS only, no link) ----
+    // ---- SMS proof display (raw SMS only) ----
     let smsHtml = '';
     const hasSms = req.sms_proof && req.sms_proof.length > 5;
     if (hasSms) {
@@ -516,6 +516,20 @@
       `;
     } else {
       smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
+    }
+
+    // ---- Build clickable receipt link if transaction number exists ----
+    let receiptLinkHtml = '';
+    if (req.parsed_txn) {
+      const link = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(req.parsed_txn)}`;
+      receiptLinkHtml = `
+        <div class="detail-row">
+          <span class="detail-label">🔗 Receipt Link</span>
+          <span class="detail-value">
+            <a href="${link}" target="_blank" style="color:#3498db; font-weight:600;">Open Receipt (${req.parsed_txn})</a>
+          </span>
+        </div>
+      `;
     }
 
     // ---- Parsed data comparison (keep) ----
@@ -546,7 +560,7 @@
               </div>
             </div>
             <div class="verification-item">
-              <div class="vlabel">🆔 Transaction ID</div>
+              <div class="vlabel">🆔 Transaction Number</div>
               <div class="vvalue">${txnDisplay}</div>
             </div>
             <div class="verification-item" style="grid-column: span 2;">
@@ -563,7 +577,7 @@
       verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS.</p>`;
     }
 
-    // ---- Build modal body (without proof image and without Open Receipt link) ----
+    // ---- Build modal body (includes the receipt link) ----
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
       <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
@@ -571,6 +585,7 @@
       <div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${req.amount} ETB</span></div>
       <div class="detail-row"><span class="detail-label">Method</span><span class="detail-value">${req.payment_type || 'Unknown'}</span></div>
       <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
+      ${receiptLinkHtml}
       ${smsHtml}
       ${verificationHtml}
     `;
