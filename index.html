@@ -817,7 +817,7 @@
 
             <!-- SMS PROOF SECTION -->
             <div class="input-group">
-                <label>📱 Paste Confirmation SMS <span style="font-weight:400;color:#64748b;">(proof of payment)</span></label>
+                <label id="smsProofLabel">📱 Paste Confirmation SMS <span style="font-weight:400;color:#64748b;">(proof of payment)</span></label>
                 <textarea id="depositSmsProof" rows="4" placeholder="Paste the SMS you received from Telebirr / CBE Birr / M-Pesa here..."></textarea>
                 <div style="display:flex; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap;">
                     <button id="parseSmsBtn" class="parse-btn">🔍 Parse SMS</button>
@@ -1438,13 +1438,27 @@
             let acc = '',
                 title = '',
                 hint = '';
-            if (type === 'telebirr') { title = 'Telebirr';
+            let smsLabel = '',
+                smsPlaceholder = '';
+            if (type === 'telebirr') {
+                title = 'Telebirr';
                 acc = depositAccounts.telebirr || '0924839730';
-                hint = '09xxxxxxxx'; } else if (type === 'cbebirr') { title = 'CBE Birr';
+                hint = '09xxxxxxxx';
+                smsLabel = '📱 Paste Telebirr Confirmation SMS (proof of payment)';
+                smsPlaceholder = 'Paste Telebirr confirmation SMS here...';
+            } else if (type === 'cbebirr') {
+                title = 'CBE Birr';
                 acc = depositAccounts.cbebirr || '1000123456789';
-                hint = '09xxxxxxxx'; } else { title = 'M-Pesa';
+                hint = '09xxxxxxxx';
+                smsLabel = '🏦 Paste CBE Birr Confirmation SMS (proof of payment)';
+                smsPlaceholder = 'Paste CBE Birr confirmation SMS here...';
+            } else {
+                title = 'M-Pesa';
                 acc = depositAccounts.mpesa || '0712345678';
-                hint = '07xxxxxxxx'; }
+                hint = '07xxxxxxxx';
+                smsLabel = '📲 Paste M-Pesa Confirmation SMS (proof of payment)';
+                smsPlaceholder = 'Paste M-Pesa confirmation SMS here...';
+            }
 
             document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
             const copyDiv = document.getElementById('depositAccountNumber');
@@ -1454,6 +1468,8 @@
             document.getElementById('depositPlayerPhone').value = '';
             document.getElementById('depositAmount').value = '';
             document.getElementById('depositSmsProof').value = '';
+            document.getElementById('depositSmsProof').placeholder = smsPlaceholder;
+            document.getElementById('smsProofLabel').innerHTML = smsLabel;
             document.getElementById('smsParseResult').className = 'sms-parse-result';
             document.getElementById('smsParseResult').innerHTML = '';
             const parseBtn = document.getElementById('parseSmsBtn');
