@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS game_rounds (
   stake INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ADD THESE COLUMNS FOR SMS PROOF
+ALTER TABLE deposit_requests 
+ADD COLUMN IF NOT EXISTS sms_proof TEXT,
+ADD COLUMN IF NOT EXISTS parsed_amount NUMERIC,
+ADD COLUMN IF NOT EXISTS parsed_txn TEXT,
+ADD COLUMN IF NOT EXISTS parsed_method TEXT;
 */
 // ============================================================
 
@@ -769,10 +776,26 @@ async function endGameWithWinners(stake) {
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  const { phone, amount, payment_type } = req.body;
+  
+  const { 
+    phone, 
+    amount, 
+    payment_type,
+    sms_proof,           // new: raw SMS text
+    parsed_amount,       // new: detected amount
+    parsed_txn,          // new: detected transaction ID
+    parsed_method        // new: detected payment method
+  } = req.body;
+  
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
+  
+  // Optional: validate SMS proof if provided
+  if (sms_proof && sms_proof.length < 5) {
+    return res.status(400).json({ error: 'SMS proof is too short or invalid' });
+  }
+
   try {
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -784,7 +807,11 @@ app.post('/api/request-deposit', async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      proof_path: null
+      proof_path: null,
+      sms_proof: sms_proof || null,
+      parsed_amount: parsed_amount ? Number(parsed_amount) : null,
+      parsed_txn: parsed_txn || null,
+      parsed_method: parsed_method || null
     }).select().single();
     
     if (error) throw error;
@@ -793,7 +820,10 @@ app.post('/api/request-deposit', async (req, res) => {
       transactionId: data.id.toString(),
       amount: amt,
       currency: 'ETB',
-      method: payment_type
+      method: payment_type,
+      hasSmsProof: !!sms_proof,
+      parsedAmount: parsed_amount,
+      parsedTxn: parsed_txn
     });
     
     res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
