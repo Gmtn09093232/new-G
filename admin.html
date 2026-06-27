@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
   <title>🎰 Admin Panel – Deposits & Withdrawals</title>
   <style>
+    /* (all styles unchanged) */
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
     .container { max-width: 1100px; margin: 0 auto; }
@@ -321,6 +322,25 @@
 
   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
+  // ---- Generate receipt link based on payment type ----
+  function getReceiptLink(paymentType, txn, phone) {
+    if (!txn) return null;
+    const encodedTxn = encodeURIComponent(txn);
+    switch (paymentType) {
+      case 'telebirr':
+        return `https://transactioninfo.ethiotelecom.et/receipt/${encodedTxn}`;
+      case 'cbebirr':
+        // phone might be undefined, use empty string if missing
+        const phoneParam = phone ? `&PH=${encodeURIComponent(phone)}` : '';
+        return `https://cbepay1.cbe.com.et/aureceipt?TID=${encodedTxn}${phoneParam}`;
+      case 'mpesa':
+        // No known link for M-Pesa; return null or a placeholder
+        return null;
+      default:
+        return null;
+    }
+  }
+
   // ---- Tab switching ----
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -495,7 +515,7 @@
     });
   }
 
-  // ---- Detail modals (with clickable receipt link) ----
+  // ---- Detail modals (with method‑specific receipt link) ----
   function openDepositDetail(id) {
     const req = depositData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -518,21 +538,32 @@
       smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
     }
 
-    // ---- Build clickable receipt link if transaction number exists ----
+    // ---- Build clickable receipt link based on payment type ----
     let receiptLinkHtml = '';
     if (req.parsed_txn) {
-      const link = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(req.parsed_txn)}`;
-      receiptLinkHtml = `
-        <div class="detail-row">
-          <span class="detail-label">🔗 Receipt Link</span>
-          <span class="detail-value">
-            <a href="${link}" target="_blank" style="color:#3498db; font-weight:600;">Open Receipt (${req.parsed_txn})</a>
-          </span>
-        </div>
-      `;
+      const link = getReceiptLink(req.payment_type, req.parsed_txn, req.phone);
+      if (link) {
+        const displayText = req.payment_type === 'cbebirr' ? 'CBE Receipt' : 'Open Receipt';
+        receiptLinkHtml = `
+          <div class="detail-row">
+            <span class="detail-label">🔗 ${req.payment_type === 'cbebirr' ? 'CBE Birr Receipt' : 'Receipt Link'}</span>
+            <span class="detail-value">
+              <a href="${link}" target="_blank" style="color:#3498db; font-weight:600;">${displayText} (${req.parsed_txn})</a>
+            </span>
+          </div>
+        `;
+      } else {
+        // M-Pesa or unknown – show the transaction number but no link
+        receiptLinkHtml = `
+          <div class="detail-row">
+            <span class="detail-label">🆔 Transaction Number</span>
+            <span class="detail-value">${req.parsed_txn} (no receipt link available)</span>
+          </div>
+        `;
+      }
     }
 
-    // ---- Parsed data comparison (keep) ----
+    // ---- Parsed data comparison ----
     let verificationHtml = '';
     if (req.parsed_amount || req.parsed_txn || req.parsed_method) {
       const amountMatch = req.parsed_amount ? (Math.abs(req.parsed_amount - req.amount) < 1) : false;
@@ -577,7 +608,7 @@
       verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS.</p>`;
     }
 
-    // ---- Build modal body (includes the receipt link) ----
+    // ---- Build modal body ----
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
       <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
