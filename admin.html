@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
   <title>🎰 Admin Panel – Deposits & Withdrawals</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
@@ -101,9 +99,6 @@
     .modal-content .detail-label { font-weight: 600; width: 160px; color: #94a3b8; flex-shrink: 0; }
     .modal-content .detail-value { flex: 1; word-break: break-word; }
     .modal-content .proof-full { max-width: 100%; max-height: 400px; border-radius: 12px; border: 2px solid #f39c12; margin: 12px 0; }
-    .modal-content .extracted-box { background: #0f1a24; padding: 12px; border-radius: 16px; font-family: monospace; margin: 12px 0; }
-    .match { color: #2ecc71; font-weight: bold; }
-    .mismatch { color: #e74c3c; font-weight: bold; }
     .sms-box {
       background: #0f1a24;
       border-radius: 16px;
@@ -126,32 +121,6 @@
       letter-spacing: 1px;
       display: block;
       margin-bottom: 6px;
-    }
-    .sms-box .sms-link {
-      margin-top: 10px;
-      display: inline-block;
-      background: #2d3748;
-      padding: 6px 16px;
-      border-radius: 40px;
-      font-family: system-ui;
-      font-size: 0.85rem;
-      border: 1px solid #3498db;
-    }
-    .sms-box .sms-link a {
-      color: #3498db;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .sms-box .sms-link a:hover {
-      text-decoration: underline;
-    }
-    .sms-box .sms-link .ref-code {
-      background: #0a0f1c;
-      padding: 2px 10px;
-      border-radius: 12px;
-      color: #facc15;
-      font-weight: 700;
-      margin-left: 6px;
     }
 
     .verification-grid {
@@ -352,86 +321,6 @@
 
   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
-  // ---- QR/OCR functions (unchanged) ----
-  function extractRefFromQR(imageSrc) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = imageSrc;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qrCode = jsQR(imageData.data, canvas.width, canvas.height);
-        if (qrCode && qrCode.data) {
-          const data = qrCode.data;
-          const match = data.match(/\/receipt\/([A-Z0-9]+)/i);
-          if (match) resolve(match[1]);
-          else { const refMatch = data.match(/^([A-Z0-9]{8,})$/); resolve(refMatch ? refMatch[1] : null); }
-        } else resolve(null);
-      };
-      img.onerror = () => reject('Failed to load image for QR scan');
-    });
-  }
-
-  async function extractRefFromOCR(imageUrl) {
-    try {
-      const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng');
-      const match = text.match(/Transaction\s*Number\s*:\s*([A-Z0-9]+)/i);
-      if (match && match[1]) return match[1].trim();
-      const fallback = text.match(/\bDE[A-Z0-9]{8,}\b/i);
-      return fallback ? fallback[0] : null;
-    } catch { return null; }
-  }
-
-  async function getReferenceFromProof(imagePath) {
-    try { const qrRef = await extractRefFromQR(imagePath); if (qrRef) return { ref: qrRef, method: 'QR' }; } catch (e) { console.warn('QR failed'); }
-    const ocrRef = await extractRefFromOCR(imagePath);
-    if (ocrRef) return { ref: ocrRef, method: 'OCR' };
-    return null;
-  }
-
-  // ---- Generate verification link ----
-  function getVerificationLink(paymentType, ref) {
-    const encoded = encodeURIComponent(ref);
-    switch (paymentType) {
-      case 'telebirr': return `https://transactioninfo.ethiotelecom.et/receipt/${encoded}`;
-      case 'cbebirr': return `https://cbebirr.com/verify?txn=${encoded}`;
-      case 'mpesa': return `https://mpesa.ethiotelecom.et/transaction/${encoded}`;
-      default: return null;
-    }
-  }
-
-  // ---- IMPROVED: Extract transaction reference from SMS text ----
-  function extractTxnFromSms(text) {
-    if (!text) return null;
-    // Normalize whitespace
-    const clean = text.replace(/\s+/g, ' ').trim();
-    // Common patterns – added more for Telebirr codes like DFR2BFG92O
-    const patterns = [
-      /(?:transaction|txn|ref|receipt|id|number)\s*(?:id|no|number|#)?\s*[:.]?\s*([A-Z0-9]{6,20})/i,
-      /\b([A-Z0-9]{8,16})\b/,
-      /\b([A-Z]{2,}[0-9]{4,}[A-Z0-9]*)\b/,
-      /\b(?:DFR|DE|TRX)[A-Z0-9]{6,12}\b/i,
-      /\b([A-Z]{2,}[0-9]{6,})\b/
-    ];
-    for (const pattern of patterns) {
-      const match = clean.match(pattern);
-      if (match) {
-        const ref = match[1] ? match[1].replace(/[^A-Z0-9]/g, '') : match[0].replace(/[^A-Z0-9]/g, '');
-        if (ref.length >= 6) {
-          console.log('✅ Extracted reference from SMS:', ref);
-          return ref;
-        }
-      }
-    }
-    console.warn('⚠️ No reference extracted from SMS:', clean.substring(0, 100) + '...');
-    return null;
-  }
-
   // ---- Tab switching ----
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -606,7 +495,7 @@
     });
   }
 
-  // ---- Detail modals ----
+  // ---- Detail modals (removed Open Receipt link and Proof Image) ----
   function openDepositDetail(id) {
     const req = depositData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -615,40 +504,21 @@
     document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
     const body = document.getElementById('modalBody');
 
-    // ---- SMS proof with clickable link ----
+    // ---- SMS proof display (raw SMS only, no link) ----
     let smsHtml = '';
     const hasSms = req.sms_proof && req.sms_proof.length > 5;
     if (hasSms) {
-      // Try to extract reference from SMS, fallback to parsed_txn
-      let txnRef = req.parsed_txn || extractTxnFromSms(req.sms_proof);
-      let linkHtml = '';
-      if (txnRef) {
-        const verifyLink = getVerificationLink(req.payment_type, txnRef);
-        if (verifyLink) {
-          linkHtml = `
-            <div class="sms-link">
-              🔗 <a href="${verifyLink}" target="_blank">Open Receipt</a>
-              <span class="ref-code">${txnRef}</span>
-            </div>
-          `;
-        } else {
-          linkHtml = `<div class="sms-link">ℹ️ Reference found: <strong>${txnRef}</strong> (no direct link available)</div>`;
-        }
-      } else {
-        linkHtml = `<div class="sms-link" style="border-color:#94a3b8;">⚠️ No transaction reference detected in SMS.</div>`;
-      }
       smsHtml = `
         <div class="sms-box">
           <span class="sms-label">📱 SMS Proof (raw)</span>
           ${escapeHtml(req.sms_proof)}
-          ${linkHtml}
         </div>
       `;
     } else {
       smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
     }
 
-    // ---- Parsed data comparison (unchanged) ----
+    // ---- Parsed data comparison (keep) ----
     let verificationHtml = '';
     if (req.parsed_amount || req.parsed_txn || req.parsed_method) {
       const amountMatch = req.parsed_amount ? (Math.abs(req.parsed_amount - req.amount) < 1) : false;
@@ -693,9 +563,7 @@
       verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS.</p>`;
     }
 
-    // ---- Proof image and QR/OCR extraction (unchanged) ----
-    const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-full" onclick="window.open(this.src)">` : '<p style="color:#94a3b8;">No proof image</p>';
-
+    // ---- Build modal body (without proof image and without Open Receipt link) ----
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
       <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
@@ -705,11 +573,6 @@
       <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${new Date(req.created_at).toLocaleString()}</span></div>
       ${smsHtml}
       ${verificationHtml}
-      <div class="detail-row" style="flex-direction:column; padding:12px 0;">
-        <span class="detail-label" style="width:100%;">🖼️ Proof Image</span>
-        <span class="detail-value">${proofHtml}</span>
-        <div id="extractedRefDisplay" style="margin-top:8px; font-size:0.85rem; color:#94a3b8;">⏳ Scanning image for reference...</div>
-      </div>
     `;
 
     document.getElementById('detailModal').classList.add('active');
@@ -720,33 +583,6 @@
     document.getElementById('modalRejectBtn').style.display = 'block';
     document.getElementById('modalApproveBtn').onclick = () => processDeposit(req.id, 'approve');
     document.getElementById('modalRejectBtn').onclick = () => processDeposit(req.id, 'reject');
-
-    // Scan image for reference (unchanged)
-    if (req.proof_path) {
-      getReferenceFromProof(req.proof_path).then(result => {
-        const display = document.getElementById('extractedRefDisplay');
-        if (result) {
-          const ref = result.ref;
-          const receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(ref)}`;
-          const submittedRef = req.parsed_txn || '';
-          let matchHtml = '';
-          if (submittedRef && submittedRef.toUpperCase() === ref.toUpperCase()) {
-            matchHtml = '<span class="match">✅ Matches SMS parsed TXN</span>';
-          } else if (submittedRef) {
-            matchHtml = `<span class="mismatch">❌ Does NOT match SMS parsed TXN (${submittedRef})</span>`;
-          } else {
-            matchHtml = '<span style="color:#f39c12;">ℹ️ No SMS TXN to compare</span>';
-          }
-          display.innerHTML = `<strong>📸 Extracted from image: ${ref}</strong> (via ${result.method}) ${matchHtml}<br><a href="${receiptUrl}" target="_blank" style="color:#3498db;">📄 Official receipt link</a>`;
-        } else {
-          display.textContent = '❌ Could not extract reference from image.';
-        }
-      }).catch(() => {
-        document.getElementById('extractedRefDisplay').textContent = '❌ Verification error.';
-      });
-    } else {
-      document.getElementById('extractedRefDisplay').textContent = 'No proof image to scan.';
-    }
   }
 
   function openWithdrawDetail(id) {
