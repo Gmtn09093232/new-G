@@ -147,10 +147,11 @@
     }
     .sms-box .sms-link .ref-code {
       background: #0a0f1c;
-      padding: 2px 8px;
+      padding: 2px 10px;
       border-radius: 12px;
       color: #facc15;
       font-weight: 700;
+      margin-left: 6px;
     }
 
     .verification-grid {
@@ -409,19 +410,25 @@
     if (!text) return null;
     // Normalize whitespace
     const clean = text.replace(/\s+/g, ' ').trim();
-    // Common patterns
+    // Common patterns – added more for Telebirr codes like DFR2BFG92O
     const patterns = [
       /(?:transaction|txn|ref|receipt|id|number)\s*(?:id|no|number|#)?\s*[:.]?\s*([A-Z0-9]{6,20})/i,
       /\b([A-Z0-9]{8,16})\b/,
       /\b([A-Z]{2,}[0-9]{4,}[A-Z0-9]*)\b/,
+      /\b(?:DFR|DE|TRX)[A-Z0-9]{6,12}\b/i,
+      /\b([A-Z]{2,}[0-9]{6,})\b/
     ];
     for (const pattern of patterns) {
       const match = clean.match(pattern);
       if (match) {
-        const ref = match[1].replace(/[^A-Z0-9]/g, '');
-        if (ref.length >= 6) return ref;
+        const ref = match[1] ? match[1].replace(/[^A-Z0-9]/g, '') : match[0].replace(/[^A-Z0-9]/g, '');
+        if (ref.length >= 6) {
+          console.log('✅ Extracted reference from SMS:', ref);
+          return ref;
+        }
       }
     }
+    console.warn('⚠️ No reference extracted from SMS:', clean.substring(0, 100) + '...');
     return null;
   }
 
