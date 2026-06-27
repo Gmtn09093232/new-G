@@ -1309,32 +1309,33 @@
                 }
             }
 
-            // Extract Transaction Number
-            const txnPatterns = [
-                /(?:TXN|TRX|REF|TID|ID|TRANSACTION|REFERENCE|RECEIPT)\s*[:.\s#]*([A-Z0-9]{6,20})/i,
-                /(?:TXN|TRX|REF|TID|ID)\s*[:.\s]*([A-Z0-9]{6,20})/i,
-                /(?:REF|REFERENCE)\s*[:.\s]*([A-Z0-9]{6,20})/i,
-                /([A-Z0-9]{8,16})/i
-            ];
-
-            for (const pattern of txnPatterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    const code = match[1].replace(/[^A-Z0-9]/gi, '');
-                    if (code.length >= 4) {
-                        result.txnId = code;
-                        result.confidence += 25;
-                        break;
+            // ---- IMPROVED: Extract Transaction Number from Telebirr link ----
+            // Look for the receipt URL pattern: https://transactioninfo.ethiotelecom.et/receipt/CODE
+            const linkPattern = /https?:\/\/transactioninfo\.ethiotelecom\.et\/receipt\/([A-Z0-9]+)/i;
+            let linkMatch = text.match(linkPattern);
+            if (linkMatch && linkMatch[1]) {
+                result.txnId = linkMatch[1].toUpperCase();
+                result.confidence += 40;
+            } else {
+                // Fallback: look for standalone codes in the text (e.g., DFR2BFG92O, DE123456, etc.)
+                const txnPatterns = [
+                    /(?:TXN|TRX|REF|TID|ID|TRANSACTION|REFERENCE|RECEIPT)\s*[:.\s#]*([A-Z0-9]{6,20})/i,
+                    /(?:TXN|TRX|REF|TID|ID)\s*[:.\s]*([A-Z0-9]{6,20})/i,
+                    /(?:REF|REFERENCE)\s*[:.\s]*([A-Z0-9]{6,20})/i,
+                    /([A-Z0-9]{8,16})/i,
+                    /\b(?:DFR|DE|TRX)[A-Z0-9]{6,12}\b/i,
+                    /\b([A-Z]{2,}[0-9]{6,})\b/
+                ];
+                for (const pattern of txnPatterns) {
+                    const match = text.match(pattern);
+                    if (match) {
+                        const code = match[1] ? match[1].replace(/[^A-Z0-9]/gi, '') : match[0].replace(/[^A-Z0-9]/gi, '');
+                        if (code.length >= 6) {
+                            result.txnId = code;
+                            result.confidence += 25;
+                            break;
+                        }
                     }
-                }
-            }
-
-            // If no txn ID, try to find a code-like string
-            if (!result.txnId) {
-                const codeMatch = text.match(/\b([A-Z]{2,}[0-9]{4,}[A-Z0-9]*)\b/);
-                if (codeMatch) {
-                    result.txnId = codeMatch[1];
-                    result.confidence += 15;
                 }
             }
 
