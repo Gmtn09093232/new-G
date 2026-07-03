@@ -516,13 +516,13 @@ BOT_IDS.forEach((id) => botBalances.set(id, 1000));
 
 // Ethiopian male first names
 const ETHIOPIAN_MALE_NAMES = [
-  'Abebe', 'Alemayehu', 'Chala', 'Dawit', 'Fikru', 'Girma', 'Haile', 'Isayas',
-  'Kebede', 'Lemma', 'Mekonnen', 'Nebiyu', 'Oli', 'Pascal', 'Robel', 'Sileshi',
-  'Tadesse', 'Uriel', 'Wondimu', 'Yared', 'Zemenu', 'Biruk', 'Desta', 'Ermias',
-  'Fitsum', 'Gemechu', 'Ibrahim', 'Kalkidan', 'Mulugeta', 'Natnael', 'Oumer',
-  'Tekle', 'Worku', 'Yonas', 'Zeritu', 'Amanuel', 'Belete', 'Daniel', 'Endalk',
-  'Gashaw', 'Habtamu', 'Jemal', 'Kassahun', 'Lema', 'Mengistu', 'Mulu',
-  'Negash', 'Reta', 'Tesfaye', 'Wolde'
+  'Abebe', 'Alemayehu', 'mekia', 'Dawit', 'Fikru', 'Girma', 'Haile', 'zid',
+  'Kebede', 'nega', 'Mekonnen', 'Nebiyu', 'bay', 'Robel', 'teddy',
+  'Tadesse', 'Wondimu', 'Yared', 'Zemenu', 'Biruk', 'Desta', 'Ermias',
+  'Fitsum', 'Ibrahim', 'belaya', 'Mulugeta', 'Natnael', 'dera',
+  'Tekle', 'Worku', 'Yonas', 'Amanuel', 'Belete', 'Daniel', 'Endalk',
+  'Gashaw', 'Habtamu', 'Kassahun', 'Lul', 'Mengistu', 'Mulu',
+  'Negash', 'abela', 'Tesfaye', 'Wolde'
 ];
 
 function getRandomMaleEthiopianName() {
