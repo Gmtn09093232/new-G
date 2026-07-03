@@ -149,7 +149,6 @@ app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
 app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
-app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -461,6 +460,7 @@ const games = {
 // ======================== BOT PLAYERS (only for stake 20) ========================
 const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
 const botBalances = new Map();
+// Initialise with 1000 ETB each
 BOT_IDS.forEach((id) => botBalances.set(id, 1000));
 
 const ETHIOPIAN_MALE_NAMES = [
@@ -488,16 +488,20 @@ let botGameHistory = [];
 function addBotsToGame(stake) {
   if (stake !== 20) return;
   const game = getGame(stake);
+  // Remove any existing bots (they might be left from previous round)
   game.players = game.players.filter(p => !BOT_IDS.includes(p.telegramId));
+  // Also remove their card numbers from takenCardNumbers
   for (const p of game.players) {
     if (BOT_IDS.includes(p.telegramId)) {
       game.takenCardNumbers.delete(p.cardNumber);
     }
   }
+  // Now add bots that have sufficient balance
   const availableNumbers = [];
   for (let i = 1; i <= 100; i++) {
     if (!game.takenCardNumbers.has(i)) availableNumbers.push(i);
   }
+  // Shuffle available numbers
   for (let i = availableNumbers.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [availableNumbers[i], availableNumbers[j]] = [availableNumbers[j], availableNumbers[i]];
@@ -505,8 +509,10 @@ function addBotsToGame(stake) {
   for (let i = 0; i < BOT_IDS.length; i++) {
     const botId = BOT_IDS[i];
     const balance = botBalances.get(botId) || 0;
+    // Only add if balance >= entry fee
     if (balance < game.entryFee) {
-      botBalances.set(botId, 1000);
+      console.log(`⚠️ Bot ${botId} has insufficient balance (${balance}) to join stake ${stake}`);
+      continue;
     }
     if (availableNumbers.length === 0) {
       console.log('⚠️ No available numbers for bots');
@@ -702,20 +708,23 @@ async function startGame(stake) {
   const game = getGame(stake);
   const toRemove = [];
   for (const p of game.players) {
+    // Check balance for all players (including bots)
     if (p.isBot) {
       const bal = botBalances.get(p.telegramId) || 0;
       if (bal < game.entryFee) {
-        botBalances.set(p.telegramId, 1000);
+        toRemove.push(p);
       }
-      continue;
+    } else {
+      const user = users[p.telegramId];
+      if (!user || user.balance < game.entryFee) toRemove.push(p);
     }
-    const user = users[p.telegramId];
-    if (!user || user.balance < game.entryFee) toRemove.push(p);
   }
   for (const p of toRemove) {
     const idx = game.players.findIndex(pl => pl.telegramId === p.telegramId);
-    if (idx !== -1) game.players.splice(idx, 1);
-    if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
+    if (idx !== -1) {
+      game.players.splice(idx, 1);
+      if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
+    }
   }
   io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
   broadcastPlayerCount(stake);
@@ -728,9 +737,14 @@ async function startGame(stake) {
     return;
   }
 
-  // Deduct entry fees ONLY from real players, not bots
+  // Deduct entry fees from ALL players (real and bots)
   for (const p of game.players) {
-    if (p.isBot) continue;
+    if (p.isBot) {
+      const bal = botBalances.get(p.telegramId) || 0;
+      botBalances.set(p.telegramId, bal - game.entryFee);
+      console.log(`💸 Bot ${p.telegramId} paid entry fee ${game.entryFee}, balance now ${botBalances.get(p.telegramId)}`);
+      continue;
+    }
     const user = users[p.telegramId];
     if (user) {
       user.balance -= game.entryFee;
@@ -877,7 +891,7 @@ async function endGameWithWinners(stake) {
       if (w.isBot) {
         const bal = botBalances.get(w.telegramId) || 0;
         botBalances.set(w.telegramId, bal + prizeEach);
-        console.log(`🤖 Bot ${w.telegramId} won ${prizeEach} (balance now ${botBalances.get(w.telegramId)})`);
+        console.log(`🏆 Bot ${w.telegramId} won ${prizeEach} (balance now ${botBalances.get(w.telegramId)})`);
         continue;
       }
       const user = users[w.telegramId];
