@@ -13,7 +13,7 @@
       padding: 20px;
       margin: 0;
     }
-    .container { max-width: 1000px; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     h1 { text-align: center; color: #f39c12; }
     .card {
       background: #16213e;
@@ -53,7 +53,7 @@
     .refresh-btn:hover { background: #e67e22; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 15px;
       margin: 20px 0;
     }
@@ -87,11 +87,35 @@
     th { background: #0f3460; color: #f1c40f; }
     .no-data { text-align: center; color: #888; padding: 20px; }
     .loading { text-align: center; color: #f1c40f; padding: 20px; }
+    .btn-force {
+      background: #e74c3c;
+      border: none;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-force:hover:not(:disabled) { background: #c0392b; }
+    .btn-force:disabled {
+      background: #555;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .message {
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .message.success { background: #27ae60; display: block; }
+    .message.error { background: #e74c3c; display: block; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>🤖 Bot Performance Stats</h1>
+  <div id="message" class="message"></div>
   <div class="card">
     <div class="filter-form">
       <label>From: <input type="date" id="fromDate"></label>
@@ -109,8 +133,8 @@
       </div>
       <h3>Per Bot Breakdown</h3>
       <table>
-        <thead><tr><th>Bot ID</th><th>Games Played</th><th>Total Winnings (ETB)</th><th>Current Balance (ETB)</th></tr></thead>
-        <tbody id="perBotTable"><tr><td colspan="4" class="loading">Loading...</td></tr></tbody>
+        <thead><tr><th>Bot ID</th><th>Games Played</th><th>Total Winnings (ETB)</th><th>Current Balance (ETB)</th><th>Actions</th></tr></thead>
+        <tbody id="perBotTable"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
       </table>
       <div id="recentGames" style="margin-top:20px;">
         <h3>Recent Games (last 10)</h3>
@@ -125,7 +149,13 @@
 <script>
   const ADMIN_SECRET = prompt('Enter admin secret:') || '';
 
-  // Helper to fetch with error handling
+  function showMessage(text, type = 'success') {
+    const msg = document.getElementById('message');
+    msg.textContent = text;
+    msg.className = 'message ' + type;
+    setTimeout(() => { msg.className = 'message'; }, 5000);
+  }
+
   async function fetchJSON(url) {
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -142,33 +172,48 @@
     if (to) historyUrl += `&to=${to}`;
 
     try {
-      // Fetch both history and current status in parallel
       const [historyData, statusData] = await Promise.all([
         fetchJSON(historyUrl),
         fetchJSON(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`)
       ]);
-
       renderStats(historyData.history, statusData.bots);
     } catch (err) {
-      alert('Error: ' + err.message);
+      showMessage('Error loading data: ' + err.message, 'error');
+    }
+  }
+
+  async function forceWin(botId) {
+    if (!confirm(`Force bot ${botId} to win the current game?`)) return;
+    try {
+      const resp = await fetch('/admin/bot-force-win', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, botId })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Failed');
+      showMessage(`✅ Bot ${botId} forced to win! Game ending.`, 'success');
+      // Refresh after 3 seconds to let the game finish
+      setTimeout(() => fetchStats(), 3000);
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
     }
   }
 
   function renderStats(history, bots) {
-    // Build a map of botId -> current balance
     const balanceMap = {};
-    bots.forEach(b => { balanceMap[b.id] = b.balance; });
+    const inGameMap = {};
+    bots.forEach(b => {
+      balanceMap[b.id] = b.balance;
+      inGameMap[b.id] = b.inGame;
+    });
 
-    // Calculate totals from history
     const totalGames = history.length;
     const totalWinnings = history.reduce((sum, e) => sum + e.prizeWon, 0);
     const totalEntryFees = totalGames * 20;
     const difference = totalWinnings - totalEntryFees;
-
-    // Calculate total current balance (sum of all bot balances)
     const totalBalance = bots.reduce((sum, b) => sum + b.balance, 0);
 
-    // Update summary boxes
     document.getElementById('totalGames').textContent = totalGames;
     document.getElementById('totalWinnings').textContent = totalWinnings.toFixed(2);
     document.getElementById('totalEntryFees').textContent = totalEntryFees.toFixed(2);
@@ -178,33 +223,37 @@
     const box = document.getElementById('differenceBox');
     box.className = 'stat-box ' + (difference >= 0 ? 'positive' : 'negative');
 
-    // Per-bot stats (merge history with current balance)
     const perBot = {};
     for (const entry of history) {
       if (!perBot[entry.botId]) perBot[entry.botId] = { games: 0, winnings: 0 };
       perBot[entry.botId].games++;
       perBot[entry.botId].winnings += entry.prizeWon;
     }
-    // Add current balance for each bot (even if they have no history)
     for (const bot of bots) {
       if (!perBot[bot.id]) perBot[bot.id] = { games: 0, winnings: 0 };
       perBot[bot.id].balance = bot.balance;
+      perBot[bot.id].inGame = bot.inGame;
     }
 
     const tbody = document.getElementById('perBotTable');
     tbody.innerHTML = '';
     for (const [botId, stats] of Object.entries(perBot)) {
-      const row = document.createElement('tr');
-      row.innerHTML = `
+      const inGame = stats.inGame || false;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
         <td>${botId}</td>
         <td>${stats.games}</td>
         <td>${stats.winnings.toFixed(2)}</td>
         <td>${(stats.balance || 0).toFixed(2)}</td>
+        <td>
+          <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
+            ${inGame ? 'Force Win' : 'Not in Game'}
+          </button>
+        </td>
       `;
-      tbody.appendChild(row);
+      tbody.appendChild(tr);
     }
 
-    // Recent games (if any)
     const recentTable = document.getElementById('recentTable');
     if (history.length === 0) {
       recentTable.innerHTML = '<tr><td colspan="4" class="no-data">No games played.</td></tr>';
