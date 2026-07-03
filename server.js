@@ -509,6 +509,157 @@ const games = {
   30: createGameState(30)
 };
 
+// ======================== BOT PLAYERS (only for stake 20) ========================
+const BOT_IDS = ['bot_1', 'bot_2', 'bot_3', 'bot_4', 'bot_5'];
+const botBalances = new Map();
+BOT_IDS.forEach((id) => botBalances.set(id, 1000));
+
+// Ethiopian male first names
+const ETHIOPIAN_MALE_NAMES = [
+  'Abebe', 'Alemayehu', 'Chala', 'Dawit', 'Fikru', 'Girma', 'Haile', 'Isayas',
+  'Kebede', 'Lemma', 'Mekonnen', 'Nebiyu', 'Oli', 'Pascal', 'Robel', 'Sileshi',
+  'Tadesse', 'Uriel', 'Wondimu', 'Yared', 'Zemenu', 'Biruk', 'Desta', 'Ermias',
+  'Fitsum', 'Gemechu', 'Ibrahim', 'Kalkidan', 'Mulugeta', 'Natnael', 'Oumer',
+  'Tekle', 'Worku', 'Yonas', 'Zeritu', 'Amanuel', 'Belete', 'Daniel', 'Endalk',
+  'Gashaw', 'Habtamu', 'Jemal', 'Kassahun', 'Lema', 'Mengistu', 'Mulu',
+  'Negash', 'Reta', 'Tesfaye', 'Wolde'
+];
+
+function getRandomMaleEthiopianName() {
+  return ETHIOPIAN_MALE_NAMES[Math.floor(Math.random() * ETHIOPIAN_MALE_NAMES.length)];
+}
+
+// Track game counter and bot win history for forced wins
+let gameCounter = 0;
+const botLastWinGame = new Map();
+BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
+
+function addBotsToGame(stake) {
+  if (stake !== 20) return;
+  const game = getGame(stake);
+  // Remove any existing bots from players (they might be left from previous round)
+  game.players = game.players.filter(p => !BOT_IDS.includes(p.telegramId));
+  // Also remove their card numbers from takenCardNumbers
+  for (const p of game.players) {
+    if (BOT_IDS.includes(p.telegramId)) {
+      game.takenCardNumbers.delete(p.cardNumber);
+    }
+  }
+  // Now add bots
+  const availableNumbers = [];
+  for (let i = 1; i <= 100; i++) {
+    if (!game.takenCardNumbers.has(i)) availableNumbers.push(i);
+  }
+  // Shuffle available numbers
+  for (let i = availableNumbers.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [availableNumbers[i], availableNumbers[j]] = [availableNumbers[j], availableNumbers[i]];
+  }
+  for (let i = 0; i < BOT_IDS.length; i++) {
+    const botId = BOT_IDS[i];
+    const balance = botBalances.get(botId) || 0;
+    // Ensure bot has enough balance (we never deduct, but keep top-up)
+    if (balance < game.entryFee) {
+      botBalances.set(botId, 1000);
+    }
+    if (availableNumbers.length === 0) {
+      console.log('⚠️ No available numbers for bots');
+      break;
+    }
+    const cardNumber = availableNumbers.pop();
+    const card = game.cardSet[cardNumber - 1];
+    const botName = getRandomMaleEthiopianName();
+    const botPlayer = {
+      telegramId: botId,
+      username: botName,
+      card: card,
+      markedNumbers: [],
+      cardNumber: cardNumber,
+      ip: '127.0.0.1',
+      isBot: true,
+      hasCalledBingo: false
+    };
+    game.players.push(botPlayer);
+    game.takenCardNumbers.add(cardNumber);
+  }
+}
+
+// Rotate bot names every 10 minutes
+setInterval(() => {
+  const game = getGame(20);
+  if (!game) return;
+  for (const p of game.players) {
+    if (p.isBot) {
+      const newName = getRandomMaleEthiopianName();
+      p.username = newName;
+      console.log(`🔄 Bot ${p.telegramId} name changed to ${newName}`);
+    }
+  }
+  notifyAdminClients();
+}, 10 * 60 * 1000);
+
+function updateBotsOnNumber(stake, number) {
+  const game = getGame(stake);
+  if (game.status !== 'running') return;
+  const bots = game.players.filter(p => p.isBot);
+  for (const bot of bots) {
+    const flat = bot.card.flat();
+    if (flat.includes(number) && !bot.markedNumbers.includes(number)) {
+      bot.markedNumbers.push(number);
+    }
+    const lastCalled = game.calledNumbers[game.calledNumbers.length - 1];
+    if (lastCalled === undefined) continue;
+    if (isBingoValidOnLastCall(bot.card, bot.markedNumbers, lastCalled)) {
+      if (!bot.hasCalledBingo && !game.winners.find(w => w.telegramId === bot.telegramId)) {
+        bot.hasCalledBingo = true;
+        const delay = 2000 + Math.random() * 4000;
+        setTimeout(() => {
+          if (game.status !== 'running') return;
+          if (game.winners.find(w => w.telegramId === bot.telegramId)) return;
+          handleBingoClaim(bot.telegramId, stake);
+        }, delay);
+      }
+    }
+  }
+}
+
+// ======================== BINGO CLAIM HANDLER ========================
+function handleBingoClaim(telegramId, stake) {
+  const game = getGame(stake);
+  if (game.status !== 'running') return;
+  const player = game.players.find(p => p.telegramId === telegramId);
+  if (!player) return;
+  if (game.winners.find(w => w.telegramId === telegramId)) return;
+  const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
+  if (lastCalled === null) return;
+  if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
+    return;
+  }
+  if (game.winningNumber === null) {
+    game.winningNumber = lastCalled;
+  }
+  game.winners.push({ 
+    telegramId, 
+    username: player.username, 
+    isBot: player.isBot || false 
+  });
+  if (!player.isBot) {
+    Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, { 
+      cardId: player.cardNumber, 
+      cardGrid: player.card, 
+      calledNumber: lastCalled, 
+      winType: 'bingo_line' 
+    });
+  }
+  if (!game.bingoGraceTimeout) {
+    io.to(`stake_${stake}`).emit('multipleBingoPossible', { stake, message: 'Bingo claimed! Waiting for other potential winners...' });
+    game.bingoGraceTimeout = setTimeout(() => {
+      endGameWithWinners(stake);
+    }, 3000);
+  }
+}
+// =================================================================================
+
 function getGame(stake) {
   return games[stake];
 }
@@ -524,7 +675,8 @@ function getAllPlayersList() {
         username: p.username,
         cardNumber: p.cardNumber,
         stake,
-        telegram_handle: user ? user.telegram_handle : null
+        telegram_handle: user ? user.telegram_handle : null,
+        isBot: p.isBot || false
       });
     });
   }
@@ -577,9 +729,28 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
-  io.to(`stake_${stake}`).emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
-  io.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
-  publicNamespace.emit('lobbyState', { stake, startsIn: 45, takenNumbers: [], playersCount: 0 });
+  if (stake === 20) {
+    addBotsToGame(stake);
+  }
+  
+  io.to(`stake_${stake}`).emit('lobbyState', { 
+    stake, 
+    startsIn: 45, 
+    takenNumbers: Array.from(game.takenCardNumbers), 
+    playersCount: game.players.length 
+  });
+  io.emit('lobbyState', { 
+    stake, 
+    startsIn: 45, 
+    takenNumbers: Array.from(game.takenCardNumbers), 
+    playersCount: game.players.length 
+  });
+  publicNamespace.emit('lobbyState', { 
+    stake, 
+    startsIn: 45, 
+    takenNumbers: Array.from(game.takenCardNumbers), 
+    playersCount: game.players.length 
+  });
   
   broadcastPlayerCount(stake);
   
@@ -591,6 +762,14 @@ async function startGame(stake) {
   const game = getGame(stake);
   const toRemove = [];
   for (const p of game.players) {
+    if (p.isBot) {
+      // Bots never removed; ensure they have balance (they won't lose anyway)
+      const bal = botBalances.get(p.telegramId) || 0;
+      if (bal < game.entryFee) {
+        botBalances.set(p.telegramId, 1000);
+      }
+      continue;
+    }
     const user = users[p.telegramId];
     if (!user || user.balance < game.entryFee) toRemove.push(p);
   }
@@ -610,7 +789,9 @@ async function startGame(stake) {
     return;
   }
 
+  // Deduct entry fees ONLY from real players, not bots
   for (const p of game.players) {
+    if (p.isBot) continue;  // bots do NOT pay
     const user = users[p.telegramId];
     if (user) {
       user.balance -= game.entryFee;
@@ -631,6 +812,9 @@ async function startGame(stake) {
   game.status = 'running';
   game.calledNumbers = [];
   game.winningNumber = null;
+  for (const p of game.players) {
+    if (p.isBot) p.hasCalledBingo = false;
+  }
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
   startCalling(stake);
@@ -656,6 +840,8 @@ function startCalling(stake) {
     game.calledNumbers.push(number);
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
     Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
+    
+    updateBotsOnNumber(stake, number);
   }, 4000);
 }
 
@@ -687,11 +873,46 @@ async function endGameWithWinners(stake) {
   game.status = 'ended';
   clearInterval(game.callInterval);
 
-  // Calculate round totals regardless of winners
+  // Increment game counter
+  gameCounter++;
+
+  // ---- FORCED WIN LOGIC for bots ----
+  // If no bot has won yet in this game, check if we need to force a win for some bot
+  const botWinners = game.winners.filter(w => w.isBot);
+  if (botWinners.length === 0) {
+    // Find a bot that hasn't won in the last 7 games and is still in the game
+    const eligibleBots = game.players.filter(p => p.isBot);
+    for (const bot of eligibleBots) {
+      const lastWin = botLastWinGame.get(bot.telegramId) || 0;
+      if (gameCounter - lastWin >= 7) {
+        // Force this bot to win
+        console.log(`🤖 Forcing win for bot ${bot.telegramId} (${bot.username}) – last win at game ${lastWin}, current ${gameCounter}`);
+        // Add to winners
+        if (game.winningNumber === null) {
+          // Use the last called number if available, otherwise pick a random one from calledNumbers
+          game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
+        }
+        game.winners.push({
+          telegramId: bot.telegramId,
+          username: bot.username,
+          isBot: true
+        });
+        // Update last win game
+        botLastWinGame.set(bot.telegramId, gameCounter);
+        break; // only force one bot per game
+      }
+    }
+  } else {
+    // If a bot won naturally, update its last win game
+    for (const w of botWinners) {
+      botLastWinGame.set(w.telegramId, gameCounter);
+    }
+  }
+
+  // ---- Continue with normal end-of-game logic ----
   const totalEntryFees = game.players.length * game.entryFee;
   const houseProfit = totalEntryFees - game.prizePool;
 
-  // Always insert a round record (even with no winners)
   try {
     const { error } = await supabase.from('game_rounds').insert({
       total_entry_fees: totalEntryFees,
@@ -711,6 +932,12 @@ async function endGameWithWinners(stake) {
   if (game.winners.length > 0) {
     const prizeEach = Math.floor(game.prizePool / game.winners.length);
     for (const w of game.winners) {
+      if (w.isBot) {
+        const bal = botBalances.get(w.telegramId) || 0;
+        botBalances.set(w.telegramId, bal + prizeEach);
+        console.log(`🤖 Bot ${w.telegramId} won ${prizeEach} (balance now ${botBalances.get(w.telegramId)})`);
+        continue;
+      }
       const user = users[w.telegramId];
       if (user) {
         user.balance += prizeEach;
@@ -765,7 +992,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Deposit endpoints ----------
+// ---------- Deposit endpoints (unchanged) ----------
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -853,7 +1080,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- Withdrawal endpoints ----------
+// ---------- Withdrawal endpoints (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1224,33 +1451,10 @@ io.on('connection', async (socket) => {
   
   socket.on('claimBingo', () => {
     if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'running') return;
-    const player = game.players.find(p => p.telegramId === socket.userId);
-    if (!player) return;
-    const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    if (lastCalled === null || !isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
-      socket.emit('invalidBingo');
-      Audit.bingoRejected(`stake_${currentStake}`, socket.userId, ip, { reason: 'invalid_bingo_call', lastCalled });
-      return;
-    }
-    if (game.winners.find(w => w.telegramId === socket.userId)) return;
-    if (game.winningNumber === null) {
-      game.winningNumber = lastCalled;
-    }
-    game.winners.push({ telegramId: socket.userId, username: socket.username });
-    Audit.bingoCalled(`stake_${currentStake}`, socket.userId, ip, { cardId: player.cardNumber.toString(), cardGrid: player.card, calledNumber: lastCalled, winType: 'bingo_line' });
-    socket.emit('bingoValid');
-    if (!game.bingoGraceTimeout && game.winners.length === 1) {
-      io.to(`stake_${currentStake}`).emit('multipleBingoPossible', { stake: currentStake, message: 'Bingo claimed! Waiting for other potential winners...' });
-      game.bingoGraceTimeout = setTimeout(() => { endGameWithWinners(currentStake); }, 3000);
-    }
+    handleBingoClaim(socket.userId, currentStake);
   });
   
-  // ------- UPDATED getBalance to force refresh -------
   socket.on('getBalance', async () => {
-    // Pass refresh=true to always fetch fresh from Supabase
     const u = await loadUser(socket.userId, socket.username, null, null, true);
     socket.emit('balanceUpdate', u.balance);
   });
