@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      margin: 0;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { text-align: center; color: #f39c12; margin-bottom: 20px; }
+    .card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #2a3a5e;
+    }
+    th {
+      background: #0f3460;
+      color: #f1c40f;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+    }
+    td { font-size: 0.95rem; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .badge-online { background: #27ae60; color: #fff; }
+    .badge-offline { background: #7f8c8d; color: #fff; }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button {
+      background: #3498db;
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2980b9; }
+    button.danger { background: #e74c3c; }
+    button.danger:hover { background: #c0392b; }
+    button.success { background: #2ecc71; }
+    button.success:hover { background: #27ae60; }
+    input[type="number"] {
+      width: 80px;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #2a3a5e;
+      background: #1a1a2e;
+      color: #fff;
+    }
+    .small-input { width: 70px; }
+    .centered-cell { text-align: center; }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      color: #7f8c8d;
+      font-size: 0.85rem;
+    }
+    .refresh-btn {
+      background: #f39c12;
+      float: right;
+      margin-top: -10px;
+    }
+    .refresh-btn:hover { background: #e67e22; }
+    .game-info {
+      font-size: 1rem;
+      color: #f1c40f;
+      margin-bottom: 10px;
+    }
+    .message {
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .message.success { background: #27ae60; display: block; }
+    .message.error { background: #e74c3c; display: block; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🤖 Bot Management</h1>
+  <div id="message" class="message"></div>
+  <div class="card">
+    <div class="game-info">
+      <span>Current Game #: <strong id="gameCounter">0</strong></span>
+      <button class="refresh-btn" onclick="fetchBots()">↻ Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Bot ID</th>
+          <th>Username</th>
+          <th>Balance (ETB)</th>
+          <th>Last Win Game</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="botsTableBody">
+        <tr><td colspan="6" class="centered-cell">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="footer">Use this panel to monitor and control bot players. Changes are applied immediately.</div>
+</div>
+
+<script>
+  const ADMIN_SECRET = prompt('Enter admin secret:') || '';
+
+  function showMessage(text, type = 'success') {
+    const msg = document.getElementById('message');
+    msg.textContent = text;
+    msg.className = 'message ' + type;
+    setTimeout(() => { msg.className = 'message'; }, 5000);
+  }
+
+  async function fetchBots() {
+    try {
+      const resp = await fetch(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`);
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Failed to fetch');
+      renderBots(data.bots, data.currentGame);
+    } catch (err) {
+      showMessage('Error loading bot data: ' + err.message, 'error');
+    }
+  }
+
+  function renderBots(bots, game) {
+    document.getElementById('gameCounter').textContent = game;
+    const tbody = document.getElementById('botsTableBody');
+    if (!bots || bots.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6">No bots found.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = bots.map(bot => {
+      const inGame = bot.inGame;
+      const statusClass = inGame ? 'badge-online' : 'badge-offline';
+      const statusText = inGame ? `In Game (card ${bot.cardNumber})` : 'Idle';
+      return `
+        <tr>
+          <td><strong>${bot.id}</strong></td>
+          <td>${bot.username}</td>
+          <td>${bot.balance.toFixed(2)}</td>
+          <td>${bot.lastWinGame}</td>
+          <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+          <td class="actions">
+            <input type="number" id="bal_${bot.id}" value="${bot.balance}" step="1" min="0" class="small-input">
+            <button class="success" onclick="resetBalance('${bot.id}')">Set Balance</button>
+            ${inGame ? `<button class="danger" onclick="forceWin('${bot.id}')">Force Win</button>` : ''}
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  async function resetBalance(botId) {
+    const input = document.getElementById(`bal_${botId}`);
+    const newBalance = parseFloat(input.value);
+    if (isNaN(newBalance) || newBalance < 0) {
+      showMessage('Invalid balance amount', 'error');
+      return;
+    }
+    try {
+      const resp = await fetch('/admin/bot-reset-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, botId, newBalance })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error);
+      showMessage(`Balance for ${botId} reset to ${newBalance} ETB`);
+      fetchBots(); // refresh
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
+    }
+  }
+
+  async function forceWin(botId) {
+    if (!confirm(`Force ${botId} to win the current game?`)) return;
+    try {
+      const resp = await fetch('/admin/bot-force-win', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, botId })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error);
+      showMessage(`✅ ${botId} forced to win! Game ending.`);
+      fetchBots();
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
+    }
+  }
+
+  // Auto-refresh every 10 seconds
+  fetchBots();
+  setInterval(fetchBots, 10000);
+</script>
+</body>
+</html>
