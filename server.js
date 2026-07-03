@@ -149,6 +149,7 @@ app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
 app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
+app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -992,6 +993,93 @@ async function endGameWithWinners(stake) {
   setTimeout(() => resetGame(stake), 5000);
   notifyAdminClients();
 }
+
+// ======================== BOT ADMIN ENDPOINTS ========================
+
+// GET /admin/bots-status – returns current bot data
+app.get('/admin/bots-status', (req, res) => {
+  const { secret } = req.query;
+  if (secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const botData = BOT_IDS.map(id => {
+    const balance = botBalances.get(id) || 0;
+    const lastWin = botLastWinGame.get(id) || 0;
+    // Find the player object in the 20-birr game (if present)
+    const game = getGame(20);
+    const player = game.players.find(p => p.telegramId === id);
+    return {
+      id,
+      username: player ? player.username : 'not in game',
+      balance,
+      lastWinGame: lastWin,
+      inGame: !!player,
+      cardNumber: player ? player.cardNumber : null
+    };
+  });
+
+  res.json({ success: true, bots: botData, currentGame: gameCounter });
+});
+
+// POST /admin/bot-reset-balance – reset a specific bot's balance
+app.post('/admin/bot-reset-balance', async (req, res) => {
+  const { secret, botId, newBalance } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
+  const bal = Number(newBalance);
+  if (isNaN(bal) || bal < 0) return res.status(400).json({ error: 'Balance must be a non-negative number' });
+
+  botBalances.set(botId, bal);
+  Audit.adminAction('BOT_BALANCE_RESET', 'admin', req.ip, { botId, newBalance: bal });
+  res.json({ success: true, newBalance: bal });
+});
+
+// POST /admin/bot-force-win – force a specific bot to win the current game (if game is running)
+app.post('/admin/bot-force-win', async (req, res) => {
+  const { secret, botId } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
+
+  const game = getGame(20);
+  if (!game || game.status !== 'running') {
+    return res.status(400).json({ error: 'Game is not running' });
+  }
+
+  const player = game.players.find(p => p.telegramId === botId);
+  if (!player) {
+    return res.status(400).json({ error: 'Bot is not in the current game' });
+  }
+
+  // Force win: add to winners if not already
+  if (game.winners.find(w => w.telegramId === botId)) {
+    return res.status(400).json({ error: 'Bot already won this game' });
+  }
+
+  if (game.winningNumber === null) {
+    game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
+  }
+  game.winners.push({
+    telegramId: botId,
+    username: player.username,
+    isBot: true
+  });
+  botLastWinGame.set(botId, gameCounter);
+  Audit.adminAction('BOT_FORCED_WIN', 'admin', req.ip, { botId, game: gameCounter });
+
+  // If this is the first winner, trigger grace period or end immediately?
+  // We'll end the game immediately to avoid waiting.
+  clearTimeout(game.bingoGraceTimeout);
+  game.bingoGraceTimeout = null;
+  endGameWithWinners(20);
+
+  res.json({ success: true, message: `Bot ${botId} forced to win. Game ending.` });
+});
+
+// Serve the new admin-bots page
+app.get('/admin-bots', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-bots.html'));
+});
 
 // ---------- Deposit endpoints ----------
 app.post('/api/request-deposit', async (req, res) => {
