@@ -13,7 +13,7 @@
       padding: 20px;
       margin: 0;
     }
-    .container { max-width: 1100px; margin: 0 auto; }
+    .container { max-width: 1200px; margin: 0 auto; }
     h1 { text-align: center; color: #f39c12; }
     .card {
       background: #16213e;
@@ -48,9 +48,17 @@
     .filter-form button:hover { background: #2980b9; }
     .refresh-btn {
       background: #f39c12;
-      float: right;
     }
     .refresh-btn:hover { background: #e67e22; }
+    .reset-all-btn {
+      background: #e67e22;
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .reset-all-btn:hover { background: #d35400; }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -102,6 +110,24 @@
       cursor: not-allowed;
       opacity: 0.6;
     }
+    .btn-set {
+      background: #2ecc71;
+      border: none;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-set:hover { background: #27ae60; }
+    .balance-input {
+      width: 70px;
+      padding: 4px;
+      border-radius: 4px;
+      border: 1px solid #2a3a5e;
+      background: #1a1a2e;
+      color: #fff;
+    }
     .message {
       padding: 10px;
       border-radius: 5px;
@@ -110,6 +136,12 @@
     }
     .message.success { background: #27ae60; display: block; }
     .message.error { background: #e74c3c; display: block; }
+    .actions-cell {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -122,6 +154,7 @@
       <label>To: <input type="date" id="toDate"></label>
       <button onclick="fetchStats()">Apply Filter</button>
       <button class="refresh-btn" onclick="fetchStats()">↻ Refresh</button>
+      <button class="reset-all-btn" onclick="resetAllBalances()">Reset All Balances to 1000</button>
     </div>
     <div id="statsDisplay">
       <div class="stats-grid" id="summaryStats">
@@ -133,7 +166,15 @@
       </div>
       <h3>Per Bot Breakdown</h3>
       <table>
-        <thead><tr><th>Bot ID</th><th>Games Played</th><th>Total Winnings (ETB)</th><th>Current Balance (ETB)</th><th>Actions</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Bot ID</th>
+            <th>Games Played</th>
+            <th>Total Winnings (ETB)</th>
+            <th>Current Balance (ETB)</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
         <tbody id="perBotTable"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
       </table>
       <div id="recentGames" style="margin-top:20px;">
@@ -182,6 +223,42 @@
     }
   }
 
+  async function resetBalance(botId, newBalance) {
+    if (isNaN(newBalance) || newBalance < 0) {
+      showMessage('Invalid balance amount', 'error');
+      return;
+    }
+    try {
+      const resp = await fetch('/admin/bot-reset-balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: ADMIN_SECRET, botId, newBalance })
+      });
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Failed');
+      showMessage(`✅ Balance for ${botId} set to ${newBalance} ETB`, 'success');
+      fetchStats(); // refresh
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error');
+    }
+  }
+
+  async function resetAllBalances() {
+    if (!confirm('Reset all bot balances to 1000 ETB?')) return;
+    try {
+      // Get current bot list from the table (or we can fetch fresh)
+      const statusData = await fetchJSON(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`);
+      const bots = statusData.bots;
+      for (const bot of bots) {
+        await resetBalance(bot.id, 1000);
+      }
+      showMessage('✅ All balances reset to 1000 ETB', 'success');
+      fetchStats();
+    } catch (err) {
+      showMessage('Error resetting balances: ' + err.message, 'error');
+    }
+  }
+
   async function forceWin(botId) {
     if (!confirm(`Force bot ${botId} to win the current game?`)) return;
     try {
@@ -192,8 +269,7 @@
       });
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || 'Failed');
-      showMessage(`✅ Bot ${botId} forced to win! Game ending.`, 'success');
-      // Refresh after 3 seconds to let the game finish
+      showMessage(`✅ ${botId} forced to win! Game ending.`, 'success');
       setTimeout(() => fetchStats(), 3000);
     } catch (err) {
       showMessage('Error: ' + err.message, 'error');
@@ -246,9 +322,13 @@
         <td>${stats.winnings.toFixed(2)}</td>
         <td>${(stats.balance || 0).toFixed(2)}</td>
         <td>
-          <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
-            ${inGame ? 'Force Win' : 'Not in Game'}
-          </button>
+          <div class="actions-cell">
+            <input type="number" class="balance-input" id="bal_${botId}" value="${stats.balance || 0}" step="1" min="0">
+            <button class="btn-set" onclick="resetBalance('${botId}', parseFloat(document.getElementById('bal_${botId}').value))">Set</button>
+            <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
+              ${inGame ? 'Force Win' : 'Not in Game'}
+            </button>
+          </div>
         </td>
       `;
       tbody.appendChild(tr);
