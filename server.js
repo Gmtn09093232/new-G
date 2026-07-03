@@ -478,27 +478,27 @@ function getRandomMaleEthiopianName() {
   return ETHIOPIAN_MALE_NAMES[Math.floor(Math.random() * ETHIOPIAN_MALE_NAMES.length)];
 }
 
-// Track game counter and bot win history for forced wins
+// Track game counter and bot win history
 let gameCounter = 0;
 const botLastWinGame = new Map();
 BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
 
+// Track consecutive real wins since last bot win (for forced-win trigger)
+let realWinsSinceBotWin = 0;
+
 // ---------- Bot game history for stats (in-memory) ----------
 let botGameHistory = [];
 
-// ---------- NEW: Single bot add/remove functions ----------
+// ---------- Single bot add/remove functions ----------
 function addSingleBotToGame(botId, stake) {
   const game = getGame(stake);
   if (!game || game.status !== 'lobby') return false;
-  // Check if bot already in game
   if (game.players.find(p => p.telegramId === botId)) return false;
-  // Check balance
   const balance = botBalances.get(botId) || 0;
   if (balance < game.entryFee) {
     console.log(`⚠️ Bot ${botId} insufficient balance (${balance}) to join stake ${stake}`);
     return false;
   }
-  // Find available card number
   const availableNumbers = [];
   for (let i = 1; i <= 100; i++) {
     if (!game.takenCardNumbers.has(i)) availableNumbers.push(i);
@@ -522,7 +522,6 @@ function addSingleBotToGame(botId, stake) {
   };
   game.players.push(botPlayer);
   game.takenCardNumbers.add(cardNumber);
-  // Emit cardTaken event
   io.to(`stake_${stake}`).emit('cardTaken', {
     stake,
     number: cardNumber,
@@ -542,7 +541,6 @@ function removeBotFromGame(botId, stake) {
   const player = game.players[idx];
   if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
   game.players.splice(idx, 1);
-  // Emit updated taken numbers
   io.to(`stake_${stake}`).emit('cardTaken', {
     stake,
     number: player.cardNumber,
@@ -559,36 +557,27 @@ function scheduleBotJoining(stake) {
   const game = getGame(stake);
   if (!game || stake !== 20) return;
 
-  // Clear any pending timeouts from previous lobby
   for (const timeout of game.botTimeouts) {
     clearTimeout(timeout);
   }
   game.botTimeouts = [];
 
-  // Shuffle bot order
   const shuffledBots = [...BOT_IDS].sort(() => Math.random() - 0.5);
-
-  // Start after 3 seconds (timer at 42s)
-  const startDelay = 3000; // 3s
-
-  let delay = startDelay;
+  const startDelay = 3000; // 3s (timer at 42s)
   const interval = 2000; // 2 seconds between each bot
 
   shuffledBots.forEach((botId, index) => {
-    const joinDelay = delay + index * interval;
+    const joinDelay = startDelay + index * interval;
     const timeout = setTimeout(() => {
-      // Check if game is still in lobby and bot not already in
       if (game.status !== 'lobby') return;
       const added = addSingleBotToGame(botId, stake);
       if (added) {
-        // With 30% probability, schedule a card change after 2 seconds
+        // 30% chance to change card after 2 seconds
         if (Math.random() < 0.3) {
           const changeTimeout = setTimeout(() => {
             if (game.status !== 'lobby') return;
-            // Remove and re-add with a different card
             const removed = removeBotFromGame(botId, stake);
             if (removed) {
-              // Re-add with a new card (maybe different)
               addSingleBotToGame(botId, stake);
             }
           }, 2000);
@@ -729,7 +718,6 @@ function resetGame(stake) {
   clearInterval(game.callInterval);
   clearTimeout(game.lobbyTimer);
   clearTimeout(game.bingoGraceTimeout);
-  // Clear any pending bot timeouts
   for (const timeout of game.botTimeouts) {
     clearTimeout(timeout);
   }
@@ -745,7 +733,6 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
   
-  // Do NOT add bots instantly – schedule them after a delay
   if (stake === 20) {
     scheduleBotJoining(stake);
   }
@@ -776,7 +763,6 @@ function resetGame(stake) {
 
 async function startGame(stake) {
   const game = getGame(stake);
-  // Clear any pending bot timeouts (they shouldn't fire after game starts)
   for (const timeout of game.botTimeouts) {
     clearTimeout(timeout);
   }
@@ -812,7 +798,6 @@ async function startGame(stake) {
     return;
   }
 
-  // Deduct entry fees from ALL players (real and bots)
   for (const p of game.players) {
     if (p.isBot) {
       const bal = botBalances.get(p.telegramId) || 0;
@@ -903,29 +888,38 @@ async function endGameWithWinners(stake) {
   // Increment game counter
   gameCounter++;
 
-  // ---- FORCED WIN LOGIC for bots (every 2 games) ----
+  // ---- FORCED WIN LOGIC based on real-player wins ----
+  const realWinners = game.winners.filter(w => !w.isBot);
   const botWinners = game.winners.filter(w => w.isBot);
-  if (botWinners.length === 0) {
+
+  // Update realWinsSinceBotWin
+  if (realWinners.length > 0) {
+    realWinsSinceBotWin++;
+    console.log(`👤 Real winner(s) found. realWinsSinceBotWin = ${realWinsSinceBotWin}`);
+  }
+
+  // If any bot won naturally, reset the counter
+  if (botWinners.length > 0) {
+    realWinsSinceBotWin = 0;
+    console.log(`🤖 Bot won naturally. realWinsSinceBotWin reset to 0`);
+  }
+
+  // Forced win: if no bot won yet and realWinsSinceBotWin >= 2
+  if (botWinners.length === 0 && realWinsSinceBotWin >= 2) {
     const eligibleBots = game.players.filter(p => p.isBot);
     for (const bot of eligibleBots) {
-      const lastWin = botLastWinGame.get(bot.telegramId) || 0;
-      if (gameCounter - lastWin >= 2) {
-        console.log(`🤖 Forcing win for bot ${bot.telegramId} (${bot.username}) – last win at game ${lastWin}, current ${gameCounter}`);
-        if (game.winningNumber === null) {
-          game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
-        }
-        game.winners.push({
-          telegramId: bot.telegramId,
-          username: bot.username,
-          isBot: true
-        });
-        botLastWinGame.set(bot.telegramId, gameCounter);
-        break;
+      console.log(`🤖 Forcing win for bot ${bot.telegramId} (${bot.username}) – realWinsSinceBotWin = ${realWinsSinceBotWin}`);
+      if (game.winningNumber === null) {
+        game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
       }
-    }
-  } else {
-    for (const w of botWinners) {
-      botLastWinGame.set(w.telegramId, gameCounter);
+      game.winners.push({
+        telegramId: bot.telegramId,
+        username: bot.username,
+        isBot: true
+      });
+      botLastWinGame.set(bot.telegramId, gameCounter);
+      realWinsSinceBotWin = 0; // reset after forcing
+      break;
     }
   }
 
@@ -959,24 +953,31 @@ async function endGameWithWinners(stake) {
     });
   }
 
-  // ---- Distribute prizes ----
+  // ---- Distribute prizes (real players take full pool if they exist) ----
   if (game.winners.length > 0) {
-    const prizeEach = Math.floor(game.prizePool / game.winners.length);
-    for (const w of game.winners) {
-      if (w.isBot) {
-        const bal = botBalances.get(w.telegramId) || 0;
-        botBalances.set(w.telegramId, bal + prizeEach);
-        console.log(`🏆 Bot ${w.telegramId} won ${prizeEach} (balance now ${botBalances.get(w.telegramId)})`);
-        continue;
-      }
+    const realWinnersFinal = game.winners.filter(w => !w.isBot);
+    const botWinnersFinal = game.winners.filter(w => w.isBot);
+
+    let prizeEachReal = 0;
+    let prizeEachBot = 0;
+
+    if (realWinnersFinal.length > 0) {
+      prizeEachReal = Math.floor(game.prizePool / realWinnersFinal.length);
+      prizeEachBot = 0;
+    } else {
+      prizeEachBot = Math.floor(game.prizePool / botWinnersFinal.length);
+    }
+
+    // Pay real winners
+    for (const w of realWinnersFinal) {
       const user = users[w.telegramId];
       if (user) {
-        user.balance += prizeEach;
+        user.balance += prizeEachReal;
         await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
         const winnerSocket = await getSocketByUserId(w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
         Audit.winPaidOut(`stake_${stake}`, w.telegramId, null, {
-          amount: prizeEach,
+          amount: prizeEachReal,
           currency: 'ETB',
           totalPrizePool: game.prizePool,
           totalWinners: game.winners.length,
@@ -986,6 +987,14 @@ async function endGameWithWinners(stake) {
       }
     }
 
+    // Pay bot winners (only if no real winners)
+    for (const w of botWinnersFinal) {
+      const bal = botBalances.get(w.telegramId) || 0;
+      botBalances.set(w.telegramId, bal + prizeEachBot);
+      console.log(`🏆 Bot ${w.telegramId} won ${prizeEachBot} (balance now ${botBalances.get(w.telegramId)})`);
+    }
+
+    // Suspicious IP detection (optional)
     const ipCounts = {};
     game.winners.forEach(w => {
       const player = game.players.find(p => p.telegramId === w.telegramId);
@@ -1007,7 +1016,7 @@ async function endGameWithWinners(stake) {
       stake,
       winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
       winners: winnerNames,
-      prizeEach,
+      prizeEach: realWinnersFinal.length > 0 ? prizeEachReal : prizeEachBot,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
       winningNumber: game.winningNumber
