@@ -53,7 +53,7 @@
     .refresh-btn:hover { background: #e67e22; }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 15px;
       margin: 20px 0;
     }
@@ -86,6 +86,7 @@
     }
     th { background: #0f3460; color: #f1c40f; }
     .no-data { text-align: center; color: #888; padding: 20px; }
+    .loading { text-align: center; color: #f1c40f; padding: 20px; }
   </style>
 </head>
 <body>
@@ -100,15 +101,16 @@
     </div>
     <div id="statsDisplay">
       <div class="stats-grid" id="summaryStats">
-        <div class="stat-box"><div class="value" id="totalGames">-</div><div class="label">Total Games</div></div>
+        <div class="stat-box"><div class="value" id="totalGames">-</div><div class="label">Total Bot Participations</div></div>
         <div class="stat-box"><div class="value" id="totalWinnings">-</div><div class="label">Total Winnings (ETB)</div></div>
-        <div class="stat-box"><div class="value" id="totalEntryFees">-</div><div class="label">Entry Fees (games × 20) </div></div>
+        <div class="stat-box"><div class="value" id="totalEntryFees">-</div><div class="label">Entry Fees (participations × 20)</div></div>
         <div class="stat-box" id="differenceBox"><div class="value" id="difference">-</div><div class="label">Difference (Winnings - Fees)</div></div>
+        <div class="stat-box"><div class="value" id="totalBalance">-</div><div class="label">Total Current Balance (ETB)</div></div>
       </div>
       <h3>Per Bot Breakdown</h3>
       <table>
-        <thead><tr><th>Bot ID</th><th>Games Played</th><th>Total Winnings (ETB)</th></tr></thead>
-        <tbody id="perBotTable"></tbody>
+        <thead><tr><th>Bot ID</th><th>Games Played</th><th>Total Winnings (ETB)</th><th>Current Balance (ETB)</th></tr></thead>
+        <tbody id="perBotTable"><tr><td colspan="4" class="loading">Loading...</td></tr></tbody>
       </table>
       <div id="recentGames" style="margin-top:20px;">
         <h3>Recent Games (last 10)</h3>
@@ -123,74 +125,100 @@
 <script>
   const ADMIN_SECRET = prompt('Enter admin secret:') || '';
 
+  // Helper to fetch with error handling
+  async function fetchJSON(url) {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
   async function fetchStats() {
     const from = document.getElementById('fromDate').value;
     const to = document.getElementById('toDate').value;
-    let url = `/admin/bot-history?secret=${encodeURIComponent(ADMIN_SECRET)}`;
-    if (from) url += `&from=${from}`;
-    if (to) url += `&to=${to}`;
+    let historyUrl = `/admin/bot-history?secret=${encodeURIComponent(ADMIN_SECRET)}`;
+    if (from) historyUrl += `&from=${from}`;
+    if (to) historyUrl += `&to=${to}`;
+
     try {
-      const resp = await fetch(url);
-      const data = await resp.json();
-      if (!data.success) throw new Error(data.error || 'Failed');
-      renderStats(data.history);
+      // Fetch both history and current status in parallel
+      const [historyData, statusData] = await Promise.all([
+        fetchJSON(historyUrl),
+        fetchJSON(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`)
+      ]);
+
+      renderStats(historyData.history, statusData.bots);
     } catch (err) {
       alert('Error: ' + err.message);
     }
   }
 
-  function renderStats(history) {
-    if (!history || history.length === 0) {
-      document.getElementById('totalGames').textContent = '0';
-      document.getElementById('totalWinnings').textContent = '0.00';
-      document.getElementById('totalEntryFees').textContent = '0.00';
-      document.getElementById('difference').textContent = '0.00';
-      document.getElementById('perBotTable').innerHTML = '<tr><td colspan="3" class="no-data">No games played in this period.</td></tr>';
-      document.getElementById('recentTable').innerHTML = '<tr><td colspan="4" class="no-data">No games played.</td></tr>';
-      return;
-    }
+  function renderStats(history, bots) {
+    // Build a map of botId -> current balance
+    const balanceMap = {};
+    bots.forEach(b => { balanceMap[b.id] = b.balance; });
 
-    // Calculate totals
+    // Calculate totals from history
     const totalGames = history.length;
     const totalWinnings = history.reduce((sum, e) => sum + e.prizeWon, 0);
-    const totalEntryFees = totalGames * 20 ;  // 20 birr stake * 5 bots
+    const totalEntryFees = totalGames * 20;
     const difference = totalWinnings - totalEntryFees;
+
+    // Calculate total current balance (sum of all bot balances)
+    const totalBalance = bots.reduce((sum, b) => sum + b.balance, 0);
 
     // Update summary boxes
     document.getElementById('totalGames').textContent = totalGames;
     document.getElementById('totalWinnings').textContent = totalWinnings.toFixed(2);
     document.getElementById('totalEntryFees').textContent = totalEntryFees.toFixed(2);
+    document.getElementById('totalBalance').textContent = totalBalance.toFixed(2);
     const diffEl = document.getElementById('difference');
     diffEl.textContent = difference.toFixed(2);
     const box = document.getElementById('differenceBox');
     box.className = 'stat-box ' + (difference >= 0 ? 'positive' : 'negative');
 
-    // Per-bot stats
+    // Per-bot stats (merge history with current balance)
     const perBot = {};
     for (const entry of history) {
       if (!perBot[entry.botId]) perBot[entry.botId] = { games: 0, winnings: 0 };
       perBot[entry.botId].games++;
       perBot[entry.botId].winnings += entry.prizeWon;
     }
+    // Add current balance for each bot (even if they have no history)
+    for (const bot of bots) {
+      if (!perBot[bot.id]) perBot[bot.id] = { games: 0, winnings: 0 };
+      perBot[bot.id].balance = bot.balance;
+    }
+
     const tbody = document.getElementById('perBotTable');
     tbody.innerHTML = '';
     for (const [botId, stats] of Object.entries(perBot)) {
       const row = document.createElement('tr');
-      row.innerHTML = `<td>${botId}</td><td>${stats.games}</td><td>${stats.winnings.toFixed(2)}</td>`;
+      row.innerHTML = `
+        <td>${botId}</td>
+        <td>${stats.games}</td>
+        <td>${stats.winnings.toFixed(2)}</td>
+        <td>${(stats.balance || 0).toFixed(2)}</td>
+      `;
       tbody.appendChild(row);
     }
 
-    // Show last 10 games (most recent first)
-    const recent = history.slice(-10).reverse();
+    // Recent games (if any)
     const recentTable = document.getElementById('recentTable');
-    recentTable.innerHTML = recent.map(e => `
-      <tr>
-        <td>${e.gameNumber}</td>
-        <td>${e.botId}</td>
-        <td>${new Date(e.date).toLocaleDateString()}</td>
-        <td>${e.prizeWon.toFixed(2)}</td>
-      </tr>
-    `).join('');
+    if (history.length === 0) {
+      recentTable.innerHTML = '<tr><td colspan="4" class="no-data">No games played.</td></tr>';
+    } else {
+      const recent = history.slice(-10).reverse();
+      recentTable.innerHTML = recent.map(e => `
+        <tr>
+          <td>${e.gameNumber}</td>
+          <td>${e.botId}</td>
+          <td>${new Date(e.date).toLocaleDateString()}</td>
+          <td>${e.prizeWon.toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
   }
 
   // Set default dates: today
