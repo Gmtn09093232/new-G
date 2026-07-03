@@ -510,19 +510,19 @@ const games = {
 };
 
 // ======================== BOT PLAYERS (only for stake 20) ========================
-const BOT_IDS = ['bot_1', 'bot_2', 'bot_3', 'bot_4', 'bot_5'];
+const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
 const botBalances = new Map();
 BOT_IDS.forEach((id) => botBalances.set(id, 1000));
 
 // Ethiopian male first names
 const ETHIOPIAN_MALE_NAMES = [
-  'Abebe', 'Alemayehu', 'mekia', 'Dawit', 'Fikru', 'Girma', 'Haile', 'zid',
-  'Kebede', 'nega', 'Mekonnen', 'Nebiyu', 'bay', 'Robel', 'teddy',
-  'Tadesse', 'Wondimu', 'Yared', 'Zemenu', 'Biruk', 'Desta', 'Ermias',
-  'Fitsum', 'Ibrahim', 'belaya', 'Mulugeta', 'Natnael', 'dera',
-  'Tekle', 'Worku', 'Yonas', 'Amanuel', 'Belete', 'Daniel', 'Endalk',
-  'Gashaw', 'Habtamu', 'Kassahun', 'Lul', 'Mengistu', 'Mulu',
-  'Negash', 'abela', 'Tesfaye', 'Wolde'
+  'Abe', 'Alex', 'mekia', 'Dawit', 'Fikru', 'Girma', 'Haile', 'zid',
+  'sura cr7', 'nega', 'Mekonnen', 'Nebiyu', 'baye', 'Robel', 'teddy',
+  'Tadesse', 'Wondia', 'Yared', 'Zemenu', 'Birukee', 'bura', 'Ermias',
+  'Fitsum', 'shaki', 'belaya', 'Mulugeta', 'Nati', 'dera',
+  'Tekle', 'Worku', 'jhone', 'Aman', 'Belete', 'Daniel', 'Endalk',
+  'Gashaw', 'Habtia', 'kassish', 'Lul', 'Mengistu', 'Mulu',
+  '@', 'abela', 'Tesfaye', 'Wolde'
 ];
 
 function getRandomMaleEthiopianName() {
