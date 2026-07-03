@@ -149,6 +149,7 @@ app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
 app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
+app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
