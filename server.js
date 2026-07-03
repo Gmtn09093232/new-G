@@ -880,11 +880,12 @@ async function endGameWithWinners(stake) {
   // If no bot has won yet in this game, check if we need to force a win for some bot
   const botWinners = game.winners.filter(w => w.isBot);
   if (botWinners.length === 0) {
-    // Find a bot that hasn't won in the last 7 games and is still in the game
+    // Find a bot that hasn't won in the last 2 games and is still in the game
     const eligibleBots = game.players.filter(p => p.isBot);
     for (const bot of eligibleBots) {
       const lastWin = botLastWinGame.get(bot.telegramId) || 0;
-      if (gameCounter - lastWin >= 7) {
+      // 🔽 CHANGED from 7 to 2 🔽
+      if (gameCounter - lastWin >= 2) {
         // Force this bot to win
         console.log(`🤖 Forcing win for bot ${bot.telegramId} (${bot.username}) – last win at game ${lastWin}, current ${gameCounter}`);
         // Add to winners
@@ -992,7 +993,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Deposit endpoints (unchanged) ----------
+// ---------- Deposit endpoints ----------
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1080,7 +1081,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---------- Withdrawal endpoints (unchanged) ----------
+// ---------- Withdrawal endpoints ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
