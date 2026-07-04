@@ -608,9 +608,7 @@ setInterval(() => {
 }, 10 * 60 * 1000);
 
 function updateBotsOnNumber(stake, number) {
-  // Only for stake 20
   if (stake !== 20) return;
-
   const game = getGame(stake);
   if (game.status !== 'running') return;
   const bots = game.players.filter(p => p.isBot);
@@ -624,7 +622,8 @@ function updateBotsOnNumber(stake, number) {
     if (isBingoValidOnLastCall(bot.card, bot.markedNumbers, lastCalled)) {
       if (!bot.hasCalledBingo && !game.winners.find(w => w.telegramId === bot.telegramId)) {
         bot.hasCalledBingo = true;
-        const delay = 2000 + Math.random() * 4000;
+        // 👇 New delay: 0–2000ms, with 20% chance of instant claim
+        const delay = Math.random() < 0.2 ? 0 : 500 + Math.random() * 1500;
         setTimeout(() => {
           if (game.status !== 'running') return;
           if (game.winners.find(w => w.telegramId === bot.telegramId)) return;
