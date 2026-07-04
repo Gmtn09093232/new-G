@@ -494,6 +494,23 @@ const forceBotWinNextGame = { 20: false, 100: false, 30: false };
 // ---------- Bot game history for stats (in-memory) ----------
 let botGameHistory = [];
 
+// ---------- Bot name persistence (12 hours) ----------
+const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000; // 12 hours
+const botNameAssignments = new Map(); // botId -> { name, assignedAt }
+
+function getBotName(botId) {
+  const now = Date.now();
+  const entry = botNameAssignments.get(botId);
+  if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) {
+    return entry.name;
+  }
+  // Assign new name
+  const newName = getRandomMaleEthiopianName();
+  botNameAssignments.set(botId, { name: newName, assignedAt: now });
+  console.log(`🆕 Bot ${botId} assigned new name: ${newName} (valid for 12h)`);
+  return newName;
+}
+
 // ---------- Single bot add/remove functions ----------
 function addSingleBotToGame(botId, stake) {
   // Only allow bots in stake 20
@@ -517,7 +534,8 @@ function addSingleBotToGame(botId, stake) {
   }
   const cardNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
   const card = game.cardSet[cardNumber - 1];
-  const botName = getRandomMaleEthiopianName();
+  // Use persistent bot name
+  const botName = getBotName(botId);
   const botPlayer = {
     telegramId: botId,
     username: botName,
@@ -571,8 +589,8 @@ function syncBotsToRealPlayers(stake) {
 
   const realPlayers = game.players.filter(p => !p.isBot);
   const realCount = realPlayers.length;
-  // Desired bots: if no real players, keep 1 bot; else match real count up to 5
-  let desiredBotCount = realCount === 0 ? 1 : Math.min(realCount, 5);
+  // Desired bots: if no real players, keep 2 bots; else match real count up to 5
+  let desiredBotCount = realCount === 0 ? 2 : Math.min(realCount, 5);
 
   const currentBots = game.players.filter(p => p.isBot);
   const botCount = currentBots.length;
@@ -593,19 +611,8 @@ function syncBotsToRealPlayers(stake) {
   }
 }
 
-// Rotate bot names every 10 minutes (only for stake 20)
-setInterval(() => {
-  const game = getGame(20);
-  if (!game) return;
-  for (const p of game.players) {
-    if (p.isBot) {
-      const newName = getRandomMaleEthiopianName();
-      p.username = newName;
-      console.log(`🔄 Bot ${p.telegramId} name changed to ${newName}`);
-    }
-  }
-  notifyAdminClients();
-}, 10 * 60 * 1000);
+// Note: The 10-minute name rotation interval has been removed.
+// Bots now keep their names for 12 hours via getBotName().
 
 function updateBotsOnNumber(stake, number) {
   if (stake !== 20) return;
