@@ -560,7 +560,6 @@ function addSingleBotToGame(botId, stake) {
 }
 
 function removeBotFromGame(botId, stake) {
-  // Only allow bots in stake 20, but we'll allow removal if they are there (shouldn't be other stakes)
   const game = getGame(stake);
   if (!game) return false;
   const idx = game.players.findIndex(p => p.telegramId === botId);
@@ -589,24 +588,40 @@ function syncBotsToRealPlayers(stake) {
 
   const realPlayers = game.players.filter(p => !p.isBot);
   const realCount = realPlayers.length;
-  // Desired bots: if no real players, keep 2 bots; else match real count up to 5
-  let desiredBotCount = realCount === 0 ? 2 : Math.min(realCount, 5);
+
+  // Determine desired bot count based on real players:
+  // 0 real -> 2 bots
+  // 1 real -> 2 bots
+  // >=2 real -> number of bots = realCount, capped at 5
+  let desiredBotCount;
+  if (realCount === 0) {
+    desiredBotCount = 2;
+  } else if (realCount === 1) {
+    desiredBotCount = 2;
+  } else {
+    desiredBotCount = Math.min(realCount, 5);
+  }
 
   const currentBots = game.players.filter(p => p.isBot);
   const botCount = currentBots.length;
 
   if (botCount < desiredBotCount) {
-    // Add one bot
+    // Add enough bots to reach desired count
     const availableBotIds = BOT_IDS.filter(id => !game.players.find(p => p.telegramId === id));
-    if (availableBotIds.length > 0) {
-      const botId = availableBotIds[Math.floor(Math.random() * availableBotIds.length)];
+    const needed = desiredBotCount - botCount;
+    for (let i = 0; i < Math.min(needed, availableBotIds.length); i++) {
+      const botId = availableBotIds[i];
       addSingleBotToGame(botId, stake);
     }
   } else if (botCount > desiredBotCount) {
-    // Remove one bot (the last one in the array)
-    const lastBot = currentBots[currentBots.length - 1];
-    if (lastBot) {
-      removeBotFromGame(lastBot.telegramId, stake);
+    // Remove bots until we reach desired count (remove the last ones)
+    const toRemove = botCount - desiredBotCount;
+    const currentBotList = game.players.filter(p => p.isBot);
+    for (let i = 0; i < toRemove; i++) {
+      const bot = currentBotList[currentBotList.length - 1 - i];
+      if (bot) {
+        removeBotFromGame(bot.telegramId, stake);
+      }
     }
   }
 }
