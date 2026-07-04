@@ -90,13 +90,15 @@
         @media (max-width: 550px) { .card-container td { width: 48px; height: 48px; border-radius: 18px; font-size: 1rem; } .card-container thead tr th { width: 48px; font-size: 1.2rem; } .grid-100 { gap: 5px; } #bingoBtn { font-size: 1.3rem; } .stake-option { width: 130px; font-size: 1.2rem; padding: 12px 16px; } .player-count-badge { font-size: 0.6rem; } }
         /* SMS preview styling */
         .sms-preview { background: #f0fdf4; border-radius: 20px; padding: 12px; margin-top: 8px; border: 1px solid #86efac; }
-        .sms-preview .row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; padding: 4px 0; }
-        .sms-preview .label { font-weight: 600; color: #166534; width: 100px; }
+        .sms-preview .row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; padding: 4px 0; flex-wrap: wrap; }
+        .sms-preview .label { font-weight: 600; color: #166534; width: 100px; flex-shrink: 0; }
         .sms-preview .value { color: #1e293b; }
-        .sms-preview .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 600; }
+        .sms-preview .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 600; white-space: nowrap; }
         .status-badge.parsed { background: #dcfce7; color: #15803d; }
         .status-badge.pending { background: #fef9c3; color: #a16207; }
         .status-badge.error { background: #fee2e2; color: #b91c1c; }
+        .status-badge.mismatch { background: #fef9c3; color: #b91c1c; border: 1px solid #b91c1c; }
+        .warning-box { background: #fef9c3; border-left: 4px solid #b91c1c; padding: 8px 12px; margin: 8px 0; font-size: 0.75rem; color: #92400e; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -117,6 +119,9 @@
             <div class="row"><span class="label">💰 Amount:</span><span id="previewAmount" class="value">—</span><span id="amountStatus" class="status-badge pending">⏳ Parsing</span></div>
             <div class="row"><span class="label">🔢 Transaction ID:</span><span id="previewTxId" class="value">—</span><span id="txStatus" class="status-badge pending">⏳ Parsing</span></div>
             <div class="row"><span class="label">📅 Date/Time:</span><span id="previewDate" class="value">—</span></div>
+            <div id="methodMismatchWarning" class="warning-box hidden" style="margin-top:6px;">
+                ⚠️ <span data-key="methodMismatch">The method detected in the SMS does not match your selected payment method. Please verify.</span>
+            </div>
             <div style="margin-top:8px;font-size:0.7rem;color:#475569;border-top:1px solid #e2e8f0;padding-top:8px;" data-key="autoDetectHint">✔ Auto-detected – Please verify before submitting</div>
         </div>
         <div class="transaction-summary" data-key="depositHint">💡 After sending payment, paste the confirmation SMS above and submit. Admin will verify using your phone number and SMS proof.</div>
@@ -264,7 +269,8 @@
                 winLabelShort: "🎯 ማሸነፍ፦", winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
                 claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦", claimValueShort: "ወዲያው “CLAIM BINGO!”",
                 smsPasteLabel: "📨 የማረጋገጫ ኤስኤምኤስ (ሙሉ ጽሑፍ) ይለጥፉ",
-                autoDetectHint: "✔ በራስ-ተገኝቷል – ከማስገባትዎ በፊት ያረጋግጡ"
+                autoDetectHint: "✔ በራስ-ተገኝቷል – ከማስገባትዎ በፊት ያረጋግጡ",
+                methodMismatch: "በኤስኤምኤስ ውስጥ የተገኘው ዘዴ ከመረጡት የክፍያ ዘዴ ጋር አይመሳሰልም። እባክዎ ያረጋግጡ።"
             },
             en: {
                 depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel", sendPayment: "Send payment to the number below",
@@ -287,7 +293,8 @@
                 winLabelShort: "🎯 Winning:", winValueShort: "Row, Column, Diagonal or 4 Corners",
                 claimLabelShort: "⏱️ Claim:", claimValueShort: "Immediately 'CLAIM BINGO!'",
                 smsPasteLabel: "📨 Paste confirmation SMS (full text)",
-                autoDetectHint: "✔ Auto-detected – Please verify before submitting"
+                autoDetectHint: "✔ Auto-detected – Please verify before submitting",
+                methodMismatch: "The method detected in the SMS does not match your selected payment method. Please verify."
             }
         };
 
@@ -472,19 +479,41 @@
 
             // Update status badges
             const methodStatus = document.getElementById('methodStatus');
-            if (parsed.method) { methodStatus.textContent = '✔ Detected'; methodStatus.className = 'status-badge parsed'; } else { methodStatus.textContent = '⚠️ Not detected'; methodStatus.className = 'status-badge error'; }
+            // Check method match vs selectedDepositType
+            let methodMatch = false;
+            let methodDetected = parsed.method;
+            if (methodDetected && selectedDepositType) {
+                methodMatch = (methodDetected === selectedDepositType);
+            }
+            if (methodDetected && methodMatch) {
+                methodStatus.textContent = '✔ Match';
+                methodStatus.className = 'status-badge parsed';
+            } else if (methodDetected && !methodMatch) {
+                methodStatus.textContent = '❌ Mismatch';
+                methodStatus.className = 'status-badge mismatch';
+            } else {
+                methodStatus.textContent = '⚠️ Not detected';
+                methodStatus.className = 'status-badge error';
+            }
+
             const amountStatus = document.getElementById('amountStatus');
             if (parsed.amount) { amountStatus.textContent = '✔ Parsed'; amountStatus.className = 'status-badge parsed'; } else { amountStatus.textContent = '⚠️ Not found'; amountStatus.className = 'status-badge error'; }
             const txStatus = document.getElementById('txStatus');
             if (parsed.transactionId) { txStatus.textContent = '✔ Parsed'; txStatus.className = 'status-badge parsed'; } else { txStatus.textContent = '⚠️ Not found'; txStatus.className = 'status-badge error'; }
+
+            // Show mismatch warning if method detected and selectedDepositType exists and they differ
+            const warningBox = document.getElementById('methodMismatchWarning');
+            if (methodDetected && selectedDepositType && !methodMatch) {
+                warningBox.classList.remove('hidden');
+            } else {
+                warningBox.classList.add('hidden');
+            }
 
             // Auto-fill amount if empty and parsed
             const amountInput = document.getElementById('depositAmount');
             if (parsed.amount && !amountInput.value) {
                 amountInput.value = parsed.amount;
             }
-            // Auto-detect method and update selectedDepositType? but we already have a selected method from the previous step.
-            // We'll keep the method as selected by user.
         }
 
         // ---------- REST OF ORIGINAL FUNCTIONS ----------
@@ -546,12 +575,36 @@
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
-        function openDepositDetailsModal(type){ selectedDepositType=type; let acc='', title='', hint=''; if(type==='telebirr'){ title='Telebirr'; acc=depositAccounts.telebirr||'0924839730'; hint='09xxxxxxxx'; } else if(type==='cbebirr'){ title='CBE Birr'; acc=depositAccounts.cbebirr||'1000123456789'; hint='09xxxxxxxx'; } else{ title='M-Pesa'; acc=depositAccounts.mpesa||'0712345678'; hint='07xxxxxxxx'; } document.getElementById('depositDetailsTitle').innerHTML=`Deposit via ${title}`; const copyDiv = document.getElementById('depositAccountNumber'); if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`; copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`); document.getElementById('depositPlayerPhone').placeholder=hint; document.getElementById('depositPlayerPhone').value=''; document.getElementById('depositAmount').value=''; document.getElementById('depositSmsText').value=''; document.getElementById('smsPreviewContainer').classList.add('hidden'); document.getElementById('depositDetailsModal').classList.add('active'); closeDepositTypeModal(); unlockSpeech(); }
+        function openDepositDetailsModal(type){ 
+            selectedDepositType = type; // store selected method
+            let acc='', title='', hint=''; 
+            if(type==='telebirr'){ title='Telebirr'; acc=depositAccounts.telebirr||'0924839730'; hint='09xxxxxxxx'; } 
+            else if(type==='cbebirr'){ title='CBE Birr'; acc=depositAccounts.cbebirr||'1000123456789'; hint='09xxxxxxxx'; } 
+            else{ title='M-Pesa'; acc=depositAccounts.mpesa||'0712345678'; hint='07xxxxxxxx'; } 
+            document.getElementById('depositDetailsTitle').innerHTML=`Deposit via ${title}`; 
+            const copyDiv = document.getElementById('depositAccountNumber'); 
+            if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`; 
+            copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`); 
+            document.getElementById('depositPlayerPhone').placeholder=hint; 
+            document.getElementById('depositPlayerPhone').value=''; 
+            document.getElementById('depositAmount').value=''; 
+            document.getElementById('depositSmsText').value=''; 
+            document.getElementById('smsPreviewContainer').classList.add('hidden'); 
+            document.getElementById('depositDetailsModal').classList.add('active'); 
+            closeDepositTypeModal(); 
+            unlockSpeech(); 
+        }
         let isSubmittingDeposit=false;
         async function submitDepositRequest(){ if(isSubmittingDeposit) return; const phone=document.getElementById('depositPlayerPhone').value.trim(); const amount=document.getElementById('depositAmount').value.trim(); const proofText=document.getElementById('depositSmsText').value.trim(); if(!phone.match(/^(09|07)\d{8}$/)){ alert('Invalid phone number.'); return; } if(!amount||isNaN(amount)||Number(amount)<10){ alert('Minimum deposit 10 ETB'); return; } if(!proofText){ alert('Please paste the full confirmation SMS.'); return; } // Parse to get transaction ID
             const parsed = parseSms(proofText);
             const txId = parsed.transactionId || '';
             if(!txId){ alert('Could not extract transaction ID from SMS. Please ensure it is correct.'); return; }
+            // Check method match (warning only, not blocking)
+            if (parsed.method && selectedDepositType && parsed.method !== selectedDepositType) {
+                if (!confirm('⚠️ The SMS mentions a different payment method (' + parsed.method + ') than you selected (' + selectedDepositType + '). Are you sure you want to continue?')) {
+                    return;
+                }
+            }
             isSubmittingDeposit=true; const submitBtn=document.getElementById('submitDepositBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Sending...'; try{ const response=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount,payment_type:selectedDepositType, transaction_reference: txId, proof_text: proofText})}); const result=await response.json(); if(result.success){ alert('✅ Deposit request submitted!'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingDeposit=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function openWithdrawTypeModal(){ document.getElementById('withdrawTypeModal').classList.add('active'); unlockSpeech(); }
         function openWithdrawDetailsModal(type){ selectedWithdrawType=type; let title=type==='telebirr'?'Telebirr':type==='cbebirr'?'CBE Birr':'M-Pesa'; let hint=type==='mpesa'?'07xxxxxxxx':'09xxxxxxxx'; document.getElementById('withdrawDetailsTitle').innerHTML=`Withdraw via ${title}`; document.getElementById('withdrawReceiver').placeholder=hint; document.getElementById('withdrawReceiver').value=''; document.getElementById('withdrawAmount').value=''; document.getElementById('withdrawName').value=''; document.getElementById('withdrawDetailsModal').classList.add('active'); document.getElementById('withdrawTypeModal').classList.remove('active'); unlockSpeech(); }
