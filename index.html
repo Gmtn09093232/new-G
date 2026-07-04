@@ -69,7 +69,8 @@
         .copy-number { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 6px 12px; border-radius: 40px; cursor: pointer; transition: 0.1s; font-weight: 600; color: #1e293b; margin-top: 6px; width: fit-content; }
         .copy-number:active { background: #e2e8f0; transform: scale(0.96); }
         .input-group { margin: 14px 0; }
-        .input-group input { width: 100%; padding: 12px; border-radius: 60px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 0.85rem; }
+        .input-group input, .input-group textarea { width: 100%; padding: 12px; border-radius: 60px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 0.85rem; font-family: inherit; }
+        .input-group textarea { border-radius: 24px; resize: vertical; min-height: 80px; }
         .transaction-summary { background: #fef9e6; border-radius: 28px; padding: 12px; font-size: 0.75rem; color: #92400e; margin: 12px 0; text-align: center; }
         .modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
         .modal-buttons button { flex: 1; padding: 12px; border-radius: 60px; font-weight: 700; border: none; }
@@ -87,9 +88,15 @@
         .history-card { background: #fef9f0; border-radius: 28px; padding: 14px; margin-bottom: 12px; border-left: 5px solid #f97316; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
         .history-card strong { color: #ea580c; }
         @media (max-width: 550px) { .card-container td { width: 48px; height: 48px; border-radius: 18px; font-size: 1rem; } .card-container thead tr th { width: 48px; font-size: 1.2rem; } .grid-100 { gap: 5px; } #bingoBtn { font-size: 1.3rem; } .stake-option { width: 130px; font-size: 1.2rem; padding: 12px 16px; } .player-count-badge { font-size: 0.6rem; } }
-        /* new: SMS example styling */
-        .sms-example { background: #f1f5f9; border-radius: 20px; padding: 10px; font-size: 0.7rem; margin-top: 6px; border-left: 3px solid #f97316; }
-        .sms-example strong { color: #ea580c; }
+        /* SMS preview styling */
+        .sms-preview { background: #f0fdf4; border-radius: 20px; padding: 12px; margin-top: 8px; border: 1px solid #86efac; }
+        .sms-preview .row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; padding: 4px 0; }
+        .sms-preview .label { font-weight: 600; color: #166534; width: 100px; }
+        .sms-preview .value { color: #1e293b; }
+        .sms-preview .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: 600; }
+        .status-badge.parsed { background: #dcfce7; color: #15803d; }
+        .status-badge.pending { background: #fef9c3; color: #a16207; }
+        .status-badge.error { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -100,15 +107,19 @@
     <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div>
         <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
         <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
-        <!-- SMS Proof field with example -->
-        <div class="input-group"><label data-key="smsCode">📱 SMS Confirmation Code / Transaction ID</label><input type="text" id="depositSmsCode" placeholder="e.g. DFR2BFG92O" required>
-            <div class="sms-example">
-                <div style="font-weight:600;" data-key="smsExampleTitle">📱 Example SMS from telebirr:</div>
-                <div style="color:#475569;" data-key="smsExampleText">"Dear ... Your transaction number is <strong>DFR2BFG92O</strong> ..."</div>
-                <div style="margin-top:4px;" data-key="smsExampleHint">➡️ Copy the transaction number (e.g., <strong>DFR2BFG92O</strong>) and paste above.</div>
-            </div>
+        <!-- SMS paste area -->
+        <div class="input-group"><label data-key="smsPasteLabel">📨 Paste confirmation SMS (full text)</label>
+            <textarea id="depositSmsText" placeholder="Paste the entire SMS you received from telebirr/CBE/M-Pesa ..." rows="3"></textarea>
         </div>
-        <div class="transaction-summary" data-key="depositHint">💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.</div>
+        <!-- Parsed preview -->
+        <div id="smsPreviewContainer" class="sms-preview hidden">
+            <div class="row"><span class="label">📱 Method:</span><span id="previewMethod" class="value">—</span><span id="methodStatus" class="status-badge pending">⏳ Auto-detecting</span></div>
+            <div class="row"><span class="label">💰 Amount:</span><span id="previewAmount" class="value">—</span><span id="amountStatus" class="status-badge pending">⏳ Parsing</span></div>
+            <div class="row"><span class="label">🔢 Transaction ID:</span><span id="previewTxId" class="value">—</span><span id="txStatus" class="status-badge pending">⏳ Parsing</span></div>
+            <div class="row"><span class="label">📅 Date/Time:</span><span id="previewDate" class="value">—</span></div>
+            <div style="margin-top:8px;font-size:0.7rem;color:#475569;border-top:1px solid #e2e8f0;padding-top:8px;" data-key="autoDetectHint">✔ Auto-detected – Please verify before submitting</div>
+        </div>
+        <div class="transaction-summary" data-key="depositHint">💡 After sending payment, paste the confirmation SMS above and submit. Admin will verify using your phone number and SMS proof.</div>
         <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
     <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div><div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
@@ -235,7 +246,7 @@
             am: {
                 depositTitle: "ተቀማጭ", chooseMethod: "የክፍያ ዘዴ ይምረጡ", cancel: "ይቅር", sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
                 recipientLabel: "📞 ተቀባይ አካውንት (ለመቅዳት ይንኩ)", accountName: "የአካውንት ስም", yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
-                amountLabel: "💰 መጠን (ETB)", depositHint: "💡 ክፍያ ከላኩ በኋላ ይህን ቅጽ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ያረጋግጣል እና ገንዘብ ይጨምራል።",
+                amountLabel: "💰 መጠን (ETB)", depositHint: "💡 ክፍያ ከላኩ በኋላ የማረጋገጫ ኤስኤምኤስ ከላይ ይለጥፉ እና ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ እና በኤስኤምኤስ ማረጋገጫ ያረጋግጣል።",
                 requestDeposit: "✔ ተቀማጭ ጠይቅ", back: "← ተመለስ", withdrawTitle: "ገንዘብ አውጣ", selectMethod: "የማውጫ ዘዴ ይምረጡ",
                 yourDetails: "የአካውንትዎ ዝርዝሮች", fullName: "👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)", accountNumber: "📞 አካውንት / ስልክ ቁጥር",
                 amountWithdraw: "💰 መጠን (ETB) - ዝቅተኛ 20 ETB", withdrawHint: "⏱️ ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።", requestWithdrawal: "✔ ገንዘብ ማውጣት ጠይቅ",
@@ -252,15 +263,13 @@
                 prizeLabelShort: "🏆 የሽልማት ገንዘብ፦", prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
                 winLabelShort: "🎯 ማሸነፍ፦", winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
                 claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦", claimValueShort: "ወዲያው “CLAIM BINGO!”",
-                smsCode: "📱 የSMS ማረጋገጫ ኮድ / ግብይት መለያ",
-                smsExampleTitle: "📱 ከቴሌብር የሚመጣ የSMS ምሳሌ፦",
-                smsExampleText: "ውድ ... የግብይት ቁጥርዎ <strong>DFR2BFG92O</strong> ነው ...",
-                smsExampleHint: "➡️ የግብይት ቁጥሩን (ለምሳሌ <strong>DFR2BFG92O</strong>) ቅዱት ከላይ ይለጥፉ።"
+                smsPasteLabel: "📨 የማረጋገጫ ኤስኤምኤስ (ሙሉ ጽሑፍ) ይለጥፉ",
+                autoDetectHint: "✔ በራስ-ተገኝቷል – ከማስገባትዎ በፊት ያረጋግጡ"
             },
             en: {
                 depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel", sendPayment: "Send payment to the number below",
                 recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)", accountName: "ACCOUNT NAME", yourPhone: "📞 Your Phone Number (for verification)",
-                amountLabel: "💰 Amount (ETB)", depositHint: "💡 After sending payment, submit this form. Admin will verify using your phone number and add funds.",
+                amountLabel: "💰 Amount (ETB)", depositHint: "💡 After sending payment, paste the confirmation SMS above and submit. Admin will verify using your phone number and SMS proof.",
                 requestDeposit: "✔ Request Deposit", back: "← Back", withdrawTitle: "Withdraw Funds", selectMethod: "Select withdrawal method",
                 yourDetails: "Your account details", fullName: "👤 Full Name (as per bank/mobile money)", accountNumber: "📞 Account / Phone Number",
                 amountWithdraw: "💰 Amount (ETB) - Min 20 ETB", withdrawHint: "⏱️ Withdrawals processed within moment.", requestWithdrawal: "✔ Request Withdrawal",
@@ -277,10 +286,8 @@
                 prizeLabelShort: "🏆 Prize Money:", prizeValueShort: "80% (100% if 1 player)",
                 winLabelShort: "🎯 Winning:", winValueShort: "Row, Column, Diagonal or 4 Corners",
                 claimLabelShort: "⏱️ Claim:", claimValueShort: "Immediately 'CLAIM BINGO!'",
-                smsCode: "📱 SMS Confirmation Code / Transaction ID",
-                smsExampleTitle: "📱 Example SMS from telebirr:",
-                smsExampleText: "Dear ... Your transaction number is <strong>DFR2BFG92O</strong> ...",
-                smsExampleHint: "➡️ Copy the transaction number (e.g., <strong>DFR2BFG92O</strong>) and paste above."
+                smsPasteLabel: "📨 Paste confirmation SMS (full text)",
+                autoDetectHint: "✔ Auto-detected – Please verify before submitting"
             }
         };
 
@@ -415,7 +422,72 @@
             socket.on('withdrawStatus', data => alert(data.status==='approved'?`✅ Withdrawal -${data.amount} ETB processed.`:'❌ Withdrawal rejected.'));
         }
 
-        // ========== REST OF ORIGINAL FUNCTIONS ==========
+        // ========== SMS PARSING LOGIC ==========
+        function parseSms(text) {
+            const result = {
+                method: null,
+                amount: null,
+                transactionId: null,
+                date: null,
+                raw: text
+            };
+            // Detect method
+            const lower = text.toLowerCase();
+            if (lower.includes('telebirr') || lower.includes('tele birr')) result.method = 'telebirr';
+            else if (lower.includes('cbe') || lower.includes('cbebirr')) result.method = 'cbebirr';
+            else if (lower.includes('mpesa') || lower.includes('m-pesa')) result.method = 'mpesa';
+
+            // Extract transaction ID (look for pattern like DFR2BFG92O)
+            const txMatch = text.match(/\b([A-Z0-9]{8,12})\b/);
+            if (txMatch) result.transactionId = txMatch[1];
+
+            // Extract amount (look for ETB [number] or [number] ETB)
+            const amountMatch = text.match(/(\d+\.?\d*)\s*ETB/i) || text.match(/ETB\s*(\d+\.?\d*)/i);
+            if (amountMatch) result.amount = parseFloat(amountMatch[1]);
+
+            // Extract date (look for dd/mm/yyyy or dd/mm/yy or similar)
+            const dateMatch = text.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})/);
+            if (dateMatch) result.date = dateMatch[1];
+            // also try to get time
+            const timeMatch = text.match(/(\d{2}:\d{2}:\d{2})/);
+            if (timeMatch && result.date) result.date += ' ' + timeMatch[1];
+
+            return result;
+        }
+
+        function updateSmsPreview() {
+            const text = document.getElementById('depositSmsText').value.trim();
+            const container = document.getElementById('smsPreviewContainer');
+            if (!text) {
+                container.classList.add('hidden');
+                return;
+            }
+            container.classList.remove('hidden');
+            const parsed = parseSms(text);
+            // Update fields
+            document.getElementById('previewMethod').textContent = parsed.method ? parsed.method.toUpperCase() : '—';
+            document.getElementById('previewAmount').textContent = parsed.amount ? parsed.amount.toFixed(2) + ' ETB' : '—';
+            document.getElementById('previewTxId').textContent = parsed.transactionId || '—';
+            document.getElementById('previewDate').textContent = parsed.date || '—';
+
+            // Update status badges
+            const methodStatus = document.getElementById('methodStatus');
+            if (parsed.method) { methodStatus.textContent = '✔ Detected'; methodStatus.className = 'status-badge parsed'; } else { methodStatus.textContent = '⚠️ Not detected'; methodStatus.className = 'status-badge error'; }
+            const amountStatus = document.getElementById('amountStatus');
+            if (parsed.amount) { amountStatus.textContent = '✔ Parsed'; amountStatus.className = 'status-badge parsed'; } else { amountStatus.textContent = '⚠️ Not found'; amountStatus.className = 'status-badge error'; }
+            const txStatus = document.getElementById('txStatus');
+            if (parsed.transactionId) { txStatus.textContent = '✔ Parsed'; txStatus.className = 'status-badge parsed'; } else { txStatus.textContent = '⚠️ Not found'; txStatus.className = 'status-badge error'; }
+
+            // Auto-fill amount if empty and parsed
+            const amountInput = document.getElementById('depositAmount');
+            if (parsed.amount && !amountInput.value) {
+                amountInput.value = parsed.amount;
+            }
+            // Auto-detect method and update selectedDepositType? but we already have a selected method from the previous step.
+            // We'll keep the method as selected by user.
+        }
+
+        // ---------- REST OF ORIGINAL FUNCTIONS ----------
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if(btn){ btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
         function unlockSpeech() { if(speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(()=>window.speechSynthesis.cancel(),100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if(soundMuted && currentUtterance){ window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
@@ -474,9 +546,13 @@
         async function loadDepositAccounts(){ try{ const res=await fetch('/api/deposit-accounts'); depositAccounts=await res.json(); }catch(e){} }
         function openDepositTypeModal(){ document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
         function closeDepositTypeModal(){ document.getElementById('depositTypeModal').classList.remove('active'); }
-        function openDepositDetailsModal(type){ selectedDepositType=type; let acc='', title='', hint=''; if(type==='telebirr'){ title='Telebirr'; acc=depositAccounts.telebirr||'0924839730'; hint='09xxxxxxxx'; } else if(type==='cbebirr'){ title='CBE Birr'; acc=depositAccounts.cbebirr||'1000123456789'; hint='09xxxxxxxx'; } else{ title='M-Pesa'; acc=depositAccounts.mpesa||'0712345678'; hint='07xxxxxxxx'; } document.getElementById('depositDetailsTitle').innerHTML=`Deposit via ${title}`; const copyDiv = document.getElementById('depositAccountNumber'); if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`; copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`); document.getElementById('depositPlayerPhone').placeholder=hint; document.getElementById('depositPlayerPhone').value=''; document.getElementById('depositAmount').value=''; document.getElementById('depositSmsCode').value=''; document.getElementById('depositDetailsModal').classList.add('active'); closeDepositTypeModal(); unlockSpeech(); }
+        function openDepositDetailsModal(type){ selectedDepositType=type; let acc='', title='', hint=''; if(type==='telebirr'){ title='Telebirr'; acc=depositAccounts.telebirr||'0924839730'; hint='09xxxxxxxx'; } else if(type==='cbebirr'){ title='CBE Birr'; acc=depositAccounts.cbebirr||'1000123456789'; hint='09xxxxxxxx'; } else{ title='M-Pesa'; acc=depositAccounts.mpesa||'0712345678'; hint='07xxxxxxxx'; } document.getElementById('depositDetailsTitle').innerHTML=`Deposit via ${title}`; const copyDiv = document.getElementById('depositAccountNumber'); if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`; copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`); document.getElementById('depositPlayerPhone').placeholder=hint; document.getElementById('depositPlayerPhone').value=''; document.getElementById('depositAmount').value=''; document.getElementById('depositSmsText').value=''; document.getElementById('smsPreviewContainer').classList.add('hidden'); document.getElementById('depositDetailsModal').classList.add('active'); closeDepositTypeModal(); unlockSpeech(); }
         let isSubmittingDeposit=false;
-        async function submitDepositRequest(){ if(isSubmittingDeposit) return; const phone=document.getElementById('depositPlayerPhone').value.trim(); const amount=document.getElementById('depositAmount').value.trim(); const smsCode=document.getElementById('depositSmsCode').value.trim(); if(!phone.match(/^(09|07)\d{8}$/)){ alert('Invalid phone number.'); return; } if(!amount||isNaN(amount)||Number(amount)<10){ alert('Minimum deposit 10 ETB'); return; } if(!smsCode){ alert('Please enter the SMS confirmation code / transaction ID.'); return; } isSubmittingDeposit=true; const submitBtn=document.getElementById('submitDepositBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Sending...'; try{ const response=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount,payment_type:selectedDepositType, transaction_reference: smsCode})}); const result=await response.json(); if(result.success){ alert('✅ Deposit request submitted!'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingDeposit=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
+        async function submitDepositRequest(){ if(isSubmittingDeposit) return; const phone=document.getElementById('depositPlayerPhone').value.trim(); const amount=document.getElementById('depositAmount').value.trim(); const proofText=document.getElementById('depositSmsText').value.trim(); if(!phone.match(/^(09|07)\d{8}$/)){ alert('Invalid phone number.'); return; } if(!amount||isNaN(amount)||Number(amount)<10){ alert('Minimum deposit 10 ETB'); return; } if(!proofText){ alert('Please paste the full confirmation SMS.'); return; } // Parse to get transaction ID
+            const parsed = parseSms(proofText);
+            const txId = parsed.transactionId || '';
+            if(!txId){ alert('Could not extract transaction ID from SMS. Please ensure it is correct.'); return; }
+            isSubmittingDeposit=true; const submitBtn=document.getElementById('submitDepositBtn'); const originalText=submitBtn.innerText; submitBtn.disabled=true; submitBtn.innerText='⏳ Sending...'; try{ const response=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount,payment_type:selectedDepositType, transaction_reference: txId, proof_text: proofText})}); const result=await response.json(); if(result.success){ alert('✅ Deposit request submitted!'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: '+(result.error||'Submission failed')); } } catch(err){ alert('⚠️ Network error.'); } finally{ isSubmittingDeposit=false; submitBtn.disabled=false; submitBtn.innerText=originalText; unlockSpeech(); } }
         function openWithdrawTypeModal(){ document.getElementById('withdrawTypeModal').classList.add('active'); unlockSpeech(); }
         function openWithdrawDetailsModal(type){ selectedWithdrawType=type; let title=type==='telebirr'?'Telebirr':type==='cbebirr'?'CBE Birr':'M-Pesa'; let hint=type==='mpesa'?'07xxxxxxxx':'09xxxxxxxx'; document.getElementById('withdrawDetailsTitle').innerHTML=`Withdraw via ${title}`; document.getElementById('withdrawReceiver').placeholder=hint; document.getElementById('withdrawReceiver').value=''; document.getElementById('withdrawAmount').value=''; document.getElementById('withdrawName').value=''; document.getElementById('withdrawDetailsModal').classList.add('active'); document.getElementById('withdrawTypeModal').classList.remove('active'); unlockSpeech(); }
         let isSubmittingWithdraw=false;
@@ -515,6 +591,9 @@
         document.getElementById('rulesBtn')?.addEventListener('click',()=>rulesModal.classList.add('active'));
         document.getElementById('rulesBtnGame')?.addEventListener('click',()=>rulesModal.classList.add('active'));
         closeRules?.addEventListener('click',()=>rulesModal.classList.remove('active'));
+
+        // ---------- SMS parse on input ----------
+        document.getElementById('depositSmsText')?.addEventListener('input', updateSmsPreview);
 
         // ---------- INIT ----------
         loadDepositAccounts();
