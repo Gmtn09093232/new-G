@@ -454,7 +454,7 @@ function createGameState(entryFee) {
     bingoGraceTimeout: null,
     winningNumber: null,
     botTimeouts: [],         // for staggered bot actions
-    syncInterval: null       // for lobby sync
+    bot3Added: false         // flag to track if 3rd bot already added
   };
 }
 
@@ -578,57 +578,29 @@ function removeBotFromGame(botId, stake) {
   return true;
 }
 
-// ---------- Dynamic bot count sync ----------
-function syncBotsToRealPlayers(stake) {
-  // Bots are only for stake 20
+// ---------- Dynamic bot count sync (only for third bot) ----------
+function checkAndAddThirdBot(stake) {
   if (stake !== 20) return;
-
   const game = getGame(stake);
   if (!game || game.status !== 'lobby') return;
+  if (game.bot3Added) return; // already added
 
+  // Count real players (non-bots)
   const realPlayers = game.players.filter(p => !p.isBot);
-  const realCount = realPlayers.length;
-
-  // Determine desired bot count based on real players:
-  // 0 real -> 2 bots
-  // 1 real -> 2 bots
-  // >=2 real -> number of bots = realCount, capped at 5
-  let desiredBotCount;
-  if (realCount === 0) {
-    desiredBotCount = 2;
-  } else if (realCount === 1) {
-    desiredBotCount = 2;
-  } else {
-    desiredBotCount = Math.min(realCount, 5);
-  }
-
-  const currentBots = game.players.filter(p => p.isBot);
-  const botCount = currentBots.length;
-
-  if (botCount < desiredBotCount) {
-    // Add enough bots to reach desired count
-    const availableBotIds = BOT_IDS.filter(id => !game.players.find(p => p.telegramId === id));
-    const needed = desiredBotCount - botCount;
-    for (let i = 0; i < Math.min(needed, availableBotIds.length); i++) {
-      const botId = availableBotIds[i];
-      addSingleBotToGame(botId, stake);
-    }
-  } else if (botCount > desiredBotCount) {
-    // Remove bots until we reach desired count (remove the last ones)
-    const toRemove = botCount - desiredBotCount;
-    const currentBotList = game.players.filter(p => p.isBot);
-    for (let i = 0; i < toRemove; i++) {
-      const bot = currentBotList[currentBotList.length - 1 - i];
-      if (bot) {
-        removeBotFromGame(bot.telegramId, stake);
-      }
-    }
+  if (realPlayers.length >= 3) {
+    // We have at least 3 real players; add bot 3 after 0.5s
+    game.bot3Added = true;
+    setTimeout(() => {
+      // Re-check conditions before adding
+      if (game.status !== 'lobby') return;
+      if (game.players.find(p => p.telegramId === BOT_IDS[2])) return; // already in game
+      addSingleBotToGame(BOT_IDS[2], stake);
+      console.log(`🤖 Third bot (${BOT_IDS[2]}) added because 3 real players joined.`);
+    }, 500);
   }
 }
 
-// Note: The 10-minute name rotation interval has been removed.
-// Bots now keep their names for 12 hours via getBotName().
-
+// ---------- Update bots on number call ----------
 function updateBotsOnNumber(stake, number) {
   if (stake !== 20) return;
   const game = getGame(stake);
@@ -644,7 +616,6 @@ function updateBotsOnNumber(stake, number) {
     if (isBingoValidOnLastCall(bot.card, bot.markedNumbers, lastCalled)) {
       if (!bot.hasCalledBingo && !game.winners.find(w => w.telegramId === bot.telegramId)) {
         bot.hasCalledBingo = true;
-        // 👇 New delay: 0–2000ms, with 20% chance of instant claim
         const delay = Math.random() < 0.2 ? 0 : 500 + Math.random() * 1500;
         setTimeout(() => {
           if (game.status !== 'running') return;
@@ -750,10 +721,7 @@ function resetGame(stake) {
     clearTimeout(timeout);
   }
   game.botTimeouts = [];
-  if (game.syncInterval) {
-    clearInterval(game.syncInterval);
-    game.syncInterval = null;
-  }
+  game.bot3Added = false; // reset flag
   game.status = 'lobby';
   game.players = [];
   game.takenCardNumbers.clear();
@@ -764,14 +732,28 @@ function resetGame(stake) {
   game.winningNumber = null;
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
-  
-  // Start sync interval for dynamic bot count (only for stake 20)
+
+  // Schedule bots for stake 20 only: bot1 at 41s, bot2 at 39s
   if (stake === 20) {
-    // Initial sync after a short delay to allow real players to join first
-    setTimeout(() => syncBotsToRealPlayers(stake), 1000);
-    game.syncInterval = setInterval(() => syncBotsToRealPlayers(stake), 3000);
+    const scheduleBotAtRemaining = (botIndex, remainingSeconds) => {
+      if (botIndex >= BOT_IDS.length) return;
+      const absoluteTime = game.lobbyEndTime - remainingSeconds * 1000;
+      const delay = absoluteTime - Date.now();
+      if (delay <= 0) return; // skip if already past
+      const timeout = setTimeout(() => {
+        if (game.status !== 'lobby') return;
+        const botId = BOT_IDS[botIndex];
+        if (game.players.find(p => p.telegramId === botId)) return;
+        addSingleBotToGame(botId, stake);
+      }, delay);
+      game.botTimeouts.push(timeout);
+    };
+
+    scheduleBotAtRemaining(0, 41); // first bot at 41s left
+    scheduleBotAtRemaining(1, 39); // second bot at 39s left
+    // Third bot is handled dynamically via checkAndAddThirdBot
   }
-  
+
   io.to(`stake_${stake}`).emit('lobbyState', { 
     stake, 
     startsIn: 45, 
@@ -798,20 +780,11 @@ function resetGame(stake) {
 
 async function startGame(stake) {
   const game = getGame(stake);
-  // Clear sync interval
-  if (game.syncInterval) {
-    clearInterval(game.syncInterval);
-    game.syncInterval = null;
-  }
+  // Clear bot timeouts (they might not have fired if game started early)
   for (const timeout of game.botTimeouts) {
     clearTimeout(timeout);
   }
   game.botTimeouts = [];
-
-  // Final sync – only for stake 20
-  if (stake === 20) {
-    syncBotsToRealPlayers(stake);
-  }
 
   const toRemove = [];
   for (const p of game.players) {
@@ -1581,8 +1554,8 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // Sync bots after real player joins (only for stake 20)
-    if (currentStake === 20) syncBotsToRealPlayers(currentStake);
+    // Check for third bot if stake is 20
+    if (currentStake === 20) checkAndAddThirdBot(currentStake);
   });
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
@@ -1604,8 +1577,8 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // Sync bots after real player joins (only for stake 20)
-    if (currentStake === 20) syncBotsToRealPlayers(currentStake);
+    // Check for third bot if stake is 20
+    if (currentStake === 20) checkAndAddThirdBot(currentStake);
   });
   socket.on('markNumber', (number) => {
     if (!currentStake) return;
