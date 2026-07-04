@@ -929,6 +929,9 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
+// ============================================================
+//  🔥 FIXED ENDGAME FUNCTION – Bots removed when real winner exists
+// ============================================================
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1006,23 +1009,34 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  // ---- Distribute prizes (real players take full pool if they exist) ----
+  // ---- 🔥 FIX: Remove bots from winners if any real winner exists ----
+  const realWinnersFinal = game.winners.filter(w => !w.isBot);
+  const botWinnersFinal = game.winners.filter(w => w.isBot);
+
+  if (realWinnersFinal.length > 0) {
+    // Only real winners remain in the list – bots are excluded
+    game.winners = realWinnersFinal;
+  }
+  // If no real winners, keep bot winners as they are (game.winners already contains them)
+
+  // ---- Distribute prizes ----
   if (game.winners.length > 0) {
-    const realWinnersFinal = game.winners.filter(w => !w.isBot);
-    const botWinnersFinal = game.winners.filter(w => w.isBot);
+    // Recalculate after possible filter
+    const finalRealWinners = game.winners.filter(w => !w.isBot);
+    const finalBotWinners = game.winners.filter(w => w.isBot);
 
     let prizeEachReal = 0;
     let prizeEachBot = 0;
 
-    if (realWinnersFinal.length > 0) {
-      prizeEachReal = Math.floor(game.prizePool / realWinnersFinal.length);
+    if (finalRealWinners.length > 0) {
+      prizeEachReal = Math.floor(game.prizePool / finalRealWinners.length);
       prizeEachBot = 0;
     } else {
-      prizeEachBot = Math.floor(game.prizePool / botWinnersFinal.length);
+      prizeEachBot = Math.floor(game.prizePool / finalBotWinners.length);
     }
 
     // Pay real winners
-    for (const w of realWinnersFinal) {
+    for (const w of finalRealWinners) {
       const user = users[w.telegramId];
       if (user) {
         user.balance += prizeEachReal;
@@ -1041,7 +1055,7 @@ async function endGameWithWinners(stake) {
     }
 
     // Pay bot winners (only if no real winners)
-    for (const w of botWinnersFinal) {
+    for (const w of finalBotWinners) {
       const bal = botBalances.get(w.telegramId) || 0;
       botBalances.set(w.telegramId, bal + prizeEachBot);
       console.log(`🏆 Bot ${w.telegramId} won ${prizeEachBot} (balance now ${botBalances.get(w.telegramId)})`);
@@ -1069,7 +1083,7 @@ async function endGameWithWinners(stake) {
       stake,
       winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
       winners: winnerNames,
-      prizeEach: realWinnersFinal.length > 0 ? prizeEachReal : prizeEachBot,
+      prizeEach: finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
       winningNumber: game.winningNumber
