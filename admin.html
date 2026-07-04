@@ -75,9 +75,11 @@
     .request-card .summary .info .phone { font-size: 0.8rem; color: #94a3b8; }
     .request-card .summary .badge { background: #f39c12; color: #0a0f1c; padding: 2px 10px; border-radius: 40px; font-weight: bold; font-size: 0.7rem; white-space: nowrap; }
     .proof-thumb { max-height: 40px; border-radius: 6px; border: 1px solid #f39c12; cursor: pointer; vertical-align: middle; }
-    .sms-badge { background: #2d3748; color: #facc15; font-size: 0.6rem; padding: 2px 10px; border-radius: 40px; border: 1px solid #facc15; font-weight: 600; display: inline-block; }
-    .sms-badge.has-sms { border-color: #2ecc71; color: #2ecc71; }
-    .sms-badge.no-sms { border-color: #94a3b8; color: #94a3b8; }
+
+    /* SMS badge */
+    .sms-badge { display: inline-block; padding: 2px 10px; border-radius: 40px; font-size: 0.6rem; font-weight: 600; }
+    .sms-badge.has-sms { background: #2d3748; color: #2ecc71; border: 1px solid #2ecc71; }
+    .sms-badge.no-sms { background: #2d3748; color: #94a3b8; border: 1px solid #94a3b8; }
 
     .action-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
     .action-buttons button { padding: 6px 16px; border: none; border-radius: 40px; font-weight: bold; cursor: pointer; flex: 1; font-size: 0.85rem; }
@@ -99,6 +101,8 @@
     .modal-content .detail-label { font-weight: 600; width: 160px; color: #94a3b8; flex-shrink: 0; }
     .modal-content .detail-value { flex: 1; word-break: break-word; }
     .modal-content .proof-full { max-width: 100%; max-height: 400px; border-radius: 12px; border: 2px solid #f39c12; margin: 12px 0; }
+
+    /* SMS box */
     .sms-box {
       background: #0f1a24;
       border-radius: 16px;
@@ -123,6 +127,7 @@
       margin-bottom: 6px;
     }
 
+    /* Verification grid */
     .verification-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -147,6 +152,7 @@
     .verification-item .vvalue.match { color: #2ecc71; }
     .verification-item .vvalue.mismatch { color: #e74c3c; }
     .verification-item .vvalue.partial { color: #f39c12; }
+    .verification-item .vvalue.na { color: #94a3b8; }
 
     .status-badge {
       display: inline-block;
@@ -160,7 +166,7 @@
     .status-badge.unverified { background: #e74c3c; color: #fff; }
     .status-badge.no-sms { background: #94a3b8; color: #000; }
 
-    /* Mobile overrides */
+    /* Mobile */
     @media (max-width: 640px) {
       .modal-content .detail-row { flex-direction: column; padding: 12px 0; }
       .modal-content .detail-label { width: 100%; margin-bottom: 4px; }
@@ -321,23 +327,43 @@
 
   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
 
-  // ---- Format phone number for CBE Birr: remove leading 0 and prepend 251 ----
+  // ==================== SMS PARSING (same as client) ====================
+  function parseSms(text) {
+    const result = {
+      method: null,
+      amount: null,
+      transactionId: null,
+      date: null
+    };
+    if (!text || text.length < 5) return result;
+    const lower = text.toLowerCase();
+    if (lower.includes('telebirr') || lower.includes('tele birr')) result.method = 'telebirr';
+    else if (lower.includes('cbe') || lower.includes('cbebirr')) result.method = 'cbebirr';
+    else if (lower.includes('mpesa') || lower.includes('m-pesa')) result.method = 'mpesa';
+
+    const txMatch = text.match(/\b([A-Z0-9]{8,12})\b/);
+    if (txMatch) result.transactionId = txMatch[1];
+
+    const amountMatch = text.match(/(\d+\.?\d*)\s*ETB/i) || text.match(/ETB\s*(\d+\.?\d*)/i);
+    if (amountMatch) result.amount = parseFloat(amountMatch[1]);
+
+    const dateMatch = text.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})/);
+    if (dateMatch) result.date = dateMatch[1];
+    const timeMatch = text.match(/(\d{2}:\d{2}:\d{2})/);
+    if (timeMatch && result.date) result.date += ' ' + timeMatch[1];
+
+    return result;
+  }
+
+  // ==================== RECEIPT LINK ====================
   function formatCbePhone(phone) {
     if (!phone) return '';
-    // Remove any non-digit characters
     let cleaned = phone.replace(/\D/g, '');
-    // If starts with 0, remove it
-    if (cleaned.startsWith('0')) {
-      cleaned = cleaned.substring(1);
-    }
-    // If it already starts with 251, keep as is; otherwise prepend 251
-    if (!cleaned.startsWith('251')) {
-      cleaned = '251' + cleaned;
-    }
+    if (cleaned.startsWith('0')) cleaned = cleaned.substring(1);
+    if (!cleaned.startsWith('251')) cleaned = '251' + cleaned;
     return cleaned;
   }
 
-  // ---- Generate receipt link based on payment type ----
   function getReceiptLink(paymentType, txn, phone) {
     if (!txn) return null;
     const encodedTxn = encodeURIComponent(txn);
@@ -349,14 +375,13 @@
         const phoneParam = formattedPhone ? `&PH=${encodeURIComponent(formattedPhone)}` : '';
         return `https://cbepay1.cbe.com.et/aureceipt?TID=${encodedTxn}${phoneParam}`;
       case 'mpesa':
-        // No known link for M-Pesa; return null
         return null;
       default:
         return null;
     }
   }
 
-  // ---- Tab switching ----
+  // ==================== TABS ====================
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -367,7 +392,7 @@
     });
   });
 
-  // ---- Fetch Stats ----
+  // ==================== STATS ====================
   async function fetchStats() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
@@ -417,7 +442,7 @@
     }
   }
 
-  // ---- Fetch Deposits ----
+  // ==================== DEPOSITS ====================
   async function fetchDeposits() {
     try {
       const res = await fetch(`${API_BASE}/admin/deposits?secret=${ADMIN_SECRET}`);
@@ -441,11 +466,30 @@
       const card = document.createElement('div');
       card.className = 'request-card';
       card.dataset.id = req.id;
+
+      // Check SMS proof
+      const hasSms = req.proof_text && req.proof_text.length > 5;
+      const smsBadge = hasSms
+        ? `<span class="sms-badge has-sms">📱 SMS Proof ✓</span>`
+        : `<span class="sms-badge no-sms">📱 No SMS</span>`;
+
+      // Parse SMS on the fly for preview
+      let parsedInfo = '';
+      let matchIcon = '';
+      if (hasSms) {
+        const parsed = parseSms(req.proof_text);
+        if (parsed.amount) {
+          const match = Math.abs(parsed.amount - req.amount) < 1;
+          parsedInfo = `📊 ${parsed.amount} ETB`;
+          matchIcon = match ? '✅' : '⚠️';
+        }
+        if (parsed.transactionId) {
+          parsedInfo += ` 🆔 ${parsed.transactionId}`;
+        }
+      }
+
       const proofHtml = req.proof_path ? `<img src="${req.proof_path}" class="proof-thumb" onclick="event.stopPropagation(); window.open(this.src)">` : '';
-      const hasSms = req.sms_proof && req.sms_proof.length > 5;
-      const smsBadge = hasSms ? `<span class="sms-badge has-sms">📱 SMS Proof</span>` : `<span class="sms-badge no-sms">📱 No SMS</span>`;
-      const parsedInfo = req.parsed_amount ? `📊 ${req.parsed_amount} ETB` : '';
-      const matchStatus = req.parsed_amount && req.amount ? (Math.abs(req.parsed_amount - req.amount) < 1 ? '✅' : '⚠️') : '';
+
       card.innerHTML = `
         <div class="summary">
           <div class="info">
@@ -453,7 +497,7 @@
             <span class="detail">${req.amount} ETB via ${req.payment_type || 'Unknown'}</span>
             <span class="phone">${req.phone || 'N/A'} ${proofHtml}</span>
             ${smsBadge}
-            ${parsedInfo ? `<span class="detail">${parsedInfo} ${matchStatus}</span>` : ''}
+            ${parsedInfo ? `<span class="detail">${parsedInfo} ${matchIcon}</span>` : ''}
           </div>
           <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
         </div>
@@ -477,7 +521,7 @@
     });
   }
 
-  // ---- Fetch Withdrawals ----
+  // ==================== WITHDRAWALS ====================
   async function fetchWithdrawals() {
     try {
       const res = await fetch(`${API_BASE}/admin/withdrawals?secret=${ADMIN_SECRET}`);
@@ -507,6 +551,7 @@
             <span class="main">#${req.id} – ${escapeHtml(req.username)}</span>
             <span class="detail">${req.amount} ETB via ${req.withdrawal_type || 'Unknown'}</span>
             <span class="phone">📱 ${escapeHtml(req.phone_number)}</span>
+            ${req.receiver_name ? `<span class="detail">👤 ${escapeHtml(req.receiver_name)}</span>` : ''}
           </div>
           <span class="badge">${new Date(req.created_at).toLocaleDateString()}</span>
         </div>
@@ -530,7 +575,7 @@
     });
   }
 
-  // ---- Detail modals (with method‑specific receipt link) ----
+  // ==================== DETAIL MODALS ====================
   function openDepositDetail(id) {
     const req = depositData.find(r => r.id === id);
     if (!req) { alert('Request not found'); return; }
@@ -539,51 +584,38 @@
     document.getElementById('modalTitle').innerText = `Deposit Request #${req.id}`;
     const body = document.getElementById('modalBody');
 
-    // ---- SMS proof display (raw SMS only) ----
+    // ---- SMS proof (raw) ----
+    const hasSms = req.proof_text && req.proof_text.length > 5;
     let smsHtml = '';
-    const hasSms = req.sms_proof && req.sms_proof.length > 5;
     if (hasSms) {
       smsHtml = `
         <div class="sms-box">
           <span class="sms-label">📱 SMS Proof (raw)</span>
-          ${escapeHtml(req.sms_proof)}
+          ${escapeHtml(req.proof_text)}
         </div>
       `;
     } else {
       smsHtml = `<p style="color:#94a3b8;">📱 No SMS proof submitted.</p>`;
     }
 
-    // ---- Build clickable receipt link based on payment type ----
-    let receiptLinkHtml = '';
-    if (req.parsed_txn) {
-      const link = getReceiptLink(req.payment_type, req.parsed_txn, req.phone);
-      if (link) {
-        const displayText = req.payment_type === 'cbebirr' ? 'CBE Receipt' : 'Open Receipt';
-        receiptLinkHtml = `
-          <div class="detail-row">
-            <span class="detail-label">🔗 ${req.payment_type === 'cbebirr' ? 'CBE Birr Receipt' : 'Receipt Link'}</span>
-            <span class="detail-value">
-              <a href="${link}" target="_blank" style="color:#3498db; font-weight:600;">${displayText} (${req.parsed_txn})</a>
-            </span>
-          </div>
-        `;
-      } else {
-        // M-Pesa or unknown – show the transaction number but no link
-        receiptLinkHtml = `
-          <div class="detail-row">
-            <span class="detail-label">🆔 Transaction Number</span>
-            <span class="detail-value">${req.parsed_txn} (no receipt link available)</span>
-          </div>
-        `;
-      }
-    }
-
-    // ---- Parsed data comparison ----
+    // ---- Parse SMS for verification ----
     let verificationHtml = '';
-    if (req.parsed_amount || req.parsed_txn || req.parsed_method) {
-      const amountMatch = req.parsed_amount ? (Math.abs(req.parsed_amount - req.amount) < 1) : false;
-      const methodMatch = req.parsed_method ? (req.parsed_method === req.payment_type) : false;
-      const txnDisplay = req.parsed_txn || '—';
+    if (hasSms) {
+      const parsed = parseSms(req.proof_text);
+      const amountMatch = parsed.amount ? Math.abs(parsed.amount - req.amount) < 1 : false;
+      const methodMatch = parsed.method ? parsed.method === req.payment_type : false;
+      const txMatch = parsed.transactionId ? parsed.transactionId === req.transaction_reference : false;
+
+      // Overall status
+      let overallStatus = 'unverified';
+      let overallText = '❌ Unverified';
+      if (amountMatch && methodMatch && txMatch) {
+        overallStatus = 'verified';
+        overallText = '✅ Fully Verified';
+      } else if (amountMatch || methodMatch || txMatch) {
+        overallStatus = 'partial';
+        overallText = '⚠️ Partial Match';
+      }
 
       verificationHtml = `
         <div style="margin:10px 0;">
@@ -591,39 +623,64 @@
           <div class="verification-grid">
             <div class="verification-item">
               <div class="vlabel">💰 Amount</div>
-              <div class="vvalue ${amountMatch ? 'match' : (req.parsed_amount ? 'mismatch' : '')}">
-                ${req.parsed_amount ? req.parsed_amount + ' ETB' : '—'}
-                ${amountMatch ? '✅' : (req.parsed_amount ? '❌' : '')}
-                ${!req.parsed_amount ? '(not detected)' : ''}
+              <div class="vvalue ${amountMatch ? 'match' : (parsed.amount ? 'mismatch' : 'na')}">
+                ${parsed.amount ? parsed.amount + ' ETB' : '—'}
+                ${parsed.amount ? (amountMatch ? '✅' : '❌') : ''}
               </div>
             </div>
             <div class="verification-item">
               <div class="vlabel">📌 Method</div>
-              <div class="vvalue ${methodMatch ? 'match' : (req.parsed_method ? 'mismatch' : '')}">
-                ${req.parsed_method || '—'}
-                ${methodMatch ? '✅' : (req.parsed_method ? '❌' : '')}
-                ${!req.parsed_method ? '(not detected)' : ''}
+              <div class="vvalue ${methodMatch ? 'match' : (parsed.method ? 'mismatch' : 'na')}">
+                ${parsed.method || '—'}
+                ${parsed.method ? (methodMatch ? '✅' : '❌') : ''}
               </div>
             </div>
             <div class="verification-item">
-              <div class="vlabel">🆔 Transaction Number</div>
-              <div class="vvalue">${txnDisplay}</div>
+              <div class="vlabel">🆔 Transaction ID</div>
+              <div class="vvalue ${txMatch ? 'match' : (parsed.transactionId ? 'mismatch' : 'na')}">
+                ${parsed.transactionId || '—'}
+                ${parsed.transactionId ? (txMatch ? '✅' : '❌') : ''}
+              </div>
             </div>
             <div class="verification-item" style="grid-column: span 2;">
-              <div class="vlabel">📊 Overall Verification Status</div>
-              <div class="vvalue ${(amountMatch && methodMatch) ? 'match' : (req.parsed_amount || req.parsed_method ? 'partial' : '')}">
-                ${(amountMatch && methodMatch) ? '✅ Fully Verified' : 
-                  (req.parsed_amount || req.parsed_method ? '⚠️ Partial Match' : '❌ No Data')}
+              <div class="vlabel">📊 Overall Status</div>
+              <div class="vvalue ${overallStatus === 'verified' ? 'match' : (overallStatus === 'partial' ? 'partial' : 'mismatch')}">
+                ${overallText}
+                <span class="status-badge ${overallStatus}">${overallStatus.toUpperCase()}</span>
               </div>
             </div>
           </div>
         </div>
       `;
     } else {
-      verificationHtml = `<p style="color:#94a3b8;">ℹ️ No parsed data available from SMS.</p>`;
+      verificationHtml = `<p style="color:#94a3b8;">ℹ️ No SMS to parse.</p>`;
     }
 
-    // ---- Build modal body ----
+    // ---- Receipt link ----
+    let receiptLinkHtml = '';
+    if (req.transaction_reference) {
+      const link = getReceiptLink(req.payment_type, req.transaction_reference, req.phone);
+      if (link) {
+        const displayText = req.payment_type === 'cbebirr' ? 'CBE Receipt' : 'Open Receipt';
+        receiptLinkHtml = `
+          <div class="detail-row">
+            <span class="detail-label">🔗 ${req.payment_type === 'cbebirr' ? 'CBE Birr Receipt' : 'Receipt Link'}</span>
+            <span class="detail-value">
+              <a href="${link}" target="_blank" style="color:#3498db; font-weight:600;">${displayText} (${req.transaction_reference})</a>
+            </span>
+          </div>
+        `;
+      } else {
+        receiptLinkHtml = `
+          <div class="detail-row">
+            <span class="detail-label">🆔 Transaction Number</span>
+            <span class="detail-value">${req.transaction_reference} (no receipt link available)</span>
+          </div>
+        `;
+      }
+    }
+
+    // ---- Build body ----
     body.innerHTML = `
       <div class="detail-row"><span class="detail-label">ID</span><span class="detail-value">${req.id}</span></div>
       <div class="detail-row"><span class="detail-label">User</span><span class="detail-value">${escapeHtml(req.username)} (${req.telegram_id})</span></div>
@@ -637,8 +694,6 @@
     `;
 
     document.getElementById('detailModal').classList.add('active');
-
-    // Show modal action buttons
     document.getElementById('modalActions').style.display = 'flex';
     document.getElementById('modalApproveBtn').style.display = 'block';
     document.getElementById('modalRejectBtn').style.display = 'block';
@@ -665,7 +720,6 @@
     `;
 
     document.getElementById('detailModal').classList.add('active');
-
     document.getElementById('modalActions').style.display = 'flex';
     document.getElementById('modalApproveBtn').style.display = 'block';
     document.getElementById('modalRejectBtn').style.display = 'block';
@@ -673,7 +727,7 @@
     document.getElementById('modalRejectBtn').onclick = () => processWithdrawal(req.id, 'reject');
   }
 
-  // ---- Process actions ----
+  // ==================== PROCESS ACTIONS ====================
   async function processDeposit(requestId, action) {
     if (!confirm(`Are you sure to ${action} this deposit?`)) return;
     try {
@@ -702,7 +756,7 @@
     } catch (err) { alert(err.message); }
   }
 
-  // ---- Manual balance add ----
+  // ==================== MANUAL BALANCE ====================
   document.getElementById('manualAddBtn').addEventListener('click', async () => {
     const telegramId = document.getElementById('manualUserId').value.trim();
     const amount = document.getElementById('manualAmount').value.trim();
@@ -742,7 +796,7 @@
     }
   });
 
-  // ---- Modal close ----
+  // ==================== MODAL CLOSE ====================
   document.getElementById('closeModalBtn').addEventListener('click', () => {
     document.getElementById('detailModal').classList.remove('active');
   });
@@ -750,7 +804,7 @@
     if (e.target === e.currentTarget) document.getElementById('detailModal').classList.remove('active');
   });
 
-  // ---- Refresh & filter ----
+  // ==================== REFRESH & FILTER ====================
   document.getElementById('refreshDepositsBtn').addEventListener('click', fetchDeposits);
   document.getElementById('depositFilter').addEventListener('change', renderDeposits);
   document.getElementById('refreshWithdrawalsBtn').addEventListener('click', fetchWithdrawals);
@@ -758,7 +812,7 @@
   document.getElementById('applyStatsBtn').addEventListener('click', fetchStats);
   document.getElementById('refreshStatsBtn').addEventListener('click', fetchStats);
 
-  // ---- Initial load ----
+  // ==================== INIT ====================
   fetchStats();
   fetchDeposits();
   fetchWithdrawals();
