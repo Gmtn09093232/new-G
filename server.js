@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS game_rounds (
 
 -- ADD THIS for SMS proof
 ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS transaction_reference TEXT;
+ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS proof_text TEXT;
 */
 // ============================================================
 
@@ -1162,7 +1163,7 @@ app.get('/admin-bot-stats', (req, res) => {
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  const { phone, amount, payment_type, transaction_reference } = req.body; // added transaction_reference
+  const { phone, amount, payment_type, transaction_reference, proof_text } = req.body;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
@@ -1176,7 +1177,8 @@ app.post('/api/request-deposit', async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: transaction_reference || null, // store SMS proof
+      transaction_reference: transaction_reference || null,
+      proof_text: proof_text || null, // store full SMS
       proof_path: null
     }).select().single();
     if (error) throw error;
@@ -1185,7 +1187,8 @@ app.post('/api/request-deposit', async (req, res) => {
       amount: amt,
       currency: 'ETB',
       method: payment_type,
-      transactionReference: transaction_reference
+      transactionReference: transaction_reference,
+      proofLength: proof_text ? proof_text.length : 0
     });
     res.json({ success: true, requestId: data.id, message: `Deposit request of ${amt} ETB via ${payment_type} submitted.` });
   } catch (err) {
