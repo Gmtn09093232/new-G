@@ -91,21 +91,54 @@
         .telegram-links { text-align: center; margin-top: 20px; font-size: 0.7rem; }
         .telegram-links a { color: #ea580c; text-decoration: none; font-weight: 600; }
         .telegram-links a:hover { text-decoration: underline; }
+        /* Multi-admin styles */
+        .admin-option { background: #f8fafc; border-radius: 16px; padding: 12px 16px; margin: 8px 0; border: 2px solid #e2e8f0; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; }
+        .admin-option:hover { border-color: #f97316; background: #fff7ed; }
+        .admin-option.selected { border-color: #f97316; background: #fff7ed; box-shadow: 0 0 0 3px rgba(249,115,22,0.2); }
+        .admin-option input[type="radio"] { width: 20px; height: 20px; accent-color: #f97316; flex-shrink: 0; }
+        .admin-option .admin-info { flex: 1; }
+        .admin-option .admin-name { font-weight: 600; color: #1e293b; }
+        .admin-option .admin-number { font-size: 0.8rem; color: #64748b; font-family: monospace; }
+        .admin-option .admin-badge { font-size: 0.65rem; background: #fef3c7; color: #92400e; padding: 2px 10px; border-radius: 20px; }
+        .payment-method-label { font-size: 0.8rem; font-weight: 600; color: #64748b; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
     <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
 
     <!-- MODALS -->
-    <div id="depositTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button><button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;"><span data-key="cancel">Cancel</span></button></div></div>
-    <div id="depositDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div><div class="account-card"><div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div><div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div><div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div><div class="account-number" style="font-size:1rem;">DOT BINGO OFFICIAL</div></div>
+    <div id="depositTypeModal" class="modal"><div class="modal-content">
+        <div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div>
+        <div id="depositAccountsList">
+            <!-- Accounts will be loaded here -->
+            <div style="text-align:center; padding:20px; color:#94a3b8;">Loading accounts...</div>
+        </div>
+        <button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9; margin-top:8px;"><span data-key="cancel">Cancel</span></button>
+    </div></div>
+
+    <div id="depositDetailsModal" class="modal"><div class="modal-content">
+        <div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div>
+        <div class="account-card">
+            <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
+            <div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div>
+            <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
+            <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
+            <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
+        </div>
         <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
         <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
+        <div class="input-group"><label data-key="refLabel">📝 Transaction Reference (optional)</label><input type="text" id="depositRef" placeholder="Reference from SMS"></div>
+        <div class="input-group"><label data-key="proofLabel">📋 SMS Proof (optional)</label><textarea id="depositProof" placeholder="Paste the SMS confirmation here"></textarea></div>
         <div class="transaction-summary" data-key="depositHint">💡 After sending payment, enter your details above and submit. Admin will verify your deposit using your phone number.</div>
-        <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
+        <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
+    </div></div>
+
     <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
+    
     <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div><div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
+    
     <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">100/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
+    
     <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
 
     <!-- STAKE PAGE -->
@@ -218,6 +251,7 @@
         let currentUtterance = null, soundMuted = false, speechUnlocked = false;
         let pendingSelection = null, pendingRandom = false;
         let currentStake = null;
+        let selectedAdminId = null;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
 
         // ========== LANGUAGE SUPPORT ==========
@@ -244,7 +278,8 @@
                 entryFeeLabelShort: "💰 የመግቢያ ክፍያ፦", entryFeeValues: "100/20/30 ብር (እንደ ምርጫዎ)",
                 prizeLabelShort: "🏆 የሽልማት ገንዘብ፦", prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
                 winLabelShort: "🎯 ማሸነፍ፦", winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
-                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦", claimValueShort: "ወዲያው “CLAIM BINGO!”"
+                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦", claimValueShort: "ወዲያው “CLAIM BINGO!”",
+                refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)", proofLabel: "📋 የኤስኤምኤስ ማስረጃ (አማራጭ)"
             },
             en: {
                 depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel", sendPayment: "Send payment to the number below",
@@ -265,7 +300,8 @@
                 entryFeeLabelShort: "💰 Entry Fee:", entryFeeValues: "100/20/30 Birr (as per your choice)",
                 prizeLabelShort: "🏆 Prize Money:", prizeValueShort: "80% (100% if 1 player)",
                 winLabelShort: "🎯 Winning:", winValueShort: "Row, Column, Diagonal or 4 Corners",
-                claimLabelShort: "⏱️ Claim:", claimValueShort: "Immediately 'CLAIM BINGO!'"
+                claimLabelShort: "⏱️ Claim:", claimValueShort: "Immediately 'CLAIM BINGO!'",
+                refLabel: "📝 Transaction Reference (optional)", proofLabel: "📋 SMS Proof (optional)"
             }
         };
 
@@ -306,7 +342,291 @@
         }
         applyLanguage();
 
-        // ---------- AUTO-RECONNECT ON PAGE LOAD ----------
+        // ========== LOAD DEPOSIT ACCOUNTS ==========
+        async function loadDepositAccounts() {
+            try {
+                const res = await fetch('/api/deposit-accounts');
+                const data = await res.json();
+                if (data.success) {
+                    depositAccounts = data.accounts;
+                    renderDepositAccounts();
+                }
+            } catch (e) {
+                console.error('Error loading deposit accounts:', e);
+                document.getElementById('depositAccountsList').innerHTML = 
+                    '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+            }
+        }
+
+        function renderDepositAccounts() {
+            const container = document.getElementById('depositAccountsList');
+            container.innerHTML = '';
+            
+            let hasAccounts = false;
+            
+            for (const [type, accounts] of Object.entries(depositAccounts)) {
+                if (!accounts || accounts.length === 0) continue;
+                hasAccounts = true;
+                
+                const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
+                const label = document.createElement('div');
+                label.className = 'payment-method-label';
+                label.textContent = typeLabel;
+                container.appendChild(label);
+                
+                accounts.forEach(account => {
+                    const div = document.createElement('div');
+                    div.className = 'admin-option';
+                    div.innerHTML = `
+                        <input type="radio" name="depositAccount" value="${account.adminId}" data-number="${account.number}" data-name="${account.name}">
+                        <div class="admin-info">
+                            <div class="admin-name">${account.name}</div>
+                            <div class="admin-number">📱 ${account.number}</div>
+                        </div>
+                        <span class="admin-badge">${typeLabel}</span>
+                    `;
+                    div.addEventListener('click', () => {
+                        const radio = div.querySelector('input[type="radio"]');
+                        radio.checked = true;
+                        document.querySelectorAll('.admin-option').forEach(el => el.classList.remove('selected'));
+                        div.classList.add('selected');
+                        // Open deposit details
+                        openDepositDetailsModal(type, account.adminId, account.number, account.name);
+                    });
+                    container.appendChild(div);
+                });
+            }
+            
+            if (!hasAccounts) {
+                container.innerHTML = 
+                    '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
+            }
+        }
+
+        // ========== DEPOSIT FUNCTIONS ==========
+        function openDepositTypeModal() {
+            document.getElementById('depositTypeModal').classList.add('active');
+            loadDepositAccounts(); // Refresh accounts
+            unlockSpeech();
+        }
+
+        function closeDepositTypeModal() {
+            document.getElementById('depositTypeModal').classList.remove('active');
+        }
+
+        function openDepositDetailsModal(type, adminId, accountNumber, accountName) {
+            selectedDepositType = type;
+            selectedAdminId = adminId;
+            
+            let title = type.charAt(0).toUpperCase() + type.slice(1);
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
+            
+            const copyDiv = document.getElementById('depositAccountNumber');
+            if (copyDiv) copyDiv.innerHTML = `📋 ${accountNumber}`;
+            copyDiv.setAttribute('onclick', `copyToClipboard('${accountNumber}')`);
+            
+            document.getElementById('depositAccountName').textContent = accountName || 'DOT BINGO OFFICIAL';
+            document.getElementById('depositAdminInfo').textContent = `Admin: ${accountName}`;
+            
+            document.getElementById('depositPlayerPhone').value = '';
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositRef').value = '';
+            document.getElementById('depositProof').value = '';
+            
+            document.getElementById('depositDetailsModal').classList.add('active');
+            closeDepositTypeModal();
+            unlockSpeech();
+        }
+
+        let isSubmittingDeposit = false;
+        async function submitDepositRequest() {
+            if (isSubmittingDeposit) return;
+            
+            if (!selectedAdminId) {
+                alert('Please select a deposit account first');
+                return;
+            }
+            
+            const phone = document.getElementById('depositPlayerPhone').value.trim();
+            const amount = document.getElementById('depositAmount').value.trim();
+            const ref = document.getElementById('depositRef').value.trim();
+            const proof = document.getElementById('depositProof').value.trim();
+            
+            if (!phone.match(/^(09|07)\d{8}$/)) { 
+                alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'); 
+                return; 
+            }
+            if (!amount || isNaN(amount) || Number(amount) < 10) { 
+                alert('Minimum deposit is 10 ETB'); 
+                return; 
+            }
+            
+            isSubmittingDeposit = true;
+            const submitBtn = document.getElementById('submitDepositBtn');
+            const originalText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = '⏳ Sending...';
+            
+            try {
+                const response = await fetch('/api/request-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        phone: phone,
+                        amount: Number(amount),
+                        payment_type: selectedDepositType,
+                        transaction_reference: ref || null,
+                        proof_text: proof || null,
+                        admin_id: selectedAdminId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n👤 Admin: ${result.adminName || 'Processing'}\n📱 Account: ${result.adminNumber || 'N/A'}\n\n⏳ Please wait for admin approval.`);
+                    document.getElementById('depositDetailsModal').classList.remove('active');
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Submission failed'));
+                }
+            } catch (err) {
+                alert('⚠️ Network error. Please try again.');
+                console.error('Deposit error:', err);
+            } finally {
+                isSubmittingDeposit = false;
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+                unlockSpeech();
+            }
+        }
+
+        // ========== WITHDRAWAL FUNCTIONS ==========
+        function openWithdrawTypeModal() { 
+            document.getElementById('withdrawTypeModal').classList.add('active'); 
+            unlockSpeech(); 
+        }
+
+        function closeWithdrawTypeModal() { 
+            document.getElementById('withdrawTypeModal').classList.remove('active'); 
+        }
+
+        function openWithdrawDetailsModal(type) { 
+            selectedWithdrawType = type; 
+            let title = type === 'telebirr' ? 'Telebirr' : type === 'cbebirr' ? 'CBE Birr' : 'M-Pesa'; 
+            let hint = type === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx'; 
+            document.getElementById('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`; 
+            document.getElementById('withdrawReceiver').placeholder = hint; 
+            document.getElementById('withdrawReceiver').value = ''; 
+            document.getElementById('withdrawAmount').value = ''; 
+            document.getElementById('withdrawName').value = ''; 
+            document.getElementById('withdrawDetailsModal').classList.add('active'); 
+            document.getElementById('withdrawTypeModal').classList.remove('active'); 
+            unlockSpeech(); 
+        }
+
+        let isSubmittingWithdraw = false;
+        async function submitWithdrawRequest() { 
+            if (isSubmittingWithdraw) return; 
+            const receiver = document.getElementById('withdrawReceiver').value.trim(); 
+            const amount = document.getElementById('withdrawAmount').value.trim(); 
+            const name = document.getElementById('withdrawName').value.trim(); 
+            if (!name) { alert("Full name required"); return; } 
+            if (!amount || isNaN(amount) || Number(amount) < 20) { alert('Minimum withdrawal is 20 ETB'); return; } 
+            if (!receiver.match(/^(09|07)\d{8}$/)) { alert(`Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`); return; } 
+            
+            isSubmittingWithdraw = true; 
+            const submitBtn = document.getElementById('submitWithdrawBtn'); 
+            const originalText = submitBtn.innerText; 
+            submitBtn.disabled = true; 
+            submitBtn.innerText = '⏳ Processing...'; 
+            
+            try { 
+                const response = await fetch('/api/request-withdraw', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ 
+                        amount: Number(amount), 
+                        phone: receiver, 
+                        withdrawal_type: selectedWithdrawType, 
+                        name: name 
+                    }) 
+                }); 
+                const result = await response.json(); 
+                if (result.success) { 
+                    alert('✅ Withdrawal request submitted!'); 
+                    document.getElementById('withdrawDetailsModal').classList.remove('active'); 
+                } else { 
+                    alert('❌ Error: ' + (result.error || 'Submission failed')); 
+                } 
+            } catch (err) { 
+                alert('⚠️ Network error.'); 
+            } finally { 
+                isSubmittingWithdraw = false; 
+                submitBtn.disabled = false; 
+                submitBtn.innerText = originalText; 
+                unlockSpeech(); 
+            } 
+        }
+
+        // ========== REST OF ORIGINAL FUNCTIONS ==========
+        function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
+        function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(), 100); }
+        function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
+        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45) return "ኤን"; if (num <= 60) return "ጂ"; return "ኦ"; }
+        function getAmharicNumberWord(n) { const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"]; const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"]; if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; } if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]); let ten = Math.floor(n / 10), unit = n % 10; if (unit === 0) return tens[ten]; return tens[ten] + " " + ones[unit]; }
+        function speakAmharicNumberWithLetter(number) { if (soundMuted || number < 1 || number > 75) return; if (!speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; } const fullText = getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number); if (window.speechSynthesis) { if (currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang = 'am-ET'; utterance.rate = 0.85; const voices = window.speechSynthesis.getVoices(); const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am')); if (amharicVoice) utterance.voice = amharicVoice; currentUtterance = utterance; window.speechSynthesis.speak(utterance); } }
+
+        function updatePlayerCountFromServer(count) {
+            const c = count !== undefined ? count : serverTakenNumbers.size;
+            if (playersCountEl) playersCountEl.innerText = c;
+            if (gamePlayersCountEl) gamePlayersCountEl.innerText = c;
+        }
+
+        function loadStats() { try { totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0'); totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0'); totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch (e) { recentGames = []; } updateStatsUI(); }
+        function saveStats() { localStorage.setItem('dot_bingo_total_games', totalGames); localStorage.setItem('dot_bingo_total_wins', totalWins); localStorage.setItem('dot_bingo_total_earned', totalEarned); localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10))); }
+        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++; if (win) { totalWins++; totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null }); if (recentGames.length > 10) recentGames.pop(); saveStats(); updateStatsUI(); }
+        function updateStatsUI() { document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if (recentDiv) { if (recentGames.length) { recentDiv.innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g.winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g.winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—'; const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
+        function syncBalance(v) { currentBalance = v; lobbyBalanceEl.innerText = v; if (document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText = v; if (document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText = v; if (document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText = v; }
+        function renderCard(card, containerId, clickable) { const cont = document.getElementById(containerId); if (!cont) return; cont.innerHTML = ''; if (!card || !Array.isArray(card) || card.length === 0) { cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>'; return; } const table = document.createElement('table'); table.style.borderCollapse = 'separate'; table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document.createElement('tr'); ['B', 'I', 'N', 'G', 'O'].forEach(l => { let th = document.createElement('th'); th.textContent = l; hr.appendChild(th); }); thead.appendChild(hr); table.appendChild(thead); const tbody = document.createElement('tbody'); for (let r = 0; r < 5; r++) { const tr = document.createElement('tr'); for (let c = 0; c < 5; c++) { const val = card[r][c]; const td = document.createElement('td'); td.textContent = val === 'FREE' ? '★' : val; if (val === 'FREE') td.classList.add('free'); if (markedNumbers.includes(val)) td.classList.add('marked'); if (clickable && val !== 'FREE') { td.style.cursor = 'pointer'; td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); }; } tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
+        function buildNumberGrid() { if (!numberGrid) return; numberGrid.innerHTML = ''; for (let i = 1; i <= 100; i++) { const cell = document.createElement('div'); cell.className = 'grid-cell'; cell.dataset.number = i; cell.textContent = i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i); if (isTaken && !isOwn) { cell.classList.add('taken'); cell.onclick = null; } else if (isOwn) { cell.classList.add('own-card'); cell.onclick = null; } else { cell.onclick = () => { if (!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)) { if (selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); } pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
+        function updateGridWithTakenNumbers(takenArray) { const newServerSet = new Set(takenArray); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(takenArray); if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(serverTakenNumbers.size); }
+        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l = 'O'; return `${l}-${n}`; }
+        function showLobby(sec) {
+            currentMainPage = 'lobby';
+            currentTimerSeconds = sec;
+            stakePage.classList.add('hidden');
+            lobbyPage.classList.remove('hidden');
+            gamePage.classList.add('hidden');
+            historyPage.classList.add('hidden');
+            walletPage.classList.add('hidden');
+            profilePage.classList.add('hidden');
+            isGameActive = false;
+            markedNumbers = [];
+            if (socket) socket.emit('getBalance');
+            startTimer(sec);
+            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            updateStatsUI();
+        }
+        function showGame() {
+            currentMainPage = 'game';
+            stakePage.classList.add('hidden');
+            lobbyPage.classList.add('hidden');
+            gamePage.classList.remove('hidden');
+            historyPage.classList.add('hidden');
+            walletPage.classList.add('hidden');
+            profilePage.classList.add('hidden');
+            isGameActive = true;
+            clearInterval(lobbyTimerInterval);
+            if (socket) socket.emit('getBalance');
+            if (userCard.length) renderCard(userCard, 'gameCard', true);
+        }
+        function startTimer(sec) { let left = sec; lobbyTimerEl.textContent = left + 's'; clearInterval(lobbyTimerInterval); lobbyTimerInterval = setInterval(() => { left--; currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent = left + 's'; }, 1000); }
+        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
+        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; serverTakenNumbers.clear(); displayTakenNumbers.clear(); currentStake = null; localStorage.removeItem('dot_bingo_stake'); if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); lobbyPage.classList.add('hidden'); gamePage.classList.add('hidden'); stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
+
+        function showWinnerOverlay(data) { if (data.noWinner) { if (currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length > 1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML = title; document.getElementById('winListContainer').innerHTML = winnersList.map(w => `<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv = document.createElement('div'); confDiv.className = 'confetti'; for (let i = 0; i < 120; i++) { let p = document.createElement('div'); p.className = 'confetti-piece'; p.style.left = Math.random() * 100 + '%'; p.style.animationDuration = (Math.random() * 3 + 2) + 's'; p.style.backgroundColor = `hsl(${Math.random() * 30 + 20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
+
+        // ---------- AUTO-RECONNECT ----------
         function restoreGameSession() {
             const savedStake = localStorage.getItem('dot_bingo_stake');
             if (savedStake) {
@@ -400,134 +720,16 @@
             socket.on('withdrawStatus', data => alert(data.status === 'approved' ? `✅ Withdrawal -${data.amount} ETB processed.` : '❌ Withdrawal rejected.'));
         }
 
-        // ========== REST OF ORIGINAL FUNCTIONS (SMS removed) ==========
-        function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
-        function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(), 100); }
-        function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
-        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45) return "ኤን"; if (num <= 60) return "ጂ"; return "ኦ"; }
-        function getAmharicNumberWord(n) { const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"]; const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"]; if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; } if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]); let ten = Math.floor(n / 10),
-                unit = n % 10; if (unit === 0) return tens[ten]; return tens[ten] + " " + ones[unit]; }
-        function speakAmharicNumberWithLetter(number) { if (soundMuted || number < 1 || number > 75) return; if (!speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; } const fullText = getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number); if (window.speechSynthesis) { if (currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang = 'am-ET'; utterance.rate = 0.85; const voices = window.speechSynthesis.getVoices(); const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am')); if (amharicVoice) utterance.voice = amharicVoice; currentUtterance = utterance; window.speechSynthesis.speak(utterance); } }
-
-        function updatePlayerCountFromServer(count) {
-            const c = count !== undefined ? count : serverTakenNumbers.size;
-            if (playersCountEl) playersCountEl.innerText = c;
-            if (gamePlayersCountEl) gamePlayersCountEl.innerText = c;
-        }
-
-        function loadStats() { try { totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0'); totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0'); totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch (e) { recentGames = []; } updateStatsUI(); }
-        function saveStats() { localStorage.setItem('dot_bingo_total_games', totalGames); localStorage.setItem('dot_bingo_total_wins', totalWins); localStorage.setItem('dot_bingo_total_earned', totalEarned); localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10))); }
-        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++; if (win) { totalWins++; totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null }); if (recentGames.length > 10) recentGames.pop(); saveStats(); updateStatsUI(); }
-        function updateStatsUI() { document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if (recentDiv) { if (recentGames.length) { recentDiv.innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g.winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g.winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—'; const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
-        function syncBalance(v) { currentBalance = v; lobbyBalanceEl.innerText = v; if (document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText = v; if (document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText = v; if (document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText = v; }
-        function renderCard(card, containerId, clickable) { const cont = document.getElementById(containerId); if (!cont) return; cont.innerHTML = ''; if (!card || !Array.isArray(card) || card.length === 0) { cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>'; return; } const table = document.createElement('table'); table.style.borderCollapse = 'separate'; table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document.createElement('tr'); ['B', 'I', 'N', 'G', 'O'].forEach(l => { let th = document.createElement('th'); th.textContent = l; hr.appendChild(th); }); thead.appendChild(hr); table.appendChild(thead); const tbody = document.createElement('tbody'); for (let r = 0; r < 5; r++) { const tr = document.createElement('tr'); for (let c = 0; c < 5; c++) { const val = card[r][c]; const td = document.createElement('td'); td.textContent = val === 'FREE' ? '★' : val; if (val === 'FREE') td.classList.add('free'); if (markedNumbers.includes(val)) td.classList.add('marked'); if (clickable && val !== 'FREE') { td.style.cursor = 'pointer'; td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); }; } tr.appendChild(td); } tbody.appendChild(tr); } table.appendChild(tbody); cont.appendChild(table); }
-        function buildNumberGrid() { if (!numberGrid) return; numberGrid.innerHTML = ''; for (let i = 1; i <= 100; i++) { const cell = document.createElement('div'); cell.className = 'grid-cell'; cell.dataset.number = i; cell.textContent = i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i); if (isTaken && !isOwn) { cell.classList.add('taken'); cell.onclick = null; } else if (isOwn) { cell.classList.add('own-card'); cell.onclick = null; } else { cell.onclick = () => { if (!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)) { if (selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); } pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i; buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
-        function updateGridWithTakenNumbers(takenArray) { const newServerSet = new Set(takenArray); serverTakenNumbers = newServerSet; const newDisplaySet = new Set(takenArray); if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid(); updatePlayerCountFromServer(serverTakenNumbers.size); }
-        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l = 'O'; return `${l}-${n}`; }
-        function showLobby(sec) {
-            currentMainPage = 'lobby';
-            currentTimerSeconds = sec;
-            stakePage.classList.add('hidden');
-            lobbyPage.classList.remove('hidden');
-            gamePage.classList.add('hidden');
-            historyPage.classList.add('hidden');
-            walletPage.classList.add('hidden');
-            profilePage.classList.add('hidden');
-            isGameActive = false;
-            markedNumbers = [];
-            if (socket) socket.emit('getBalance');
-            startTimer(sec);
-            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
-            updateStatsUI();
-        }
-        function showGame() {
-            currentMainPage = 'game';
-            stakePage.classList.add('hidden');
-            lobbyPage.classList.add('hidden');
-            gamePage.classList.remove('hidden');
-            historyPage.classList.add('hidden');
-            walletPage.classList.add('hidden');
-            profilePage.classList.add('hidden');
-            isGameActive = true;
-            clearInterval(lobbyTimerInterval);
-            if (socket) socket.emit('getBalance');
-            if (userCard.length) renderCard(userCard, 'gameCard', true);
-        }
-        function startTimer(sec) { let left = sec; lobbyTimerEl.textContent = left + 's'; clearInterval(lobbyTimerInterval); lobbyTimerInterval = setInterval(() => { left--; currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent = left + 's'; }, 1000); }
-        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
-        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; serverTakenNumbers.clear(); displayTakenNumbers.clear(); currentStake = null; localStorage.removeItem('dot_bingo_stake'); if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); lobbyPage.classList.add('hidden'); gamePage.classList.add('hidden'); stakePage.classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
-
-        async function loadDepositAccounts() { try { const res = await fetch('/api/deposit-accounts'); depositAccounts = await res.json(); } catch (e) {} }
-        function openDepositTypeModal() { document.getElementById('depositTypeModal').classList.add('active'); unlockSpeech(); }
-        function closeDepositTypeModal() { document.getElementById('depositTypeModal').classList.remove('active'); }
-        function openDepositDetailsModal(type) {
-            selectedDepositType = type;
-            let acc = '',
-                title = '',
-                hint = '';
-            if (type === 'telebirr') { title = 'Telebirr';
-                acc = depositAccounts.telebirr || '0924839730';
-                hint = '09xxxxxxxx'; } else if (type === 'cbebirr') { title = 'CBE Birr';
-                acc = depositAccounts.cbebirr || '1000123456789';
-                hint = '09xxxxxxxx'; } else { title = 'M-Pesa';
-                acc = depositAccounts.mpesa || '0712345678';
-                hint = '07xxxxxxxx'; }
-            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
-            const copyDiv = document.getElementById('depositAccountNumber');
-            if (copyDiv) copyDiv.innerHTML = `📋 ${acc}`;
-            copyDiv.setAttribute('onclick', `copyToClipboard('${acc}')`);
-            document.getElementById('depositPlayerPhone').placeholder = hint;
-            document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmount').value = '';
-            document.getElementById('depositDetailsModal').classList.add('active');
-            closeDepositTypeModal();
-            unlockSpeech();
-        }
-        let isSubmittingDeposit = false;
-        async function submitDepositRequest() {
-            if (isSubmittingDeposit) return;
-            const phone = document.getElementById('depositPlayerPhone').value.trim();
-            const amount = document.getElementById('depositAmount').value.trim();
-            if (!phone.match(/^(09|07)\d{8}$/)) { alert('Invalid phone number.'); return; }
-            if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit 10 ETB'); return; }
-            isSubmittingDeposit = true;
-            const submitBtn = document.getElementById('submitDepositBtn');
-            const originalText = submitBtn.innerText;
-            submitBtn.disabled = true;
-            submitBtn.innerText = '⏳ Sending...';
-            try {
-                const response = await fetch('/api/request-deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, amount, payment_type: selectedDepositType }) });
-                const result = await response.json();
-                if (result.success) { alert('✅ Deposit request submitted!'); document.getElementById('depositDetailsModal').classList.remove('active'); } else { alert('❌ Error: ' + (result.error || 'Submission failed')); }
-            } catch (err) { alert('⚠️ Network error.'); } finally { isSubmittingDeposit = false; submitBtn.disabled = false; submitBtn.innerText = originalText; unlockSpeech(); }
-        }
-        function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active'); unlockSpeech(); }
-        function openWithdrawDetailsModal(type) { selectedWithdrawType = type; let title = type === 'telebirr' ? 'Telebirr' : type === 'cbebirr' ? 'CBE Birr' : 'M-Pesa'; let hint = type === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx'; document.getElementById('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`; document.getElementById('withdrawReceiver').placeholder = hint; document.getElementById('withdrawReceiver').value = ''; document.getElementById('withdrawAmount').value = ''; document.getElementById('withdrawName').value = ''; document.getElementById('withdrawDetailsModal').classList.add('active'); document.getElementById('withdrawTypeModal').classList.remove('active'); unlockSpeech(); }
-        let isSubmittingWithdraw = false;
-        async function submitWithdrawRequest() { if (isSubmittingWithdraw) return; const receiver = document.getElementById('withdrawReceiver').value.trim(); const amount = document.getElementById('withdrawAmount').value.trim(); const name = document.getElementById('withdrawName').value.trim(); if (!name) { alert("Full name required"); return; } if (!amount || isNaN(amount) || Number(amount) < 20) { alert('Min 20 ETB'); return; } if (!receiver.match(/^(09|07)\d{8}$/)) { alert(`Invalid ${selectedWithdrawType} number`); return; } isSubmittingWithdraw = true; const submitBtn = document.getElementById('submitWithdrawBtn'); const originalText = submitBtn.innerText; submitBtn.disabled = true; submitBtn.innerText = '⏳ Processing...'; try { const response = await fetch('/api/request-withdraw', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, phone: receiver, withdrawal_type: selectedWithdrawType, name }) }); const result = await response.json(); if (result.success) { alert('✅ Withdrawal request submitted!'); document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: ' + (result.error || 'Submission failed')); } } catch (err) { alert('⚠️ Network error.'); } finally { isSubmittingWithdraw = false; submitBtn.disabled = false; submitBtn.innerText = originalText; unlockSpeech(); } }
-
-        function showWinnerOverlay(data) { if (data.noWinner) { if (currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length > 1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML = title; document.getElementById('winListContainer').innerHTML = winnersList.map(w => `<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv = document.createElement('div'); confDiv.className = 'confetti'; for (let i = 0; i < 120; i++) { let p = document.createElement('div'); p.className = 'confetti-piece'; p.style.left = Math.random() * 100 + '%'; p.style.animationDuration = (Math.random() * 3 + 2) + 's'; p.style.backgroundColor = `hsl(${Math.random() * 30 + 20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
-
         // ========== EVENT LISTENERS ==========
-        document.getElementById('stake100Btn')?.addEventListener('click', () => { alert('100 ETB stake selected'); loadStats(); connectToGame(100);
-            showLobby(30);
-            unlockSpeech(); });
-        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected'); loadStats(); connectToGame(20);
-            showLobby(30);
-            unlockSpeech(); });
-        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30);
-            showLobby(30);
-            unlockSpeech(); });
+        document.getElementById('stake100Btn')?.addEventListener('click', () => { alert('100 ETB stake selected'); loadStats(); connectToGame(100); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected'); loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
         document.getElementById('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumberEl.textContent = '⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
-        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo');
-            unlockSpeech(); });
+        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
         document.getElementById('muteToggleBtn')?.addEventListener('click', toggleMute);
         document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
 
-        document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('click', () => { const page = btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if (page === 'lobby') { if (currentMainPage === 'lobby') showLobby(currentTimerSeconds); else showGame(); } else { if (currentMainPage === 'lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if (page === 'history') historyPage.classList.remove('hidden'); else if (page === 'wallet') { walletPage.classList.remove('hidden');
-                    syncBalance(currentBalance); } else if (page === 'profile') { profilePage.classList.remove('hidden');
-                    syncBalance(currentBalance);
-                    updateStatsUI(); } } unlockSpeech(); }); });
+        document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('click', () => { const page = btn.getAttribute('data-page'); clearInterval(lobbyTimerInterval); if (page === 'lobby') { if (currentMainPage === 'lobby') showLobby(currentTimerSeconds); else showGame(); } else { if (currentMainPage === 'lobby') lobbyPage.classList.add('hidden'); else gamePage.classList.add('hidden'); if (page === 'history') historyPage.classList.remove('hidden'); else if (page === 'wallet') { walletPage.classList.remove('hidden'); syncBalance(currentBalance); } else if (page === 'profile') { profilePage.classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); } } unlockSpeech(); }); });
 
         document.getElementById('backFromHistoryBtn')?.addEventListener('click', goBackToMain);
         document.getElementById('backFromWalletBtn')?.addEventListener('click', goBackToMain);
@@ -537,23 +739,22 @@
         document.getElementById('withdrawFromWalletBtn')?.addEventListener('click', openWithdrawTypeModal);
         document.getElementById('depositBtn')?.addEventListener('click', openDepositTypeModal);
         document.getElementById('withdrawBtn')?.addEventListener('click', openWithdrawTypeModal);
-        document.querySelectorAll('#depositTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click', () => openDepositDetailsModal(btn.dataset.type)));
+        
         document.getElementById('closeDepositTypeBtn')?.addEventListener('click', closeDepositTypeModal);
-        document.getElementById('backDepositBtn')?.addEventListener('click', () => { document.getElementById('depositDetailsModal').classList.remove('active');
-            openDepositTypeModal(); });
+        document.getElementById('backDepositBtn')?.addEventListener('click', () => { document.getElementById('depositDetailsModal').classList.remove('active'); openDepositTypeModal(); });
         document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
+        
         document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click', () => openWithdrawDetailsModal(btn.dataset.type)));
         document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click', () => document.getElementById('withdrawTypeModal').classList.remove('active'));
-        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => { document.getElementById('withdrawDetailsModal').classList.remove('active');
-            openWithdrawTypeModal(); });
+        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => { document.getElementById('withdrawDetailsModal').classList.remove('active'); openWithdrawTypeModal(); });
         document.getElementById('submitWithdrawBtn')?.addEventListener('click', submitWithdrawRequest);
-        const rulesModal = document.getElementById('rulesModal'),
-            closeRules = document.getElementById('closeRulesBtn');
+        
+        const rulesModal = document.getElementById('rulesModal'), closeRules = document.getElementById('closeRulesBtn');
         document.getElementById('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
         document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
-        // ---------- INIT ----------
+        // ========== INIT ==========
         loadDepositAccounts();
         buildNumberGrid();
         loadStats();
