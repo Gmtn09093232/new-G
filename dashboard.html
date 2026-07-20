@@ -2,198 +2,1057 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>👥 User Management | Bingo Admin</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Bingo</title>
   <style>
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #0a0f1c; color: #eee; padding: 12px; margin: 0; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    h1 { color: #f39c12; font-size: 1.6rem; margin: 0 0 16px; text-align: center; }
-    .total-card { background: #1e3a3f; border-radius: 28px; padding: 14px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-left: 6px solid #f39c12; }
-    .total-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: #f39c12; font-weight: bold; }
-    .total-value { font-size: 1.8rem; font-weight: 800; color: #2ecc71; }
-    .stats-bar { background: #2c3e50; border-radius: 40px; padding: 10px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-    .players-table-wrapper { background: #0f1724; border-radius: 24px; padding: 4px; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 600px; }
-    th { text-align: left; padding: 12px 8px; background: #0f1724; color: #f39c12; font-weight: bold; border-bottom: 2px solid #f39c12; }
-    td { padding: 12px 8px; border-bottom: 1px solid #2c3e50; vertical-align: middle; }
-    .handle { color: #2ecc71; font-family: monospace; }
-    .telegram-id { font-family: monospace; font-size: 0.75rem; background: #0f1724; padding: 4px 6px; border-radius: 8px; display: inline-block; }
-    .balance-positive { color: #2ecc71; font-weight: bold; }
-    .balance-zero { color: #95a5a6; }
-    .balance-negative { color: #e74c3c; font-weight: bold; }
-    button { background: #f39c12; border: none; padding: 10px 20px; border-radius: 48px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: 0.1s; }
-    .delete-btn { background: #e74c3c; color: white; padding: 4px 12px; font-size: 0.75rem; }
-    .edit-balance-btn { background: #3498db; color: white; padding: 4px 12px; font-size: 0.75rem; margin-right: 6px; }
-    .refresh-btn { background: #3498db; color: white; margin-bottom: 20px; width: auto; display: inline-block; }
-    button:active { transform: scale(0.97); }
-    .empty-message { text-align: center; padding: 32px 20px; color: #95a5a6; font-style: italic; }
-    .footer { text-align: center; font-size: 0.7rem; margin-top: 24px; color: #5d6d7e; }
-    @media (max-width: 700px) { th, td { padding: 8px 4px; font-size: 0.75rem; } .total-value { font-size: 1.4rem; } }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px 0;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .header .subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 5px;
+    }
+
+    .header .admin-info {
+      font-size: 13px;
+      opacity: 0.85;
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .header .admin-info span {
+      background: rgba(255,255,255,0.15);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 18px 20px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .stat-card .label {
+      font-size: 13px;
+      color: #888;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-top: 5px;
+    }
+
+    .stat-card .value.green { color: #10b981; }
+    .stat-card .value.blue { color: #3b82f6; }
+    .stat-card .value.orange { color: #f59e0b; }
+    .stat-card .value.red { color: #ef4444; }
+    .stat-card .value.purple { color: #8b5cf6; }
+
+    .stat-card .sub-value {
+      font-size: 12px;
+      color: #999;
+      margin-top: 3px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .tab-btn {
+      padding: 10px 22px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      background: #f3f4f6;
+      color: #333;
+    }
+
+    .tab-btn.active {
+      background: #667eea;
+      color: white;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .tab-btn .badge {
+      display: inline-block;
+      background: #ef4444;
+      color: white;
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 12px;
+      margin-left: 5px;
+    }
+
+    /* Tab Content */
+    .tab-content {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      min-height: 300px;
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    .tab-pane h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    /* Table */
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    table th {
+      background: #f8fafc;
+      text-align: left;
+      padding: 12px 14px;
+      font-weight: 600;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap;
+    }
+
+    table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    table tr:hover td {
+      background: #fafbfc;
+    }
+
+    .user-cell {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-cell .name {
+      font-weight: 500;
+      color: #1e293b;
+    }
+
+    .user-cell .id {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-badge.approved {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-badge.rejected {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-sm {
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+
+    .btn-success {
+      background: #10b981;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #059669;
+      transform: scale(1.02);
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+      transform: scale(1.02);
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5b6fd4;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: #667eea;
+      border: 1.5px solid #667eea;
+    }
+
+    .btn-outline:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+    }
+
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .empty-state p {
+      font-size: 15px;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: #94a3b8;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 14px 24px;
+      border-radius: 10px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.4s ease;
+      z-index: 999;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: #10b981;
+    }
+
+    .toast.error {
+      background: #ef4444;
+    }
+
+    .toast.info {
+      background: #3b82f6;
+    }
+
+    /* Refresh button */
+    .refresh-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 14px 18px;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+      transition: all 0.3s;
+      font-size: 18px;
+      z-index: 100;
+    }
+
+    .refresh-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 24px rgba(102, 126, 234, 0.5);
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 640px) {
+      .header h1 {
+        font-size: 20px;
+      }
+      
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+
+      .stat-card .value {
+        font-size: 22px;
+      }
+
+      .tabs {
+        padding: 6px 10px;
+      }
+
+      .tab-btn {
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+
+      .tab-content {
+        padding: 14px;
+      }
+
+      table {
+        font-size: 13px;
+      }
+
+      table th, table td {
+        padding: 8px 10px;
+      }
+
+      .action-buttons .btn {
+        font-size: 11px;
+        padding: 3px 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .stat-card {
+        padding: 12px 14px;
+      }
+
+      .stat-card .value {
+        font-size: 20px;
+      }
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #c1c7d0;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0a7b0;
+    }
   </style>
 </head>
 <body>
-<div class="container">
-  <h1>👥 User Management</h1>
 
-  <div class="total-card">
-    <span class="total-label">💰 TOTAL BALANCE (All users)</span>
-    <span class="total-value" id="totalBalanceSum">0</span>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <h1>📊 Admin Dashboard</h1>
+      <div class="subtitle">Manage your players, deposits, and withdrawals</div>
+      <div class="admin-info" id="adminInfo">
+        <span>👤 Loading...</span>
+        <span>📱 Loading...</span>
+        <span>💳 Loading...</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="label">👥 Players</div>
+        <div class="value blue" id="statPlayers">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">💰 Total Deposits</div>
+        <div class="value green" id="statDeposits">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">📈 Today's Deposits</div>
+        <div class="value orange" id="statTodayDeposits">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">⏳ Pending Deposits</div>
+        <div class="value red" id="statPendingDeposits">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">🏦 Total Withdrawals</div>
+        <div class="value orange" id="statWithdrawals">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">⏳ Pending Withdrawals</div>
+        <div class="value red" id="statPendingWithdrawals">-</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="deposits" onclick="switchTab('deposits')">
+        💰 Deposits <span class="badge" id="depositBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">
+        🏦 Withdrawals <span class="badge" id="withdrawalBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
+        👥 Players <span class="badge" id="playerBadge">0</span>
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+
+      <!-- Deposits Tab -->
+      <div class="tab-pane active" id="tab-deposits">
+        <h2>💰 Pending Deposit Requests</h2>
+        <div id="depositsList">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top:10px;">Loading deposits...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Withdrawals Tab -->
+      <div class="tab-pane" id="tab-withdrawals">
+        <h2>🏦 Pending Withdrawal Requests</h2>
+        <div id="withdrawalsList">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top:10px;">Loading withdrawals...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Players Tab -->
+      <div class="tab-pane" id="tab-players">
+        <h2>👥 Your Players</h2>
+        <div id="playersList">
+          <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top:10px;">Loading players...</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
-  <div class="stats-bar">
-    <span>👥 Total registered:</span>
-    <span id="registeredCount">0</span>
-    <button id="refreshBtn" class="refresh-btn">⟳ Refresh List</button>
-  </div>
 
-  <div class="players-table-wrapper">
-    <table id="usersTable">
-      <thead>
-        <tr><th>@ Handle</th><th>🆔 Telegram ID</th><th>👤 Username</th><th>💰 Balance</th><th>✏️ Balance</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="usersTableBody">
-        <tr><td colspan="6" class="empty-message">Loading users…</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="footer">⚠️ Deleting a user removes them from all active games and the database. They can rejoin as a new player.</div>
-</div>
+  <!-- Refresh Button -->
+  <button class="refresh-btn" onclick="refreshAll()" title="Refresh all data">
+    🔄
+  </button>
 
-<script>
-  const ADMIN_SECRET = prompt("Enter admin secret:") || "your_secret_here";
-  const API_BASE = '';
-  let adminSocket = null;
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
 
-  function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;')); }
+  <script>
+    // Get admin secret from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const SECRET = urlParams.get('secret');
 
-  function connectAdminSocket() {
-    if (adminSocket) adminSocket.disconnect();
-    adminSocket = io('/admin', { query: { secret: ADMIN_SECRET } });
-    adminSocket.on('connect', () => {
-      console.log('Admin socket connected for user management');
-      adminSocket.emit('admin:getAllRegisteredPlayers');
-    });
-    adminSocket.on('admin:allRegisteredPlayers', (data) => {
-      renderUsersTable(data.users);
-    });
-    adminSocket.on('connect_error', (err) => {
-      console.error('Socket error:', err);
-      document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="empty-message">❌ WebSocket error – check secret and server.</td></tr>';
-    });
-  }
-
-  async function editBalance(telegramId) {
-    const newBalance = prompt(`Enter new balance (ETB) for user ${telegramId}:`, '0');
-    if (newBalance === null) return; // cancelled
-    const num = parseFloat(newBalance);
-    if (isNaN(num) || num < 0) {
-      alert('Please enter a valid non‑negative number.');
-      return;
-    }
-    try {
-      const res = await fetch(`${API_BASE}/admin/set-balance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, userId: telegramId, newBalance: num })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`✅ Balance for ${telegramId} updated to ${num} ETB.`);
-        // Refresh the list via socket
-        if (adminSocket) adminSocket.emit('admin:getAllRegisteredPlayers');
-      } else {
-        alert(`❌ Error: ${data.error || 'Update failed'}`);
-      }
-    } catch (err) {
-      alert(`⚠️ Network error: ${err.message}`);
-    }
-  }
-
-  function renderUsersTable(users) {
-    const tbody = document.getElementById('usersTableBody');
-    const countSpan = document.getElementById('registeredCount');
-    countSpan.innerText = users ? users.length : 0;
-
-    let totalBalance = 0;
-    if (users && users.length > 0) {
-      totalBalance = users.reduce((sum, u) => sum + (u.balance || 0), 0);
-    }
-    document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
-
-    if (!users || users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-message">📭 No registered users found.</td></tr>';
-      return;
-    }
-
-    const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
-    let html = '';
-    sorted.forEach(user => {
-      const telegramId = escapeHtml(user.telegramId);
-      const username = escapeHtml(user.username) || '—';
-      const balance = user.balance ?? 0;
-      const handle = user.telegram_handle;
-      const handleDisplay = handle ? `@${handle}` : '—';
-      let balanceClass = 'balance-zero';
-      if (balance > 0) balanceClass = 'balance-positive';
-      else if (balance < 0) balanceClass = 'balance-negative';
-      const formattedBalance = balance.toLocaleString();
-
-      html += `
-        <tr>
-          <td><span class="handle">${handleDisplay}</span></td>
-          <td><span class="telegram-id">${telegramId}</span></td>
-          <td>📱 ${username}</td>
-          <td><span class="${balanceClass}">${formattedBalance}</span></td>
-          <td><button class="edit-balance-btn" data-id="${telegramId}">✏️ Edit</button></td>
-          <td><button class="delete-btn" data-id="${telegramId}" style="background:#e74c3c; padding:4px 12px;">🗑️ Delete</button></td>
-        </tr>
+    // Check if secret is provided
+    if (!SECRET) {
+      document.body.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;padding:20px;">
+          <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+          <h2 style="color:#ef4444;">Missing Admin Secret</h2>
+          <p style="color:#6b7280;max-width:400px;text-align:center;margin-top:8px;">
+            Please add <code style="background:#f3f4f6;padding:2px 8px;border-radius:4px;">?secret=YOUR_SECRET</code> to the URL.
+          </p>
+          <p style="color:#9ca3af;font-size:13px;margin-top:12px;">
+            Example: admin-dashboard.html?secret=admin_secret_1
+          </p>
+        </div>
       `;
-    });
-    tbody.innerHTML = html;
-
-    // Attach edit event listeners
-    document.querySelectorAll('.edit-balance-btn').forEach(btn => {
-      btn.removeEventListener('click', handleEdit);
-      btn.addEventListener('click', handleEdit);
-    });
-
-    // Attach delete event listeners
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-      btn.removeEventListener('click', handleDelete);
-      btn.addEventListener('click', handleDelete);
-    });
-  }
-
-  async function handleEdit(e) {
-    const telegramId = e.currentTarget.getAttribute('data-id');
-    await editBalance(telegramId);
-  }
-
-  async function handleDelete(e) {
-    const telegramId = e.currentTarget.getAttribute('data-id');
-    if (!confirm(`⚠️ Delete user ${telegramId}?\nThis will remove them from all active games and database permanently.`)) return;
-    try {
-      const res = await fetch(`${API_BASE}/admin/delete-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: ADMIN_SECRET, telegramId })
-      });
-      const data = await res.json();
-      alert(data.success ? `User ${telegramId} deleted.` : `Error: ${data.error}`);
-      if (data.success && adminSocket) {
-        adminSocket.emit('admin:getAllRegisteredPlayers');
-      }
-    } catch (err) {
-      alert(`Delete failed: ${err.message}`);
+      throw new Error('Missing admin secret');
     }
-  }
 
-  document.getElementById('refreshBtn').addEventListener('click', () => {
-    if (adminSocket) adminSocket.emit('admin:getAllRegisteredPlayers');
-  });
+    // State
+    let currentTab = 'deposits';
+    let refreshInterval = null;
+    let isRefreshing = false;
 
-  connectAdminSocket();
-</script>
+    // ---------- Toast ----------
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast ${type}`;
+      toast.classList.add('show');
+      
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 4000);
+    }
+
+    // ---------- Tab Switching ----------
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      // Update tab buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+      });
+      
+      // Update tab panes
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === `tab-${tab}`);
+      });
+      
+      // Load tab content
+      if (tab === 'deposits') loadDeposits();
+      else if (tab === 'withdrawals') loadWithdrawals();
+      else if (tab === 'players') loadPlayers();
+    }
+
+    // ---------- Load Stats ----------
+    async function loadStats() {
+      try {
+        const response = await fetch(`/admin/stats?secret=${SECRET}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load stats');
+        }
+        
+        // Update admin info
+        document.getElementById('adminInfo').innerHTML = `
+          <span>👤 ${data.admin.name}</span>
+          <span>📱 ${data.admin.phone}</span>
+          <span>💳 ${data.admin.deposit_number}</span>
+        `;
+        
+        // Update stats
+        document.getElementById('statPlayers').textContent = data.stats.playerCount;
+        document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(2)} ETB`;
+        document.getElementById('statTodayDeposits').textContent = `${data.stats.todayDeposits.toFixed(2)} ETB`;
+        document.getElementById('statPendingDeposits').textContent = data.stats.pendingDeposits;
+        document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(2)} ETB`;
+        document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
+        
+        // Update badges
+        document.getElementById('depositBadge').textContent = data.stats.pendingDeposits;
+        document.getElementById('withdrawalBadge').textContent = data.stats.pendingWithdrawals;
+        document.getElementById('playerBadge').textContent = data.stats.playerCount;
+        
+        return data;
+      } catch (error) {
+        console.error('Error loading stats:', error);
+        showToast('Error loading stats: ' + error.message, 'error');
+        return null;
+      }
+    }
+
+    // ---------- Load Deposits ----------
+    async function loadDeposits() {
+      const container = document.getElementById('depositsList');
+      
+      try {
+        const response = await fetch(`/admin/deposits?secret=${SECRET}`);
+        const data = await response.json();
+        
+        if (!data.requests) {
+          throw new Error('Invalid response');
+        }
+        
+        if (data.requests.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">✅</div>
+              <p>No pending deposit requests</p>
+            </div>
+          `;
+          return;
+        }
+        
+        container.innerHTML = `
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Amount</th>
+                  <th>Phone</th>
+                  <th>Reference</th>
+                  <th>Payment</th>
+                  <th>Submitted</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.requests.map(req => `
+                  <tr>
+                    <td>
+                      <div class="user-cell">
+                        <span class="name">${escapeHtml(req.username)}</span>
+                        <span class="id">ID: ${req.telegram_id}</span>
+                      </div>
+                    </td>
+                    <td><strong>${req.amount} ETB</strong></td>
+                    <td>${req.phone || 'N/A'}</td>
+                    <td>${req.transaction_reference || 'N/A'}</td>
+                    <td><span class="status-badge pending">${req.payment_type}</span></td>
+                    <td>${formatDate(req.created_at)}</td>
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn btn-success btn-sm" onclick="processDeposit(${req.id}, 'approve')">✅ Approve</button>
+                        <button class="btn btn-danger btn-sm" onclick="processDeposit(${req.id}, 'reject')">❌ Reject</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading deposits:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">❌</div>
+            <p style="color:#ef4444;">Error loading deposits: ${escapeHtml(error.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    // ---------- Load Withdrawals ----------
+    async function loadWithdrawals() {
+      const container = document.getElementById('withdrawalsList');
+      
+      try {
+        const response = await fetch(`/admin/withdrawals?secret=${SECRET}`);
+        const data = await response.json();
+        
+        if (!data.requests) {
+          throw new Error('Invalid response');
+        }
+        
+        if (data.requests.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">✅</div>
+              <p>No pending withdrawal requests</p>
+            </div>
+          `;
+          return;
+        }
+        
+        container.innerHTML = `
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Amount</th>
+                  <th>Phone</th>
+                  <th>Type</th>
+                  <th>Account Name</th>
+                  <th>Submitted</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.requests.map(req => `
+                  <tr>
+                    <td>
+                      <div class="user-cell">
+                        <span class="name">${escapeHtml(req.username)}</span>
+                        <span class="id">ID: ${req.telegram_id}</span>
+                      </div>
+                    </td>
+                    <td><strong>${req.amount} ETB</strong></td>
+                    <td>${req.phone_number || 'N/A'}</td>
+                    <td><span class="status-badge pending">${req.withdrawal_type}</span></td>
+                    <td>${req.receiver_name || 'N/A'}</td>
+                    <td>${formatDate(req.created_at)}</td>
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn btn-success btn-sm" onclick="processWithdrawal(${req.id}, 'approve')">✅ Approve</button>
+                        <button class="btn btn-danger btn-sm" onclick="processWithdrawal(${req.id}, 'reject')">❌ Reject</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading withdrawals:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">❌</div>
+            <p style="color:#ef4444;">Error loading withdrawals: ${escapeHtml(error.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    // ---------- Load Players ----------
+    async function loadPlayers() {
+      const container = document.getElementById('playersList');
+      
+      try {
+        const response = await fetch(`/admin/players?secret=${SECRET}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load players');
+        }
+        
+        if (data.players.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="icon">👤</div>
+              <p>No players assigned to you yet</p>
+              <p style="font-size:13px;color:#94a3b8;margin-top:4px;">Players will appear here after their first deposit</p>
+            </div>
+          `;
+          return;
+        }
+        
+        container.innerHTML = `
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Balance</th>
+                  <th>Referred By</th>
+                  <th>First Deposit</th>
+                  <th>Recent Deposits</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.players.map(player => `
+                  <tr>
+                    <td>
+                      <div class="user-cell">
+                        <span class="name">${escapeHtml(player.username)}</span>
+                        <span class="id">ID: ${player.telegram_id}</span>
+                      </div>
+                    </td>
+                    <td><strong>${player.balance.toFixed(2)} ETB</strong></td>
+                    <td>${player.referred_by || 'N/A'}</td>
+                    <td>${player.first_deposit_amount > 0 ? player.first_deposit_amount + ' ETB' : 'None'}</td>
+                    <td>
+                      ${player.recentDeposits && player.recentDeposits.length > 0 ? 
+                        player.recentDeposits.slice(0, 3).map(d => 
+                          `<span class="status-badge ${d.status}">${d.amount} ETB</span>`
+                        ).join(' ') : 
+                        'No deposits'
+                      }
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <p style="margin-top:12px;color:#94a3b8;font-size:13px;">
+            Total: <strong>${data.count}</strong> players
+          </p>
+        `;
+      } catch (error) {
+        console.error('Error loading players:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">❌</div>
+            <p style="color:#ef4444;">Error loading players: ${escapeHtml(error.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    // ---------- Process Deposit ----------
+    async function processDeposit(requestId, action) {
+      if (!confirm(`Are you sure you want to ${action} this deposit request?`)) return;
+      
+      try {
+        const response = await fetch('/admin/process-deposit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: SECRET,
+            requestId: requestId,
+            action: action
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showToast(`✅ Deposit ${action}ed successfully!`, 'success');
+          refreshAll();
+        } else {
+          throw new Error(data.error || 'Failed to process');
+        }
+      } catch (error) {
+        showToast('❌ Error: ' + error.message, 'error');
+      }
+    }
+
+    // ---------- Process Withdrawal ----------
+    async function processWithdrawal(requestId, action) {
+      if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
+      
+      try {
+        const response = await fetch('/admin/process-withdrawal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            secret: SECRET,
+            requestId: requestId,
+            action: action
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          showToast(`✅ Withdrawal ${action}ed successfully!`, 'success');
+          refreshAll();
+        } else {
+          throw new Error(data.error || 'Failed to process');
+        }
+      } catch (error) {
+        showToast('❌ Error: ' + error.message, 'error');
+      }
+    }
+
+    // ---------- Refresh All ----------
+    async function refreshAll() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      
+      try {
+        await loadStats();
+        
+        // Load current tab
+        if (currentTab === 'deposits') await loadDeposits();
+        else if (currentTab === 'withdrawals') await loadWithdrawals();
+        else if (currentTab === 'players') await loadPlayers();
+        
+        showToast('🔄 Data refreshed', 'info');
+      } catch (error) {
+        console.error('Error refreshing:', error);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // ---------- Utility Functions ----------
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch {
+        return dateString;
+      }
+    }
+
+    // ---------- Auto-Refresh ----------
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        // Only refresh if tab is visible
+        if (!document.hidden) {
+          refreshAll();
+        }
+      }, 30000); // Every 30 seconds
+    }
+
+    // Stop auto-refresh when tab is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
+        }
+      } else {
+        startAutoRefresh();
+        refreshAll();
+      }
+    });
+
+    // ---------- Initial Load ----------
+    async function init() {
+      await refreshAll();
+      startAutoRefresh();
+    }
+
+    // Handle keyboard shortcut: Ctrl+R to refresh
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'r') {
+        e.preventDefault();
+        refreshAll();
+      }
+    });
+
+    // Start
+    init();
+
+    console.log('🔐 Admin Dashboard loaded');
+    console.log(`👤 Secret: ${SECRET}`);
+  </script>
 </body>
 </html>
