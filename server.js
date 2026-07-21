@@ -1,5 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite
 // ============================================================
 
 require('dotenv').config();
@@ -201,7 +201,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser ----------
+// ---------- loadUser (with admin invite support) ----------
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -229,9 +229,25 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
-      console.log(`🆕 Creating new user ${id} with adminId: ${adminId || 'none'}`);
+      console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
+      
+      let finalAdminId = adminId || null;
       let adminName = null;
-      if (adminId) {
+      
+      // Check if inviteCode belongs to an admin
+      if (!finalAdminId && inviteCode) {
+        const { data: adminData, error: adminErr } = await supabase
+          .from('admins')
+          .select('id, name')
+          .eq('invite_code', inviteCode)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!adminErr && adminData) {
+          finalAdminId = adminData.id;
+          adminName = adminData.name;
+          console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
+        }
+      } else if (adminId) {
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
           .select('name')
@@ -239,6 +255,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .maybeSingle();
         if (!adminErr && adminData) adminName = adminData.name;
       }
+      
       const newUser = {
         telegram_id: id,
         username: username || 'Player',
@@ -246,11 +263,13 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         balance: 10,
         referred_by: inviteCode || null,
         first_deposit_amount: 0,
-        admin_id: adminId || null,
+        admin_id: finalAdminId,
         assigned_admin_name: adminName
       };
+      
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
+      
       if (inviteCode) {
         const { data: inviteData, error: fetchError } = await supabase
           .from('invite_stats')
@@ -268,6 +287,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
             .insert({ invite_code: inviteCode, count: 1 });
         }
       }
+      
       users[id] = {
         id,
         username: newUser.username,
@@ -364,7 +384,7 @@ app.post('/admin/login', async (req, res) => {
   }
 });
 
-// ---------- Admin Registration ----------
+// ---------- Admin Registration (with invite_code generation) ----------
 app.post('/admin/register', async (req, res) => {
   const { phone, name, deposit_number, payment_type, pin, confirm_pin, registration_secret } = req.body;
   if (!phone || !name || !deposit_number || !payment_type || !pin || !confirm_pin) {
@@ -384,6 +404,8 @@ app.post('/admin/register', async (req, res) => {
       .maybeSingle();
     if (existing) return res.status(400).json({ success: false, error: 'Phone number already registered' });
     const secretKey = crypto.randomBytes(16).toString('hex');
+    // Generate invite code from name + random
+    const inviteCode = name.substring(0, 3).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
     const { data: newAdmin, error: insertErr } = await supabase
       .from('admins')
       .insert({
@@ -393,13 +415,14 @@ app.post('/admin/register', async (req, res) => {
         payment_type,
         secret_key: secretKey,
         pin,
+        invite_code: inviteCode,
         commission_rate: 0.05,
         is_active: true
       })
       .select()
       .single();
     if (insertErr) throw insertErr;
-    console.log(`✅ New admin registered: ${name} (${phone})`);
+    console.log(`✅ New admin registered: ${name} (${phone}) with invite code: ${inviteCode}`);
     res.json({ success: true, message: 'Registration successful!', admin: { id: newAdmin.id, name: newAdmin.name, phone: newAdmin.phone, deposit_number: newAdmin.deposit_number } });
   } catch (err) {
     console.error('Registration error:', err.message);
@@ -414,7 +437,7 @@ app.get('/admin/session', async (req, res) => {
   try {
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('id, name, phone, deposit_number, commission_rate')
+      .select('id, name, phone, deposit_number, commission_rate, invite_code')
       .eq('id', req.session.adminId)
       .eq('is_active', true)
       .maybeSingle();
@@ -426,6 +449,41 @@ app.get('/admin/session', async (req, res) => {
 app.get('/admin/registration-config', (req, res) => {
   const requiresSecret = !!process.env.ADMIN_REGISTRATION_SECRET;
   res.json({ requiresSecret });
+});
+
+// ---------- Get Admin Invite Info ----------
+app.get('/admin/invite-info', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  try {
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('id, name, invite_code, phone, deposit_number')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error || !admin) {
+      req.session.destroy();
+      return res.status(401).json({ error: 'Session expired' });
+    }
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'YourBot';
+    const inviteLink = `https://t.me/${botUsername}?start=${admin.invite_code}`;
+    res.json({
+      success: true,
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        invite_code: admin.invite_code,
+        invite_link: inviteLink,
+        phone: admin.phone,
+        deposit_number: admin.deposit_number
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching invite info:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ---------- Legacy admin balance management ----------
@@ -1020,7 +1078,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- UPDATED endGameWithWinners (with admin contributions) ----------
+// ---------- endGameWithWinners (with admin contributions) ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1028,7 +1086,6 @@ async function endGameWithWinners(stake) {
 
   gameCounter++;
 
-  // ---- Forced win logic ----
   if (stake === 20) {
     const realWinners = game.winners.filter(w => !w.isBot);
     const botWinners = game.winners.filter(w => w.isBot);
@@ -1051,11 +1108,9 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  // ---- Compute house profit ----
   const totalEntryFees = game.players.length * game.entryFee;
-  const houseProfit = totalEntryFees - game.prizePool; // 20% when >1 player
+  const houseProfit = totalEntryFees - game.prizePool;
 
-  // ---- Record game round ----
   let gameRoundId = null;
   try {
     const { data, error } = await supabase
@@ -1075,7 +1130,6 @@ async function endGameWithWinners(stake) {
     console.error(`❌ Failed to insert game_round for stake ${stake}:`, err.message);
   }
 
-  // ---- Record admin contributions ----
   if (gameRoundId && houseProfit > 0) {
     const adminGroups = {};
     for (const player of game.players) {
@@ -1112,7 +1166,6 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  // ---- Bot history (stake 20) ----
   if (stake === 20) {
     const botsInGame = game.players.filter(p => p.isBot);
     for (const bot of botsInGame) {
@@ -1128,13 +1181,11 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  // ---- Keep forced bots ----
   const realWinnersFinal = game.winners.filter(w => !w.isBot);
   if (realWinnersFinal.length > 0) {
     game.winners = game.winners.filter(w => !w.isBot || w.isForced);
   }
 
-  // ---- Distribute prizes ----
   if (game.winners.length > 0) {
     const finalRealWinners = game.winners.filter(w => !w.isBot);
     const finalBotWinners = game.winners.filter(w => w.isBot);
@@ -1693,7 +1744,7 @@ app.get('/admin/stats', async (req, res) => {
 });
 
 // ---------- Daily Commission Calculation ----------
-const DAILY_COMMISSION_HOUR = 0; // midnight
+const DAILY_COMMISSION_HOUR = 0;
 const DAILY_COMMISSION_MINUTE = 0;
 
 async function calculateDailyCommissions() {
@@ -1726,7 +1777,6 @@ async function calculateDailyCommissions() {
         const totalHouseProfit = contributions.reduce((sum, c) => sum + Number(c.house_profit_share || 0), 0);
 
         if (totalCommission > 0) {
-          // Check if record already exists for this date
           const { data: existing } = await supabase
             .from('admin_daily_commissions')
             .select('id')
@@ -1743,7 +1793,6 @@ async function calculateDailyCommissions() {
                 commission_amount: totalCommission
               })
               .eq('id', existing.id);
-            console.log(`🔄 Updated daily commission for admin ${admin.name} for ${yesterdayStr}`);
           } else {
             await supabase
               .from('admin_daily_commissions')
@@ -1766,7 +1815,6 @@ async function calculateDailyCommissions() {
   }
 }
 
-// Schedule daily job
 function scheduleDailyCommission() {
   const now = new Date();
   const nextRun = new Date(now);
@@ -1896,7 +1944,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
         .update({ status: 'approved', processed_at: new Date().toISOString() })
         .eq('id', requestId);
 
-      // Mark pending daily commissions as paid
       await supabase
         .from('admin_daily_commissions')
         .update({ status: 'paid', paid_at: new Date().toISOString() })
