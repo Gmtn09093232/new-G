@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard</title>
+  <title>Admin Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -383,6 +383,15 @@
         </div>
         <button class="btn btn-primary" onclick="copyInviteLink()">📋 Copy Invite Link</button>
         <button class="btn btn-outline" onclick="copyInviteCode()" style="margin-left: 8px;">📋 Copy Code</button>
+
+        <!-- NEW: Admin's own payment numbers -->
+        <div style="margin-top: 24px; background: #f1f5f9; padding: 16px; border-radius: 12px;">
+          <h3 style="margin-bottom: 8px;">📱 Your Payment Numbers</h3>
+          <p style="font-size: 13px; color: #64748b; margin-bottom: 10px;">Players assigned to you will see these numbers to send deposits.</p>
+          <div><strong>Telebirr:</strong> <span id="adminTelebirr">Not set</span></div>
+          <div><strong>CBE Birr:</strong> <span id="adminCbe">Not set</span></div>
+          <div><strong>M-Pesa:</strong> <span id="adminMpesa">Not set</span></div>
+        </div>
       </div>
     </div>
   </div>
@@ -615,9 +624,10 @@
       }
     }
 
-    // ---------- Load Invite Info ----------
+    // ---------- Load Invite Info & Payment Numbers ----------
     async function loadInviteInfo() {
       try {
+        // Load invite info
         const res = await fetch('/admin/invite-info');
         const data = await res.json();
         if (data.success) {
@@ -626,7 +636,7 @@
           window._inviteCode = data.admin.invite_code;
           window._inviteLink = data.admin.invite_link;
         } else {
-          // Fallback: use hardcoded bot username
+          // Fallback
           const inviteCode = data.admin?.invite_code || '01207';
           const fallbackLink = `https://t.me/${BOT_USERNAME}?start=${inviteCode}`;
           document.getElementById('inviteCodeDisplay').textContent = inviteCode;
@@ -634,9 +644,21 @@
           window._inviteCode = inviteCode;
           window._inviteLink = fallbackLink;
         }
+
+        // Also load admin payment numbers from session
+        const sessionRes = await fetch('/admin/session');
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData.success && sessionData.admin) {
+            const a = sessionData.admin;
+            document.getElementById('adminTelebirr').textContent = a.telebirr_number || 'Not set';
+            document.getElementById('adminCbe').textContent = a.cbebirr_number || 'Not set';
+            document.getElementById('adminMpesa').textContent = a.mpesa_number || 'Not set';
+          }
+        }
       } catch (err) {
-        // Network error – use hardcoded fallback
-        const inviteCode = '01207'; // fallback invite code
+        // Network error – fallback for invite
+        const inviteCode = '01207';
         const fallbackLink = `https://t.me/${BOT_USERNAME}?start=${inviteCode}`;
         document.getElementById('inviteCodeDisplay').textContent = inviteCode;
         document.getElementById('inviteLinkDisplay').textContent = fallbackLink;
