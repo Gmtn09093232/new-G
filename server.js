@@ -2433,6 +2433,146 @@ app.get('/super-admin/platform-stats', async (req, res) => {
   }
 });
 
+// ============================================================
+//  🆕 IMPORT PLAYERS – Admin manual Telegram ID assignment
+// ============================================================
+app.post('/admin/import-players', async (req, res) => {
+  // 1. Ensure admin is logged in
+  if (!req.session.adminId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+
+  const { telegramIds, overwrite = false } = req.body;
+
+  // 2. Validate input
+  if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
+    return res.status(400).json({ success: false, error: 'At least one Telegram ID required' });
+  }
+
+  try {
+    // 3. Get admin details (to get name for assignment)
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !admin) {
+      req.session.destroy();
+      return res.status(401).json({ success: false, error: 'Session expired' });
+    }
+
+    const results = [];
+    let successCount = 0;
+
+    // 4. Process each Telegram ID
+    for (const rawId of telegramIds) {
+      const tgId = String(rawId).trim();
+      if (!tgId || !/^\d+$/.test(tgId)) {
+        results.push({ telegramId: tgId, success: false, error: 'Invalid ID (must be numeric)' });
+        continue;
+      }
+
+      try {
+        // 5. Check if user exists; if not, create a minimal user
+        let { data: existingUser, error: findErr } = await supabase
+          .from('users')
+          .select('telegram_id, admin_id')
+          .eq('telegram_id', tgId)
+          .maybeSingle();
+
+        if (findErr) {
+          results.push({ telegramId: tgId, success: false, error: findErr.message });
+          continue;
+        }
+
+        // If overwrite is false and user already has an admin, skip
+        if (!overwrite && existingUser && existingUser.admin_id !== null) {
+          results.push({ telegramId: tgId, success: false, error: 'Already assigned to another admin (skipped)' });
+          continue;
+        }
+
+        let user = existingUser;
+
+        // If user does not exist, create one
+        if (!user) {
+          const newUser = {
+            telegram_id: tgId,
+            username: `Player_${tgId.slice(-4)}`, // fallback name
+            balance: 10,
+            referred_by: null,
+            first_deposit_amount: 0,
+            admin_id: admin.id,
+            assigned_admin_name: admin.name,
+            telegram_handle: null
+          };
+          const { error: insertErr } = await supabase
+            .from('users')
+            .insert(newUser);
+          if (insertErr) {
+            results.push({ telegramId: tgId, success: false, error: insertErr.message });
+            continue;
+          }
+          // also update cache
+          users[tgId] = {
+            id: tgId,
+            username: newUser.username,
+            balance: newUser.balance,
+            telegram_handle: null,
+            referred_by: null,
+            first_deposit_amount: 0,
+            admin_id: newUser.admin_id,
+            assigned_admin_name: newUser.assigned_admin_name
+          };
+          results.push({ telegramId: tgId, success: true, created: true });
+          successCount++;
+        } else {
+          // Update existing user
+          const { error: updateErr } = await supabase
+            .from('users')
+            .update({
+              admin_id: admin.id,
+              assigned_admin_name: admin.name
+            })
+            .eq('telegram_id', tgId);
+          if (updateErr) {
+            results.push({ telegramId: tgId, success: false, error: updateErr.message });
+            continue;
+          }
+          // update cache if present
+          if (users[tgId]) {
+            users[tgId].admin_id = admin.id;
+            users[tgId].assigned_admin_name = admin.name;
+          }
+          results.push({ telegramId: tgId, success: true, updated: true });
+          successCount++;
+        }
+      } catch (err) {
+        results.push({ telegramId: tgId, success: false, error: err.message });
+      }
+    }
+
+    // 6. Log the action
+    Audit.adminAction('IMPORT_PLAYERS', req.session.adminId, req.ip, {
+      count: telegramIds.length,
+      successCount,
+      overwrite,
+      sampleIds: telegramIds.slice(0, 5)
+    });
+
+    res.json({
+      success: true,
+      message: `Imported ${successCount} player(s)`,
+      results
+    });
+
+  } catch (err) {
+    console.error('Import players error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ---------- Statistics ----------
 app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'stats.html')));
 
