@@ -1,5 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin
 // ============================================================
 
 require('dotenv').config();
@@ -159,6 +159,22 @@ async function getAdminDeposits(adminId, status = 'approved') {
   } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
+// ============================================================
+//  SUPER ADMIN HELPER
+// ============================================================
+async function isSuperAdmin(adminId) {
+  try {
+    const { data, error } = await supabase
+      .from('admins')
+      .select('is_super_admin')
+      .eq('id', adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error || !data) return false;
+    return data.is_super_admin === true;
+  } catch { return false; }
+}
+
 // ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
@@ -188,6 +204,7 @@ app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'in
 app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
+app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -418,7 +435,7 @@ app.post('/admin/register', async (req, res) => {
         secret_key: secretKey,
         pin,
         invite_code: inviteCode,
-        commission_rate: 0.05,
+        commission_rate: 0.40,
         is_active: true,
         telebirr_number: telebirr_number || null,
         cbebirr_number: cbebirr_number || null,
@@ -1939,7 +1956,7 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Super Admin: Process Admin Withdrawal ----------
+// ---------- Super Admin: Process Admin Withdrawal (legacy) ----------
 app.post('/admin/process-admin-withdrawal', async (req, res) => {
   const { secret, requestId, action } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -1975,6 +1992,407 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
     }
   } catch (err) {
     console.error('Process admin withdrawal error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+//  SUPER ADMIN ENDPOINTS
+// ============================================================
+
+// ---------- Get all admins (super admin only) ----------
+app.get('/super-admin/admins', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { data: admins, error } = await supabase
+      .from('admins')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    const adminsWithStats = await Promise.all(admins.map(async (admin) => {
+      const playerCount = await getAdminPlayerCount(admin.id);
+      const totalDeposits = await getAdminDeposits(admin.id);
+      const { data: pendingDeposits } = await supabase
+        .from('deposit_requests')
+        .select('count')
+        .eq('admin_id', admin.id)
+        .eq('status', 'pending');
+      
+      const { data: withdrawals } = await supabase
+        .from('withdrawal_requests')
+        .select('amount, status')
+        .eq('admin_id', admin.id);
+      
+      const totalWithdrawals = withdrawals
+        .filter(w => w.status === 'approved')
+        .reduce((sum, w) => sum + Number(w.amount), 0);
+      const pendingWithdrawals = withdrawals
+        .filter(w => w.status === 'pending').length;
+      
+      const { data: pendingEarnings } = await supabase
+        .from('admin_daily_commissions')
+        .select('commission_amount')
+        .eq('admin_id', admin.id)
+        .eq('status', 'pending');
+      const totalPendingEarnings = pendingEarnings
+        .reduce((sum, e) => sum + Number(e.commission_amount), 0);
+      
+      const { data: paidEarnings } = await supabase
+        .from('admin_daily_commissions')
+        .select('commission_amount')
+        .eq('admin_id', admin.id)
+        .eq('status', 'paid');
+      const totalEarned = paidEarnings
+        .reduce((sum, e) => sum + Number(e.commission_amount), 0);
+      
+      return {
+        ...admin,
+        stats: {
+          playerCount,
+          totalDeposits,
+          pendingDeposits: pendingDeposits?.[0]?.count || 0,
+          totalWithdrawals,
+          pendingWithdrawals,
+          totalPendingEarnings,
+          totalEarned
+        }
+      };
+    }));
+    
+    res.json({ success: true, admins: adminsWithStats });
+  } catch (err) {
+    console.error('Error fetching admins:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Get admin details (super admin only) ----------
+app.get('/super-admin/admin/:adminId', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { adminId } = req.params;
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('id', adminId)
+      .maybeSingle();
+    
+    if (error || !admin) {
+      return res.status(404).json({ error: 'Admin not found' });
+    }
+    
+    const players = await getAdminPlayers(adminId);
+    const { data: deposits } = await supabase
+      .from('deposit_requests')
+      .select('*')
+      .eq('admin_id', adminId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    const { data: withdrawals } = await supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('admin_id', adminId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    
+    const { data: earnings } = await supabase
+      .from('admin_daily_commissions')
+      .select('*')
+      .eq('admin_id', adminId)
+      .order('date', { ascending: false })
+      .limit(30);
+    
+    const { data: adminWithdrawals } = await supabase
+      .from('admin_withdrawal_requests')
+      .select('*')
+      .eq('admin_id', adminId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    
+    res.json({
+      success: true,
+      admin,
+      stats: {
+        players: players.length,
+        deposits,
+        withdrawals,
+        earnings,
+        adminWithdrawals
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching admin details:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Toggle admin active status (super admin only) ----------
+app.post('/super-admin/toggle-admin', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  const { adminId, isActive } = req.body;
+  if (!adminId) {
+    return res.status(400).json({ error: 'Admin ID required' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    if (parseInt(adminId) === req.session.adminId) {
+      return res.status(400).json({ error: 'Cannot change your own status' });
+    }
+    
+    const { error } = await supabase
+      .from('admins')
+      .update({ is_active: isActive })
+      .eq('id', adminId);
+    
+    if (error) throw error;
+    
+    Audit.adminAction('SUPER_ADMIN_TOGGLE_ADMIN', req.session.adminId, req.ip, {
+      targetAdminId: adminId,
+      newStatus: isActive
+    });
+    
+    res.json({ success: true, message: `Admin ${isActive ? 'activated' : 'deactivated'}` });
+  } catch (err) {
+    console.error('Error toggling admin:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Update admin commission rate (super admin only) ----------
+app.post('/super-admin/update-commission', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  const { adminId, commissionRate } = req.body;
+  if (!adminId || commissionRate === undefined) {
+    return res.status(400).json({ error: 'Admin ID and commission rate required' });
+  }
+  
+  if (commissionRate < 0 || commissionRate > 1) {
+    return res.status(400).json({ error: 'Commission rate must be between 0 and 1' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { error } = await supabase
+      .from('admins')
+      .update({ commission_rate: commissionRate })
+      .eq('id', adminId);
+    
+    if (error) throw error;
+    
+    Audit.adminAction('SUPER_ADMIN_UPDATE_COMMISSION', req.session.adminId, req.ip, {
+      targetAdminId: adminId,
+      newCommissionRate: commissionRate
+    });
+    
+    res.json({ success: true, message: 'Commission rate updated' });
+  } catch (err) {
+    console.error('Error updating commission:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Get all admin withdrawal requests (super admin only) ----------
+app.get('/super-admin/admin-withdrawals', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { status = 'pending', limit = 50 } = req.query;
+    
+    let query = supabase
+      .from('admin_withdrawal_requests')
+      .select('*, admins(name, phone)')
+      .order('created_at', { ascending: false })
+      .limit(Math.min(parseInt(limit), 100));
+    
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+    
+    const { data: requests, error } = await query;
+    
+    if (error) throw error;
+    
+    res.json({ success: true, requests });
+  } catch (err) {
+    console.error('Error fetching admin withdrawals:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Process admin withdrawal (super admin only) ----------
+app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  const { requestId, action } = req.body;
+  if (!requestId || !['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ error: 'Request ID and valid action required' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { data: reqData, error: fetchErr } = await supabase
+      .from('admin_withdrawal_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+    
+    if (fetchErr || !reqData) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    if (reqData.status !== 'pending') {
+      return res.status(400).json({ error: 'Request already processed' });
+    }
+    
+    if (action === 'approve') {
+      await supabase
+        .from('admin_withdrawal_requests')
+        .update({ status: 'approved', processed_at: new Date().toISOString() })
+        .eq('id', requestId);
+      
+      await supabase
+        .from('admin_daily_commissions')
+        .update({ status: 'paid', paid_at: new Date().toISOString() })
+        .eq('admin_id', reqData.admin_id)
+        .eq('status', 'pending');
+      
+      Audit.adminAction('SUPER_ADMIN_APPROVE_WITHDRAWAL', req.session.adminId, req.ip, {
+        targetAdminId: reqData.admin_id,
+        amount: reqData.amount,
+        requestId
+      });
+      
+      res.json({ success: true, message: 'Withdrawal approved' });
+    } else {
+      await supabase
+        .from('admin_withdrawal_requests')
+        .update({ status: 'rejected', processed_at: new Date().toISOString() })
+        .eq('id', requestId);
+      
+      Audit.adminAction('SUPER_ADMIN_REJECT_WITHDRAWAL', req.session.adminId, req.ip, {
+        targetAdminId: reqData.admin_id,
+        amount: reqData.amount,
+        requestId
+      });
+      
+      res.json({ success: true, message: 'Withdrawal rejected' });
+    }
+  } catch (err) {
+    console.error('Error processing admin withdrawal:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Get platform stats (super admin only) ----------
+app.get('/super-admin/platform-stats', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  
+  try {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (!isSuper) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    
+    const { count: totalUsers } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    
+    const { count: totalAdmins } = await supabase
+      .from('admins')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+    
+    const { data: deposits } = await supabase
+      .from('deposit_requests')
+      .select('amount')
+      .eq('status', 'approved');
+    const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
+    
+    const { data: withdrawals } = await supabase
+      .from('withdrawal_requests')
+      .select('amount')
+      .eq('status', 'approved');
+    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
+    
+    const { data: rounds } = await supabase
+      .from('game_rounds')
+      .select('house_profit');
+    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
+    
+    const { data: paidEarnings } = await supabase
+      .from('admin_daily_commissions')
+      .select('commission_amount')
+      .eq('status', 'paid');
+    const totalAdminEarnings = paidEarnings.reduce((sum, e) => sum + Number(e.commission_amount), 0);
+    
+    const { count: pendingWithdrawals } = await supabase
+      .from('admin_withdrawal_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    
+    res.json({
+      success: true,
+      stats: {
+        totalUsers: totalUsers || 0,
+        totalAdmins: totalAdmins || 0,
+        totalDeposits,
+        totalWithdrawals,
+        totalHouseProfit,
+        totalAdminEarnings,
+        pendingWithdrawals: pendingWithdrawals || 0
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching platform stats:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
