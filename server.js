@@ -330,7 +330,7 @@ app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html'))
 app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
 app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
-app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
+app.get('/admin-login', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
