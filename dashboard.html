@@ -65,6 +65,44 @@
     .stat-card .value.red { color: #ef4444; }
     .stat-card .value.purple { color: #8b5cf6; }
 
+    /* Commission Summary Bar */
+    .commission-bar {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      border-radius: 14px;
+      padding: 14px 20px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      box-shadow: 0 2px 12px rgba(245, 158, 11, 0.3);
+      color: #1e293b;
+    }
+    .commission-bar .item {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .commission-bar .label {
+      font-weight: 500;
+      font-size: 13px;
+      opacity: 0.8;
+    }
+    .commission-bar .amount {
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 0.5px;
+    }
+    .commission-bar .amount.pending { color: #b45309; }
+    .commission-bar .amount.earned { color: #065f46; }
+    @media (max-width: 480px) {
+      .commission-bar { flex-direction: column; align-items: stretch; text-align: center; }
+      .commission-bar .item { justify-content: center; }
+      .commission-bar .amount { font-size: 18px; }
+    }
+
     .tabs {
       display: flex;
       gap: 4px;
@@ -370,6 +408,22 @@
       <div class="stat-card"><div class="label">⏳ Pending With.</div><div class="value red" id="statPendingWithdrawals">-</div></div>
     </div>
 
+    <!-- 🆕 LIVE COMMISSION BAR -->
+    <div class="commission-bar" id="commissionBar">
+      <div class="item">
+        <span class="label">💰 Pending Commission</span>
+        <span class="amount pending" id="pendingCommission">0 ETB</span>
+      </div>
+      <div class="item">
+        <span class="label">📈 Total Earned</span>
+        <span class="amount earned" id="totalCommissionEarned">0 ETB</span>
+      </div>
+      <div class="item">
+        <span class="label">📊 Rate</span>
+        <span class="amount" id="commissionRateDisplay" style="color:#1e293b;">0%</span>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <div class="tabs" id="tabContainer">
       <button class="tab-btn active" data-tab="deposits" onclick="switchTab('deposits')">💰 Deposits <span class="badge" id="depositBadge">0</span></button>
@@ -616,6 +670,36 @@
         return data;
       } catch (err) {
         showToast('Error loading stats: ' + err.message, 'error');
+        return null;
+      }
+    }
+
+    // ============================
+    // 🆕 LOAD COMMISSION SUMMARY (LIVE)
+    // ============================
+    async function loadCommissionSummary() {
+      try {
+        const res = await fetch('/admin/daily-commissions');
+        if (!res.ok) throw new Error('Failed to load commission');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        const pending = data.stats.totalPending || 0;
+        const earned = data.stats.totalEarned || 0;
+        const rate = data.admin.commission_rate || 0;
+
+        document.getElementById('pendingCommission').textContent = `${pending.toFixed(0)} ETB`;
+        document.getElementById('totalCommissionEarned').textContent = `${earned.toFixed(0)} ETB`;
+        document.getElementById('commissionRateDisplay').textContent = `${(rate * 100).toFixed(0)}%`;
+
+        // Also update the badges in earnings tab
+        const earningsBadge = document.getElementById('earningsBadge');
+        if (earningsBadge) earningsBadge.textContent = pending > 0 ? `${pending.toFixed(0)}` : '0';
+
+        return data;
+      } catch (err) {
+        console.error('Commission load error:', err);
+        // Don't show toast to avoid spam
         return null;
       }
     }
@@ -913,6 +997,7 @@
           document.getElementById('withdrawEarningsPhone').value = '';
           document.getElementById('withdrawEarningsName').value = '';
           loadEarnings();
+          loadCommissionSummary(); // update the live bar
         } else {
           throw new Error(data.error || 'Failed to request withdrawal');
         }
@@ -942,7 +1027,6 @@
       input.disabled = true;
 
       try {
-        // We'll use the same import endpoint for a single ID
         const response = await fetch('/admin/import-players', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -959,7 +1043,6 @@
             input.value = '';
             loadPlayers();
           } else {
-            // If already assigned, offer overwrite
             if (result.error && result.error.includes('Already assigned')) {
               if (confirm(`This player is already assigned to another admin. Do you want to reassign?`)) {
                 const overwriteRes = await fetch('/admin/import-players', {
@@ -1044,12 +1127,11 @@
         const data = await response.json();
 
         if (data.success) {
-          const results = data.results; // array of { telegramId, success, created, updated, error }
+          const results = data.results;
           const added = results.filter(r => r.success && r.created).length;
           const updated = results.filter(r => r.success && r.updated).length;
           const failed = results.filter(r => !r.success).length;
           let html = `<div style="font-weight:600;">✅ ${added} added, ${updated} updated${failed > 0 ? `, ${failed} failed` : ''}</div>`;
-          // Show details
           if (results.length > 0) {
             html += '<ul style="list-style:none;padding:0;margin-top:6px;font-size:12px;">';
             results.forEach(r => {
@@ -1071,13 +1153,14 @@
     }
 
     // ============================
-    // REFRESH
+    // REFRESH ALL (includes commission)
     // ============================
     async function refreshAll() {
       if (isRefreshing) return;
       isRefreshing = true;
       try {
         await loadStats();
+        await loadCommissionSummary(); // <-- live commission bar
         if (currentTab === 'deposits') await loadDeposits();
         else if (currentTab === 'withdrawals') await loadWithdrawals();
         else if (currentTab === 'players') await loadPlayers();
