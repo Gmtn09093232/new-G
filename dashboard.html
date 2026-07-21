@@ -311,6 +311,7 @@
       <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">🏦 Withdrawals <span class="badge" id="withdrawalBadge">0</span></button>
       <button class="tab-btn" data-tab="players" onclick="switchTab('players')">👥 Players <span class="badge" id="playerBadge">0</span></button>
       <button class="tab-btn" data-tab="earnings" onclick="switchTab('earnings')">💰 Earnings <span class="badge" id="earningsBadge">0</span></button>
+      <button class="tab-btn" data-tab="invite" onclick="switchTab('invite')">🔗 Invite</button>
     </div>
 
     <div class="tab-content">
@@ -332,7 +333,7 @@
         <div id="playersList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;">Loading players...</p></div></div>
       </div>
 
-      <!-- Earnings Tab (Daily Commissions) -->
+      <!-- Earnings Tab -->
       <div class="tab-pane" id="tab-earnings">
         <h2>💰 Your Daily Commissions</h2>
         <div class="stats-grid" style="margin-bottom:15px;">
@@ -367,6 +368,21 @@
           <button class="btn btn-primary" onclick="requestAdminWithdrawal()" style="padding:12px 24px; min-height:44px;">📤 Request</button>
         </div>
         <div id="withdrawStatus" style="margin-top:10px; font-size:14px;"></div>
+      </div>
+
+      <!-- Invite Tab -->
+      <div class="tab-pane" id="tab-invite">
+        <h2>🔗 Your Invite Link</h2>
+        <p>Share this link with players. They will be automatically assigned to you.</p>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 12px; margin: 16px 0;">
+          <div style="font-size: 14px; color: #64748b;">Your Invite Code</div>
+          <div style="font-size: 24px; font-weight: 700; color: #1e293b; font-family: monospace;" id="inviteCodeDisplay">Loading...</div>
+        </div>
+        <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; word-break: break-all; margin-bottom: 16px;">
+          <span id="inviteLinkDisplay">Loading...</span>
+        </div>
+        <button class="btn btn-primary" onclick="copyInviteLink()">📋 Copy Invite Link</button>
+        <button class="btn btn-outline" onclick="copyInviteCode()" style="margin-left: 8px;">📋 Copy Code</button>
       </div>
     </div>
   </div>
@@ -414,6 +430,7 @@
       else if (tab === 'withdrawals') loadWithdrawals();
       else if (tab === 'players') loadPlayers();
       else if (tab === 'earnings') loadEarnings();
+      else if (tab === 'invite') loadInviteInfo();
     }
 
     // ---------- Load Stats ----------
@@ -595,6 +612,39 @@
       }
     }
 
+    // ---------- Load Invite Info ----------
+    async function loadInviteInfo() {
+      try {
+        const res = await fetch('/admin/invite-info');
+        if (!res.ok) throw new Error('Failed to load invite info');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        document.getElementById('inviteCodeDisplay').textContent = data.admin.invite_code;
+        document.getElementById('inviteLinkDisplay').textContent = data.admin.invite_link;
+        window._inviteCode = data.admin.invite_code;
+        window._inviteLink = data.admin.invite_link;
+      } catch (err) {
+        showToast('Error loading invite info: ' + err.message, 'error');
+      }
+    }
+
+    // ---------- Copy Invite Functions ----------
+    function copyInviteLink() {
+      if (window._inviteLink) {
+        navigator.clipboard.writeText(window._inviteLink)
+          .then(() => showToast('✅ Invite link copied!', 'success'))
+          .catch(() => showToast('❌ Failed to copy', 'error'));
+      }
+    }
+
+    function copyInviteCode() {
+      if (window._inviteCode) {
+        navigator.clipboard.writeText(window._inviteCode)
+          .then(() => showToast('✅ Invite code copied!', 'success'))
+          .catch(() => showToast('❌ Failed to copy', 'error'));
+      }
+    }
+
     // ---------- Process Deposit ----------
     async function processDeposit(requestId, action) {
       if (!confirm(`Are you sure you want to ${action} this deposit request?`)) return;
@@ -693,6 +743,7 @@
         else if (currentTab === 'withdrawals') await loadWithdrawals();
         else if (currentTab === 'players') await loadPlayers();
         else if (currentTab === 'earnings') await loadEarnings();
+        else if (currentTab === 'invite') await loadInviteInfo();
         showToast('🔄 Data refreshed', 'info');
       } catch (err) {
         console.error('Refresh error:', err);
