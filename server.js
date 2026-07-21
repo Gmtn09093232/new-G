@@ -1,5 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission
 // ============================================================
 
 require('dotenv').config();
@@ -176,9 +176,6 @@ async function isSuperAdmin(adminId) {
 }
 
 // ---------- Static endpoints ----------
-// ============================================================
-//  UPDATED /api/deposit-accounts - filter by user's admin
-// ============================================================
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
@@ -197,7 +194,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins;
     if (adminId) {
-      // Only return the admin the user is assigned to
       const { data, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -206,7 +202,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
       if (error) throw error;
       admins = data || [];
     } else {
-      // No admin assigned yet – show all active admins
       const { data, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -251,7 +246,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser (with admin invite support) ----------
+// ---------- loadUser ----------
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -284,7 +279,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       let finalAdminId = adminId || null;
       let adminName = null;
       
-      // Check if inviteCode belongs to an admin
       if (!finalAdminId && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
@@ -410,7 +404,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   }
 });
 
-// ---------- Admin Login (no secret) ----------
+// ---------- Admin Login ----------
 app.post('/admin/login', async (req, res) => {
   const { phone, pin } = req.body;
   if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
@@ -434,7 +428,7 @@ app.post('/admin/login', async (req, res) => {
   }
 });
 
-// ---------- Admin Registration (with invite_code generation and payment numbers) ----------
+// ---------- Admin Registration ----------
 app.post('/admin/register', async (req, res) => {
   const { 
     phone, name, deposit_number, payment_type, pin, confirm_pin, 
@@ -1136,7 +1130,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- endGameWithWinners (with admin contributions) ----------
+// ---------- endGameWithWinners ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1202,7 +1196,6 @@ async function endGameWithWinners(stake) {
       adminGroups[adminId].playerCount++;
     }
 
-    // Admin commission percentage (40% of house profit)
     const adminCommissionFraction = parseFloat(process.env.ADMIN_COMMISSION_PERCENTAGE) || 0.40;
     const adminShareTotal = houseProfit * adminCommissionFraction;
 
@@ -1423,7 +1416,6 @@ app.post('/api/request-deposit', async (req, res) => {
       .maybeSingle();
     if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
 
-    // Validate the payment type exists for this admin
     const methodField = `${payment_type}_number`;
     if (!admin[methodField]) {
       return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
@@ -1453,7 +1445,7 @@ app.post('/api/request-deposit', async (req, res) => {
       transaction_reference: transaction_reference || null,
       proof_text: proof_text || null,
       admin_id: admin.id,
-      assigned_deposit_number: admin[methodField] // store the actual number used
+      assigned_deposit_number: admin[methodField]
     }).select().single();
 
     if (error) throw error;
@@ -1954,6 +1946,129 @@ app.get('/admin/daily-commissions', async (req, res) => {
   }
 });
 
+// ---------- LIVE COMMISSION – Real-time from game_admin_contributions ----------
+app.get('/admin/live-commission', async (req, res) => {
+  if (!req.session.adminId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, commission_rate')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !admin) {
+      req.session.destroy();
+      return res.status(401).json({ success: false, error: 'Session expired' });
+    }
+
+    // Get all contributions for this admin
+    const { data: contributions, error: contribErr } = await supabase
+      .from('game_admin_contributions')
+      .select('house_profit_share, total_entry_fees, created_at, game_round_id')
+      .eq('admin_id', admin.id);
+
+    if (contribErr) throw contribErr;
+
+    // Get paid commissions
+    const { data: paidCommissions, error: paidErr } = await supabase
+      .from('admin_daily_commissions')
+      .select('commission_amount, status, date')
+      .eq('admin_id', admin.id);
+
+    if (paidErr) throw paidErr;
+
+    const paidDates = new Set();
+    if (paidCommissions) {
+      paidCommissions.forEach(c => {
+        if (c.status === 'paid') {
+          const dateStr = c.date;
+          paidDates.add(dateStr);
+        }
+      });
+    }
+
+    // Group by date
+    const dailyTotals = {};
+    let totalPending = 0;
+    let totalPaid = 0;
+
+    if (contributions) {
+      for (const contrib of contributions) {
+        const date = new Date(contrib.created_at);
+        const dateStr = date.toISOString().split('T')[0];
+        const share = Number(contrib.house_profit_share) || 0;
+        const fees = Number(contrib.total_entry_fees) || 0;
+
+        if (!dailyTotals[dateStr]) {
+          dailyTotals[dateStr] = {
+            date: dateStr,
+            totalCommission: 0,
+            totalEntryFees: 0,
+            isPaid: paidDates.has(dateStr)
+          };
+        }
+        dailyTotals[dateStr].totalCommission += share;
+        dailyTotals[dateStr].totalEntryFees += fees;
+      }
+    }
+
+    // Build rounds
+    const rounds = [];
+    for (const [dateStr, data] of Object.entries(dailyTotals)) {
+      rounds.push({
+        date: dateStr,
+        total_entry_fees: data.totalEntryFees,
+        commission_amount: data.totalCommission,
+        status: data.isPaid ? 'paid' : 'pending'
+      });
+
+      if (data.isPaid) {
+        totalPaid += data.totalCommission;
+      } else {
+        totalPending += data.totalCommission;
+      }
+    }
+
+    // Sort by date (newest first)
+    rounds.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Get total earned from paid commissions
+    let totalEarned = 0;
+    if (paidCommissions) {
+      paidCommissions.forEach(c => {
+        if (c.status === 'paid') {
+          totalEarned += Number(c.commission_amount) || 0;
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        commission_rate: admin.commission_rate
+      },
+      stats: {
+        pending: totalPending,
+        paid: totalPaid,
+        totalEarned: totalEarned,
+        totalPending: totalPending,
+        totalAvailable: totalPending
+      },
+      rounds: rounds
+    });
+
+  } catch (err) {
+    console.error('Error fetching live commission:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ---------- Admin Request Withdrawal ----------
 app.post('/admin/request-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1963,14 +2078,40 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   if (!phone || !receiver_name) return res.status(400).json({ error: 'Phone and receiver name required' });
 
   try {
-    const { data: pendingEarnings, error: pendingErr } = await supabase
+    // Check pending earnings from live contributions
+    const { data: contributions, error: contribErr } = await supabase
+      .from('game_admin_contributions')
+      .select('house_profit_share, created_at')
+      .eq('admin_id', req.session.adminId);
+
+    if (contribErr) throw contribErr;
+
+    // Get paid dates
+    const { data: paidCommissions, error: paidErr } = await supabase
       .from('admin_daily_commissions')
-      .select('commission_amount')
+      .select('date')
       .eq('admin_id', req.session.adminId)
-      .eq('status', 'pending');
-    if (pendingErr) throw pendingErr;
-    const totalPending = pendingEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
-    if (totalPending < amt) return res.status(400).json({ error: 'Insufficient pending earnings' });
+      .eq('status', 'paid');
+
+    if (paidErr) throw paidErr;
+
+    const paidDates = new Set();
+    if (paidCommissions) {
+      paidCommissions.forEach(c => paidDates.add(c.date));
+    }
+
+    let totalPending = 0;
+    if (contributions) {
+      for (const contrib of contributions) {
+        const date = new Date(contrib.created_at);
+        const dateStr = date.toISOString().split('T')[0];
+        if (!paidDates.has(dateStr)) {
+          totalPending += Number(contrib.house_profit_share) || 0;
+        }
+      }
+    }
+
+    if (totalPending < amt) return res.status(400).json({ error: `Insufficient pending earnings. Available: ${totalPending.toFixed(0)} ETB` });
 
     const { data, error } = await supabase
       .from('admin_withdrawal_requests')
@@ -2036,7 +2177,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 //  SUPER ADMIN ENDPOINTS
 // ============================================================
 
-// ---------- Get all admins (super admin only) ----------
 app.get('/super-admin/admins', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2112,7 +2252,6 @@ app.get('/super-admin/admins', async (req, res) => {
   }
 });
 
-// ---------- Get admin details (super admin only) ----------
 app.get('/super-admin/admin/:adminId', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2181,7 +2320,6 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
   }
 });
 
-// ---------- Toggle admin active status (super admin only) ----------
 app.post('/super-admin/toggle-admin', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2221,7 +2359,6 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
-// ---------- Update admin commission rate (super admin only) ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2261,7 +2398,6 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- Get all admin withdrawal requests (super admin only) ----------
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2296,7 +2432,6 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Process admin withdrawal (super admin only) ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2366,7 +2501,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Get platform stats (super admin only) ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -2434,23 +2568,20 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 });
 
 // ============================================================
-//  🆕 IMPORT PLAYERS – Admin manual Telegram ID assignment
+//  IMPORT PLAYERS – Manual paste only (JSON)
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
-  // 1. Ensure admin is logged in
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
   }
 
   const { telegramIds, overwrite = false } = req.body;
 
-  // 2. Validate input
   if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
     return res.status(400).json({ success: false, error: 'At least one Telegram ID required' });
   }
 
   try {
-    // 3. Get admin details (to get name for assignment)
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name')
@@ -2466,7 +2597,6 @@ app.post('/admin/import-players', async (req, res) => {
     const results = [];
     let successCount = 0;
 
-    // 4. Process each Telegram ID
     for (const rawId of telegramIds) {
       const tgId = String(rawId).trim();
       if (!tgId || !/^\d+$/.test(tgId)) {
@@ -2475,7 +2605,6 @@ app.post('/admin/import-players', async (req, res) => {
       }
 
       try {
-        // 5. Check if user exists; if not, create a minimal user
         let { data: existingUser, error: findErr } = await supabase
           .from('users')
           .select('telegram_id, admin_id')
@@ -2487,19 +2616,15 @@ app.post('/admin/import-players', async (req, res) => {
           continue;
         }
 
-        // If overwrite is false and user already has an admin, skip
         if (!overwrite && existingUser && existingUser.admin_id !== null) {
           results.push({ telegramId: tgId, success: false, error: 'Already assigned to another admin (skipped)' });
           continue;
         }
 
-        let user = existingUser;
-
-        // If user does not exist, create one
-        if (!user) {
+        if (!existingUser) {
           const newUser = {
             telegram_id: tgId,
-            username: `Player_${tgId.slice(-4)}`, // fallback name
+            username: `Player_${tgId.slice(-4)}`,
             balance: 10,
             referred_by: null,
             first_deposit_amount: 0,
@@ -2507,14 +2632,11 @@ app.post('/admin/import-players', async (req, res) => {
             assigned_admin_name: admin.name,
             telegram_handle: null
           };
-          const { error: insertErr } = await supabase
-            .from('users')
-            .insert(newUser);
+          const { error: insertErr } = await supabase.from('users').insert(newUser);
           if (insertErr) {
             results.push({ telegramId: tgId, success: false, error: insertErr.message });
             continue;
           }
-          // also update cache
           users[tgId] = {
             id: tgId,
             username: newUser.username,
@@ -2528,7 +2650,6 @@ app.post('/admin/import-players', async (req, res) => {
           results.push({ telegramId: tgId, success: true, created: true });
           successCount++;
         } else {
-          // Update existing user
           const { error: updateErr } = await supabase
             .from('users')
             .update({
@@ -2540,7 +2661,6 @@ app.post('/admin/import-players', async (req, res) => {
             results.push({ telegramId: tgId, success: false, error: updateErr.message });
             continue;
           }
-          // update cache if present
           if (users[tgId]) {
             users[tgId].admin_id = admin.id;
             users[tgId].assigned_admin_name = admin.name;
@@ -2553,12 +2673,10 @@ app.post('/admin/import-players', async (req, res) => {
       }
     }
 
-    // 6. Log the action
     Audit.adminAction('IMPORT_PLAYERS', req.session.adminId, req.ip, {
       count: telegramIds.length,
       successCount,
-      overwrite,
-      sampleIds: telegramIds.slice(0, 5)
+      overwrite
     });
 
     res.json({
