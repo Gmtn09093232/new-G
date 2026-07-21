@@ -1,97 +1,5 @@
 // ============================================================
-//  REQUIRED SQL MIGRATIONS (run in Supabase SQL editor)
-// ============================================================
-/*
--- Add admin columns to users
-ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS first_deposit_amount NUMERIC DEFAULT 0;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS admin_id BIGINT;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_admin_name TEXT;
-
--- Create invite_stats table
-CREATE TABLE IF NOT EXISTS invite_stats (
-  invite_code TEXT PRIMARY KEY,
-  count INTEGER DEFAULT 0
-);
-
-INSERT INTO invite_stats (invite_code) VALUES 
-  ('db'), ('mk'), ('hd'), ('ji'), ('ok'), 
-  ('ghy'), ('bghu'), ('kil'), ('hg'), ('jkl'), ('jkil')
-ON CONFLICT (invite_code) DO NOTHING;
-
--- Create game_rounds table
-CREATE TABLE IF NOT EXISTS game_rounds (
-  id BIGSERIAL PRIMARY KEY,
-  total_entry_fees NUMERIC DEFAULT 0,
-  prize_pool NUMERIC DEFAULT 0,
-  house_profit NUMERIC DEFAULT 0,
-  stake INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Add SMS proof columns to deposit_requests
-ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS transaction_reference TEXT;
-ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS proof_text TEXT;
-ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS admin_id BIGINT;
-ALTER TABLE deposit_requests ADD COLUMN IF NOT EXISTS assigned_deposit_number TEXT;
-
--- Add admin_id to withdrawal_requests
-ALTER TABLE withdrawal_requests ADD COLUMN IF NOT EXISTS admin_id BIGINT;
-ALTER TABLE withdrawal_requests ADD COLUMN IF NOT EXISTS assigned_admin_name TEXT;
-
--- Create admins table
-CREATE TABLE IF NOT EXISTS admins (
-  id BIGSERIAL PRIMARY KEY,
-  phone TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  deposit_number TEXT NOT NULL,
-  payment_type TEXT NOT NULL,
-  secret_key TEXT NOT NULL,
-  pin TEXT DEFAULT '1234',
-  commission_rate NUMERIC DEFAULT 0.05,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  is_active BOOLEAN DEFAULT TRUE
-);
-
--- Admin earnings table
-CREATE TABLE IF NOT EXISTS admin_earnings (
-  id BIGSERIAL PRIMARY KEY,
-  admin_id BIGINT REFERENCES admins(id) NOT NULL,
-  amount NUMERIC NOT NULL,
-  source TEXT NOT NULL,
-  deposit_id BIGINT REFERENCES deposit_requests(id) NULL,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  paid_at TIMESTAMPTZ NULL
-);
-
--- Admin withdrawal requests
-CREATE TABLE IF NOT EXISTS admin_withdrawal_requests (
-  id BIGSERIAL PRIMARY KEY,
-  admin_id BIGINT REFERENCES admins(id) NOT NULL,
-  amount NUMERIC NOT NULL,
-  phone TEXT NOT NULL,
-  withdrawal_type TEXT NOT NULL,
-  receiver_name TEXT NOT NULL,
-  status TEXT DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  processed_at TIMESTAMPTZ NULL
-);
-
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_users_admin_id ON users(admin_id);
-CREATE INDEX IF NOT EXISTS idx_deposits_admin_id ON deposit_requests(admin_id);
-CREATE INDEX IF NOT EXISTS idx_withdrawals_admin_id ON withdrawal_requests(admin_id);
-CREATE INDEX IF NOT EXISTS idx_admin_earnings_admin_id ON admin_earnings(admin_id);
-CREATE INDEX IF NOT EXISTS idx_admin_withdrawal_requests_admin_id ON admin_withdrawal_requests(admin_id);
-
--- Insert sample admins (change phone/pin/secret as needed)
-INSERT INTO admins (phone, name, deposit_number, payment_type, secret_key, pin, commission_rate) VALUES 
-  ('0924839730', 'Admin 1', '0924839730', 'telebirr', 'admin_secret_1', '1234', 0.05),
-  ('0912345678', 'Admin 2', '0912345678', 'telebirr', 'admin_secret_2', '1234', 0.07),
-  ('0922222222', 'Admin 3', '1000123456789', 'cbebirr', 'admin_secret_3', '1234', 0.05)
-ON CONFLICT (phone) DO NOTHING;
-*/
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions
 // ============================================================
 
 require('dotenv').config();
@@ -137,23 +45,11 @@ app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
 // ---------- Audit Logger ----------
-async function logAuditEvent({
-  eventType,
-  roomId = null,
-  userId = 'system',
-  ipAddress = null,
-  details = {}
-}) {
+async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
   try {
     const { error } = await supabase
       .from('audit_logs')
-      .insert({
-        event_type: eventType,
-        room_id: roomId,
-        user_id: userId,
-        ip_address: ipAddress,
-        details
-      });
+      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: ipAddress, details });
     if (error) throw error;
   } catch (err) {
     console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message);
@@ -199,13 +95,10 @@ function detectRapidWins(roomId, userId, ip) {
   return false;
 }
 
-// ---------- Admin Management Functions ----------
+// ---------- Admin Helper Functions ----------
 const adminCache = {};
-
 async function loadAdmin(secretKey) {
-  if (adminCache[secretKey] && (Date.now() - adminCache[secretKey].cachedAt < 60000)) {
-    return adminCache[secretKey];
-  }
+  if (adminCache[secretKey] && (Date.now() - adminCache[secretKey].cachedAt < 60000)) return adminCache[secretKey];
   try {
     const { data, error } = await supabase
       .from('admins')
@@ -214,15 +107,9 @@ async function loadAdmin(secretKey) {
       .eq('is_active', true)
       .maybeSingle();
     if (error) throw error;
-    if (data) {
-      adminCache[secretKey] = { ...data, cachedAt: Date.now() };
-      return adminCache[secretKey];
-    }
+    if (data) { adminCache[secretKey] = { ...data, cachedAt: Date.now() }; return adminCache[secretKey]; }
     return null;
-  } catch (err) {
-    console.error('Error loading admin:', err.message);
-    return null;
-  }
+  } catch (err) { console.error('Error loading admin:', err.message); return null; }
 }
 
 async function getAllAdmins() {
@@ -234,10 +121,7 @@ async function getAllAdmins() {
       .order('name');
     if (error) throw error;
     return data || [];
-  } catch (err) {
-    console.error('Error fetching admins:', err.message);
-    return [];
-  }
+  } catch (err) { console.error('Error fetching admins:', err.message); return []; }
 }
 
 async function getAdminPlayers(adminId) {
@@ -249,10 +133,7 @@ async function getAdminPlayers(adminId) {
       .order('username');
     if (error) throw error;
     return data || [];
-  } catch (err) {
-    console.error('Error fetching admin players:', err.message);
-    return [];
-  }
+  } catch (err) { console.error('Error fetching admin players:', err.message); return []; }
 }
 
 async function getAdminPlayerCount(adminId) {
@@ -263,10 +144,7 @@ async function getAdminPlayerCount(adminId) {
       .eq('admin_id', adminId);
     if (error) throw error;
     return count || 0;
-  } catch (err) {
-    console.error('Error counting admin players:', err.message);
-    return 0;
-  }
+  } catch (err) { console.error('Error counting admin players:', err.message); return 0; }
 }
 
 async function getAdminDeposits(adminId, status = 'approved') {
@@ -278,25 +156,7 @@ async function getAdminDeposits(adminId, status = 'approved') {
       .eq('status', status);
     if (error) throw error;
     return data.reduce((sum, d) => sum + Number(d.amount), 0);
-  } catch (err) {
-    console.error('Error fetching admin deposits:', err.message);
-    return 0;
-  }
-}
-
-async function getAdminPendingEarnings(adminId) {
-  try {
-    const { data, error } = await supabase
-      .from('admin_earnings')
-      .select('amount')
-      .eq('admin_id', adminId)
-      .eq('status', 'pending');
-    if (error) throw error;
-    return data.reduce((sum, e) => sum + Number(e.amount), 0);
-  } catch (err) {
-    console.error('Error fetching pending earnings:', err.message);
-    return 0;
-  }
+  } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
 // ---------- Static endpoints ----------
@@ -334,9 +194,7 @@ app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-au
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) {
-    return res.status(403).send('Forbidden: invalid or missing admin secret');
-  }
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).send('Forbidden');
   res.sendFile(path.join(__dirname, 'admin-live-players.html'));
 });
 
@@ -485,9 +343,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 // ---------- Admin Login (no secret) ----------
 app.post('/admin/login', async (req, res) => {
   const { phone, pin } = req.body;
-  if (!phone || !pin) {
-    return res.status(400).json({ success: false, error: 'Phone and PIN required' });
-  }
+  if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
   try {
     const { data: admin, error } = await supabase
       .from('admins')
@@ -496,22 +352,12 @@ app.post('/admin/login', async (req, res) => {
       .eq('pin', pin)
       .eq('is_active', true)
       .maybeSingle();
-    if (error || !admin) {
-      return res.status(401).json({ success: false, error: 'Invalid phone or PIN' });
-    }
+    if (error || !admin) return res.status(401).json({ success: false, error: 'Invalid phone or PIN' });
     req.session.adminId = admin.id;
     req.session.adminName = admin.name;
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
-    res.json({
-      success: true,
-      admin: {
-        id: admin.id,
-        name: admin.name,
-        phone: admin.phone,
-        deposit_number: admin.deposit_number
-      }
-    });
+    res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
   } catch (err) {
     console.error('Admin login error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -521,38 +367,22 @@ app.post('/admin/login', async (req, res) => {
 // ---------- Admin Registration ----------
 app.post('/admin/register', async (req, res) => {
   const { phone, name, deposit_number, payment_type, pin, confirm_pin, registration_secret } = req.body;
-
   if (!phone || !name || !deposit_number || !payment_type || !pin || !confirm_pin) {
     return res.status(400).json({ success: false, error: 'All fields are required' });
   }
-  if (pin !== confirm_pin) {
-    return res.status(400).json({ success: false, error: 'PINs do not match' });
-  }
-  if (pin.length < 4 || !/^\d+$/.test(pin)) {
-    return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits' });
-  }
-  if (!phone.match(/^(09|07)\d{8}$/)) {
-    return res.status(400).json({ success: false, error: 'Invalid phone number' });
-  }
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) {
-    return res.status(400).json({ success: false, error: 'Invalid payment type' });
-  }
-
+  if (pin !== confirm_pin) return res.status(400).json({ success: false, error: 'PINs do not match' });
+  if (pin.length < 4 || !/^\d+$/.test(pin)) return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits' });
+  if (!phone.match(/^(09|07)\d{8}$/)) return res.status(400).json({ success: false, error: 'Invalid phone number' });
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ success: false, error: 'Invalid payment type' });
   const requiredSecret = process.env.ADMIN_REGISTRATION_SECRET;
-  if (requiredSecret && registration_secret !== requiredSecret) {
-    return res.status(403).json({ success: false, error: 'Invalid registration secret' });
-  }
-
+  if (requiredSecret && registration_secret !== requiredSecret) return res.status(403).json({ success: false, error: 'Invalid registration secret' });
   try {
     const { data: existing } = await supabase
       .from('admins')
       .select('phone')
       .eq('phone', phone)
       .maybeSingle();
-    if (existing) {
-      return res.status(400).json({ success: false, error: 'Phone number already registered' });
-    }
-
+    if (existing) return res.status(400).json({ success: false, error: 'Phone number already registered' });
     const secretKey = crypto.randomBytes(16).toString('hex');
     const { data: newAdmin, error: insertErr } = await supabase
       .from('admins')
@@ -568,37 +398,19 @@ app.post('/admin/register', async (req, res) => {
       })
       .select()
       .single();
-
     if (insertErr) throw insertErr;
-
     console.log(`✅ New admin registered: ${name} (${phone})`);
-    res.json({
-      success: true,
-      message: 'Registration successful!',
-      admin: {
-        id: newAdmin.id,
-        name: newAdmin.name,
-        phone: newAdmin.phone,
-        deposit_number: newAdmin.deposit_number
-      }
-    });
+    res.json({ success: true, message: 'Registration successful!', admin: { id: newAdmin.id, name: newAdmin.name, phone: newAdmin.phone, deposit_number: newAdmin.deposit_number } });
   } catch (err) {
     console.error('Registration error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ---------- Admin Logout ----------
-app.post('/admin/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
-});
+app.post('/admin/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
-// ---------- Admin Session Check ----------
 app.get('/admin/session', async (req, res) => {
-  if (!req.session.adminId) {
-    return res.status(401).json({ success: false, error: 'Not logged in' });
-  }
+  if (!req.session.adminId) return res.status(401).json({ success: false, error: 'Not logged in' });
   try {
     const { data: admin, error } = await supabase
       .from('admins')
@@ -606,23 +418,17 @@ app.get('/admin/session', async (req, res) => {
       .eq('id', req.session.adminId)
       .eq('is_active', true)
       .maybeSingle();
-    if (error || !admin) {
-      req.session.destroy();
-      return res.status(401).json({ success: false, error: 'Session expired' });
-    }
+    if (error || !admin) { req.session.destroy(); return res.status(401).json({ success: false, error: 'Session expired' }); }
     res.json({ success: true, admin });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ---------- Registration Config ----------
 app.get('/admin/registration-config', (req, res) => {
   const requiresSecret = !!process.env.ADMIN_REGISTRATION_SECRET;
   res.json({ requiresSecret });
 });
 
-// ---------- Admin add/set/delete balance (legacy) ----------
+// ---------- Legacy admin balance management ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -670,11 +476,7 @@ app.post('/admin/set-balance', async (req, res) => {
     await supabase.from('users').update({ balance: newBal }).eq('telegram_id', strId);
     if (users[strId]) users[strId].balance = newBal;
     else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
-    await Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, {
-      targetUserId: strId,
-      oldBalance: existing.balance,
-      newBalance: newBal
-    });
+    await Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal });
     const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
     res.json({ success: true, newBalance: newBal });
@@ -725,7 +527,7 @@ app.post('/admin/delete-user', async (req, res) => {
   }
 });
 
-// ---------- Bingo game logic (unchanged) ----------
+// ---------- Bingo Game Logic ----------
 function generateCard() {
   const columns = [
     [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
@@ -809,9 +611,7 @@ const botNameAssignments = new Map();
 function getBotName(botId) {
   const now = Date.now();
   const entry = botNameAssignments.get(botId);
-  if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) {
-    return entry.name;
-  }
+  if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) return entry.name;
   const newName = getRandomMaleEthiopianName();
   botNameAssignments.set(botId, { name: newName, assignedAt: now });
   console.log(`🆕 Bot ${botId} assigned new name: ${newName} (valid for 12h)`);
@@ -948,11 +748,11 @@ function handleBingoClaim(telegramId, stake, force = false) {
   });
 
   if (!player.isBot && !force) {
-    Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, { 
-      cardId: player.cardNumber, 
-      cardGrid: player.card, 
-      calledNumber: game.winningNumber, 
-      winType: 'bingo_line' 
+    Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, {
+      cardId: player.cardNumber,
+      cardGrid: player.card,
+      calledNumber: game.winningNumber,
+      winType: 'bingo_line'
     });
   }
 
@@ -1060,25 +860,25 @@ function resetGame(stake) {
     scheduleBotAtRemaining(1, 39);
   }
 
-  io.to(`stake_${stake}`).emit('lobbyState', { 
-    stake, 
-    startsIn: 45, 
-    takenNumbers: Array.from(game.takenCardNumbers), 
-    playersCount: game.players.length 
+  io.to(`stake_${stake}`).emit('lobbyState', {
+    stake,
+    startsIn: 45,
+    takenNumbers: Array.from(game.takenCardNumbers),
+    playersCount: game.players.length
   });
-  io.emit('lobbyState', { 
-    stake, 
-    startsIn: 45, 
-    takenNumbers: Array.from(game.takenCardNumbers), 
-    playersCount: game.players.length 
+  io.emit('lobbyState', {
+    stake,
+    startsIn: 45,
+    takenNumbers: Array.from(game.takenCardNumbers),
+    playersCount: game.players.length
   });
-  publicNamespace.emit('lobbyState', { 
-    stake, 
-    startsIn: 45, 
-    takenNumbers: Array.from(game.takenCardNumbers), 
-    playersCount: game.players.length 
+  publicNamespace.emit('lobbyState', {
+    stake,
+    startsIn: 45,
+    takenNumbers: Array.from(game.takenCardNumbers),
+    playersCount: game.players.length
   });
-  
+
   broadcastPlayerCount(stake);
   game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
   notifyAdminClients();
@@ -1204,9 +1004,11 @@ function getLines(card) {
   lines.push([card[0][0], card[0][4], card[4][0], card[4][4]]);
   return lines;
 }
+
 function isLineComplete(line, marked) {
   return line.every(val => val === 'FREE' || marked.includes(val));
 }
+
 function isBingoValidOnLastCall(card, marked, lastCalled) {
   if (lastCalled === null) return false;
   const lines = getLines(card);
@@ -1218,6 +1020,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
+// ---------- UPDATED endGameWithWinners (with admin contributions) ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1225,6 +1028,7 @@ async function endGameWithWinners(stake) {
 
   gameCounter++;
 
+  // ---- Forced win logic ----
   if (stake === 20) {
     const realWinners = game.winners.filter(w => !w.isBot);
     const botWinners = game.winners.filter(w => w.isBot);
@@ -1247,19 +1051,68 @@ async function endGameWithWinners(stake) {
     }
   }
 
+  // ---- Compute house profit ----
   const totalEntryFees = game.players.length * game.entryFee;
-  const houseProfit = totalEntryFees - game.prizePool;
+  const houseProfit = totalEntryFees - game.prizePool; // 20% when >1 player
+
+  // ---- Record game round ----
+  let gameRoundId = null;
   try {
-    await supabase.from('game_rounds').insert({
-      total_entry_fees: totalEntryFees,
-      prize_pool: game.prizePool,
-      house_profit: houseProfit,
-      stake
-    });
+    const { data, error } = await supabase
+      .from('game_rounds')
+      .insert({
+        total_entry_fees: totalEntryFees,
+        prize_pool: game.prizePool,
+        house_profit: houseProfit,
+        stake
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    gameRoundId = data.id;
+    console.log(`✅ Game round recorded for stake ${stake} (entry: ${totalEntryFees}, profit: ${houseProfit})`);
   } catch (err) {
     console.error(`❌ Failed to insert game_round for stake ${stake}:`, err.message);
   }
 
+  // ---- Record admin contributions ----
+  if (gameRoundId && houseProfit > 0) {
+    const adminGroups = {};
+    for (const player of game.players) {
+      if (player.isBot) continue;
+      const user = users[player.telegramId];
+      const adminId = user?.admin_id || null;
+      if (!adminId) continue;
+      if (!adminGroups[adminId]) {
+        adminGroups[adminId] = { adminId, totalEntryFees: 0, playerCount: 0 };
+      }
+      adminGroups[adminId].totalEntryFees += game.entryFee;
+      adminGroups[adminId].playerCount++;
+    }
+
+    for (const [adminId, data] of Object.entries(adminGroups)) {
+      const share = totalEntryFees > 0
+        ? (data.totalEntryFees / totalEntryFees) * houseProfit
+        : 0;
+      if (share > 0) {
+        try {
+          await supabase
+            .from('game_admin_contributions')
+            .insert({
+              game_round_id: gameRoundId,
+              admin_id: parseInt(adminId),
+              total_entry_fees: data.totalEntryFees,
+              house_profit_share: share
+            });
+          console.log(`💰 Admin ${adminId} earned ${share.toFixed(2)} ETB profit share from game ${gameRoundId}`);
+        } catch (err) {
+          console.error(`❌ Failed to record admin contribution:`, err.message);
+        }
+      }
+    }
+  }
+
+  // ---- Bot history (stake 20) ----
   if (stake === 20) {
     const botsInGame = game.players.filter(p => p.isBot);
     for (const bot of botsInGame) {
@@ -1275,11 +1128,13 @@ async function endGameWithWinners(stake) {
     }
   }
 
+  // ---- Keep forced bots ----
   const realWinnersFinal = game.winners.filter(w => !w.isBot);
   if (realWinnersFinal.length > 0) {
     game.winners = game.winners.filter(w => !w.isBot || w.isForced);
   }
 
+  // ---- Distribute prizes ----
   if (game.winners.length > 0) {
     const finalRealWinners = game.winners.filter(w => !w.isBot);
     const finalBotWinners = game.winners.filter(w => w.isBot);
@@ -1352,7 +1207,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Bot admin endpoints ----------
+// ---------- Bot Admin Endpoints ----------
 app.get('/admin/bots-status', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -1420,12 +1275,12 @@ app.get('/admin/bot-history', (req, res) => {
   let history = botGameHistory;
   if (from) {
     const fromDate = new Date(from);
-    fromDate.setHours(0,0,0,0);
+    fromDate.setHours(0, 0, 0, 0);
     history = history.filter(entry => new Date(entry.date) >= fromDate);
   }
   if (to) {
     const toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
+    toDate.setHours(23, 59, 59, 999);
     history = history.filter(entry => new Date(entry.date) <= toDate);
   }
   res.json({ success: true, history, from: from || null, to: to || null });
@@ -1438,14 +1293,14 @@ app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'adm
 app.post('/api/request-deposit', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  
+
   const { phone, amount, payment_type, transaction_reference, proof_text, admin_id } = req.body;
   const amt = Number(amount);
-  
+
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
-  
+
   try {
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
@@ -1454,10 +1309,10 @@ app.post('/api/request-deposit', async (req, res) => {
       .eq('is_active', true)
       .maybeSingle();
     if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
-    
+
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
-    
+
     if (!user.admin_id) {
       await supabase
         .from('users')
@@ -1468,7 +1323,7 @@ app.post('/api/request-deposit', async (req, res) => {
         users[userId].assigned_admin_name = admin.name;
       }
     }
-    
+
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1481,9 +1336,9 @@ app.post('/api/request-deposit', async (req, res) => {
       admin_id: admin.id,
       assigned_deposit_number: admin.deposit_number
     }).select().single();
-    
+
     if (error) throw error;
-    
+
     Audit.depositInitiated(userId, req.ip, {
       transactionId: data.id.toString(),
       amount: amt,
@@ -1495,7 +1350,7 @@ app.post('/api/request-deposit', async (req, res) => {
       transactionReference: transaction_reference,
       proofLength: proof_text ? proof_text.length : 0
     });
-    
+
     res.json({
       success: true,
       requestId: data.id,
@@ -1513,28 +1368,28 @@ app.post('/api/request-deposit', async (req, res) => {
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
-  
+
   const { amount, phone, withdrawal_type, name } = req.body;
   const amt = Number(amount);
-  
+
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) return res.status(400).json({ error: 'Invalid withdrawal type' });
   const receiver = (phone || '').trim();
   if (!receiver || receiver.length < 10) return res.status(400).json({ error: 'Valid receiver phone/account required' });
   const receiverName = (name || '').trim();
   if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
-  
+
   try {
     const user = await loadUser(userId, null, null, null, false);
     if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
-    
+
     let adminId = user.admin_id;
     let adminName = user.assigned_admin_name;
     if (!adminId) {
       const admins = await getAllAdmins();
       if (admins.length > 0) { adminId = admins[0].id; adminName = admins[0].name; }
     }
-    
+
     const { data, error } = await supabase.from('withdrawal_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1546,9 +1401,9 @@ app.post('/api/request-withdraw', async (req, res) => {
       admin_id: adminId,
       assigned_admin_name: adminName
     }).select().single();
-    
+
     if (error) throw error;
-    
+
     Audit.withdrawalRequested(userId, req.ip, {
       transactionId: data.id.toString(),
       amount: amt,
@@ -1559,7 +1414,7 @@ app.post('/api/request-withdraw', async (req, res) => {
       adminId,
       adminName
     });
-    
+
     res.json({
       success: true,
       requestId: data.id,
@@ -1610,7 +1465,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   try {
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
-      .select('id, name, phone, commission_rate')
+      .select('id, name, phone')
       .eq('id', req.session.adminId)
       .eq('is_active', true)
       .maybeSingle();
@@ -1635,22 +1490,6 @@ app.post('/admin/process-deposit', async (req, res) => {
         processed_at: new Date().toISOString()
       }).eq('id', requestId);
 
-      // ----- Commission -----
-      const commissionRate = admin.commission_rate || 0.05;
-      const commission = reqData.amount * commissionRate;
-      if (commission > 0) {
-        await supabase
-          .from('admin_earnings')
-          .insert({
-            admin_id: admin.id,
-            amount: commission,
-            source: 'deposit_commission',
-            deposit_id: requestId,
-            status: 'pending'
-          });
-        console.log(`💰 Admin ${admin.name} earned ${commission} ETB commission from deposit ${requestId}`);
-      }
-
       Audit.depositCompleted(reqData.telegram_id, req.ip, {
         transactionId: requestId.toString(),
         providerRef: reqData.id.toString(),
@@ -1660,10 +1499,12 @@ app.post('/admin/process-deposit', async (req, res) => {
         adminId: admin.id,
         adminName: admin.name
       });
+
       if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
         user.first_deposit_amount = reqData.amount;
         await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
       }
+
       const playerSocket = await getSocketByUserId(reqData.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', user.balance);
@@ -1830,7 +1671,8 @@ app.get('/admin/stats', async (req, res) => {
       .select('amount, status, created_at')
       .eq('admin_id', admin.id);
     const totalDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const todayDeposits = deposits.filter(d => d.status === 'approved' && new Date(d.created_at) >= today).reduce((sum, d) => sum + Number(d.amount), 0);
     const { data: withdrawals } = await supabase
       .from('withdrawal_requests')
@@ -1850,8 +1692,97 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// ---------- Admin Earnings ----------
-app.get('/admin/earnings', async (req, res) => {
+// ---------- Daily Commission Calculation ----------
+const DAILY_COMMISSION_HOUR = 0; // midnight
+const DAILY_COMMISSION_MINUTE = 0;
+
+async function calculateDailyCommissions() {
+  console.log('⏰ Running daily commission calculation...');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  try {
+    const { data: admins, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name')
+      .eq('is_active', true);
+    if (adminErr) throw adminErr;
+
+    for (const admin of admins) {
+      const { data: contributions, error: contribErr } = await supabase
+        .from('game_admin_contributions')
+        .select('house_profit_share, total_entry_fees, created_at')
+        .eq('admin_id', admin.id)
+        .gte('created_at', yesterday.toISOString())
+        .lt('created_at', today.toISOString());
+      if (contribErr) throw contribErr;
+
+      if (contributions && contributions.length > 0) {
+        const totalCommission = contributions.reduce((sum, c) => sum + Number(c.house_profit_share), 0);
+        const totalEntryFees = contributions.reduce((sum, c) => sum + Number(c.total_entry_fees || 0), 0);
+        const totalHouseProfit = contributions.reduce((sum, c) => sum + Number(c.house_profit_share || 0), 0);
+
+        if (totalCommission > 0) {
+          // Check if record already exists for this date
+          const { data: existing } = await supabase
+            .from('admin_daily_commissions')
+            .select('id')
+            .eq('admin_id', admin.id)
+            .eq('date', yesterdayStr)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase
+              .from('admin_daily_commissions')
+              .update({
+                total_entry_fees: totalEntryFees,
+                total_house_profit: totalHouseProfit,
+                commission_amount: totalCommission
+              })
+              .eq('id', existing.id);
+            console.log(`🔄 Updated daily commission for admin ${admin.name} for ${yesterdayStr}`);
+          } else {
+            await supabase
+              .from('admin_daily_commissions')
+              .insert({
+                admin_id: admin.id,
+                date: yesterdayStr,
+                total_entry_fees: totalEntryFees,
+                total_house_profit: totalHouseProfit,
+                commission_amount: totalCommission,
+                status: 'pending'
+              });
+            console.log(`✅ Admin ${admin.name} earned ${totalCommission.toFixed(2)} ETB commission for ${yesterdayStr}`);
+          }
+        }
+      }
+    }
+    console.log('✅ Daily commission calculation complete!');
+  } catch (err) {
+    console.error('❌ Daily commission calculation error:', err.message);
+  }
+}
+
+// Schedule daily job
+function scheduleDailyCommission() {
+  const now = new Date();
+  const nextRun = new Date(now);
+  nextRun.setHours(DAILY_COMMISSION_HOUR, DAILY_COMMISSION_MINUTE, 0, 0);
+  if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
+  const msUntilNextRun = nextRun - now;
+  console.log(`⏰ Next daily commission calculation at: ${nextRun.toLocaleString()}`);
+  setTimeout(() => {
+    calculateDailyCommissions();
+    setInterval(calculateDailyCommissions, 24 * 60 * 60 * 1000);
+  }, msUntilNextRun);
+}
+scheduleDailyCommission();
+
+// ---------- Admin Earnings (Daily Commissions) ----------
+app.get('/admin/daily-commissions', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
     const { data: admin, error: adminErr } = await supabase
@@ -1862,28 +1793,52 @@ app.get('/admin/earnings', async (req, res) => {
       .maybeSingle();
     if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
 
-    const { data: earnings, error } = await supabase
-      .from('admin_earnings')
+    const { data: dailyCommissions, error } = await supabase
+      .from('admin_daily_commissions')
       .select('*')
       .eq('admin_id', admin.id)
-      .order('created_at', { ascending: false });
+      .order('date', { ascending: false })
+      .limit(30);
     if (error) throw error;
 
-    const totalEarned = earnings.filter(e => e.status === 'paid').reduce((sum, e) => sum + Number(e.amount), 0);
-    const totalPending = earnings.filter(e => e.status === 'pending').reduce((sum, e) => sum + Number(e.amount), 0);
+    const { data: pendingEarnings, error: pendingErr } = await supabase
+      .from('admin_daily_commissions')
+      .select('commission_amount')
+      .eq('admin_id', admin.id)
+      .eq('status', 'pending');
+    if (pendingErr) throw pendingErr;
+    const totalPending = pendingEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
+
+    const { data: paidEarnings, error: paidErr } = await supabase
+      .from('admin_daily_commissions')
+      .select('commission_amount')
+      .eq('admin_id', admin.id)
+      .eq('status', 'paid');
+    if (paidErr) throw paidErr;
+    const totalPaid = paidEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
 
     res.json({
       success: true,
-      admin: { id: admin.id, name: admin.name, commission_rate: admin.commission_rate },
-      earnings,
-      totalEarned,
-      totalPending
+      daily: dailyCommissions,
+      stats: {
+        totalEarned: totalPaid,
+        totalPending: totalPending,
+        totalPaid: totalPaid,
+        totalAvailable: totalPending
+      },
+      admin: {
+        id: admin.id,
+        name: admin.name,
+        commission_rate: admin.commission_rate
+      }
     });
   } catch (err) {
+    console.error('Error fetching daily commissions:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
+// ---------- Admin Request Withdrawal ----------
 app.post('/admin/request-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { amount, phone, withdrawal_type, receiver_name } = req.body;
@@ -1892,8 +1847,14 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   if (!phone || !receiver_name) return res.status(400).json({ error: 'Phone and receiver name required' });
 
   try {
-    const pending = await getAdminPendingEarnings(req.session.adminId);
-    if (pending < amt) return res.status(400).json({ error: 'Insufficient pending earnings' });
+    const { data: pendingEarnings, error: pendingErr } = await supabase
+      .from('admin_daily_commissions')
+      .select('commission_amount')
+      .eq('admin_id', req.session.adminId)
+      .eq('status', 'pending');
+    if (pendingErr) throw pendingErr;
+    const totalPending = pendingEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
+    if (totalPending < amt) return res.status(400).json({ error: 'Insufficient pending earnings' });
 
     const { data, error } = await supabase
       .from('admin_withdrawal_requests')
@@ -1907,7 +1868,6 @@ app.post('/admin/request-withdrawal', async (req, res) => {
       })
       .select()
       .single();
-
     if (error) throw error;
     res.json({ success: true, request: data });
   } catch (err) {
@@ -1916,6 +1876,7 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   }
 });
 
+// ---------- Super Admin: Process Admin Withdrawal ----------
 app.post('/admin/process-admin-withdrawal', async (req, res) => {
   const { secret, requestId, action } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -1935,8 +1896,9 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
         .update({ status: 'approved', processed_at: new Date().toISOString() })
         .eq('id', requestId);
 
+      // Mark pending daily commissions as paid
       await supabase
-        .from('admin_earnings')
+        .from('admin_daily_commissions')
         .update({ status: 'paid', paid_at: new Date().toISOString() })
         .eq('admin_id', reqData.admin_id)
         .eq('status', 'pending');
@@ -1955,13 +1917,49 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Statistics (legacy) ----------
+// ---------- Statistics ----------
 app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'stats.html')));
+
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret, from, to } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  // Keep your existing summary or simplify
-  res.json({ success: true, totalDeposits: 0, totalWithdrawals: 0, totalHouseProfit: 0 });
+  try {
+    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
+    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
+    let roundsQuery = supabase.from('game_rounds').select('house_profit');
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0, 0, 0, 0);
+      depositQuery = depositQuery.gte('created_at', fromDate.toISOString());
+      withdrawalQuery = withdrawalQuery.gte('created_at', fromDate.toISOString());
+      roundsQuery = roundsQuery.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      depositQuery = depositQuery.lte('created_at', toDate.toISOString());
+      withdrawalQuery = withdrawalQuery.lte('created_at', toDate.toISOString());
+      roundsQuery = roundsQuery.lte('created_at', toDate.toISOString());
+    }
+    const { data: deposits, error: depErr } = await depositQuery;
+    if (depErr) throw depErr;
+    const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
+    const { data: withdrawals, error: wdErr } = await withdrawalQuery;
+    if (wdErr) throw wdErr;
+    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
+    const { data: rounds, error: rdErr } = await roundsQuery;
+    if (rdErr) throw rdErr;
+    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
+    res.json({
+      success: true,
+      totalDeposits,
+      totalWithdrawals,
+      totalHouseProfit
+    });
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ---------- Referral endpoints ----------
@@ -2123,7 +2121,8 @@ io.on('connection', async (socket) => {
     if (game.status !== 'lobby') return;
     const userBalance = users[socket.userId]?.balance || 0;
     if (userBalance < game.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`); return; }
-    const freeNumbers = []; for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) freeNumbers.push(i);
+    const freeNumbers = [];
+    for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) freeNumbers.push(i);
     if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
     const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
     const existing = game.players.find(p => p.telegramId === socket.userId);
@@ -2220,13 +2219,13 @@ setInterval(() => {
   notifyAdminClients();
 }, 2000);
 
-// Error handler
+// ---------- Error handler ----------
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// Start all three stakes
+// ---------- Start all three stakes ----------
 resetGame(100);
 resetGame(20);
 resetGame(30);
