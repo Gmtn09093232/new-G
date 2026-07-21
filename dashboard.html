@@ -401,7 +401,7 @@
         <!-- Import button -->
         <div style="margin-bottom:12px;">
           <button class="btn btn-primary" onclick="openImportModal()" style="min-height:44px;">📥 Import Players</button>
-          <span style="font-size:12px; color:#94a3b8; margin-left:8px;">(CSV or pasted list)</span>
+          <span style="font-size:12px; color:#94a3b8; margin-left:8px;">(Paste list or CSV)</span>
         </div>
 
         <!-- Add single player -->
@@ -942,33 +942,46 @@
       input.disabled = true;
 
       try {
-        let response = await fetch('/admin/add-player', {
+        // We'll use the same import endpoint for a single ID
+        const response = await fetch('/admin/import-players', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramId })
+          body: JSON.stringify({ telegramIds: [telegramId], overwrite: false })
         });
 
-        let data = await response.json();
-
-        if (response.status === 409) {
-          const confirmMsg = `This player is already assigned to "${data.currentAdminName}". Do you want to reassign them to you?`;
-          if (!confirm(confirmMsg)) {
-            statusDiv.innerHTML = '<span style="color:#f59e0b;">Cancelled.</span>';
-            input.disabled = false;
-            return;
-          }
-          response = await fetch('/admin/add-player', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegramId, overwrite: true })
-          });
-          data = await response.json();
-        }
+        const data = await response.json();
 
         if (data.success) {
-          statusDiv.innerHTML = `<span style="color:#10b981;">✅ ${data.message}</span>`;
-          input.value = '';
-          loadPlayers();
+          const result = data.results[0];
+          if (result.success) {
+            const msg = result.created ? 'created' : 'updated';
+            statusDiv.innerHTML = `<span style="color:#10b981;">✅ Player ${telegramId} ${msg} successfully!</span>`;
+            input.value = '';
+            loadPlayers();
+          } else {
+            // If already assigned, offer overwrite
+            if (result.error && result.error.includes('Already assigned')) {
+              if (confirm(`This player is already assigned to another admin. Do you want to reassign?`)) {
+                const overwriteRes = await fetch('/admin/import-players', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ telegramIds: [telegramId], overwrite: true })
+                });
+                const overwriteData = await overwriteRes.json();
+                if (overwriteData.success && overwriteData.results[0].success) {
+                  statusDiv.innerHTML = `<span style="color:#10b981;">✅ Player ${telegramId} reassigned to you!</span>`;
+                  input.value = '';
+                  loadPlayers();
+                } else {
+                  statusDiv.innerHTML = `<span style="color:#ef4444;">❌ Failed to reassign: ${overwriteData.error}</span>`;
+                }
+              } else {
+                statusDiv.innerHTML = '<span style="color:#f59e0b;">Cancelled.</span>';
+              }
+            } else {
+              statusDiv.innerHTML = `<span style="color:#ef4444;">❌ ${result.error || 'Failed to add player'}</span>`;
+            }
+          }
         } else {
           statusDiv.innerHTML = `<span style="color:#ef4444;">❌ ${data.error}</span>`;
         }
@@ -1025,25 +1038,27 @@
         const response = await fetch('/admin/import-players', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ players: ids, overwrite })
+          body: JSON.stringify({ telegramIds: ids, overwrite })
         });
 
         const data = await response.json();
 
         if (data.success) {
-          const results = data.results;
-          let html = `<div style="margin-bottom:4px;"><strong>✅ ${results.success.length} added, ${results.reassigned.length} reassigned</strong></div>`;
-          if (results.success.length > 0) {
-            html += `<div style="color:#10b981;">Added: ${results.success.map(p => p.id).join(', ')}</div>`;
-          }
-          if (results.reassigned.length > 0) {
-            html += `<div style="color:#f59e0b;">Reassigned: ${results.reassigned.map(p => p.id).join(', ')}</div>`;
-          }
-          if (results.skipped.length > 0) {
-            html += `<div style="color:#94a3b8;">Skipped: ${results.skipped.map(p => p.id).join(', ')}</div>`;
-          }
-          if (results.failed.length > 0) {
-            html += `<div style="color:#ef4444;">Failed: ${results.failed.map(p => p.id).join(', ')}</div>`;
+          const results = data.results; // array of { telegramId, success, created, updated, error }
+          const added = results.filter(r => r.success && r.created).length;
+          const updated = results.filter(r => r.success && r.updated).length;
+          const failed = results.filter(r => !r.success).length;
+          let html = `<div style="font-weight:600;">✅ ${added} added, ${updated} updated${failed > 0 ? `, ${failed} failed` : ''}</div>`;
+          // Show details
+          if (results.length > 0) {
+            html += '<ul style="list-style:none;padding:0;margin-top:6px;font-size:12px;">';
+            results.forEach(r => {
+              const icon = r.success ? (r.created ? '➕' : '🔄') : '❌';
+              const color = r.success ? (r.created ? '#10b981' : '#f59e0b') : '#ef4444';
+              const msg = r.error || (r.created ? 'Created' : 'Updated');
+              html += `<li style="padding:2px 0;border-bottom:1px solid #f0f0f0;color:${color};">${icon} ${r.telegramId} – ${msg}</li>`;
+            });
+            html += '</ul>';
           }
           statusDiv.innerHTML = html;
           loadPlayers();
