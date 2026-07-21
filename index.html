@@ -646,18 +646,51 @@
             }
         }
 
+        // ========== FIXED: connectToGame with start_param fallback ==========
         async function connectToGame(stake) {
             currentStake = stake;
             localStorage.setItem('dot_bingo_stake', stake);
 
             const initData = tg.initData;
             if (!initData) { alert('Open inside Telegram'); return; }
+
+            // ----- FIX: get start_param from multiple sources -----
+            let startParam = null;
+
+            // 1. Try from tg.initData (if present)
+            if (initData) {
+                const params = new URLSearchParams(initData);
+                startParam = params.get('start_param');
+                console.log('🔍 start_param from initData:', startParam);
+            }
+
+            // 2. If not found, try from the page URL
+            if (!startParam) {
+                const urlParams = new URLSearchParams(window.location.search);
+                startParam = urlParams.get('start_param');
+                console.log('🔍 start_param from URL:', startParam);
+            }
+
+            // 3. If still not found, try from tg.initDataUnsafe (direct access)
+            if (!startParam && tg.initDataUnsafe) {
+                startParam = tg.initDataUnsafe.start_param;
+                console.log('🔍 start_param from initDataUnsafe:', startParam);
+            }
+
+            console.log('✅ Final start_param:', startParam);
+            // ------------------------------------------------
+
             try {
-                const res = await fetch('/api/telegram-miniapp-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData }) });
+                const res = await fetch('/api/telegram-miniapp-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData })
+                });
                 const data = await res.json();
                 if (!data.success) { alert('Auth failed'); return; }
                 document.getElementById('profileUsername').innerText = data.username || 'Player';
             } catch (e) { alert('Network error'); return; }
+
             if (socket) socket.disconnect();
             socket = io();
             socket.on('connect', () => {
