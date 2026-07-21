@@ -1,5 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods
 // ============================================================
 
 require('dotenv').config();
@@ -163,19 +163,16 @@ async function getAdminDeposits(adminId, status = 'approved') {
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const admins = await getAllAdmins();
-    const accounts = { telebirr: [], cbebirr: [], mpesa: [] };
-    admins.forEach(admin => {
-      if (admin.payment_type && accounts[admin.payment_type]) {
-        accounts[admin.payment_type].push({
-          number: admin.deposit_number,
-          name: admin.name,
-          adminId: admin.id
-        });
-      }
-    });
-    res.json({ success: true, accounts });
+    // Return each admin with their payment numbers
+    const result = admins.map(a => ({
+      id: a.id,
+      name: a.name,
+      telebirr: a.telebirr_number || null,
+      cbebirr: a.cbebirr_number || null,
+      mpesa: a.mpesa_number || null
+    }));
+    res.json({ success: true, admins: result });
   } catch (err) {
-    console.error('Error fetching deposit accounts:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -384,16 +381,22 @@ app.post('/admin/login', async (req, res) => {
   }
 });
 
-// ---------- Admin Registration (with invite_code generation) ----------
+// ---------- Admin Registration (with invite_code generation and payment numbers) ----------
 app.post('/admin/register', async (req, res) => {
-  const { phone, name, deposit_number, payment_type, pin, confirm_pin, registration_secret } = req.body;
-  if (!phone || !name || !deposit_number || !payment_type || !pin || !confirm_pin) {
-    return res.status(400).json({ success: false, error: 'All fields are required' });
+  const { 
+    phone, name, deposit_number, payment_type, pin, confirm_pin, 
+    registration_secret,
+    telebirr_number, cbebirr_number, mpesa_number 
+  } = req.body;
+  if (!phone || !name || !pin || !confirm_pin) {
+    return res.status(400).json({ success: false, error: 'Phone, name, and PIN are required' });
   }
   if (pin !== confirm_pin) return res.status(400).json({ success: false, error: 'PINs do not match' });
   if (pin.length < 4 || !/^\d+$/.test(pin)) return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits' });
   if (!phone.match(/^(09|07)\d{8}$/)) return res.status(400).json({ success: false, error: 'Invalid phone number' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ success: false, error: 'Invalid payment type' });
+  if (payment_type && !['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) {
+    return res.status(400).json({ success: false, error: 'Invalid payment type' });
+  }
   const requiredSecret = process.env.ADMIN_REGISTRATION_SECRET;
   if (requiredSecret && registration_secret !== requiredSecret) return res.status(403).json({ success: false, error: 'Invalid registration secret' });
   try {
@@ -404,20 +407,22 @@ app.post('/admin/register', async (req, res) => {
       .maybeSingle();
     if (existing) return res.status(400).json({ success: false, error: 'Phone number already registered' });
     const secretKey = crypto.randomBytes(16).toString('hex');
-    // Generate invite code from name + random
     const inviteCode = name.substring(0, 3).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
     const { data: newAdmin, error: insertErr } = await supabase
       .from('admins')
       .insert({
         phone,
         name,
-        deposit_number,
-        payment_type,
+        deposit_number: deposit_number || null,
+        payment_type: payment_type || null,
         secret_key: secretKey,
         pin,
         invite_code: inviteCode,
         commission_rate: 0.05,
-        is_active: true
+        is_active: true,
+        telebirr_number: telebirr_number || null,
+        cbebirr_number: cbebirr_number || null,
+        mpesa_number: mpesa_number || null
       })
       .select()
       .single();
@@ -437,7 +442,7 @@ app.get('/admin/session', async (req, res) => {
   try {
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('id, name, phone, deposit_number, commission_rate, invite_code')
+      .select('id, name, phone, deposit_number, commission_rate, invite_code, telebirr_number, cbebirr_number, mpesa_number')
       .eq('id', req.session.adminId)
       .eq('is_active', true)
       .maybeSingle();
@@ -467,7 +472,7 @@ app.get('/admin/invite-info', async (req, res) => {
       req.session.destroy();
       return res.status(401).json({ error: 'Session expired' });
     }
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'YourBot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'bingomkmk0120_bot';
     const inviteLink = `https://t.me/${botUsername}?start=${admin.invite_code}`;
     res.json({
       success: true,
@@ -1144,9 +1149,13 @@ async function endGameWithWinners(stake) {
       adminGroups[adminId].playerCount++;
     }
 
+    // Admin commission percentage (40% of house profit)
+    const adminCommissionFraction = parseFloat(process.env.ADMIN_COMMISSION_PERCENTAGE) || 0.40;
+    const adminShareTotal = houseProfit * adminCommissionFraction;
+
     for (const [adminId, data] of Object.entries(adminGroups)) {
       const share = totalEntryFees > 0
-        ? (data.totalEntryFees / totalEntryFees) * houseProfit
+        ? (data.totalEntryFees / totalEntryFees) * adminShareTotal
         : 0;
       if (share > 0) {
         try {
@@ -1355,11 +1364,17 @@ app.post('/api/request-deposit', async (req, res) => {
   try {
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
-      .select('id, deposit_number, name')
+      .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
       .eq('id', admin_id)
       .eq('is_active', true)
       .maybeSingle();
     if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
+
+    // Validate the payment type exists for this admin
+    const methodField = `${payment_type}_number`;
+    if (!admin[methodField]) {
+      return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
+    }
 
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -1385,7 +1400,7 @@ app.post('/api/request-deposit', async (req, res) => {
       transaction_reference: transaction_reference || null,
       proof_text: proof_text || null,
       admin_id: admin.id,
-      assigned_deposit_number: admin.deposit_number
+      assigned_deposit_number: admin[methodField] // store the actual number used
     }).select().single();
 
     if (error) throw error;
@@ -1397,7 +1412,7 @@ app.post('/api/request-deposit', async (req, res) => {
       method: payment_type,
       adminId: admin.id,
       adminName: admin.name,
-      adminNumber: admin.deposit_number,
+      adminNumber: admin[methodField],
       transactionReference: transaction_reference,
       proofLength: proof_text ? proof_text.length : 0
     });
@@ -1407,7 +1422,7 @@ app.post('/api/request-deposit', async (req, res) => {
       requestId: data.id,
       message: `Deposit request of ${amt} ETB via ${payment_type} submitted to ${admin.name}.`,
       adminName: admin.name,
-      adminNumber: admin.deposit_number
+      adminNumber: admin[methodField]
     });
   } catch (err) {
     console.error('Deposit request error:', err.message);
