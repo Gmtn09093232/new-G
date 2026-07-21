@@ -243,7 +243,7 @@
 
         const tg = window.Telegram.WebApp; tg.ready(); tg.expand();
         let socket, userCard = [], markedNumbers = [], isGameActive = false, lobbyTimerInterval = null, selectedCardNumber = null;
-        let depositAccounts = {}, selectedDepositType = null, selectedWithdrawType = null;
+        let selectedDepositType = null, selectedWithdrawType = null;
         let serverTakenNumbers = new Set();
         let displayTakenNumbers = new Set();
         let currentBalance = 0, totalGames = 0, totalWins = 0, totalEarned = 0, recentGames = [], currentGameId = null;
@@ -342,14 +342,16 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS ==========
+        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED) ==========
         async function loadDepositAccounts() {
             try {
                 const res = await fetch('/api/deposit-accounts');
                 const data = await res.json();
                 if (data.success) {
-                    depositAccounts = data.accounts;
-                    renderDepositAccounts();
+                    renderDepositAccounts(data.admins);
+                } else {
+                    document.getElementById('depositAccountsList').innerHTML = 
+                        '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
                 }
             } catch (e) {
                 console.error('Error loading deposit accounts:', e);
@@ -358,49 +360,49 @@
             }
         }
 
-        function renderDepositAccounts() {
+        function renderDepositAccounts(admins) {
             const container = document.getElementById('depositAccountsList');
             container.innerHTML = '';
             
-            let hasAccounts = false;
-            
-            for (const [type, accounts] of Object.entries(depositAccounts)) {
-                if (!accounts || accounts.length === 0) continue;
-                hasAccounts = true;
-                
-                const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-                const label = document.createElement('div');
-                label.className = 'payment-method-label';
-                label.textContent = typeLabel;
-                container.appendChild(label);
-                
-                accounts.forEach(account => {
+            if (!admins || admins.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
+                return;
+            }
+
+            // For each admin, show their name and available methods
+            admins.forEach(admin => {
+                const methods = [];
+                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr });
+                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr });
+                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa });
+                if (methods.length === 0) return;
+
+                // Admin name header
+                const adminHeader = document.createElement('div');
+                adminHeader.style.cssText = 'font-weight:700; color:#1e293b; margin-top:12px; margin-bottom:6px; font-size:1rem;';
+                adminHeader.textContent = `👤 ${admin.name}`;
+                container.appendChild(adminHeader);
+
+                methods.forEach(method => {
                     const div = document.createElement('div');
                     div.className = 'admin-option';
                     div.innerHTML = `
-                        <input type="radio" name="depositAccount" value="${account.adminId}" data-number="${account.number}" data-name="${account.name}">
                         <div class="admin-info">
-                            <div class="admin-name">${account.name}</div>
-                            <div class="admin-number">📱 ${account.number}</div>
+                            <div class="admin-name">${method.type.toUpperCase()}</div>
+                            <div class="admin-number">📱 ${method.number}</div>
                         </div>
-                        <span class="admin-badge">${typeLabel}</span>
+                        <span class="admin-badge">${method.type}</span>
                     `;
                     div.addEventListener('click', () => {
-                        const radio = div.querySelector('input[type="radio"]');
-                        radio.checked = true;
+                        // Remove selected class from all
                         document.querySelectorAll('.admin-option').forEach(el => el.classList.remove('selected'));
                         div.classList.add('selected');
                         // Open deposit details
-                        openDepositDetailsModal(type, account.adminId, account.number, account.name);
+                        openDepositDetailsModal(method.type, admin.id, method.number, admin.name);
                     });
                     container.appendChild(div);
                 });
-            }
-            
-            if (!hasAccounts) {
-                container.innerHTML = 
-                    '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
-            }
+            });
         }
 
         // ========== DEPOSIT FUNCTIONS ==========
@@ -568,7 +570,7 @@
             } 
         }
 
-        // ========== REST OF ORIGINAL FUNCTIONS ==========
+        // ========== REST OF ORIGINAL FUNCTIONS (unchanged) ==========
         function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
         function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(), 100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
@@ -755,7 +757,6 @@
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
         // ========== INIT ==========
-        loadDepositAccounts();
         buildNumberGrid();
         loadStats();
         updateMuteButton();
