@@ -176,10 +176,45 @@ async function isSuperAdmin(adminId) {
 }
 
 // ---------- Static endpoints ----------
+// ============================================================
+//  UPDATED /api/deposit-accounts - filter by user's admin
+// ============================================================
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
-    const admins = await getAllAdmins();
-    // Return each admin with their payment numbers
+    const userId = req.session?.userId;
+    let adminId = null;
+
+    if (userId) {
+      const { data: user, error } = await supabase
+        .from('users')
+        .select('admin_id')
+        .eq('telegram_id', userId)
+        .maybeSingle();
+      if (!error && user) {
+        adminId = user.admin_id;
+      }
+    }
+
+    let admins;
+    if (adminId) {
+      // Only return the admin the user is assigned to
+      const { data, error } = await supabase
+        .from('admins')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+        .eq('id', adminId)
+        .eq('is_active', true);
+      if (error) throw error;
+      admins = data || [];
+    } else {
+      // No admin assigned yet – show all active admins
+      const { data, error } = await supabase
+        .from('admins')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+        .eq('is_active', true);
+      if (error) throw error;
+      admins = data || [];
+    }
+
     const result = admins.map(a => ({
       id: a.id,
       name: a.name,
@@ -187,6 +222,7 @@ app.get('/api/deposit-accounts', async (req, res) => {
       cbebirr: a.cbebirr_number || null,
       mpesa: a.mpesa_number || null
     }));
+
     res.json({ success: true, admins: result });
   } catch (err) {
     res.status(500).json({ error: err.message });
