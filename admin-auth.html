@@ -140,16 +140,16 @@
         <input type="text" id="regName" placeholder="Your full name">
       </div>
       <div class="input-group">
-        <label>💳 Your Deposit Number</label>
-        <input type="text" id="regDepositNumber" placeholder="e.g., 0924839730">
+        <label>📱 Telebirr Number</label>
+        <input type="text" id="regTelebirr" placeholder="09xxxxxxxx">
       </div>
       <div class="input-group">
-        <label>📲 Payment Type</label>
-        <select id="regPaymentType">
-          <option value="telebirr">Telebirr</option>
-          <option value="cbebirr">CBE Birr</option>
-          <option value="mpesa">M-Pesa</option>
-        </select>
+        <label>🏦 CBE Birr Number</label>
+        <input type="text" id="regCbe" placeholder="09xxxxxx">
+      </div>
+      <div class="input-group">
+        <label>📲 M-Pesa Number</label>
+        <input type="text" id="regMpesa" placeholder="07xxxxxxxx">
       </div>
       <div class="input-group">
         <label>🔑 Create PIN (at least 4 digits)</label>
@@ -193,7 +193,7 @@
       document.getElementById('registerBtn').textContent = '🚀 Register';
     }
 
-    // ---------- Login ----------
+    // Login
     async function login() {
       hideMessage();
       const phone = document.getElementById('loginPhone').value.trim();
@@ -213,7 +213,7 @@
         const data = await res.json();
         if (data.success) {
           showMessage('✅ Login successful! Redirecting...', 'success');
-          setTimeout(() => window.location.href = '/dashboard', 1000);
+          setTimeout(() => window.location.href = '/admin-dashboard.html', 1000);
         } else {
           showMessage(data.error || 'Login failed.', 'error');
         }
@@ -226,18 +226,19 @@
       }
     }
 
-    // ---------- Register ----------
+    // Register
     async function register() {
       hideMessage();
       const phone = document.getElementById('regPhone').value.trim();
       const name = document.getElementById('regName').value.trim();
-      const depositNumber = document.getElementById('regDepositNumber').value.trim();
-      const paymentType = document.getElementById('regPaymentType').value;
+      const telebirr = document.getElementById('regTelebirr').value.trim();
+      const cbebirr = document.getElementById('regCbe').value.trim();
+      const mpesa = document.getElementById('regMpesa').value.trim();
       const pin = document.getElementById('regPin').value.trim();
       const confirmPin = document.getElementById('regConfirmPin').value.trim();
       const secret = document.getElementById('regSecret').value.trim();
 
-      if (!phone || !name || !depositNumber || !pin || !confirmPin) {
+      if (!phone || !name || !pin || !confirmPin) {
         showMessage('Please fill in all required fields.', 'error');
         return;
       }
@@ -261,7 +262,15 @@
       btn.textContent = '⏳ ...';
 
       try {
-        const payload = { phone, name, deposit_number: depositNumber, payment_type: paymentType, pin, confirm_pin: confirmPin };
+        const payload = {
+          phone,
+          name,
+          pin,
+          confirm_pin: confirmPin,
+          telebirr_number: telebirr || null,
+          cbebirr_number: cbebirr || null,
+          mpesa_number: mpesa || null
+        };
         const secretField = document.getElementById('secretField');
         if (secretField.style.display !== 'none' && secret) {
           payload.registration_secret = secret;
@@ -276,7 +285,9 @@
           showMessage('✅ Registration successful! Redirecting to login...', 'success');
           document.getElementById('regPhone').value = '';
           document.getElementById('regName').value = '';
-          document.getElementById('regDepositNumber').value = '';
+          document.getElementById('regTelebirr').value = '';
+          document.getElementById('regCbe').value = '';
+          document.getElementById('regMpesa').value = '';
           document.getElementById('regPin').value = '';
           document.getElementById('regConfirmPin').value = '';
           document.getElementById('regSecret').value = '';
