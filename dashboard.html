@@ -281,6 +281,7 @@
     <div class="header-content">
       <div class="header-left">
         <h1>📊 Admin Dashboard</h1>
+        <div class="subtitle">Manage players, deposits, withdrawals & earnings</div>
       </div>
       <div class="header-right">
         <div class="admin-info" id="adminInfo">
@@ -390,6 +391,9 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    // ---------- HARDCODED BOT USERNAME (fallback) ----------
+    const BOT_USERNAME = 'bingomkmk0120_bot';
+
     // ---------- Session Check ----------
     let ADMIN = null;
     let currentTab = 'deposits';
@@ -615,15 +619,30 @@
     async function loadInviteInfo() {
       try {
         const res = await fetch('/admin/invite-info');
-        if (!res.ok) throw new Error('Failed to load invite info');
         const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-        document.getElementById('inviteCodeDisplay').textContent = data.admin.invite_code;
-        document.getElementById('inviteLinkDisplay').textContent = data.admin.invite_link;
-        window._inviteCode = data.admin.invite_code;
-        window._inviteLink = data.admin.invite_link;
+        if (data.success) {
+          document.getElementById('inviteCodeDisplay').textContent = data.admin.invite_code;
+          document.getElementById('inviteLinkDisplay').textContent = data.admin.invite_link;
+          window._inviteCode = data.admin.invite_code;
+          window._inviteLink = data.admin.invite_link;
+        } else {
+          // Fallback: use hardcoded bot username
+          const inviteCode = data.admin?.invite_code || '01207';
+          const fallbackLink = `https://t.me/${BOT_USERNAME}?start=${inviteCode}`;
+          document.getElementById('inviteCodeDisplay').textContent = inviteCode;
+          document.getElementById('inviteLinkDisplay').textContent = fallbackLink;
+          window._inviteCode = inviteCode;
+          window._inviteLink = fallbackLink;
+        }
       } catch (err) {
-        showToast('Error loading invite info: ' + err.message, 'error');
+        // Network error – use hardcoded fallback
+        const inviteCode = '01207'; // fallback invite code
+        const fallbackLink = `https://t.me/${BOT_USERNAME}?start=${inviteCode}`;
+        document.getElementById('inviteCodeDisplay').textContent = inviteCode;
+        document.getElementById('inviteLinkDisplay').textContent = fallbackLink;
+        window._inviteCode = inviteCode;
+        window._inviteLink = fallbackLink;
+        showToast('Using fallback invite link (server unreachable)', 'info');
       }
     }
 
