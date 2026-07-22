@@ -1,5 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
 //  Super Admin supports secret‑based access and date/admin filters
 // ============================================================
 
@@ -1539,6 +1539,10 @@ app.post('/api/request-withdraw', async (req, res) => {
 });
 
 // ---------- Admin endpoints (session-based) ----------
+
+// ============================================================
+//  UPDATED: /admin/deposits with date, method, status filters
+// ============================================================
 app.get('/admin/deposits', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -1549,20 +1553,49 @@ app.get('/admin/deposits', async (req, res) => {
       .eq('is_active', true)
       .maybeSingle();
     if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-    const { data, error } = await supabase
+
+    let query = supabase
       .from('deposit_requests')
       .select('*')
-      .eq('status', 'pending')
-      .eq('admin_id', admin.id)
-      .order('created_at', { ascending: true });
+      .eq('admin_id', admin.id);
+
+    const { from, to, method, status } = req.query;
+
+    // Date filters
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+    // Method filter (payment_type)
+    if (method && method !== 'all') {
+      query = query.eq('payment_type', method);
+    }
+    // Status filter (default to 'pending' if not specified)
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    } else {
+      query = query.eq('status', 'pending');
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
     if (error) throw error;
+
     const playerCount = await getAdminPlayerCount(admin.id);
     const totalDeposits = await getAdminDeposits(admin.id);
     const approvedToday = await getAdminDeposits(admin.id, 'approved');
+
     res.json({
       requests: data,
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-      stats: { playerCount, totalDeposits, pendingCount: data.length, approvedToday }
+      stats: { playerCount, totalDeposits, pendingCount: data.filter(d => d.status === 'pending').length, approvedToday }
     });
   } catch (err) {
     console.error('Error fetching deposits:', err.message);
@@ -1570,6 +1603,59 @@ app.get('/admin/deposits', async (req, res) => {
   }
 });
 
+// ============================================================
+//  UPDATED: /admin/withdrawals with date, method, status filters
+// ============================================================
+app.get('/admin/withdrawals', async (req, res) => {
+  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, phone')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+
+    let query = supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('admin_id', admin.id);
+
+    const { from, to, method, status } = req.query;
+
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+    if (method && method !== 'all') {
+      query = query.eq('withdrawal_type', method);
+    }
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    } else {
+      query = query.eq('status', 'pending');
+    }
+
+    query = query.order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
+  } catch (err) {
+    console.error('Error fetching withdrawals:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Other Admin Endpoints ----------
 app.post('/admin/process-deposit', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
@@ -1641,29 +1727,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     }
   } catch (err) {
     console.error('Process deposit error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/admin/withdrawals', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-    const { data, error } = await supabase
-      .from('withdrawal_requests')
-      .select('*')
-      .eq('status', 'pending')
-      .eq('admin_id', admin.id)
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
-  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -2511,8 +2574,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
       paidEarningsQuery = paidEarningsQuery.eq('admin_id', adminId);
       pendingWithdrawalsQuery = pendingWithdrawalsQuery.eq('admin_id', adminId);
-      // For rounds, we can't filter by admin_id directly. We could join with game_admin_contributions, but for simplicity we'll not filter rounds by admin.
-      // House profit is global, so keep it unfiltered.
     }
 
     const [totalUsers, totalAdmins, deposits, withdrawals, rounds, paidEarnings, pendingWithdrawals] = await Promise.all([
