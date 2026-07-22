@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Super Admin</title>
+  <style>
+    /* Keep your existing CSS – I'll provide a compact version */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: #f0f2f5; min-height: 100vh; padding-bottom: 80px; }
+    .header { background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%); color: white; padding: 12px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
+    .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .header-left h1 { font-size: 18px; font-weight: 700; }
+    .header-left .subtitle { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .header-right .admin-info { font-size: 11px; opacity: 0.9; }
+    .header-right .admin-info span { background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 20px; font-size: 10px; }
+    .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s; min-height: 36px; min-width: 60px; }
+    .logout-btn:active { transform: scale(0.94); background: #dc2626; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 12px 12px 20px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-card { background: white; padding: 14px 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; }
+    .stat-card .label { font-size: 10px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 2px; line-height: 1.2; }
+    .stat-card .value.green { color: #10b981; }
+    .stat-card .value.blue { color: #3b82f6; }
+    .stat-card .value.orange { color: #f59e0b; }
+    .stat-card .value.red { color: #ef4444; }
+    .stat-card .value.purple { color: #8b5cf6; }
+
+    .tabs { display: flex; gap: 4px; margin-bottom: 14px; background: white; padding: 4px 6px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn { padding: 8px 12px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; color: #666; transition: 0.15s; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 4px; }
+    .tab-btn:active { transform: scale(0.94); }
+    .tab-btn.active { background: #7c3aed; color: white; box-shadow: 0 2px 8px rgba(124,58,237,0.3); }
+    .tab-btn .badge { display: inline-block; background: #ef4444; color: white; font-size: 10px; padding: 0 6px; border-radius: 12px; min-width: 18px; text-align: center; line-height: 16px; }
+    .tab-btn.active .badge { background: rgba(255,255,255,0.3); color: white; }
+
+    .tab-content { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 280px; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .tab-pane h2 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; }
+
+    .table-wrapper { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+    table th { background: #f8fafc; text-align: left; padding: 10px 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+    table td { padding: 10px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 13px; }
+
+    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .status-badge.pending { background: #fef3c7; color: #92400e; }
+    .status-badge.approved { background: #d1fae5; color: #065f46; }
+    .status-badge.rejected { background: #fee2e2; color: #991b1b; }
+    .status-badge.active { background: #d1fae5; color: #065f46; }
+    .status-badge.inactive { background: #fee2e2; color: #991b1b; }
+
+    .btn { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.15s; min-height: 34px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+    .btn:active { transform: scale(0.94); }
+    .btn-sm { padding: 4px 10px; font-size: 11px; min-height: 30px; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-success:active { background: #059669; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:active { background: #dc2626; }
+    .btn-primary { background: #7c3aed; color: white; }
+    .btn-primary:active { background: #6d28d9; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-warning:active { background: #d97706; }
+    .btn-outline { background: transparent; color: #7c3aed; border: 1.5px solid #7c3aed; }
+    .action-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+
+    .admin-card { background: #f8fafc; border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid #e2e8f0; transition: 0.15s; }
+    .admin-card:active { transform: scale(0.99); }
+    .admin-card .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .admin-card .admin-name { font-weight: 600; font-size: 15px; color: #1e293b; }
+    .admin-card .admin-phone { font-size: 13px; color: #64748b; }
+    .admin-card .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 8px 0; font-size: 13px; }
+    .admin-card .admin-stats div { background: white; padding: 6px 10px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; }
+    .admin-card .admin-stats strong { display: block; font-size: 16px; color: #1e293b; }
+    .admin-card .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .admin-card .admin-actions .btn { flex: 1; min-width: 80px; justify-content: center; }
+
+    .admin-detail-modal .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 16px; }
+    .admin-detail-modal .modal-overlay.active { display: flex; }
+    .admin-detail-modal .modal-content { background: white; border-radius: 16px; padding: 20px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .modal-content .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9; }
+    .modal-content .modal-header h2 { font-size: 18px; }
+    .modal-content .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; padding: 4px 8px; color: #94a3b8; }
+
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 12px 20px; border-radius: 12px; color: white; font-weight: 500; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); opacity: 0; transition: all 0.4s ease; z-index: 999; max-width: 90%; text-align: center; pointer-events: none; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
+    .toast.success { background: #10b981; }
+    .toast.error { background: #ef4444; }
+    .toast.info { background: #3b82f6; }
+
+    .refresh-btn { position: fixed; bottom: 16px; right: 16px; background: #7c3aed; color: white; border: none; padding: 14px; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 16px rgba(124,58,237,0.4); transition: 0.25s; font-size: 18px; z-index: 50; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
+    .refresh-btn:active { transform: scale(0.88); }
+
+    .empty-state { text-align: center; padding: 30px 16px; color: #94a3b8; }
+    .empty-state .icon { font-size: 36px; margin-bottom: 8px; }
+    .empty-state p { font-size: 14px; }
+    .loading { text-align: center; padding: 30px 16px; color: #94a3b8; }
+    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top: 3px solid #7c3aed; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .denied { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; padding: 20px; text-align: center; }
+    .denied .lock { font-size: 64px; margin-bottom: 16px; }
+    .denied h1 { font-size: 28px; color: #ef4444; }
+    .denied p { color: #94a3b8; margin-top: 8px; max-width: 400px; }
+
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat-card { padding: 10px 8px; }
+      .stat-card .value { font-size: 18px; }
+      .stat-card .label { font-size: 9px; }
+      .tab-btn { font-size: 11px; padding: 6px 10px; min-height: 36px; }
+      .tab-content { padding: 10px; }
+      table { font-size: 12px; min-width: 500px; }
+      table th, table td { padding: 8px 8px; }
+      .admin-card .admin-stats { grid-template-columns: repeat(2, 1fr); }
+      .refresh-btn { width: 46px; height: 46px; font-size: 16px; bottom: 12px; right: 12px; }
+      .toast { font-size: 13px; padding: 10px 16px; bottom: 12px; max-width: 95%; }
+    }
+    @media (min-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .stat-card { padding: 18px 20px; }
+      .stat-card .value { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-content">
+      <div class="header-left">
+        <h1>👑 Super Admin</h1>
+        <div class="subtitle">Manage all admins & platform</div>
+      </div>
+      <div class="header-right">
+        <div class="admin-info" id="adminInfo">
+          <span>👤 Loading...</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">🚪</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="container" id="mainContent">
+
+    <!-- Stats Grid -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="label">👥 Users</div><div class="value blue" id="statUsers">-</div></div>
+      <div class="stat-card"><div class="label">👤 Admins</div><div class="value green" id="statAdmins">-</div></div>
+      <div class="stat-card"><div class="label">💰 Deposits</div><div class="value green" id="statDeposits">-</div></div>
+      <div class="stat-card"><div class="label">🏦 Withdrawals</div><div class="value orange" id="statWithdrawals">-</div></div>
+      <div class="stat-card"><div class="label">🏠 House Profit</div><div class="value purple" id="statHouseProfit">-</div></div>
+      <div class="stat-card"><div class="label">⏳ Pending Admin With.</div><div class="value red" id="statPendingWithdrawals">-</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabContainer">
+      <button class="tab-btn active" data-tab="admins" onclick="switchTab('admins')">👤 Admins <span class="badge" id="adminBadge">0</span></button>
+      <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">💳 Withdrawals <span class="badge" id="withdrawalBadge">0</span></button>
+      <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">📊 Platform</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+
+      <!-- ADMINS -->
+      <div class="tab-pane active" id="tab-admins">
+        <h2>👤 All Admins</h2>
+        <div id="adminsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading admins...</p></div></div>
+      </div>
+
+      <!-- WITHDRAWALS -->
+      <div class="tab-pane" id="tab-withdrawals">
+        <h2>💳 Admin Withdrawal Requests</h2>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('pending')">⏳ Pending</button>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('approved')">✅ Approved</button>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('rejected')">❌ Rejected</button>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('all')">📋 All</button>
+        </div>
+        <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading withdrawals...</p></div></div>
+      </div>
+
+      <!-- PLATFORM -->
+      <div class="tab-pane" id="tab-platform">
+        <h2>📊 Platform Overview</h2>
+        <div id="platformContent"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading platform data...</p></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Refresh Button -->
+  <button class="refresh-btn" onclick="refreshAll()" title="Refresh">🔄</button>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Admin Detail Modal -->
+  <div class="admin-detail-modal" id="adminDetailModal">
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">Admin Details</h2>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div id="modalBody"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;">Loading...</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  NO SECRET – Use session only
+    // ============================================================
+
+    // ---------- Session check ----------
+    async function checkSession() {
+      try {
+        const res = await fetch('/admin/session');
+        if (res.status === 401) {
+          window.location.href = '/admin-auth';
+          return false;
+        }
+        const data = await res.json();
+        if (!data.success) {
+          window.location.href = '/admin-auth';
+          return false;
+        }
+        // Display admin name
+        document.getElementById('adminInfo').innerHTML = `<span>👤 ${data.admin.name}</span>`;
+        return true;
+      } catch (err) {
+        window.location.href = '/admin-auth';
+        return false;
+      }
+    }
+
+    async function logout() {
+      await fetch('/admin/logout', { method: 'POST' });
+      window.location.href = '/admin-auth';
+    }
+
+    // ---------- State ----------
+    let currentTab = 'admins';
+    let currentWithdrawFilter = 'pending';
+    let refreshInterval = null;
+    let isRefreshing = false;
+
+    // ---------- Toast ----------
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast ${type}`;
+      void toast.offsetWidth;
+      toast.classList.add('show');
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    // ---------- Tab ----------
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn =>
+        btn.classList.toggle('active', btn.dataset.tab === tab)
+      );
+      document.querySelectorAll('.tab-pane').forEach(pane =>
+        pane.classList.toggle('active', pane.id === `tab-${tab}`)
+      );
+      if (tab === 'admins') loadAdmins();
+      else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
+      else if (tab === 'platform') loadPlatformStats();
+
+      const container = document.getElementById('tabContainer');
+      const activeBtn = container.querySelector('.tab-btn.active');
+      if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+
+    // ---------- Load Platform Stats ----------
+    async function loadPlatformStats() {
+      const container = document.getElementById('platformContent');
+      try {
+        const res = await fetch('/super-admin/platform-stats');
+        if (!res.ok) throw new Error('Failed to load platform stats');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        document.getElementById('statUsers').textContent = data.stats.totalUsers;
+        document.getElementById('statAdmins').textContent = data.stats.totalAdmins;
+        document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`;
+        document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
+        document.getElementById('statHouseProfit').textContent = `${data.stats.totalHouseProfit.toFixed(0)} ETB`;
+        document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
+
+        container.innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">👥 Total Users</div>
+              <div style="font-size:24px;font-weight:700;color:#1e293b;">${data.stats.totalUsers}</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">👤 Active Admins</div>
+              <div style="font-size:24px;font-weight:700;color:#1e293b;">${data.stats.totalAdmins}</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">💰 Total Deposits</div>
+              <div style="font-size:24px;font-weight:700;color:#10b981;">${data.stats.totalDeposits.toFixed(0)} ETB</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">🏦 Total Withdrawals</div>
+              <div style="font-size:24px;font-weight:700;color:#f59e0b;">${data.stats.totalWithdrawals.toFixed(0)} ETB</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">🏠 House Profit</div>
+              <div style="font-size:24px;font-weight:700;color:#8b5cf6;">${data.stats.totalHouseProfit.toFixed(0)} ETB</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">💰 Admin Earnings Paid</div>
+              <div style="font-size:24px;font-weight:700;color:#3b82f6;">${data.stats.totalAdminEarnings.toFixed(0)} ETB</div>
+            </div>
+            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
+              <div style="font-size:12px;color:#94a3b8;">⏳ Pending Admin With.</div>
+              <div style="font-size:24px;font-weight:700;color:#ef4444;">${data.stats.pendingWithdrawals}</div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    // ---------- Load Admins ----------
+    async function loadAdmins() {
+      const container = document.getElementById('adminsList');
+      try {
+        const res = await fetch('/super-admin/admins');
+        if (!res.ok) throw new Error('Failed to load admins');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        document.getElementById('adminBadge').textContent = data.admins.length;
+
+        if (data.admins.length === 0) {
+          container.innerHTML = `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
+          return;
+        }
+
+        container.innerHTML = data.admins.map(admin => `
+          <div class="admin-card">
+            <div class="admin-header">
+              <div>
+                <div class="admin-name">${escapeHtml(admin.name)}</div>
+                <div class="admin-phone">📱 ${admin.phone}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+                  Code: <strong>${admin.invite_code || 'N/A'}</strong>
+                  ${admin.is_super_admin ? ' 👑 Super Admin' : ''}
+                </div>
+              </div>
+              <div>
+                <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
+              </div>
+            </div>
+            <div class="admin-stats">
+              <div><strong>${admin.stats.playerCount}</strong> Players</div>
+              <div><strong>${admin.stats.totalDeposits.toFixed(0)} ETB</strong> Deposits</div>
+              <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
+              <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin:4px 0;">
+              Commission: <strong>${(admin.commission_rate * 100)}%</strong> | 
+              Pending Withdrawals: <strong>${admin.stats.pendingWithdrawals}</strong>
+            </div>
+            <div class="admin-actions">
+              <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})">📋 View</button>
+              <button class="btn btn-warning btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})">📊 Rate</button>
+              <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
+                ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
+              </button>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    // ---------- Load Admin Detail ----------
+    async function loadAdminDetail(adminId) {
+      const body = document.getElementById('modalBody');
+      try {
+        const res = await fetch(`/super-admin/admin/${adminId}`);
+        if (!res.ok) throw new Error('Failed to load admin details');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        const a = data.admin;
+        document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
+
+        body.innerHTML = `
+          <div style="margin-bottom:12px;">
+            <div><strong>Phone:</strong> ${a.phone}</div>
+            <div><strong>Invite Code:</strong> ${a.invite_code || 'N/A'}</div>
+            <div><strong>Status:</strong> <span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></div>
+            <div><strong>Commission Rate:</strong> ${(a.commission_rate * 100)}%</div>
+            <div><strong>Super Admin:</strong> ${a.is_super_admin ? '✅ Yes' : '❌ No'}</div>
+            <div><strong>Players:</strong> ${data.stats.players}</div>
+          </div>
+
+          <hr style="margin:12px 0;">
+
+          <h4 style="margin-bottom:8px;">📋 Recent Deposits</h4>
+          ${data.stats.deposits && data.stats.deposits.length > 0 ? `
+            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+              ${data.stats.deposits.slice(0,5).map(d => `
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                  <span>${escapeHtml(d.username)}</span>
+                  <span><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div style="color:#94a3b8;font-size:13px;">No deposits</div>'}
+
+          <hr style="margin:12px 0;">
+
+          <h4 style="margin-bottom:8px;">💳 Admin Withdrawal Requests</h4>
+          ${data.stats.adminWithdrawals && data.stats.adminWithdrawals.length > 0 ? `
+            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+              ${data.stats.adminWithdrawals.map(w => `
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                  <span>${w.amount} ETB - ${w.withdrawal_type}</span>
+                  <span><span class="status-badge ${w.status}">${w.status}</span></span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div style="color:#94a3b8;font-size:13px;">No pending withdrawal requests</div>'}
+
+          <hr style="margin:12px 0;">
+
+          <h4 style="margin-bottom:8px;">💰 Earnings History</h4>
+          ${data.stats.earnings && data.stats.earnings.length > 0 ? `
+            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+              ${data.stats.earnings.slice(0,5).map(e => `
+                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                  <span>${formatDate(e.date)}</span>
+                  <span><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div style="color:#94a3b8;font-size:13px;">No earnings yet</div>'}
+
+          <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">🔴 Deactivate</button>
+            <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">🟢 Activate</button>
+            <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">📊 Set Commission</button>
+            <button class="btn btn-outline" onclick="closeModal()">Close</button>
+          </div>
+        `;
+
+      } catch (err) {
+        body.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    // ---------- Load Admin Withdrawals ----------
+    async function loadAdminWithdrawals(status = 'pending') {
+      currentWithdrawFilter = status;
+      const container = document.getElementById('withdrawalsList');
+      try {
+        const res = await fetch(`/super-admin/admin-withdrawals?status=${status}&limit=100`);
+        if (!res.ok) throw new Error('Failed to load withdrawals');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        document.getElementById('withdrawalBadge').textContent = 
+          status === 'pending' ? data.requests.filter(r => r.status === 'pending').length : 0;
+
+        if (data.requests.length === 0) {
+          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
+          return;
+        }
+
+        const showActions = status === 'pending';
+
+        container.innerHTML = `
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>Admin</th><th>Amount</th><th>Phone</th><th>Method</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead>
+              <tbody>${data.requests.map(req => `
+                <tr>
+                  <td><strong>${escapeHtml(req.admins?.name || 'Unknown')}</strong><br><small>${req.admins?.phone || ''}</small></td>
+                  <td><strong>${req.amount} ETB</strong></td>
+                  <td>${req.phone}</td>
+                  <td>${req.withdrawal_type}</td>
+                  <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                  <td>${formatDate(req.created_at)}</td>
+                  ${showActions ? `
+                    <td>
+                      <div class="action-buttons">
+                        <button class="btn btn-success btn-sm" onclick="processAdminWithdrawal(${req.id},'approve')">✅</button>
+                        <button class="btn btn-danger btn-sm" onclick="processAdminWithdrawal(${req.id},'reject')">❌</button>
+                      </div>
+                    </td>
+                  ` : ''}
+                </tr>
+              `).join('')}</tbody>
+            </table>
+          </div>
+        `;
+      } catch (err) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    // ---------- Process Admin Withdrawal ----------
+    async function processAdminWithdrawal(requestId, action) {
+      if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
+      try {
+        const res = await fetch('/super-admin/process-admin-withdrawal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, action })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Withdrawal ${action}ed!`, 'success');
+          loadAdminWithdrawals(currentWithdrawFilter);
+          loadPlatformStats();
+        } else {
+          throw new Error(data.error || 'Failed to process');
+        }
+      } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+      }
+    }
+
+    // ---------- Toggle Admin ----------
+    async function toggleAdmin(adminId, isActive) {
+      const action = isActive ? 'activate' : 'deactivate';
+      if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+      try {
+        const res = await fetch('/super-admin/toggle-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminId, isActive })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Admin ${action}d!`, 'success');
+          loadAdmins();
+          loadPlatformStats();
+          closeModal();
+        } else {
+          throw new Error(data.error || 'Failed to toggle admin');
+        }
+      } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+      }
+    }
+
+    // ---------- Edit Commission ----------
+    function editCommission(adminId, currentRate) {
+      const newRate = prompt(`Enter new commission rate (0.01 to 1.00):\nCurrent: ${(currentRate * 100)}%`, currentRate);
+      if (newRate === null) return;
+      const rate = parseFloat(newRate);
+      if (isNaN(rate) || rate < 0 || rate > 1) {
+        showToast('❌ Invalid rate. Must be between 0 and 1', 'error');
+        return;
+      }
+      updateCommission(adminId, rate);
+    }
+
+    async function updateCommission(adminId, commissionRate) {
+      try {
+        const res = await fetch('/super-admin/update-commission', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminId, commissionRate })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Commission updated to ${(commissionRate * 100)}%`, 'success');
+          loadAdmins();
+          closeModal();
+        } else {
+          throw new Error(data.error || 'Failed to update commission');
+        }
+      } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+      }
+    }
+
+    // ---------- Modal ----------
+    function openModal(adminId) {
+      document.getElementById('modalOverlay').classList.add('active');
+      loadAdminDetail(adminId);
+    }
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
+    document.getElementById('modalOverlay').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+
+    // ---------- Refresh ----------
+    async function refreshAll() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      try {
+        if (currentTab === 'admins') await loadAdmins();
+        else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
+        else if (currentTab === 'platform') await loadPlatformStats();
+        showToast('🔄 Refreshed', 'info');
+      } catch (err) {
+        console.error('Refresh error:', err);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // ---------- Utilities ----------
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      try {
+        const d = new Date(dateString);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch { return dateString; }
+    }
+
+    // ---------- Auto-refresh ----------
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        if (!document.hidden) refreshAll();
+      }, 30000);
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+      } else {
+        startAutoRefresh();
+        refreshAll();
+      }
+    });
+
+    // ---------- Keyboard shortcut ----------
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
+    });
+
+    // ---------- Init ----------
+    async function init() {
+      const loggedIn = await checkSession();
+      if (!loggedIn) return;
+      // Load all data
+      await loadPlatformStats();
+      await loadAdmins();
+      await loadAdminWithdrawals('pending');
+      startAutoRefresh();
+    }
+
+    document.addEventListener('touchstart', function() {}, { passive: true });
+    init();
+  </script>
+</body>
+</html>
