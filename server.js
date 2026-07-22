@@ -1,6 +1,6 @@
 // ============================================================
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission
-//  (Super Admin supports secret‑based access)
+//  Super Admin supports secret‑based access and date/admin filters
 // ============================================================
 
 require('dotenv').config();
@@ -2175,19 +2175,18 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 });
 
 // ============================================================
-//  SUPER ADMIN ENDPOINTS – Secret‑first (no login required)
+//  SUPER ADMIN ENDPOINTS – with secret support and filters
 // ============================================================
 
 // Helper: accept secret OR session
 async function authSuperAdmin(req, res) {
   const secret = req.query.secret || req.body.secret;
-  const validSecret = process.env.ADMIN_SECRET || '01207'; // fallback
+  const validSecret = process.env.ADMIN_SECRET || '01207';
 
   if (secret && secret === validSecret) {
     return { success: true, adminId: null, via: 'secret' };
   }
 
-  // Fallback to session if you still want it
   if (req.session.adminId) {
     const isSuper = await isSuperAdmin(req.session.adminId);
     if (isSuper) {
@@ -2198,6 +2197,7 @@ async function authSuperAdmin(req, res) {
   return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
 }
 
+// ---------- GET all admins (no filters) ----------
 app.get('/super-admin/admins', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2266,6 +2266,7 @@ app.get('/super-admin/admins', async (req, res) => {
   }
 });
 
+// ---------- GET admin detail ----------
 app.get('/super-admin/admin/:adminId', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2322,6 +2323,7 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
   }
 });
 
+// ---------- Toggle admin ----------
 app.post('/super-admin/toggle-admin', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2330,7 +2332,6 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
 
   try {
-    // If using session, prevent self-deactivation
     if (auth.via === 'session' && parseInt(adminId) === req.session.adminId) {
       return res.status(400).json({ error: 'Cannot change your own status' });
     }
@@ -2352,6 +2353,7 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
+// ---------- Update commission ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2379,18 +2381,33 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
+// ---------- GET admin withdrawal requests (with filters) ----------
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
-    const { status = 'pending', limit = 50 } = req.query;
+    const { status = 'pending', limit = 50, from, to, adminId } = req.query;
+
     let query = supabase
       .from('admin_withdrawal_requests')
       .select('*, admins(name, phone)')
       .order('created_at', { ascending: false })
       .limit(Math.min(parseInt(limit), 100));
+
     if (status !== 'all') query = query.eq('status', status);
+    if (adminId && adminId !== 'all') query = query.eq('admin_id', adminId);
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+
     const { data: requests, error } = await query;
     if (error) throw error;
     res.json({ success: true, requests });
@@ -2400,6 +2417,7 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
+// ---------- Process admin withdrawal ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2450,52 +2468,78 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
+// ---------- GET platform stats (with filters) ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
-    const { count: totalUsers } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true });
-    const { count: totalAdmins } = await supabase
-      .from('admins')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true);
-    const { data: deposits } = await supabase
-      .from('deposit_requests')
-      .select('amount')
-      .eq('status', 'approved');
-    const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
-    const { data: withdrawals } = await supabase
-      .from('withdrawal_requests')
-      .select('amount')
-      .eq('status', 'approved');
-    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-    const { data: rounds } = await supabase
-      .from('game_rounds')
-      .select('house_profit');
-    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
-    const { data: paidEarnings } = await supabase
-      .from('admin_daily_commissions')
-      .select('commission_amount')
-      .eq('status', 'paid');
-    const totalAdminEarnings = paidEarnings.reduce((sum, e) => sum + Number(e.commission_amount), 0);
-    const { count: pendingWithdrawals } = await supabase
-      .from('admin_withdrawal_requests')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending');
+    const { from, to, adminId } = req.query;
+
+    // Base queries
+    let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
+    let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
+    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
+    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
+    let roundsQuery = supabase.from('game_rounds').select('house_profit');
+    let paidEarningsQuery = supabase.from('admin_daily_commissions').select('commission_amount').eq('status', 'paid');
+    let pendingWithdrawalsQuery = supabase.from('admin_withdrawal_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+
+    // Apply date filters
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      depositQuery = depositQuery.gte('created_at', fromDate.toISOString());
+      withdrawalQuery = withdrawalQuery.gte('created_at', fromDate.toISOString());
+      roundsQuery = roundsQuery.gte('created_at', fromDate.toISOString());
+      paidEarningsQuery = paidEarningsQuery.gte('paid_at', fromDate.toISOString());
+      pendingWithdrawalsQuery = pendingWithdrawalsQuery.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      depositQuery = depositQuery.lte('created_at', toDate.toISOString());
+      withdrawalQuery = withdrawalQuery.lte('created_at', toDate.toISOString());
+      roundsQuery = roundsQuery.lte('created_at', toDate.toISOString());
+      paidEarningsQuery = paidEarningsQuery.lte('paid_at', toDate.toISOString());
+      pendingWithdrawalsQuery = pendingWithdrawalsQuery.lte('created_at', toDate.toISOString());
+    }
+
+    // Apply admin filter
+    if (adminId && adminId !== 'all') {
+      depositQuery = depositQuery.eq('admin_id', adminId);
+      withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
+      paidEarningsQuery = paidEarningsQuery.eq('admin_id', adminId);
+      pendingWithdrawalsQuery = pendingWithdrawalsQuery.eq('admin_id', adminId);
+      // For rounds, we can't filter by admin_id directly. We could join with game_admin_contributions, but for simplicity we'll not filter rounds by admin.
+      // House profit is global, so keep it unfiltered.
+    }
+
+    const [totalUsers, totalAdmins, deposits, withdrawals, rounds, paidEarnings, pendingWithdrawals] = await Promise.all([
+      userQuery,
+      adminQuery,
+      depositQuery,
+      withdrawalQuery,
+      roundsQuery,
+      paidEarningsQuery,
+      pendingWithdrawalsQuery
+    ]);
+
+    const totalDeposits = deposits.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+    const totalWithdrawals = withdrawals.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
+    const totalHouseProfit = rounds.data?.reduce((sum, r) => sum + Number(r.house_profit), 0) || 0;
+    const totalAdminEarnings = paidEarnings.data?.reduce((sum, e) => sum + Number(e.commission_amount), 0) || 0;
 
     res.json({
       success: true,
       stats: {
-        totalUsers: totalUsers || 0,
-        totalAdmins: totalAdmins || 0,
+        totalUsers: totalUsers.count || 0,
+        totalAdmins: totalAdmins.count || 0,
         totalDeposits,
         totalWithdrawals,
         totalHouseProfit,
         totalAdminEarnings,
-        pendingWithdrawals: pendingWithdrawals || 0
+        pendingWithdrawals: pendingWithdrawals.count || 0
       }
     });
   } catch (err) {
