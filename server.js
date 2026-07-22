@@ -657,7 +657,7 @@ app.post('/admin/delete-user', async (req, res) => {
       .maybeSingle();
     if (findErr || !user) return res.status(404).json({ error: 'User not found' });
     await supabase.from('users').delete().eq('telegram_id', strId);
-    for (const stake of [100, 20, 30]) {
+    for (const stake of [10, 20, 30]) {
       const game = games[stake];
       if (!game) continue;
       const playerIndex = game.players.findIndex(p => p.telegramId === strId);
@@ -734,7 +734,7 @@ function createGameState(entryFee) {
 }
 
 const games = {
-  100: createGameState(100),
+  10: createGameState(10),
   20: createGameState(20),
   30: createGameState(30)
 };
@@ -761,7 +761,7 @@ function getRandomMaleEthiopianName() {
 let gameCounter = 0;
 const botLastWinGame = new Map();
 BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
-const forceBotWinNextGame = { 20: false, 100: false, 30: false };
+const forceBotWinNextGame = { 20: false, 10: false, 30: false };
 let globalForcedBotId = null;
 let botGameHistory = [];
 const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
@@ -927,7 +927,7 @@ function getGame(stake) { return games[stake]; }
 
 function getAllPlayersList() {
   const allPlayers = [];
-  for (const stake of [100, 20, 30]) {
+  for (const stake of [10, 20, 30]) {
     const game = games[stake];
     game.players.forEach(p => {
       const user = users[p.telegramId];
@@ -948,7 +948,7 @@ function notifyAdminClients() {
   const data = {
     players: getAllPlayersList(),
     gameStatus: {
-      100: games[100].status,
+      10: games[10].status,
       20: games[20].status,
       30: games[30].status
     }
@@ -958,7 +958,7 @@ function notifyAdminClients() {
 
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
-  for (const stake of [100, 20, 30]) {
+  for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
@@ -2955,12 +2955,12 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   let currentStake = null;
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-  for (const stake of [100, 20, 30]) {
+  for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
   socket.on('joinLobby', ({ stake }) => {
-    if (![100, 20, 30].includes(stake)) return;
+    if (![10, 20, 30].includes(stake)) return;
     currentStake = stake;
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
@@ -3064,7 +3064,7 @@ adminNamespace.on('connection', (socket) => {
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
     gameStatus: {
-      100: games[100].status,
+      10: games[10].status,
       20: games[20].status,
       30: games[30].status
     }
@@ -3073,7 +3073,7 @@ adminNamespace.on('connection', (socket) => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
       gameStatus: {
-        100: games[100].status,
+        10: games[10].status,
         20: games[20].status,
         30: games[30].status
       }
@@ -3114,7 +3114,7 @@ app.use((err, req, res, next) => {
 });
 
 // ---------- Start all three stakes ----------
-resetGame(100);
+resetGame(10);
 resetGame(20);
 resetGame(30);
 
