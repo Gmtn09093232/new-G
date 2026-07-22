@@ -1,6 +1,6 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
-//  Super Admin supports secret‑based access and date/admin filters
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters + Live Balance Broadcast
+//  Uses `admin_commissions` as the primary commission source.
 // ============================================================
 
 require('dotenv').config();
@@ -1131,7 +1131,52 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- endGameWithWinners ----------
+// ---------- BROADCAST ADMIN COMMISSION (WebSocket) ----------
+async function broadcastAdminCommission(adminId) {
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, commission_rate')
+      .eq('id', adminId)
+      .single();
+    if (adminErr || !admin) return;
+
+    // Get pending and paid from admin_commissions
+    const { data: commissions, error: commErr } = await supabase
+      .from('admin_commissions')
+      .select('commission_amount, status')
+      .eq('admin_id', adminId);
+
+    if (commErr) throw commErr;
+
+    let pending = 0, totalEarned = 0;
+    if (commissions) {
+      for (const c of commissions) {
+        const amount = Number(c.commission_amount) || 0;
+        if (c.status === 'paid') totalEarned += amount;
+        else pending += amount;
+      }
+    }
+
+    const payload = {
+      pending,
+      totalEarned,
+      rate: admin.commission_rate
+    };
+
+    // Broadcast to admin's sockets
+    const sockets = await adminNamespace.fetchSockets();
+    for (const s of sockets) {
+      if (s.adminId === adminId) {
+        s.emit('admin:commissionUpdate', payload);
+      }
+    }
+  } catch (err) {
+    console.error(`Error broadcasting commission update for admin ${adminId}:`, err.message);
+  }
+}
+
+// ---------- endGameWithWinners (modified to insert into admin_commissions) ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1206,6 +1251,7 @@ async function endGameWithWinners(stake) {
         : 0;
       if (share > 0) {
         try {
+          // Insert into game_admin_contributions (for historical records)
           await supabase
             .from('game_admin_contributions')
             .insert({
@@ -1214,7 +1260,24 @@ async function endGameWithWinners(stake) {
               total_entry_fees: data.totalEntryFees,
               house_profit_share: share
             });
+
+          // ----- NEW: Insert into admin_commissions -----
+          await supabase
+            .from('admin_commissions')
+            .insert({
+              admin_id: parseInt(adminId),
+              game_round_id: gameRoundId,
+              total_entry_fees: data.totalEntryFees,
+              commission_amount: share,
+              status: 'pending'
+            })
+            .onConflict('admin_id, game_round_id')
+            .ignore(); // avoid duplicates
+
           console.log(`💰 Admin ${adminId} earned ${share.toFixed(2)} ETB profit share from game ${gameRoundId}`);
+
+          // Broadcast live commission update
+          await broadcastAdminCommission(parseInt(adminId));
         } catch (err) {
           console.error(`❌ Failed to record admin contribution:`, err.message);
         }
@@ -1541,7 +1604,7 @@ app.post('/api/request-withdraw', async (req, res) => {
 // ---------- Admin endpoints (session-based) ----------
 
 // ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters
+//  /admin/deposits with date, method, status filters
 // ============================================================
 app.get('/admin/deposits', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1561,7 +1624,6 @@ app.get('/admin/deposits', async (req, res) => {
 
     const { from, to, method, status } = req.query;
 
-    // Date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -1572,11 +1634,9 @@ app.get('/admin/deposits', async (req, res) => {
       toDate.setHours(23,59,59,999);
       query = query.lte('created_at', toDate.toISOString());
     }
-    // Method filter (payment_type)
     if (method && method !== 'all') {
       query = query.eq('payment_type', method);
     }
-    // Status filter (default to 'pending' if not specified)
     if (status && status !== 'all') {
       query = query.eq('status', status);
     } else {
@@ -1604,7 +1664,7 @@ app.get('/admin/deposits', async (req, res) => {
 });
 
 // ============================================================
-//  UPDATED: /admin/withdrawals with date, method, status filters
+//  /admin/withdrawals with date, method, status filters
 // ============================================================
 app.get('/admin/withdrawals', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1867,7 +1927,7 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// ---------- Daily Commission Calculation ----------
+// ---------- Daily Commission Calculation (backward compatibility) ----------
 const DAILY_COMMISSION_HOUR = 0;
 const DAILY_COMMISSION_MINUTE = 0;
 
@@ -1901,6 +1961,7 @@ async function calculateDailyCommissions() {
         const totalHouseProfit = contributions.reduce((sum, c) => sum + Number(c.house_profit_share || 0), 0);
 
         if (totalCommission > 0) {
+          // Upsert into admin_daily_commissions (backward compatibility)
           const { data: existing } = await supabase
             .from('admin_daily_commissions')
             .select('id')
@@ -1930,6 +1991,8 @@ async function calculateDailyCommissions() {
               });
             console.log(`✅ Admin ${admin.name} earned ${totalCommission.toFixed(2)} ETB commission for ${yesterdayStr}`);
           }
+
+          // Also update admin_commissions statuses if they are still pending? Not needed; they remain pending until paid.
         }
       }
     }
@@ -1953,7 +2016,7 @@ function scheduleDailyCommission() {
 }
 scheduleDailyCommission();
 
-// ---------- Admin Earnings (Daily Commissions) ----------
+// ---------- Admin Earnings (Daily Commissions) – backward compatibility ----------
 app.get('/admin/daily-commissions', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -2010,7 +2073,7 @@ app.get('/admin/daily-commissions', async (req, res) => {
   }
 });
 
-// ---------- LIVE COMMISSION – Real-time from game_admin_contributions ----------
+// ---------- LIVE COMMISSION – Now reads from admin_commissions ----------
 app.get('/admin/live-commission', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
@@ -2029,85 +2092,56 @@ app.get('/admin/live-commission', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Session expired' });
     }
 
-    // Get all contributions for this admin
-    const { data: contributions, error: contribErr } = await supabase
-      .from('game_admin_contributions')
-      .select('house_profit_share, total_entry_fees, created_at, game_round_id')
-      .eq('admin_id', admin.id);
+    // ----- NEW: Use admin_commissions -----
+    const { data: commissions, error: commErr } = await supabase
+      .from('admin_commissions')
+      .select('commission_amount, status, created_at, game_round_id')
+      .eq('admin_id', admin.id)
+      .order('created_at', { ascending: false });
 
-    if (contribErr) throw contribErr;
+    if (commErr) throw commErr;
 
-    // Get paid commissions
-    const { data: paidCommissions, error: paidErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('commission_amount, status, date')
-      .eq('admin_id', admin.id);
+    let totalPending = 0, totalEarned = 0;
+    const rounds = [];
 
-    if (paidErr) throw paidErr;
-
-    const paidDates = new Set();
-    if (paidCommissions) {
-      paidCommissions.forEach(c => {
+    if (commissions) {
+      const dailyMap = {};
+      for (const c of commissions) {
+        const amount = Number(c.commission_amount) || 0;
+        const dateStr = new Date(c.created_at).toISOString().split('T')[0];
         if (c.status === 'paid') {
-          const dateStr = c.date;
-          paidDates.add(dateStr);
+          totalEarned += amount;
+        } else {
+          totalPending += amount;
         }
-      });
-    }
 
-    // Group by date
-    const dailyTotals = {};
-    let totalPending = 0;
-    let totalPaid = 0;
-
-    if (contributions) {
-      for (const contrib of contributions) {
-        const date = new Date(contrib.created_at);
-        const dateStr = date.toISOString().split('T')[0];
-        const share = Number(contrib.house_profit_share) || 0;
-        const fees = Number(contrib.total_entry_fees) || 0;
-
-        if (!dailyTotals[dateStr]) {
-          dailyTotals[dateStr] = {
+        // Group by date
+        if (!dailyMap[dateStr]) {
+          dailyMap[dateStr] = {
             date: dateStr,
-            totalCommission: 0,
-            totalEntryFees: 0,
-            isPaid: paidDates.has(dateStr)
+            total_entry_fees: 0, // Not stored in admin_commissions, but can be fetched separately if needed
+            commission_amount: 0,
+            status: 'pending'
           };
         }
-        dailyTotals[dateStr].totalCommission += share;
-        dailyTotals[dateStr].totalEntryFees += fees;
-      }
-    }
-
-    // Build rounds
-    const rounds = [];
-    for (const [dateStr, data] of Object.entries(dailyTotals)) {
-      rounds.push({
-        date: dateStr,
-        total_entry_fees: data.totalEntryFees,
-        commission_amount: data.totalCommission,
-        status: data.isPaid ? 'paid' : 'pending'
-      });
-
-      if (data.isPaid) {
-        totalPaid += data.totalCommission;
-      } else {
-        totalPending += data.totalCommission;
-      }
-    }
-
-    // Sort by date (newest first)
-    rounds.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    // Get total earned from paid commissions
-    let totalEarned = 0;
-    if (paidCommissions) {
-      paidCommissions.forEach(c => {
+        dailyMap[dateStr].commission_amount += amount;
+        // Mark as paid only if all commissions for that day are paid
         if (c.status === 'paid') {
-          totalEarned += Number(c.commission_amount) || 0;
+          // If any paid, we can set status as 'paid'? For simplicity, we keep it as 'paid' if all are paid.
+          // But since we aggregate, we can't know if partial; we'll mark as paid only if every commission that day is paid.
+          // We'll handle by checking if any pending for that date later.
         }
-      });
+        // Re-evaluate status for the group
+      }
+
+      // Second pass to set status correctly (if any pending, keep pending)
+      for (const [dateStr, data] of Object.entries(dailyMap)) {
+        // Check if there is any pending commission for this date
+        const anyPending = commissions.some(c => new Date(c.created_at).toISOString().split('T')[0] === dateStr && c.status === 'pending');
+        data.status = anyPending ? 'pending' : 'paid';
+        rounds.push(data);
+      }
+      rounds.sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
     res.json({
@@ -2119,7 +2153,6 @@ app.get('/admin/live-commission', async (req, res) => {
       },
       stats: {
         pending: totalPending,
-        paid: totalPaid,
         totalEarned: totalEarned,
         totalPending: totalPending,
         totalAvailable: totalPending
@@ -2142,40 +2175,21 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   if (!phone || !receiver_name) return res.status(400).json({ error: 'Phone and receiver name required' });
 
   try {
-    // Check pending earnings from live contributions
-    const { data: contributions, error: contribErr } = await supabase
-      .from('game_admin_contributions')
-      .select('house_profit_share, created_at')
-      .eq('admin_id', req.session.adminId);
-
-    if (contribErr) throw contribErr;
-
-    // Get paid dates
-    const { data: paidCommissions, error: paidErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('date')
+    // Check pending earnings from admin_commissions
+    const { data: pendingCommissions, error: pendingErr } = await supabase
+      .from('admin_commissions')
+      .select('commission_amount')
       .eq('admin_id', req.session.adminId)
-      .eq('status', 'paid');
+      .eq('status', 'pending');
 
-    if (paidErr) throw paidErr;
+    if (pendingErr) throw pendingErr;
+    const totalPending = pendingCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0);
 
-    const paidDates = new Set();
-    if (paidCommissions) {
-      paidCommissions.forEach(c => paidDates.add(c.date));
+    if (totalPending < amt) {
+      return res.status(400).json({
+        error: `Insufficient pending earnings. Available: ${totalPending.toFixed(0)} ETB`
+      });
     }
-
-    let totalPending = 0;
-    if (contributions) {
-      for (const contrib of contributions) {
-        const date = new Date(contrib.created_at);
-        const dateStr = date.toISOString().split('T')[0];
-        if (!paidDates.has(dateStr)) {
-          totalPending += Number(contrib.house_profit_share) || 0;
-        }
-      }
-    }
-
-    if (totalPending < amt) return res.status(400).json({ error: `Insufficient pending earnings. Available: ${totalPending.toFixed(0)} ETB` });
 
     const { data, error } = await supabase
       .from('admin_withdrawal_requests')
@@ -2217,11 +2231,23 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
         .update({ status: 'approved', processed_at: new Date().toISOString() })
         .eq('id', requestId);
 
+      // ----- NEW: Mark pending commissions as paid -----
+      const now = new Date().toISOString();
       await supabase
-        .from('admin_daily_commissions')
-        .update({ status: 'paid', paid_at: new Date().toISOString() })
+        .from('admin_commissions')
+        .update({ status: 'paid', paid_at: now })
         .eq('admin_id', reqData.admin_id)
         .eq('status', 'pending');
+
+      // Also update admin_daily_commissions for backward compatibility
+      await supabase
+        .from('admin_daily_commissions')
+        .update({ status: 'paid', paid_at: now })
+        .eq('admin_id', reqData.admin_id)
+        .eq('status', 'pending');
+
+      // Broadcast update
+      await broadcastAdminCommission(reqData.admin_id);
 
       res.json({ success: true });
     } else {
@@ -2291,22 +2317,20 @@ app.get('/super-admin/admins', async (req, res) => {
         .reduce((sum, w) => sum + Number(w.amount), 0);
       const pendingWithdrawals = withdrawals
         .filter(w => w.status === 'pending').length;
-      
-      const { data: pendingEarnings } = await supabase
-        .from('admin_daily_commissions')
-        .select('commission_amount')
-        .eq('admin_id', admin.id)
-        .eq('status', 'pending');
-      const totalPendingEarnings = pendingEarnings
-        .reduce((sum, e) => sum + Number(e.commission_amount), 0);
-      
-      const { data: paidEarnings } = await supabase
-        .from('admin_daily_commissions')
-        .select('commission_amount')
-        .eq('admin_id', admin.id)
-        .eq('status', 'paid');
-      const totalEarned = paidEarnings
-        .reduce((sum, e) => sum + Number(e.commission_amount), 0);
+
+      // ----- NEW: Get pending/paid from admin_commissions -----
+      const { data: commissions, error: commErr } = await supabase
+        .from('admin_commissions')
+        .select('commission_amount, status')
+        .eq('admin_id', admin.id);
+      let totalPendingEarnings = 0, totalEarned = 0;
+      if (!commErr && commissions) {
+        for (const c of commissions) {
+          const amount = Number(c.commission_amount) || 0;
+          if (c.status === 'paid') totalEarned += amount;
+          else totalPendingEarnings += amount;
+        }
+      }
       
       return {
         ...admin,
@@ -2502,11 +2526,24 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
         .from('admin_withdrawal_requests')
         .update({ status: 'approved', processed_at: new Date().toISOString() })
         .eq('id', requestId);
+
+      // ----- NEW: Mark pending commissions as paid -----
+      const now = new Date().toISOString();
       await supabase
-        .from('admin_daily_commissions')
-        .update({ status: 'paid', paid_at: new Date().toISOString() })
+        .from('admin_commissions')
+        .update({ status: 'paid', paid_at: now })
         .eq('admin_id', reqData.admin_id)
         .eq('status', 'pending');
+
+      await supabase
+        .from('admin_daily_commissions')
+        .update({ status: 'paid', paid_at: now })
+        .eq('admin_id', reqData.admin_id)
+        .eq('status', 'pending');
+
+      // Broadcast update
+      await broadcastAdminCommission(reqData.admin_id);
+
       Audit.adminAction('SUPER_ADMIN_APPROVE_WITHDRAWAL', auth.adminId || 'secret', req.ip, {
         targetAdminId: reqData.admin_id,
         amount: reqData.amount,
@@ -2539,16 +2576,14 @@ app.get('/super-admin/platform-stats', async (req, res) => {
   try {
     const { from, to, adminId } = req.query;
 
-    // Base queries
     let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
     let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
     let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
     let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
     let roundsQuery = supabase.from('game_rounds').select('house_profit');
-    let paidEarningsQuery = supabase.from('admin_daily_commissions').select('commission_amount').eq('status', 'paid');
+    let paidEarningsQuery = supabase.from('admin_commissions').select('commission_amount').eq('status', 'paid');
     let pendingWithdrawalsQuery = supabase.from('admin_withdrawal_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
 
-    // Apply date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -2568,7 +2603,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       pendingWithdrawalsQuery = pendingWithdrawalsQuery.lte('created_at', toDate.toISOString());
     }
 
-    // Apply admin filter
     if (adminId && adminId !== 'all') {
       depositQuery = depositQuery.eq('admin_id', adminId);
       withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
@@ -2979,16 +3013,24 @@ io.on('connection', async (socket) => {
   });
 });
 
-// ---------- Admin namespace ----------
+// ---------- Admin namespace (modified to attach adminId) ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
+  const session = socket.request.session;
+  if (session && session.adminId) {
+    socket.adminId = session.adminId;
+    return next();
+  }
   const secret = socket.handshake.query.secret;
-  if (secret === process.env.ADMIN_SECRET) return next();
+  if (secret === process.env.ADMIN_SECRET) {
+    socket.adminId = null;
+    return next();
+  }
   next(new Error('Unauthorized admin access'));
 });
 
 adminNamespace.on('connection', (socket) => {
-  console.log('Admin connected to live view');
+  console.log(`Admin connected to live view (adminId: ${socket.adminId || 'unknown'})`);
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
     gameStatus: {
