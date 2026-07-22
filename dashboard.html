@@ -172,6 +172,54 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     .tab-pane h2 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; }
 
+    /* ---------- FILTER BAR ---------- */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: flex-end;
+      background: #f8fafc;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .filter-bar .input-group {
+      flex: 1;
+      min-width: 120px;
+      margin-bottom: 0;
+    }
+    .filter-bar .input-group label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 2px;
+      display: block;
+    }
+    .filter-bar .input-group input,
+    .filter-bar .input-group select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 13px;
+      background: white;
+      min-height: 36px;
+    }
+    .filter-bar .input-group input:focus,
+    .filter-bar .input-group select:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 2px rgba(102,126,234,0.1);
+    }
+    .filter-bar .btn {
+      min-height: 36px;
+      padding: 6px 16px;
+      font-size: 13px;
+    }
+    @media (max-width: 480px) {
+      .filter-bar .input-group { min-width: 100%; flex: 0 0 100%; }
+    }
+
     /* ---------- TABLES ---------- */
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
@@ -195,6 +243,9 @@
     .status-badge.approved { background: #d1fae5; color: #065f46; }
     .status-badge.rejected { background: #fee2e2; color: #991b1b; }
     .status-badge.paid { background: #dbeafe; color: #1e40af; }
+    .status-badge.telebirr { background: #e0f2fe; color: #0369a1; }
+    .status-badge.cbebirr { background: #fef3c7; color: #92400e; }
+    .status-badge.mpesa { background: #e0f2fe; color: #0369a1; }
 
     /* ---------- BUTTONS ---------- */
     .btn {
@@ -457,13 +508,75 @@
 
       <!-- DEPOSITS -->
       <div class="tab-pane active" id="tab-deposits">
-        <h2>💰 Pending Deposits</h2>
+        <h2>💰 Deposits</h2>
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="input-group">
+            <label>From Date</label>
+            <input type="date" id="depositFromDate">
+          </div>
+          <div class="input-group">
+            <label>To Date</label>
+            <input type="date" id="depositToDate">
+          </div>
+          <div class="input-group">
+            <label>Method</label>
+            <select id="depositMethod">
+              <option value="all">All</option>
+              <option value="telebirr">Telebirr</option>
+              <option value="cbebirr">CBE</option>
+              <option value="mpesa">M-Pesa</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Status</label>
+            <select id="depositStatus">
+              <option value="pending">Pending</option>
+              <option value="all">All</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="applyDepositFilters()">🔍 Filter</button>
+          <button class="btn btn-outline" onclick="resetDepositFilters()">↺ Reset</button>
+        </div>
         <div id="depositsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading deposits...</p></div></div>
       </div>
 
       <!-- WITHDRAWALS -->
       <div class="tab-pane" id="tab-withdrawals">
-        <h2>🏦 Pending Withdrawals</h2>
+        <h2>🏦 Withdrawals</h2>
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="input-group">
+            <label>From Date</label>
+            <input type="date" id="withdrawFromDate">
+          </div>
+          <div class="input-group">
+            <label>To Date</label>
+            <input type="date" id="withdrawToDate">
+          </div>
+          <div class="input-group">
+            <label>Method</label>
+            <select id="withdrawMethod">
+              <option value="all">All</option>
+              <option value="telebirr">Telebirr</option>
+              <option value="cbebirr">CBE</option>
+              <option value="mpesa">M-Pesa</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Status</label>
+            <select id="withdrawStatus">
+              <option value="pending">Pending</option>
+              <option value="all">All</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="applyWithdrawFilters()">🔍 Filter</button>
+          <button class="btn btn-outline" onclick="resetWithdrawFilters()">↺ Reset</button>
+        </div>
         <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading withdrawals...</p></div></div>
       </div>
 
@@ -589,7 +702,7 @@
   <script>
     // ============================================================
     //  FULL ADMIN DASHBOARD JAVASCRIPT
-    //  Includes LIVE COMMISSION BAR with debugging logs
+    //  Includes LIVE COMMISSION BAR + DATE/METHOD/STATUS FILTERS
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -688,18 +801,13 @@
 
     // ================================================================
     //  🆕 LIVE COMMISSION BAR – fetches from /admin/live-commission
-    //  with full logging to help you debug.
     // ================================================================
     async function loadCommissionSummary() {
       console.log('🔍 loadCommissionSummary() called');
       try {
         const url = '/admin/live-commission';
-        console.log('📡 Fetching:', url);
         const res = await fetch(url);
-        console.log('📡 Response status:', res.status, res.statusText);
-
         if (!res.ok) {
-          // If the endpoint returns 404, show a helpful message in the bar
           const errorText = await res.text();
           console.error('❌ Server returned:', errorText);
           document.getElementById('pendingCommission').textContent = '⚠️ Error';
@@ -709,30 +817,22 @@
         }
 
         const data = await res.json();
-        console.log('📊 Data received:', data);
-
-        if (!data.success) {
-          throw new Error(data.error || 'Unknown error from server');
-        }
+        if (!data.success) throw new Error(data.error || 'Unknown error');
 
         const pending = data.stats.pending || 0;
         const earned = data.stats.totalEarned || 0;
         const rate = data.admin.commission_rate || 0;
 
-        console.log(`💰 Pending: ${pending}, Earned: ${earned}, Rate: ${rate}`);
-
         document.getElementById('pendingCommission').textContent = `${pending.toFixed(0)} ETB`;
         document.getElementById('totalCommissionEarned').textContent = `${earned.toFixed(0)} ETB`;
         document.getElementById('commissionRateDisplay').textContent = `${(rate * 100).toFixed(0)}%`;
 
-        // Update earnings badge
         const earningsBadge = document.getElementById('earningsBadge');
         if (earningsBadge) earningsBadge.textContent = pending > 0 ? `${pending.toFixed(0)}` : '0';
 
         return data;
       } catch (err) {
         console.error('❌ Commission load error:', err.message);
-        // Show error in the bar so the admin knows something is wrong
         document.getElementById('pendingCommission').textContent = '⚠️ Error';
         document.getElementById('totalCommissionEarned').textContent = '⚠️ Error';
         document.getElementById('commissionRateDisplay').textContent = '⚠️ Error';
@@ -740,31 +840,87 @@
       }
     }
 
-    // ---------- LOAD DEPOSITS ----------
+    // ---------- DEPOSIT FILTERS ----------
+    function getDepositFilters() {
+      return {
+        from: document.getElementById('depositFromDate').value,
+        to: document.getElementById('depositToDate').value,
+        method: document.getElementById('depositMethod').value,
+        status: document.getElementById('depositStatus').value,
+      };
+    }
+
+    function applyDepositFilters() {
+      loadDeposits();
+    }
+
+    function resetDepositFilters() {
+      document.getElementById('depositFromDate').value = '';
+      document.getElementById('depositToDate').value = '';
+      document.getElementById('depositMethod').value = 'all';
+      document.getElementById('depositStatus').value = 'pending';
+      loadDeposits();
+    }
+
+    // ---------- WITHDRAWAL FILTERS ----------
+    function getWithdrawFilters() {
+      return {
+        from: document.getElementById('withdrawFromDate').value,
+        to: document.getElementById('withdrawToDate').value,
+        method: document.getElementById('withdrawMethod').value,
+        status: document.getElementById('withdrawStatus').value,
+      };
+    }
+
+    function applyWithdrawFilters() {
+      loadWithdrawals();
+    }
+
+    function resetWithdrawFilters() {
+      document.getElementById('withdrawFromDate').value = '';
+      document.getElementById('withdrawToDate').value = '';
+      document.getElementById('withdrawMethod').value = 'all';
+      document.getElementById('withdrawStatus').value = 'pending';
+      loadWithdrawals();
+    }
+
+    // ---------- LOAD DEPOSITS (with filters) ----------
     async function loadDeposits() {
       const container = document.getElementById('depositsList');
+      const filters = getDepositFilters();
+      const params = new URLSearchParams();
+      if (filters.from) params.append('from', filters.from);
+      if (filters.to) params.append('to', filters.to);
+      if (filters.method !== 'all') params.append('method', filters.method);
+      if (filters.status !== 'pending') params.append('status', filters.status);
+      const url = `/admin/deposits?${params.toString()}`;
+
       try {
-        const res = await fetch('/admin/deposits');
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load deposits');
         const data = await res.json();
         if (data.requests.length === 0) {
-          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No pending deposits</p></div>`;
+          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No deposits found</p></div>`;
           return;
         }
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Actions</th></tr></thead>
+              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
               <tbody>${data.requests.map(req => `
                 <tr>
                   <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
                   <td><strong>${req.amount} ETB</strong></td>
-                  <td><span class="status-badge pending">${req.payment_type}</span></td>
+                  <td><span class="status-badge ${req.payment_type}">${req.payment_type}</span></td>
+                  <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                  <td>${new Date(req.created_at).toLocaleDateString()}</td>
                   <td>
-                    <div class="action-buttons">
-                      <button class="btn btn-success btn-sm" onclick="processDeposit(${req.id},'approve')">✅</button>
-                      <button class="btn btn-danger btn-sm" onclick="processDeposit(${req.id},'reject')">❌</button>
-                    </div>
+                    ${req.status === 'pending' ? `
+                      <div class="action-buttons">
+                        <button class="btn btn-success btn-sm" onclick="processDeposit(${req.id},'approve')">✅</button>
+                        <button class="btn btn-danger btn-sm" onclick="processDeposit(${req.id},'reject')">❌</button>
+                      </div>
+                    ` : '—'}
                   </td>
                 </tr>
               `).join('')}</tbody>
@@ -776,33 +932,45 @@
       }
     }
 
-    // ---------- LOAD WITHDRAWALS ----------
+    // ---------- LOAD WITHDRAWALS (with filters) ----------
     async function loadWithdrawals() {
       const container = document.getElementById('withdrawalsList');
+      const filters = getWithdrawFilters();
+      const params = new URLSearchParams();
+      if (filters.from) params.append('from', filters.from);
+      if (filters.to) params.append('to', filters.to);
+      if (filters.method !== 'all') params.append('method', filters.method);
+      if (filters.status !== 'pending') params.append('status', filters.status);
+      const url = `/admin/withdrawals?${params.toString()}`;
+
       try {
-        const res = await fetch('/admin/withdrawals');
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load withdrawals');
         const data = await res.json();
         if (data.requests.length === 0) {
-          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No pending withdrawals</p></div>`;
+          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No withdrawals found</p></div>`;
           return;
         }
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th><th>Type</th><th>Actions</th></tr></thead>
+              <thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
               <tbody>${data.requests.map(req => `
                 <tr>
                   <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
                   <td><strong>${req.amount} ETB</strong></td>
                   <td>${req.phone_number || 'N/A'}</td>
                   <td>${req.receiver_name || 'N/A'}</td>
-                  <td><span class="status-badge pending">${req.withdrawal_type}</span></td>
+                  <td><span class="status-badge ${req.withdrawal_type}">${req.withdrawal_type}</span></td>
+                  <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                  <td>${new Date(req.created_at).toLocaleDateString()}</td>
                   <td>
-                    <div class="action-buttons">
-                      <button class="btn btn-success btn-sm" onclick="processWithdrawal(${req.id},'approve')">✅</button>
-                      <button class="btn btn-danger btn-sm" onclick="processWithdrawal(${req.id},'reject')">❌</button>
-                    </div>
+                    ${req.status === 'pending' ? `
+                      <div class="action-buttons">
+                        <button class="btn btn-success btn-sm" onclick="processWithdrawal(${req.id},'approve')">✅</button>
+                        <button class="btn btn-danger btn-sm" onclick="processWithdrawal(${req.id},'reject')">❌</button>
+                      </div>
+                    ` : '—'}
                   </td>
                 </tr>
               `).join('')}</tbody>
@@ -846,7 +1014,7 @@
       }
     }
 
-    // ---------- LOAD EARNINGS (uses live commission data) ----------
+    // ---------- LOAD EARNINGS ----------
     async function loadEarnings() {
       const container = document.getElementById('earningsList');
       try {
@@ -1176,7 +1344,7 @@
       console.log('🔄 Refreshing all data...');
       try {
         await loadStats();
-        await loadCommissionSummary(); // <-- updates the golden bar
+        await loadCommissionSummary();
         if (currentTab === 'deposits') await loadDeposits();
         else if (currentTab === 'withdrawals') await loadWithdrawals();
         else if (currentTab === 'players') await loadPlayers();
@@ -1226,13 +1394,11 @@
     async function init() {
       const loggedIn = await checkSession();
       if (!loggedIn) return;
-      // First load – this will call loadCommissionSummary()
       await refreshAll();
       startAutoRefresh();
-      console.log('✅ Dashboard initialized. Commission bar will update every 30s.');
+      console.log('✅ Dashboard initialized with filters.');
     }
 
-    // Keyboard shortcut: Ctrl+R = refresh
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
     });
