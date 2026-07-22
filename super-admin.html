@@ -5,38 +5,92 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Super Admin</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: #f0f2f5; min-height: 100vh; padding-bottom: 80px; }
-    .header { background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%); color: white; padding: 12px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
-    .header-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      padding-bottom: 80px;
+      font-size: 16px; /* base for better readability */
+    }
+    .header {
+      background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%);
+      color: white;
+      padding: 12px 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-content {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
     .header-left h1 { font-size: 18px; font-weight: 700; }
     .header-left .subtitle { font-size: 11px; opacity: 0.85; margin-top: 1px; }
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .header-right .admin-info { font-size: 11px; opacity: 0.9; }
-    .header-right .admin-info span { background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 20px; font-size: 10px; }
-    .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s; min-height: 36px; min-width: 60px; }
+    .header-right .admin-info span { background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 20px; font-size: 10px; white-space: nowrap; }
+    .logout-btn {
+      background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 40px;
+      cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s;
+      min-height: 44px; min-width: 60px; flex-shrink: 0;
+      touch-action: manipulation;
+    }
     .logout-btn:active { transform: scale(0.94); background: #dc2626; }
     .container { max-width: 1200px; margin: 0 auto; padding: 12px 12px 20px; }
 
-    /* Filter bar */
+    /* Filter bar – mobile first */
     .filter-bar {
-      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
-      background: white; padding: 12px 16px; border-radius: 12px;
+      display: flex; flex-direction: column; gap: 12px;
+      background: white; padding: 14px 16px; border-radius: 12px;
       margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .filter-bar label { font-size: 13px; font-weight: 500; color: #334155; display: flex; align-items: center; gap: 4px; }
-    .filter-bar input, .filter-bar select {
-      padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
-      font-size: 13px; background: white;
+    .filter-bar .row {
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
     }
-    .filter-bar .btn { padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .filter-bar label {
+      font-size: 14px; font-weight: 500; color: #334155;
+      display: flex; align-items: center; gap: 6px; flex: 1 1 140px;
+    }
+    .filter-bar label input,
+    .filter-bar label select {
+      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+      font-size: 14px; background: white; width: 100%;
+      min-height: 44px;
+    }
+    .filter-bar .btn-group {
+      display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .filter-bar .btn {
+      padding: 10px 20px; border-radius: 8px; border: none;
+      font-weight: 600; font-size: 14px; cursor: pointer;
+      touch-action: manipulation;
+      min-height: 48px;
+      flex: 1 1 100px;
+    }
     .btn-primary { background: #7c3aed; color: white; }
     .btn-primary:active { background: #6d28d9; }
     .btn-outline { background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed; }
     .btn-outline:active { background: #7c3aed; color: white; }
 
-    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-    .stat-card { background: white; padding: 14px 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; }
+    /* Stats grid – adapts to screen */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: white; padding: 14px 10px; border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      text-align: center;
+    }
     .stat-card .label { font-size: 10px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
     .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 2px; line-height: 1.2; }
     .stat-card .value.green { color: #10b981; }
@@ -45,35 +99,73 @@
     .stat-card .value.red { color: #ef4444; }
     .stat-card .value.purple { color: #8b5cf6; }
 
-    .tabs { display: flex; gap: 4px; margin-bottom: 14px; background: white; padding: 4px 6px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+    /* Tabs – horizontal scroll on mobile */
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 14px;
+      background: white; padding: 4px 6px; border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; flex-wrap: nowrap;
+    }
     .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn { padding: 8px 12px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; color: #666; transition: 0.15s; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 4px; }
+    .tab-btn {
+      padding: 10px 16px; border: none; background: transparent;
+      border-radius: 8px; cursor: pointer;
+      font-weight: 600; font-size: 14px; color: #666;
+      transition: 0.15s; white-space: nowrap; flex-shrink: 0;
+      min-height: 48px; display: flex; align-items: center; gap: 6px;
+      touch-action: manipulation;
+    }
     .tab-btn:active { transform: scale(0.94); }
     .tab-btn.active { background: #7c3aed; color: white; box-shadow: 0 2px 8px rgba(124,58,237,0.3); }
-    .tab-btn .badge { display: inline-block; background: #ef4444; color: white; font-size: 10px; padding: 0 6px; border-radius: 12px; min-width: 18px; text-align: center; line-height: 16px; }
+    .tab-btn .badge {
+      display: inline-block; background: #ef4444; color: white;
+      font-size: 11px; padding: 0 8px; border-radius: 12px;
+      min-width: 20px; text-align: center; line-height: 18px;
+    }
     .tab-btn.active .badge { background: rgba(255,255,255,0.3); color: white; }
 
-    .tab-content { background: white; border-radius: 12px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 280px; }
+    /* Tab content */
+    .tab-content {
+      background: white; border-radius: 12px; padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 280px;
+    }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; animation: fadeIn 0.25s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .tab-pane h2 { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 12px; }
+    .tab-pane h2 { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 12px; }
 
-    .table-wrapper { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
-    table th { background: #f8fafc; text-align: left; padding: 10px 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
-    table td { padding: 10px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 13px; }
+    /* Tables – horizontal scroll */
+    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; }
+    table th {
+      background: #f8fafc; text-align: left; padding: 12px 10px;
+      font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0;
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; }
 
-    .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .status-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+    }
     .status-badge.pending { background: #fef3c7; color: #92400e; }
     .status-badge.approved { background: #d1fae5; color: #065f46; }
     .status-badge.rejected { background: #fee2e2; color: #991b1b; }
     .status-badge.active { background: #d1fae5; color: #065f46; }
     .status-badge.inactive { background: #fee2e2; color: #991b1b; }
 
-    .btn { padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.15s; min-height: 34px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+    /* Buttons */
+    .btn {
+      padding: 8px 14px; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: 0.15s; min-height: 44px;
+      min-width: 48px; display: inline-flex; align-items: center;
+      justify-content: center; gap: 6px; touch-action: manipulation;
+    }
     .btn:active { transform: scale(0.94); }
-    .btn-sm { padding: 4px 10px; font-size: 11px; min-height: 30px; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; min-height: 36px; min-width: 40px; }
     .btn-success { background: #10b981; color: white; }
     .btn-success:active { background: #059669; }
     .btn-danger { background: #ef4444; color: white; }
@@ -82,65 +174,137 @@
     .btn-primary:active { background: #6d28d9; }
     .btn-warning { background: #f59e0b; color: white; }
     .btn-warning:active { background: #d97706; }
-    .btn-outline { background: transparent; color: #7c3aed; border: 1.5px solid #7c3aed; }
-    .action-buttons { display: flex; gap: 4px; flex-wrap: wrap; }
+    .btn-outline { background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed; }
+    .btn-outline:active { background: #7c3aed; color: white; }
+    .action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 
-    .admin-card { background: #f8fafc; border-radius: 12px; padding: 14px; margin-bottom: 12px; border: 1px solid #e2e8f0; transition: 0.15s; }
+    /* Admin cards */
+    .admin-card {
+      background: #f8fafc; border-radius: 12px; padding: 16px;
+      margin-bottom: 12px; border: 1px solid #e2e8f0; transition: 0.15s;
+    }
     .admin-card:active { transform: scale(0.99); }
-    .admin-card .admin-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-    .admin-card .admin-name { font-weight: 600; font-size: 15px; color: #1e293b; }
-    .admin-card .admin-phone { font-size: 13px; color: #64748b; }
-    .admin-card .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 8px 0; font-size: 13px; }
-    .admin-card .admin-stats div { background: white; padding: 6px 10px; border-radius: 6px; text-align: center; border: 1px solid #e2e8f0; }
-    .admin-card .admin-stats strong { display: block; font-size: 16px; color: #1e293b; }
-    .admin-card .admin-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-    .admin-card .admin-actions .btn { flex: 1; min-width: 80px; justify-content: center; }
+    .admin-card .admin-header {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+    }
+    .admin-card .admin-name { font-weight: 600; font-size: 16px; color: #1e293b; }
+    .admin-card .admin-phone { font-size: 14px; color: #64748b; }
+    .admin-card .admin-stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: 8px; margin: 8px 0; font-size: 14px;
+    }
+    .admin-card .admin-stats div {
+      background: white; padding: 8px 10px; border-radius: 8px;
+      text-align: center; border: 1px solid #e2e8f0;
+    }
+    .admin-card .admin-stats strong { display: block; font-size: 18px; color: #1e293b; }
+    .admin-card .admin-actions {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+    }
+    .admin-card .admin-actions .btn { flex: 1 1 80px; justify-content: center; }
 
-    .admin-detail-modal .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 16px; }
+    /* Modal */
+    .admin-detail-modal .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      z-index: 2000; display: none; align-items: center; justify-content: center;
+      padding: 16px;
+    }
     .admin-detail-modal .modal-overlay.active { display: flex; }
-    .admin-detail-modal .modal-content { background: white; border-radius: 16px; padding: 20px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
-    .modal-content .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9; }
-    .modal-content .modal-header h2 { font-size: 18px; }
-    .modal-content .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; padding: 4px 8px; color: #94a3b8; }
+    .admin-detail-modal .modal-content {
+      background: white; border-radius: 16px; padding: 20px;
+      max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-content .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9;
+    }
+    .modal-content .modal-header h2 { font-size: 20px; }
+    .modal-content .modal-close {
+      background: none; border: none; font-size: 28px; cursor: pointer;
+      padding: 4px 8px; color: #94a3b8;
+    }
 
-    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(100px); padding: 12px 20px; border-radius: 12px; color: white; font-weight: 500; font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); opacity: 0; transition: all 0.4s ease; z-index: 999; max-width: 90%; text-align: center; pointer-events: none; }
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      padding: 14px 24px; border-radius: 12px; color: white;
+      font-weight: 500; font-size: 15px; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      opacity: 0; transition: all 0.4s ease; z-index: 999;
+      max-width: 92%; text-align: center; pointer-events: none;
+    }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
     .toast.success { background: #10b981; }
     .toast.error { background: #ef4444; }
     .toast.info { background: #3b82f6; }
 
-    .refresh-btn { position: fixed; bottom: 16px; right: 16px; background: #7c3aed; color: white; border: none; padding: 14px; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 16px rgba(124,58,237,0.4); transition: 0.25s; font-size: 18px; z-index: 50; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; }
+    /* Refresh button */
+    .refresh-btn {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #7c3aed; color: white; border: none;
+      padding: 14px; border-radius: 50%; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(124,58,237,0.4);
+      transition: 0.25s; font-size: 20px; z-index: 50;
+      width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
     .refresh-btn:active { transform: scale(0.88); }
 
-    .empty-state { text-align: center; padding: 30px 16px; color: #94a3b8; }
-    .empty-state .icon { font-size: 36px; margin-bottom: 8px; }
-    .empty-state p { font-size: 14px; }
-    .loading { text-align: center; padding: 30px 16px; color: #94a3b8; }
-    .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid #e2e8f0; border-top: 3px solid #7c3aed; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .empty-state { text-align: center; padding: 40px 16px; color: #94a3b8; }
+    .empty-state .icon { font-size: 48px; margin-bottom: 8px; }
+    .empty-state p { font-size: 15px; }
+    .loading { text-align: center; padding: 40px 16px; color: #94a3b8; }
+    .spinner {
+      display: inline-block; width: 32px; height: 32px;
+      border: 4px solid #e2e8f0; border-top: 4px solid #7c3aed;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .denied { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; padding: 20px; text-align: center; }
+    .denied {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; flex-direction: column; padding: 20px; text-align: center;
+    }
     .denied .lock { font-size: 64px; margin-bottom: 16px; }
     .denied h1 { font-size: 28px; color: #ef4444; }
-    .denied p { color: #94a3b8; margin-top: 8px; max-width: 400px; }
+    .denied p { color: #94a3b8; margin-top: 8px; max-width: 400px; font-size: 16px; }
 
-    @media (max-width: 480px) {
+    /* ===== RESPONSIVE TWEAKS ===== */
+    @media (max-width: 640px) {
       .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .stat-card { padding: 10px 8px; }
+      .stat-card { padding: 12px 8px; }
       .stat-card .value { font-size: 18px; }
       .stat-card .label { font-size: 9px; }
-      .filter-bar { flex-direction: column; align-items: stretch; }
-      .filter-bar label { justify-content: space-between; }
-      .filter-bar input, .filter-bar select { flex: 1; }
-      .tab-btn { font-size: 11px; padding: 6px 10px; min-height: 36px; }
-      .tab-content { padding: 10px; }
-      table { font-size: 12px; min-width: 500px; }
-      table th, table td { padding: 8px 8px; }
+
+      .filter-bar .row { flex-direction: column; align-items: stretch; }
+      .filter-bar label { flex: 1 1 auto; }
+      .filter-bar .btn { flex: 1 1 auto; }
+
+      .tab-btn { font-size: 13px; padding: 8px 12px; min-height: 40px; }
+      .tab-content { padding: 12px; }
+      table { font-size: 13px; min-width: 500px; }
+      table th, table td { padding: 10px 8px; }
+
       .admin-card .admin-stats { grid-template-columns: repeat(2, 1fr); }
-      .refresh-btn { width: 46px; height: 46px; font-size: 16px; bottom: 12px; right: 12px; }
-      .toast { font-size: 13px; padding: 10px 16px; bottom: 12px; max-width: 95%; }
+      .admin-card .admin-actions .btn { flex: 1 1 60px; font-size: 12px; padding: 6px 10px; min-height: 36px; }
+
+      .refresh-btn { width: 50px; height: 50px; font-size: 18px; bottom: 16px; right: 16px; }
+      .toast { font-size: 14px; padding: 12px 18px; bottom: 16px; max-width: 96%; }
     }
+
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .stat-card .value { font-size: 16px; }
+      .header-left h1 { font-size: 16px; }
+      .header-right .admin-info span { font-size: 9px; padding: 2px 8px; }
+      .logout-btn { min-height: 38px; font-size: 11px; padding: 4px 10px; }
+    }
+
     @media (min-width: 768px) {
+      .filter-bar { flex-direction: row; flex-wrap: wrap; align-items: center; }
+      .filter-bar .row { flex: 1; }
       .stats-grid { grid-template-columns: repeat(3, 1fr); }
       .stat-card { padding: 18px 20px; }
       .stat-card .value { font-size: 28px; }
@@ -168,13 +332,17 @@
 
     <!-- ===== FILTER BAR ===== -->
     <div class="filter-bar" id="filterBar">
-      <label>From: <input type="date" id="filterFrom" /></label>
-      <label>To: <input type="date" id="filterTo" /></label>
-      <label>Admin:
-        <select id="filterAdmin"><option value="all">All Admins</option></select>
-      </label>
-      <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
-      <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+      <div class="row">
+        <label>From: <input type="date" id="filterFrom" /></label>
+        <label>To: <input type="date" id="filterTo" /></label>
+        <label>Admin:
+          <select id="filterAdmin"><option value="all">All Admins</option></select>
+        </label>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+        <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+      </div>
     </div>
 
     <!-- Stats Grid -->
@@ -200,7 +368,7 @@
       <!-- ADMINS -->
       <div class="tab-pane active" id="tab-admins">
         <h2>👤 All Admins</h2>
-        <div id="adminsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading admins...</p></div></div>
+        <div id="adminsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading admins...</p></div></div>
       </div>
 
       <!-- WITHDRAWALS -->
@@ -212,13 +380,13 @@
           <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('rejected')">❌ Rejected</button>
           <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('all')">📋 All</button>
         </div>
-        <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading withdrawals...</p></div></div>
+        <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading withdrawals...</p></div></div>
       </div>
 
       <!-- PLATFORM -->
       <div class="tab-pane" id="tab-platform">
         <h2>📊 Platform Overview</h2>
-        <div id="platformContent"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading platform data...</p></div></div>
+        <div id="platformContent"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading platform data...</p></div></div>
       </div>
 
     </div>
@@ -258,7 +426,7 @@
           <div class="lock">🔑</div>
           <h1>Secret Required</h1>
           <p>Please add <code>?secret=YOUR_SECRET</code> to the URL.</p>
-          <p style="font-size:12px;color:#94a3b8;margin-top:4px;">Default secret is <code>01207</code>.</p>
+          <p style="font-size:14px;color:#94a3b8;margin-top:4px;">Default secret is <code>01207</code>.</p>
         </div>
       `;
       throw new Error('No secret provided');
@@ -267,7 +435,6 @@
     // ---------- Helper: add secret and filters to API calls ----------
     function apiUrl(path, extraParams = {}) {
       const params = new URLSearchParams({ secret: SECRET, ...extraParams });
-      // Remove keys with empty or 'all' values
       for (const [key, value] of params) {
         if (value === '' || value === 'all' || value === null) params.delete(key);
       }
@@ -281,7 +448,6 @@
     let refreshInterval = null;
     let isRefreshing = false;
 
-    // Filter values
     let filterFrom = '';
     let filterTo = '';
     let filterAdmin = 'all';
@@ -385,8 +551,6 @@
         if (!data.success) throw new Error(data.error);
 
         document.getElementById('adminBadge').textContent = data.admins.length;
-
-        // Populate admin dropdown (if not already populated)
         populateAdminDropdown(data.admins);
 
         if (data.admins.length === 0) {
@@ -400,7 +564,7 @@
               <div>
                 <div class="admin-name">${escapeHtml(admin.name)}</div>
                 <div class="admin-phone">📱 ${admin.phone}</div>
-                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
                   Code: <strong>${admin.invite_code || 'N/A'}</strong>
                   ${admin.is_super_admin ? ' 👑 Super Admin' : ''}
                 </div>
@@ -415,7 +579,7 @@
               <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
               <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
             </div>
-            <div style="font-size:12px;color:#94a3b8;margin:4px 0;">
+            <div style="font-size:13px;color:#94a3b8;margin:4px 0;">
               Commission: <strong>${(admin.commission_rate * 100)}%</strong> | 
               Pending Withdrawals: <strong>${admin.stats.pendingWithdrawals}</strong>
             </div>
@@ -437,7 +601,6 @@
     // ---------- Populate Admin Dropdown ----------
     function populateAdminDropdown(admins) {
       const select = document.getElementById('filterAdmin');
-      // Only populate if empty or we want to refresh
       if (select.options.length > 1) return;
       select.innerHTML = '<option value="all">All Admins</option>';
       admins.forEach(admin => {
@@ -475,9 +638,9 @@
 
           <h4 style="margin-bottom:8px;">📋 Recent Deposits</h4>
           ${data.stats.deposits && data.stats.deposits.length > 0 ? `
-            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+            <div style="font-size:13px;max-height:150px;overflow-y:auto;">
               ${data.stats.deposits.slice(0,5).map(d => `
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${escapeHtml(d.username)}</span>
                   <span><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span>
                 </div>
@@ -489,9 +652,9 @@
 
           <h4 style="margin-bottom:8px;">💳 Admin Withdrawal Requests</h4>
           ${data.stats.adminWithdrawals && data.stats.adminWithdrawals.length > 0 ? `
-            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+            <div style="font-size:13px;max-height:150px;overflow-y:auto;">
               ${data.stats.adminWithdrawals.map(w => `
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${w.amount} ETB - ${w.withdrawal_type}</span>
                   <span><span class="status-badge ${w.status}">${w.status}</span></span>
                 </div>
@@ -503,9 +666,9 @@
 
           <h4 style="margin-bottom:8px;">💰 Earnings History</h4>
           ${data.stats.earnings && data.stats.earnings.length > 0 ? `
-            <div style="font-size:12px;max-height:150px;overflow-y:auto;">
+            <div style="font-size:13px;max-height:150px;overflow-y:auto;">
               ${data.stats.earnings.slice(0,5).map(e => `
-                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f1f5f9;">
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${formatDate(e.date)}</span>
                   <span><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span>
                 </div>
@@ -740,14 +903,12 @@
       }
     });
 
-    // ---------- Keyboard shortcut ----------
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
     });
 
     // ---------- Init ----------
     async function init() {
-      // Load admins (this also populates the dropdown)
       await loadAdmins();
       await loadPlatformStats();
       await loadAdminWithdrawals('pending');
