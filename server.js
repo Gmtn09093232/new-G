@@ -1333,9 +1333,23 @@ async function endGameWithWinners(stake) {
     const adminGroups = {};
     for (const player of game.players) {
       if (player.isBot) continue;
-      const user = users[player.telegramId];
+      
+      // ----- FIX: Ensure user is loaded to get admin_id -----
+      let user = users[player.telegramId];
+      if (!user) {
+        try {
+          user = await loadUser(player.telegramId, player.username, null, null, true);
+        } catch (e) {
+          console.error(`Failed to load user ${player.telegramId} for contribution:`, e);
+          continue;
+        }
+      }
       const adminId = user?.admin_id || null;
-      if (!adminId) continue;
+      if (!adminId) {
+        console.warn(`User ${player.telegramId} has no admin assigned, skipping contribution.`);
+        continue;
+      }
+      
       if (!adminGroups[adminId]) {
         adminGroups[adminId] = { adminId, totalEntryFees: 0, playerCount: 0 };
       }
