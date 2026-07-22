@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Super Admin</title>
   <style>
-    /* Keep your existing CSS – I'll provide a compact version */
+    /* Same CSS as before – compact version */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: #f0f2f5; min-height: 100vh; padding-bottom: 80px; }
     .header { background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%); color: white; padding: 12px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
@@ -137,9 +137,9 @@
       </div>
       <div class="header-right">
         <div class="admin-info" id="adminInfo">
-          <span>👤 Loading...</span>
+          <span>🔑 Secret Access</span>
         </div>
-        <button class="logout-btn" onclick="logout()">🚪</button>
+        <button class="logout-btn" onclick="refreshAll()">🔄</button>
       </div>
     </div>
   </header>
@@ -214,34 +214,30 @@
 
   <script>
     // ============================================================
-    //  NO SECRET – Use session only
+    //  SUPER ADMIN – Secret‑based (no login required)
     // ============================================================
 
-    // ---------- Session check ----------
-    async function checkSession() {
-      try {
-        const res = await fetch('/admin/session');
-        if (res.status === 401) {
-          window.location.href = '/admin-auth';
-          return false;
-        }
-        const data = await res.json();
-        if (!data.success) {
-          window.location.href = '/admin-auth';
-          return false;
-        }
-        // Display admin name
-        document.getElementById('adminInfo').innerHTML = `<span>👤 ${data.admin.name}</span>`;
-        return true;
-      } catch (err) {
-        window.location.href = '/admin-auth';
-        return false;
-      }
+    // ---------- Get secret from URL ----------
+    const urlParams = new URLSearchParams(window.location.search);
+    const SECRET = urlParams.get('secret') || '';
+
+    // If no secret, show a message (or you can set a default)
+    if (!SECRET) {
+      document.body.innerHTML = `
+        <div class="denied">
+          <div class="lock">🔑</div>
+          <h1>Secret Required</h1>
+          <p>Please add <code>?secret=YOUR_SECRET</code> to the URL.</p>
+          <p style="font-size:12px;color:#94a3b8;margin-top:4px;">Default secret is <code>01207</code>.</p>
+        </div>
+      `;
+      throw new Error('No secret provided');
     }
 
-    async function logout() {
-      await fetch('/admin/logout', { method: 'POST' });
-      window.location.href = '/admin-auth';
+    // ---------- Helper: add secret to all API calls ----------
+    function apiUrl(path) {
+      const separator = path.includes('?') ? '&' : '?';
+      return `${path}${separator}secret=${SECRET}`;
     }
 
     // ---------- State ----------
@@ -283,7 +279,7 @@
     async function loadPlatformStats() {
       const container = document.getElementById('platformContent');
       try {
-        const res = await fetch('/super-admin/platform-stats');
+        const res = await fetch(apiUrl('/super-admin/platform-stats'));
         if (!res.ok) throw new Error('Failed to load platform stats');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -336,7 +332,7 @@
     async function loadAdmins() {
       const container = document.getElementById('adminsList');
       try {
-        const res = await fetch('/super-admin/admins');
+        const res = await fetch(apiUrl('/super-admin/admins'));
         if (!res.ok) throw new Error('Failed to load admins');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -392,7 +388,7 @@
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
       try {
-        const res = await fetch(`/super-admin/admin/${adminId}`);
+        const res = await fetch(apiUrl(`/super-admin/admin/${adminId}`));
         if (!res.ok) throw new Error('Failed to load admin details');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -470,7 +466,7 @@
       currentWithdrawFilter = status;
       const container = document.getElementById('withdrawalsList');
       try {
-        const res = await fetch(`/super-admin/admin-withdrawals?status=${status}&limit=100`);
+        const res = await fetch(apiUrl(`/super-admin/admin-withdrawals?status=${status}&limit=100`));
         if (!res.ok) throw new Error('Failed to load withdrawals');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -519,7 +515,7 @@
     async function processAdminWithdrawal(requestId, action) {
       if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
       try {
-        const res = await fetch('/super-admin/process-admin-withdrawal', {
+        const res = await fetch(apiUrl('/super-admin/process-admin-withdrawal'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ requestId, action })
@@ -542,7 +538,7 @@
       const action = isActive ? 'activate' : 'deactivate';
       if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
       try {
-        const res = await fetch('/super-admin/toggle-admin', {
+        const res = await fetch(apiUrl('/super-admin/toggle-admin'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminId, isActive })
@@ -575,7 +571,7 @@
 
     async function updateCommission(adminId, commissionRate) {
       try {
-        const res = await fetch('/super-admin/update-commission', {
+        const res = await fetch(apiUrl('/super-admin/update-commission'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminId, commissionRate })
@@ -659,9 +655,7 @@
 
     // ---------- Init ----------
     async function init() {
-      const loggedIn = await checkSession();
-      if (!loggedIn) return;
-      // Load all data
+      // No session check – just load data
       await loadPlatformStats();
       await loadAdmins();
       await loadAdminWithdrawals('pending');
