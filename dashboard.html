@@ -431,7 +431,7 @@
       .tab-content { padding: 12px; }
     }
     @media (min-width: 768px) {
-      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .stats-grid { grid-template-columns: repeat(4, 1fr); } /* increased to 4 columns for the new card */
       .stat-card { padding: 18px 20px; }
       .stat-card .value { font-size: 28px; }
       .withdraw-form { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
@@ -466,8 +466,13 @@
   <!-- ===== MAIN CONTENT ===== -->
   <div class="container">
 
-    <!-- Stats Grid -->
+    <!-- Stats Grid (now 4 columns) -->
     <div class="stats-grid" id="statsGrid">
+      <!-- NEW: Available Balance -->
+      <div class="stat-card">
+        <div class="label">💰 Available Balance</div>
+        <div class="value green" id="statAvailableBalance">-</div>
+      </div>
       <div class="stat-card"><div class="label">👥 Players</div><div class="value blue" id="statPlayers">-</div></div>
       <div class="stat-card"><div class="label">💰 Deposits</div><div class="value green" id="statDeposits">-</div></div>
       <div class="stat-card"><div class="label">📈 Today</div><div class="value orange" id="statTodayDeposits">-</div></div>
@@ -477,7 +482,7 @@
     </div>
 
     <!-- ========================================================= -->
-    <!--  🆕 LIVE COMMISSION BAR – GOLDEN, ALWAYS VISIBLE         -->
+    <!--  LIVE COMMISSION BAR – GOLDEN, ALWAYS VISIBLE              -->
     <!-- ========================================================= -->
     <div class="commission-bar" id="commissionBar">
       <div class="item">
@@ -509,7 +514,6 @@
       <!-- DEPOSITS -->
       <div class="tab-pane active" id="tab-deposits">
         <h2>💰 Deposits</h2>
-        <!-- Filter Bar -->
         <div class="filter-bar">
           <div class="input-group">
             <label>From Date</label>
@@ -546,7 +550,6 @@
       <!-- WITHDRAWALS -->
       <div class="tab-pane" id="tab-withdrawals">
         <h2>🏦 Withdrawals</h2>
-        <!-- Filter Bar -->
         <div class="filter-bar">
           <div class="input-group">
             <label>From Date</label>
@@ -699,10 +702,12 @@
     </div>
   </div>
 
+  <!-- Socket.IO client -->
+  <script src="/socket.io/socket.io.js"></script>
+
   <script>
     // ============================================================
-    //  FULL ADMIN DASHBOARD JAVASCRIPT
-    //  Includes LIVE COMMISSION BAR + DATE/METHOD/STATUS FILTERS
+    //  FULL ADMIN DASHBOARD JAVASCRIPT – with Live WebSocket updates
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -799,9 +804,7 @@
       }
     }
 
-    // ================================================================
-    //  🆕 LIVE COMMISSION BAR – fetches from /admin/live-commission
-    // ================================================================
+    // ---------- LIVE COMMISSION BAR ----------
     async function loadCommissionSummary() {
       console.log('🔍 loadCommissionSummary() called');
       try {
@@ -813,6 +816,7 @@
           document.getElementById('pendingCommission').textContent = '⚠️ Error';
           document.getElementById('totalCommissionEarned').textContent = '⚠️ Error';
           document.getElementById('commissionRateDisplay').textContent = '⚠️ Error';
+          document.getElementById('statAvailableBalance').textContent = '⚠️ Error';
           throw new Error(`HTTP ${res.status} – ${res.statusText}`);
         }
 
@@ -823,10 +827,15 @@
         const earned = data.stats.totalEarned || 0;
         const rate = data.admin.commission_rate || 0;
 
+        // Golden bar
         document.getElementById('pendingCommission').textContent = `${pending.toFixed(0)} ETB`;
         document.getElementById('totalCommissionEarned').textContent = `${earned.toFixed(0)} ETB`;
         document.getElementById('commissionRateDisplay').textContent = `${(rate * 100).toFixed(0)}%`;
 
+        // Available Balance stat card
+        document.getElementById('statAvailableBalance').textContent = `${pending.toFixed(0)} ETB`;
+
+        // Earnings badge
         const earningsBadge = document.getElementById('earningsBadge');
         if (earningsBadge) earningsBadge.textContent = pending > 0 ? `${pending.toFixed(0)}` : '0';
 
@@ -836,8 +845,39 @@
         document.getElementById('pendingCommission').textContent = '⚠️ Error';
         document.getElementById('totalCommissionEarned').textContent = '⚠️ Error';
         document.getElementById('commissionRateDisplay').textContent = '⚠️ Error';
+        document.getElementById('statAvailableBalance').textContent = '⚠️ Error';
         return null;
       }
+    }
+
+    // ---------- WEBSOCKET – Live Balance Updates ----------
+    let adminSocket = null;
+
+    function connectAdminWebSocket() {
+      if (adminSocket && adminSocket.connected) return;
+
+      adminSocket = io('/admin', { transports: ['websocket', 'polling'] });
+
+      adminSocket.on('connect', () => {
+        console.log('✅ Admin WebSocket connected (live balance updates)');
+      });
+
+      adminSocket.on('admin:commissionUpdate', (data) => {
+        console.log('📡 Live commission update:', data);
+        document.getElementById('pendingCommission').textContent = `${data.pending.toFixed(0)} ETB`;
+        document.getElementById('totalCommissionEarned').textContent = `${data.totalEarned.toFixed(0)} ETB`;
+        document.getElementById('commissionRateDisplay').textContent = `${(data.rate * 100).toFixed(0)}%`;
+        document.getElementById('statAvailableBalance').textContent = `${data.pending.toFixed(0)} ETB`;
+        // Also update earnings badge
+        const badge = document.getElementById('earningsBadge');
+        if (badge) badge.textContent = data.pending > 0 ? `${data.pending.toFixed(0)}` : '0';
+        // Refresh the earnings tab if it's active
+        if (currentTab === 'earnings') loadEarnings();
+      });
+
+      adminSocket.on('disconnect', () => {
+        console.log('⚠️ Admin WebSocket disconnected');
+      });
     }
 
     // ---------- DEPOSIT FILTERS ----------
@@ -1396,7 +1436,9 @@
       if (!loggedIn) return;
       await refreshAll();
       startAutoRefresh();
-      console.log('✅ Dashboard initialized with filters.');
+      // Connect WebSocket for live updates
+      connectAdminWebSocket();
+      console.log('✅ Dashboard initialized with live WebSocket updates.');
     }
 
     document.addEventListener('keydown', (e) => {
