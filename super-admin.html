@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Super Admin</title>
   <style>
-    /* Same CSS as before – compact version */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: #f0f2f5; min-height: 100vh; padding-bottom: 80px; }
     .header { background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%); color: white; padding: 12px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); position: sticky; top: 0; z-index: 100; }
@@ -18,6 +17,24 @@
     .logout-btn { background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 40px; cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s; min-height: 36px; min-width: 60px; }
     .logout-btn:active { transform: scale(0.94); background: #dc2626; }
     .container { max-width: 1200px; margin: 0 auto; padding: 12px 12px 20px; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+      background: white; padding: 12px 16px; border-radius: 12px;
+      margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .filter-bar label { font-size: 13px; font-weight: 500; color: #334155; display: flex; align-items: center; gap: 4px; }
+    .filter-bar input, .filter-bar select {
+      padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+      font-size: 13px; background: white;
+    }
+    .filter-bar .btn { padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; font-size: 13px; }
+    .btn-primary { background: #7c3aed; color: white; }
+    .btn-primary:active { background: #6d28d9; }
+    .btn-outline { background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed; }
+    .btn-outline:active { background: #7c3aed; color: white; }
+
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
     .stat-card { background: white; padding: 14px 12px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; }
     .stat-card .label { font-size: 10px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -112,6 +129,9 @@
       .stat-card { padding: 10px 8px; }
       .stat-card .value { font-size: 18px; }
       .stat-card .label { font-size: 9px; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-bar label { justify-content: space-between; }
+      .filter-bar input, .filter-bar select { flex: 1; }
       .tab-btn { font-size: 11px; padding: 6px 10px; min-height: 36px; }
       .tab-content { padding: 10px; }
       table { font-size: 12px; min-width: 500px; }
@@ -144,7 +164,18 @@
     </div>
   </header>
 
-  <div class="container" id="mainContent">
+  <div class="container">
+
+    <!-- ===== FILTER BAR ===== -->
+    <div class="filter-bar" id="filterBar">
+      <label>From: <input type="date" id="filterFrom" /></label>
+      <label>To: <input type="date" id="filterTo" /></label>
+      <label>Admin:
+        <select id="filterAdmin"><option value="all">All Admins</option></select>
+      </label>
+      <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+      <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+    </div>
 
     <!-- Stats Grid -->
     <div class="stats-grid" id="statsGrid">
@@ -214,14 +245,13 @@
 
   <script>
     // ============================================================
-    //  SUPER ADMIN – Secret‑based (no login required)
+    //  SUPER ADMIN – Secret‑based with date & admin filters
     // ============================================================
 
     // ---------- Get secret from URL ----------
     const urlParams = new URLSearchParams(window.location.search);
     const SECRET = urlParams.get('secret') || '';
 
-    // If no secret, show a message (or you can set a default)
     if (!SECRET) {
       document.body.innerHTML = `
         <div class="denied">
@@ -234,10 +264,15 @@
       throw new Error('No secret provided');
     }
 
-    // ---------- Helper: add secret to all API calls ----------
-    function apiUrl(path) {
-      const separator = path.includes('?') ? '&' : '?';
-      return `${path}${separator}secret=${SECRET}`;
+    // ---------- Helper: add secret and filters to API calls ----------
+    function apiUrl(path, extraParams = {}) {
+      const params = new URLSearchParams({ secret: SECRET, ...extraParams });
+      // Remove keys with empty or 'all' values
+      for (const [key, value] of params) {
+        if (value === '' || value === 'all' || value === null) params.delete(key);
+      }
+      const query = params.toString();
+      return query ? `${path}?${query}` : path;
     }
 
     // ---------- State ----------
@@ -245,6 +280,11 @@
     let currentWithdrawFilter = 'pending';
     let refreshInterval = null;
     let isRefreshing = false;
+
+    // Filter values
+    let filterFrom = '';
+    let filterTo = '';
+    let filterAdmin = 'all';
 
     // ---------- Toast ----------
     function showToast(message, type = 'info') {
@@ -275,11 +315,17 @@
       if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
 
-    // ---------- Load Platform Stats ----------
+    // ---------- Load Platform Stats (with filters) ----------
     async function loadPlatformStats() {
       const container = document.getElementById('platformContent');
       try {
-        const res = await fetch(apiUrl('/super-admin/platform-stats'));
+        const params = {};
+        if (filterFrom) params.from = filterFrom;
+        if (filterTo) params.to = filterTo;
+        if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+        const url = apiUrl('/super-admin/platform-stats', params);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load platform stats');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -332,12 +378,16 @@
     async function loadAdmins() {
       const container = document.getElementById('adminsList');
       try {
-        const res = await fetch(apiUrl('/super-admin/admins'));
+        const url = apiUrl('/super-admin/admins');
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load admins');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
 
         document.getElementById('adminBadge').textContent = data.admins.length;
+
+        // Populate admin dropdown (if not already populated)
+        populateAdminDropdown(data.admins);
 
         if (data.admins.length === 0) {
           container.innerHTML = `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
@@ -384,11 +434,26 @@
       }
     }
 
+    // ---------- Populate Admin Dropdown ----------
+    function populateAdminDropdown(admins) {
+      const select = document.getElementById('filterAdmin');
+      // Only populate if empty or we want to refresh
+      if (select.options.length > 1) return;
+      select.innerHTML = '<option value="all">All Admins</option>';
+      admins.forEach(admin => {
+        const opt = document.createElement('option');
+        opt.value = admin.id;
+        opt.textContent = admin.name;
+        select.appendChild(opt);
+      });
+    }
+
     // ---------- Load Admin Detail ----------
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
       try {
-        const res = await fetch(apiUrl(`/super-admin/admin/${adminId}`));
+        const url = apiUrl(`/super-admin/admin/${adminId}`);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load admin details');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -461,12 +526,18 @@
       }
     }
 
-    // ---------- Load Admin Withdrawals ----------
+    // ---------- Load Admin Withdrawals (with filters) ----------
     async function loadAdminWithdrawals(status = 'pending') {
       currentWithdrawFilter = status;
       const container = document.getElementById('withdrawalsList');
       try {
-        const res = await fetch(apiUrl(`/super-admin/admin-withdrawals?status=${status}&limit=100`));
+        const params = { status, limit: 100 };
+        if (filterFrom) params.from = filterFrom;
+        if (filterTo) params.to = filterTo;
+        if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+        const url = apiUrl('/super-admin/admin-withdrawals', params);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load withdrawals');
         const data = await res.json();
         if (!data.success) throw new Error(data.error);
@@ -515,7 +586,8 @@
     async function processAdminWithdrawal(requestId, action) {
       if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
       try {
-        const res = await fetch(apiUrl('/super-admin/process-admin-withdrawal'), {
+        const url = apiUrl('/super-admin/process-admin-withdrawal');
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ requestId, action })
@@ -538,7 +610,8 @@
       const action = isActive ? 'activate' : 'deactivate';
       if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
       try {
-        const res = await fetch(apiUrl('/super-admin/toggle-admin'), {
+        const url = apiUrl('/super-admin/toggle-admin');
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminId, isActive })
@@ -571,7 +644,8 @@
 
     async function updateCommission(adminId, commissionRate) {
       try {
-        const res = await fetch(apiUrl('/super-admin/update-commission'), {
+        const url = apiUrl('/super-admin/update-commission');
+        const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ adminId, commissionRate })
@@ -600,6 +674,24 @@
     document.getElementById('modalOverlay').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) closeModal();
     });
+
+    // ---------- Filter Functions ----------
+    function applyFilters() {
+      filterFrom = document.getElementById('filterFrom').value;
+      filterTo = document.getElementById('filterTo').value;
+      filterAdmin = document.getElementById('filterAdmin').value;
+      refreshAll();
+    }
+
+    function resetFilters() {
+      document.getElementById('filterFrom').value = '';
+      document.getElementById('filterTo').value = '';
+      document.getElementById('filterAdmin').value = 'all';
+      filterFrom = '';
+      filterTo = '';
+      filterAdmin = 'all';
+      refreshAll();
+    }
 
     // ---------- Refresh ----------
     async function refreshAll() {
@@ -655,9 +747,9 @@
 
     // ---------- Init ----------
     async function init() {
-      // No session check – just load data
-      await loadPlatformStats();
+      // Load admins (this also populates the dropdown)
       await loadAdmins();
+      await loadPlatformStats();
       await loadAdminWithdrawals('pending');
       startAutoRefresh();
     }
