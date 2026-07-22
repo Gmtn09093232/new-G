@@ -1,6 +1,6 @@
 // ============================================================
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission
-//  (Super Admin uses session only – no secret)
+//  (Super Admin supports secret‑based access)
 // ============================================================
 
 require('dotenv').config();
@@ -2175,24 +2175,32 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 });
 
 // ============================================================
-//  SUPER ADMIN ENDPOINTS – Session only (no secret)
+//  SUPER ADMIN ENDPOINTS – Secret‑first (no login required)
 // ============================================================
 
-// Helper to check super admin session
-async function checkSuperAdmin(req, res) {
-  if (!req.session.adminId) {
-    return res.status(401).json({ error: 'Not logged in' });
+// Helper: accept secret OR session
+async function authSuperAdmin(req, res) {
+  const secret = req.query.secret || req.body.secret;
+  const validSecret = process.env.ADMIN_SECRET || '01207'; // fallback
+
+  if (secret && secret === validSecret) {
+    return { success: true, adminId: null, via: 'secret' };
   }
-  const isSuper = await isSuperAdmin(req.session.adminId);
-  if (!isSuper) {
-    return res.status(403).json({ error: 'Super admin access required' });
+
+  // Fallback to session if you still want it
+  if (req.session.adminId) {
+    const isSuper = await isSuperAdmin(req.session.adminId);
+    if (isSuper) {
+      return { success: true, adminId: req.session.adminId, via: 'session' };
+    }
   }
-  return true; // all good
+
+  return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
 }
 
 app.get('/super-admin/admins', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
     const { data: admins, error } = await supabase
@@ -2259,8 +2267,8 @@ app.get('/super-admin/admins', async (req, res) => {
 });
 
 app.get('/super-admin/admin/:adminId', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
     const { adminId } = req.params;
@@ -2315,14 +2323,15 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
 });
 
 app.post('/super-admin/toggle-admin', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   const { adminId, isActive } = req.body;
   if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
 
   try {
-    if (parseInt(adminId) === req.session.adminId) {
+    // If using session, prevent self-deactivation
+    if (auth.via === 'session' && parseInt(adminId) === req.session.adminId) {
       return res.status(400).json({ error: 'Cannot change your own status' });
     }
     const { error } = await supabase
@@ -2331,7 +2340,7 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
       .eq('id', adminId);
     if (error) throw error;
 
-    Audit.adminAction('SUPER_ADMIN_TOGGLE_ADMIN', req.session.adminId, req.ip, {
+    Audit.adminAction('SUPER_ADMIN_TOGGLE_ADMIN', auth.adminId || 'secret', req.ip, {
       targetAdminId: adminId,
       newStatus: isActive
     });
@@ -2344,8 +2353,8 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
 });
 
 app.post('/super-admin/update-commission', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   const { adminId, commissionRate } = req.body;
   if (!adminId || commissionRate === undefined) return res.status(400).json({ error: 'Admin ID and commission rate required' });
@@ -2358,7 +2367,7 @@ app.post('/super-admin/update-commission', async (req, res) => {
       .eq('id', adminId);
     if (error) throw error;
 
-    Audit.adminAction('SUPER_ADMIN_UPDATE_COMMISSION', req.session.adminId, req.ip, {
+    Audit.adminAction('SUPER_ADMIN_UPDATE_COMMISSION', auth.adminId || 'secret', req.ip, {
       targetAdminId: adminId,
       newCommissionRate: commissionRate
     });
@@ -2371,8 +2380,8 @@ app.post('/super-admin/update-commission', async (req, res) => {
 });
 
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
     const { status = 'pending', limit = 50 } = req.query;
@@ -2392,8 +2401,8 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
 });
 
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   const { requestId, action } = req.body;
   if (!requestId || !['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Request ID and valid action required' });
@@ -2417,7 +2426,7 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
         .update({ status: 'paid', paid_at: new Date().toISOString() })
         .eq('admin_id', reqData.admin_id)
         .eq('status', 'pending');
-      Audit.adminAction('SUPER_ADMIN_APPROVE_WITHDRAWAL', req.session.adminId, req.ip, {
+      Audit.adminAction('SUPER_ADMIN_APPROVE_WITHDRAWAL', auth.adminId || 'secret', req.ip, {
         targetAdminId: reqData.admin_id,
         amount: reqData.amount,
         requestId
@@ -2428,7 +2437,7 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
         .from('admin_withdrawal_requests')
         .update({ status: 'rejected', processed_at: new Date().toISOString() })
         .eq('id', requestId);
-      Audit.adminAction('SUPER_ADMIN_REJECT_WITHDRAWAL', req.session.adminId, req.ip, {
+      Audit.adminAction('SUPER_ADMIN_REJECT_WITHDRAWAL', auth.adminId || 'secret', req.ip, {
         targetAdminId: reqData.admin_id,
         amount: reqData.amount,
         requestId
@@ -2442,8 +2451,8 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
 });
 
 app.get('/super-admin/platform-stats', async (req, res) => {
-  const auth = await checkSuperAdmin(req, res);
-  if (auth !== true) return auth;
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
     const { count: totalUsers } = await supabase
