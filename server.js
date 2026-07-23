@@ -1,6 +1,7 @@
 // ============================================================
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
 //  Super Admin supports secret‑based access and date/admin filters
+//  Includes deposit balance adjustment for super admin
 // ============================================================
 
 require('dotenv').config();
@@ -160,9 +161,9 @@ async function getAdminDeposits(adminId, status = 'approved') {
   } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
-// ---------- Helper: Get admin's holding balance (total approved deposits only) ----------
+// ---------- Helper: Get admin's adjusted deposit balance (deposits + adjustments) ----------
 async function getAdminHoldingBalance(adminId) {
-  // Total approved deposits for this admin
+  // Total approved deposits
   const { data: deposits, error: depErr } = await supabase
     .from('deposit_requests')
     .select('amount')
@@ -170,14 +171,22 @@ async function getAdminHoldingBalance(adminId) {
     .eq('status', 'approved');
   if (depErr) throw depErr;
   const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
-  return totalDeposits; // no subtraction of withdrawals
+
+  // Total adjustments (negative for deductions)
+  const { data: adjustments, error: adjErr } = await supabase
+    .from('admin_deposit_adjustments')
+    .select('amount')
+    .eq('admin_id', adminId);
+  if (adjErr) throw adjErr;
+  const totalAdjustments = adjustments.reduce((sum, a) => sum + Number(a.amount), 0);
+
+  return totalDeposits + totalAdjustments;
 }
 
 // ============================================================
 //  SUPER ADMIN HELPER – Live Earnings Calculation
 // ============================================================
 async function getAdminEarnings(adminId) {
-  // Get all contributions for this admin
   const { data: contributions, error: contribErr } = await supabase
     .from('game_admin_contributions')
     .select('house_profit_share, created_at')
@@ -188,7 +197,6 @@ async function getAdminEarnings(adminId) {
     return { pending: 0, earned: 0 };
   }
 
-  // Get paid commissions
   const { data: paidCommissions, error: paidErr } = await supabase
     .from('admin_daily_commissions')
     .select('commission_amount, date')
@@ -203,7 +211,7 @@ async function getAdminEarnings(adminId) {
   const paidDates = new Set();
   if (paidCommissions) {
     paidCommissions.forEach(c => {
-      const dateStr = c.date; // YYYY-MM-DD
+      const dateStr = c.date;
       paidDates.add(dateStr);
     });
   }
@@ -224,10 +232,8 @@ async function getAdminEarnings(adminId) {
   return { pending, earned };
 }
 
-// ---------- NEW: Mark contributions as paid up to a given amount ----------
+// ---------- Mark contributions as paid up to a given amount ----------
 async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toISOString()) {
-  // Get all contributions for this admin that are not yet covered by any paid commission
-  // We'll check which dates are already paid via admin_daily_commissions
   const { data: paidCommissions, error: paidErr } = await supabase
     .from('admin_daily_commissions')
     .select('date')
@@ -236,7 +242,6 @@ async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toIS
   if (paidErr) throw paidErr;
   const paidDates = new Set(paidCommissions.map(d => d.date));
 
-  // Get all contributions
   const { data: contributions, error: contribErr } = await supabase
     .from('game_admin_contributions')
     .select('created_at, house_profit_share')
@@ -244,7 +249,6 @@ async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toIS
     .order('created_at', { ascending: true });
   if (contribErr) throw contribErr;
 
-  // Group contributions by date (YYYY-MM-DD)
   const grouped = {};
   for (const c of contributions) {
     const date = new Date(c.created_at).toISOString().split('T')[0];
@@ -262,10 +266,9 @@ async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toIS
     const available = grouped[date];
     const toPay = Math.min(available, remaining);
 
-    // Check if a daily commission for this date already exists (could be pending)
     const { data: existing, error: existErr } = await supabase
       .from('admin_daily_commissions')
-      .select('id, commission_amount, total_entry_fees, total_house_profit, status')
+      .select('id')
       .eq('admin_id', adminId)
       .eq('date', date)
       .maybeSingle();
@@ -1715,7 +1718,6 @@ app.get('/admin/deposits', async (req, res) => {
 
     const { from, to, method, status } = req.query;
 
-    // Date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -1726,11 +1728,9 @@ app.get('/admin/deposits', async (req, res) => {
       toDate.setHours(23,59,59,999);
       query = query.lte('created_at', toDate.toISOString());
     }
-    // Method filter (payment_type)
     if (method && method !== 'all') {
       query = query.eq('payment_type', method);
     }
-    // Status filter (default to 'pending' if not specified)
     if (status && status !== 'all') {
       query = query.eq('status', status);
     } else {
@@ -1822,7 +1822,7 @@ app.get('/admin/holding-balance', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/process-deposit with holding limit (based only on deposits) ----
+// ---- UPDATED: /admin/process-deposit with holding limit (based on adjusted balance) ----
 app.post('/admin/process-deposit', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
@@ -1846,7 +1846,7 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
     if (action === 'approve') {
-      // ---- HOLDING BALANCE CHECK (only deposits) ----
+      // ---- HOLDING BALANCE CHECK (adjusted) ----
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
       if (newHolding > 2000) {
@@ -1886,7 +1886,6 @@ app.post('/admin/process-deposit', async (req, res) => {
       }
       res.json({ success: true, newBalance: user.balance });
     } else {
-      // Reject – no changes to balance
       await supabase.from('deposit_requests').update({
         status: 'rejected',
         processed_at: new Date().toISOString()
@@ -2207,7 +2206,6 @@ app.get('/admin/live-commission', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Session expired' });
     }
 
-    // Get all contributions for this admin
     const { data: contributions, error: contribErr } = await supabase
       .from('game_admin_contributions')
       .select('house_profit_share, total_entry_fees, created_at, game_round_id')
@@ -2215,7 +2213,6 @@ app.get('/admin/live-commission', async (req, res) => {
 
     if (contribErr) throw contribErr;
 
-    // Get paid commissions
     const { data: paidCommissions, error: paidErr } = await supabase
       .from('admin_daily_commissions')
       .select('commission_amount, status, date')
@@ -2233,7 +2230,6 @@ app.get('/admin/live-commission', async (req, res) => {
       });
     }
 
-    // Group by date
     const dailyTotals = {};
     let totalPending = 0;
     let totalPaid = 0;
@@ -2258,7 +2254,6 @@ app.get('/admin/live-commission', async (req, res) => {
       }
     }
 
-    // Build rounds
     const rounds = [];
     for (const [dateStr, data] of Object.entries(dailyTotals)) {
       rounds.push({
@@ -2275,10 +2270,8 @@ app.get('/admin/live-commission', async (req, res) => {
       }
     }
 
-    // Sort by date (newest first)
     rounds.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Get total earned from paid commissions
     let totalEarned = 0;
     if (paidCommissions) {
       paidCommissions.forEach(c => {
@@ -2320,7 +2313,6 @@ app.post('/admin/request-withdrawal', async (req, res) => {
   if (!phone || !receiver_name) return res.status(400).json({ error: 'Phone and receiver name required' });
 
   try {
-    // Check pending earnings from live contributions
     const { data: contributions, error: contribErr } = await supabase
       .from('game_admin_contributions')
       .select('house_profit_share, created_at')
@@ -2328,7 +2320,6 @@ app.post('/admin/request-withdrawal', async (req, res) => {
 
     if (contribErr) throw contribErr;
 
-    // Get paid dates
     const { data: paidCommissions, error: paidErr } = await supabase
       .from('admin_daily_commissions')
       .select('date')
@@ -2438,7 +2429,7 @@ async function authSuperAdmin(req, res) {
   return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
 }
 
-// ---------- GET all admins (no filters) ----------
+// ---------- GET all admins (includes adjusted deposit balance) ----------
 app.get('/super-admin/admins', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2452,7 +2443,7 @@ app.get('/super-admin/admins', async (req, res) => {
 
     const adminsWithStats = await Promise.all(admins.map(async (admin) => {
       const playerCount = await getAdminPlayerCount(admin.id);
-      const totalDeposits = await getAdminDeposits(admin.id);
+      const totalDeposits = await getAdminDeposits(admin.id); // raw
       const { data: pendingDeposits } = await supabase
         .from('deposit_requests')
         .select('count')
@@ -2470,14 +2461,17 @@ app.get('/super-admin/admins', async (req, res) => {
       const pendingWithdrawals = withdrawals
         .filter(w => w.status === 'pending').length;
       
-      // ---- FIX: Use live earnings calculation ----
       const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
+      
+      // ---- NEW: Get adjusted deposit balance ----
+      const holdingBalance = await getAdminHoldingBalance(admin.id);
       
       return {
         ...admin,
         stats: {
           playerCount,
-          totalDeposits,
+          totalDeposits,          // raw deposits from deposit_requests
+          holdingBalance,         // adjusted (deposits + adjustments)
           pendingDeposits: pendingDeposits?.[0]?.count || 0,
           totalWithdrawals,
           pendingWithdrawals,
@@ -2494,7 +2488,7 @@ app.get('/super-admin/admins', async (req, res) => {
   }
 });
 
-// ---------- GET admin detail ----------
+// ---------- GET admin detail (includes adjustments) ----------
 app.get('/super-admin/admin/:adminId', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2534,8 +2528,16 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     
-    // ---- FIX: Add pending and earned totals ----
     const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(adminId);
+    const holdingBalance = await getAdminHoldingBalance(adminId);
+    
+    // Get adjustment history
+    const { data: adjustments, error: adjErr } = await supabase
+      .from('admin_deposit_adjustments')
+      .select('*')
+      .eq('admin_id', adminId)
+      .order('created_at', { ascending: false });
+    if (adjErr) throw adjErr;
     
     res.json({
       success: true,
@@ -2547,7 +2549,9 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
         earnings,
         adminWithdrawals,
         totalPendingEarnings,
-        totalEarned
+        totalEarned,
+        holdingBalance,
+        adjustments: adjustments || []
       }
     });
   } catch (err) {
@@ -2614,6 +2618,61 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
+// ---------- NEW: Super admin adjust deposit balance ----------
+app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { adminId, amount, description = '' } = req.body;
+  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
+  if (amount === undefined || isNaN(Number(amount)) || amount === 0) {
+    return res.status(400).json({ error: 'Valid non-zero amount required (negative to deduct)' });
+  }
+
+  const amt = Number(amount);
+
+  try {
+    // Verify admin exists
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id')
+      .eq('id', adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (adminErr || !admin) return res.status(404).json({ error: 'Admin not found' });
+
+    // Insert adjustment
+    const { data: newAdj, error: insertErr } = await supabase
+      .from('admin_deposit_adjustments')
+      .insert({
+        admin_id: adminId,
+        amount: amt,
+        type: 'super_admin_manual',
+        description: description || (amt < 0 ? 'Super admin deduction' : 'Super admin addition'),
+        created_by: auth.adminId || null,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    if (insertErr) throw insertErr;
+
+    // Get new balance
+    const newBalance = await getAdminHoldingBalance(adminId);
+
+    Audit.adminAction('SUPER_ADMIN_ADJUST_DEPOSIT', auth.adminId || 'secret', req.ip, {
+      targetAdminId: adminId,
+      amount: amt,
+      newBalance,
+      description: newAdj.description
+    });
+
+    res.json({ success: true, message: 'Deposit balance adjusted', adjustment: newAdj, newBalance });
+  } catch (err) {
+    console.error('Error adjusting deposit balance:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- GET admin withdrawal requests (with filters) ----------
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -2671,7 +2730,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
       // Mark contributions as paid up to the withdrawal amount
       await markContributionsAsPaid(reqData.admin_id, reqData.amount);
 
-      // Update the withdrawal request
       await supabase
         .from('admin_withdrawal_requests')
         .update({ status: 'approved', processed_at: new Date().toISOString() })
@@ -2685,7 +2743,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
 
       res.json({ success: true, message: 'Withdrawal approved' });
     } else {
-      // Reject – no changes to earnings
       await supabase
         .from('admin_withdrawal_requests')
         .update({ status: 'rejected', processed_at: new Date().toISOString() })
@@ -2713,7 +2770,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
   try {
     const { from, to, adminId } = req.query;
 
-    // Base queries
     let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
     let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
     let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
@@ -2722,7 +2778,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     let paidEarningsQuery = supabase.from('admin_daily_commissions').select('commission_amount').eq('status', 'paid');
     let pendingWithdrawalsQuery = supabase.from('admin_withdrawal_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
 
-    // Apply date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -2742,7 +2797,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       pendingWithdrawalsQuery = pendingWithdrawalsQuery.lte('created_at', toDate.toISOString());
     }
 
-    // Apply admin filter
     if (adminId && adminId !== 'all') {
       depositQuery = depositQuery.eq('admin_id', adminId);
       withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
@@ -2750,7 +2804,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       pendingWithdrawalsQuery = pendingWithdrawalsQuery.eq('admin_id', adminId);
     }
 
-    // ---- FIX: Also compute global pending earnings from contributions ----
     let pendingEarningsQuery = supabase
       .from('game_admin_contributions')
       .select('house_profit_share, created_at');
@@ -2774,10 +2827,8 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     const totalHouseProfit = rounds.data?.reduce((sum, r) => sum + Number(r.house_profit), 0) || 0;
     const totalAdminEarnings = paidEarnings.data?.reduce((sum, e) => sum + Number(e.commission_amount), 0) || 0;
 
-    // ---- Compute pending earnings (contributions not yet paid) ----
     let totalPendingEarnings = 0;
     if (pendingEarnings.data) {
-      // Get paid dates for the admin(s) in scope
       let paidDatesQuery = supabase
         .from('admin_daily_commissions')
         .select('date')
