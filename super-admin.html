@@ -516,6 +516,47 @@
       }
     }
 
+    // ---------- NEW: Reduce Deposit Balance ----------
+    async function reduceDepositBalance(adminId, currentHolding) {
+      if (currentHolding === undefined) {
+        // Fetch current holding from admin list? We'll pass it from the card.
+        // If not, we can prompt anyway.
+      }
+      const amountStr = prompt(`Enter amount to deduct from holding balance (current: ${currentHolding.toFixed(0)} ETB):`, '');
+      if (amountStr === null) return;
+      const amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount <= 0) {
+        showToast('❌ Please enter a valid positive amount.', 'error');
+        return;
+      }
+      if (amount > currentHolding) {
+        showToast(`❌ Amount cannot exceed current holding (${currentHolding.toFixed(0)} ETB).`, 'error');
+        return;
+      }
+      if (!confirm(`Are you sure you want to deduct ${amount.toFixed(0)} ETB from ${adminId}?`)) return;
+      try {
+        const url = apiUrl('/super-admin/adjust-deposit-balance');
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminId,
+            amount: -amount, // negative to deduct
+            description: `Super admin deduction of ${amount.toFixed(0)} ETB`
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`✅ Balance reduced by ${amount.toFixed(0)} ETB. New balance: ${data.newBalance.toFixed(0)} ETB`, 'success');
+          refreshAll();
+        } else {
+          throw new Error(data.error || 'Failed to reduce balance');
+        }
+      } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+      }
+    }
+
     async function loadAdmins() {
       const container = document.getElementById('adminsList');
       try {
@@ -533,7 +574,9 @@
           return;
         }
 
-        container.innerHTML = data.admins.map(admin => `
+        container.innerHTML = data.admins.map(admin => {
+          const holding = admin.stats.holdingBalance || 0;
+          return `
           <div class="admin-card">
             <div class="admin-header">
               <div>
@@ -553,6 +596,7 @@
               <div><strong>${admin.stats.totalDeposits.toFixed(0)} ETB</strong> Deposits</div>
               <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
               <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
+              <div><strong>${holding.toFixed(0)} ETB</strong> Holding</div>
             </div>
             <div style="font-size:13px;color:#94a3b8;margin:4px 0;">
               Commission: <strong>${(admin.commission_rate * 100)}%</strong> | 
@@ -564,9 +608,10 @@
               <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
                 ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
               </button>
+              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${holding})">💰 Reduce</button>
             </div>
           </div>
-        `).join('');
+        `}).join('');
 
       } catch (err) {
         container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
@@ -586,7 +631,7 @@
     }
 
     // ============================================================
-    //  UPDATED: loadAdminDetail – now includes "Recent Withdrawals"
+    //  UPDATED: loadAdminDetail – now includes Holding Balance & Adjustments
     // ============================================================
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
@@ -598,10 +643,12 @@
         if (!data.success) throw new Error(data.error);
 
         const a = data.admin;
+        const stats = data.stats;
         document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
 
-        // Helper to format date
         const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
+        const holding = stats.holdingBalance || 0;
+        const adjustments = stats.adjustments || [];
 
         body.innerHTML = `
           <div style="margin-bottom:12px;">
@@ -610,15 +657,16 @@
             <div><strong>Status:</strong> <span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></div>
             <div><strong>Commission Rate:</strong> ${(a.commission_rate * 100)}%</div>
             <div><strong>Super Admin:</strong> ${a.is_super_admin ? '✅ Yes' : '❌ No'}</div>
-            <div><strong>Players:</strong> ${data.stats.players}</div>
+            <div><strong>Players:</strong> ${stats.players}</div>
+            <div><strong>Holding Balance:</strong> <strong>${holding.toFixed(0)} ETB</strong></div>
           </div>
 
           <hr style="margin:12px 0;">
 
           <h4 style="margin-bottom:8px;">📋 Recent Deposits</h4>
-          ${data.stats.deposits && data.stats.deposits.length > 0 ? `
+          ${stats.deposits && stats.deposits.length > 0 ? `
             <div style="font-size:13px;max-height:150px;overflow-y:auto;">
-              ${data.stats.deposits.slice(0,5).map(d => `
+              ${stats.deposits.slice(0,5).map(d => `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${escapeHtml(d.username)}</span>
                   <span><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span>
@@ -629,11 +677,10 @@
 
           <hr style="margin:12px 0;">
 
-          <!-- NEW: Recent Withdrawals (player withdrawals) -->
           <h4 style="margin-bottom:8px;">🏦 Recent Withdrawals</h4>
-          ${data.stats.withdrawals && data.stats.withdrawals.length > 0 ? `
+          ${stats.withdrawals && stats.withdrawals.length > 0 ? `
             <div style="font-size:13px;max-height:150px;overflow-y:auto;">
-              ${data.stats.withdrawals.slice(0,5).map(w => `
+              ${stats.withdrawals.slice(0,5).map(w => `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${escapeHtml(w.username)} → ${escapeHtml(w.phone_number)}</span>
                   <span><strong>${w.amount} ETB</strong> <span class="status-badge ${w.status}">${w.status}</span></span>
@@ -645,9 +692,9 @@
           <hr style="margin:12px 0;">
 
           <h4 style="margin-bottom:8px;">💳 Admin Withdrawal Requests</h4>
-          ${data.stats.adminWithdrawals && data.stats.adminWithdrawals.length > 0 ? `
+          ${stats.adminWithdrawals && stats.adminWithdrawals.length > 0 ? `
             <div style="font-size:13px;max-height:150px;overflow-y:auto;">
-              ${data.stats.adminWithdrawals.map(w => `
+              ${stats.adminWithdrawals.map(w => `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${w.amount} ETB - ${w.withdrawal_type}</span>
                   <span><span class="status-badge ${w.status}">${w.status}</span></span>
@@ -659,9 +706,9 @@
           <hr style="margin:12px 0;">
 
           <h4 style="margin-bottom:8px;">💰 Earnings History</h4>
-          ${data.stats.earnings && data.stats.earnings.length > 0 ? `
+          ${stats.earnings && stats.earnings.length > 0 ? `
             <div style="font-size:13px;max-height:150px;overflow-y:auto;">
-              ${data.stats.earnings.slice(0,5).map(e => `
+              ${stats.earnings.slice(0,5).map(e => `
                 <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
                   <span>${fmt(e.date)}</span>
                   <span><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span>
@@ -669,6 +716,20 @@
               `).join('')}
             </div>
           ` : '<div style="color:#94a3b8;font-size:13px;">No earnings yet</div>'}
+
+          <hr style="margin:12px 0;">
+
+          <h4 style="margin-bottom:8px;">📊 Adjustment History</h4>
+          ${adjustments.length > 0 ? `
+            <div style="font-size:13px;max-height:150px;overflow-y:auto;">
+              ${adjustments.map(adj => `
+                <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;">
+                  <span>${fmt(adj.created_at)} - ${escapeHtml(adj.description || 'N/A')}</span>
+                  <span><strong>${adj.amount > 0 ? '+' : ''}${adj.amount.toFixed(0)} ETB</strong></span>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div style="color:#94a3b8;font-size:13px;">No adjustments</div>'}
 
           <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">🔴 Deactivate</button>
