@@ -160,6 +160,19 @@ async function getAdminDeposits(adminId, status = 'approved') {
   } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
+// ---------- Helper: Get admin's holding balance (total approved deposits only) ----------
+async function getAdminHoldingBalance(adminId) {
+  // Total approved deposits for this admin
+  const { data: deposits, error: depErr } = await supabase
+    .from('deposit_requests')
+    .select('amount')
+    .eq('admin_id', adminId)
+    .eq('status', 'approved');
+  if (depErr) throw depErr;
+  const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
+  return totalDeposits; // no subtraction of withdrawals
+}
+
 // ============================================================
 //  SUPER ADMIN HELPER – Live Earnings Calculation
 // ============================================================
@@ -259,35 +272,16 @@ async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toIS
     if (existErr) throw existErr;
 
     if (existing) {
-      // Update the existing record: set status to paid and add the paid amount
-      // However, we might have partial payment, but we'll just mark the whole date as paid
-      // because we're paying the full amount of that date's contributions.
-      // But if we only pay a portion, we need to keep the remaining pending.
-      // Since we're processing the entire date's worth, we set status to paid.
-      // This works because we only process dates where the entire amount is covered.
-      // If the withdrawal amount doesn't cover the full date, we'll only mark part of it,
-      // but we need to split the daily commission. For simplicity, we'll only mark full dates
-      // as paid if the withdrawal covers the entire date's amount.
-      // Given the design, it's acceptable to mark the entire date as paid when any amount is withdrawn,
-      // because the admin can request withdrawal of the total pending amount anyway.
-      // But to be precise, we should keep track of paid amount per date.
-      // To avoid overcomplicating, we'll create a new record for the paid portion.
-      // However, the existing table only has a single commission_amount field.
-      // So we'll update the status to 'paid' and set commission_amount to the total.
-      // This means the admin will have that date fully paid.
-      // For a more robust solution, we could add a `paid_amount` column, but we'll keep it simple.
-      // Since we're paying the entire date's amount, we can safely set status=paid.
       const { error: updateErr } = await supabase
         .from('admin_daily_commissions')
         .update({ status: 'paid', paid_at: paidAt })
         .eq('id', existing.id);
       if (updateErr) throw updateErr;
     } else {
-      // Insert a new daily commission for this date with status 'paid'
       const newEntry = {
         admin_id: adminId,
         date: date,
-        total_entry_fees: 0, // we don't have this info here, but it's not critical for earnings
+        total_entry_fees: 0,
         total_house_profit: grouped[date],
         commission_amount: grouped[date],
         status: 'paid',
@@ -1816,6 +1810,19 @@ app.get('/admin/withdrawals', async (req, res) => {
 });
 
 // ---------- Other Admin Endpoints ----------
+// ---- GET admin holding balance ----
+app.get('/admin/holding-balance', async (req, res) => {
+  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  try {
+    const holding = await getAdminHoldingBalance(req.session.adminId);
+    res.json({ success: true, holding });
+  } catch (err) {
+    console.error('Error fetching holding balance:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- UPDATED: /admin/process-deposit with holding limit (based only on deposits) ----
 app.post('/admin/process-deposit', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
@@ -1839,6 +1846,15 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
     if (action === 'approve') {
+      // ---- HOLDING BALANCE CHECK (only deposits) ----
+      const holding = await getAdminHoldingBalance(admin.id);
+      const newHolding = holding + reqData.amount;
+      if (newHolding > 2000) {
+        return res.status(400).json({
+          error: `Admin's total approved deposits exceeds 2000 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
+        });
+      }
+
       const user = await loadUser(reqData.telegram_id, null, null, null, false);
       if (!user) return res.status(404).json({ error: 'User not found' });
       user.balance += reqData.amount;
@@ -1870,6 +1886,7 @@ app.post('/admin/process-deposit', async (req, res) => {
       }
       res.json({ success: true, newBalance: user.balance });
     } else {
+      // Reject – no changes to balance
       await supabase.from('deposit_requests').update({
         status: 'rejected',
         processed_at: new Date().toISOString()
@@ -1891,6 +1908,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
+// ---- Other admin endpoints (withdrawals, players, stats) unchanged ----
 app.post('/admin/process-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
