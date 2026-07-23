@@ -559,7 +559,7 @@
   <!-- ===== MAIN CONTENT ===== -->
   <div class="container">
 
-    <!-- ===== LIVE COMMISSION BAR (always visible) ===== -->
+    <!-- ===== LIVE COMMISSION BAR ===== -->
     <div class="commission-bar" id="commissionBar">
       <div class="item">
         <span class="label">💰 Pending Commission</span>
@@ -575,7 +575,7 @@
       </div>
     </div>
 
-    <!-- ===== MAIN NAVIGATION ===== -->
+    <!-- ===== MAIN NAV ===== -->
     <div class="main-nav" id="mainNav">
       <button class="active" data-page="game" onclick="switchPage('game')">🎮 Game</button>
       <button data-page="profile" onclick="switchPage('profile')">👤 Profile</button>
@@ -611,14 +611,6 @@
           <h2>💰 Deposits</h2>
           <div class="filter-bar">
             <div class="input-group">
-              <label>From Date</label>
-              <input type="date" id="depositFromDate">
-            </div>
-            <div class="input-group">
-              <label>To Date</label>
-              <input type="date" id="depositToDate">
-            </div>
-            <div class="input-group">
               <label>Method</label>
               <select id="depositMethod">
                 <option value="all">All</option>
@@ -646,14 +638,6 @@
         <div class="tab-pane" id="tab-withdrawals">
           <h2>🏦 Withdrawals</h2>
           <div class="filter-bar">
-            <div class="input-group">
-              <label>From Date</label>
-              <input type="date" id="withdrawFromDate">
-            </div>
-            <div class="input-group">
-              <label>To Date</label>
-              <input type="date" id="withdrawToDate">
-            </div>
             <div class="input-group">
               <label>Method</label>
               <select id="withdrawMethod">
@@ -823,6 +807,7 @@
   <script>
     // ============================================================
     //  FULL ADMIN DASHBOARD JAVASCRIPT – two pages (Game / Profile)
+    //  Removed date filters
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -993,16 +978,12 @@
     // ---------- DEPOSIT FILTERS ----------
     function getDepositFilters() {
       return {
-        from: document.getElementById('depositFromDate').value,
-        to: document.getElementById('depositToDate').value,
         method: document.getElementById('depositMethod').value,
         status: document.getElementById('depositStatus').value,
       };
     }
     function applyDepositFilters() { loadDeposits(); }
     function resetDepositFilters() {
-      document.getElementById('depositFromDate').value = '';
-      document.getElementById('depositToDate').value = '';
       document.getElementById('depositMethod').value = 'all';
       document.getElementById('depositStatus').value = 'pending';
       loadDeposits();
@@ -1011,16 +992,12 @@
     // ---------- WITHDRAWAL FILTERS ----------
     function getWithdrawFilters() {
       return {
-        from: document.getElementById('withdrawFromDate').value,
-        to: document.getElementById('withdrawToDate').value,
         method: document.getElementById('withdrawMethod').value,
         status: document.getElementById('withdrawStatus').value,
       };
     }
     function applyWithdrawFilters() { loadWithdrawals(); }
     function resetWithdrawFilters() {
-      document.getElementById('withdrawFromDate').value = '';
-      document.getElementById('withdrawToDate').value = '';
       document.getElementById('withdrawMethod').value = 'all';
       document.getElementById('withdrawStatus').value = 'pending';
       loadWithdrawals();
@@ -1031,8 +1008,6 @@
       const container = document.getElementById('depositsList');
       const filters = getDepositFilters();
       const params = new URLSearchParams();
-      if (filters.from) params.append('from', filters.from);
-      if (filters.to) params.append('to', filters.to);
       if (filters.method !== 'all') params.append('method', filters.method);
       if (filters.status !== 'pending') params.append('status', filters.status);
       const url = `/admin/deposits?${params.toString()}`;
@@ -1079,8 +1054,6 @@
       const container = document.getElementById('withdrawalsList');
       const filters = getWithdrawFilters();
       const params = new URLSearchParams();
-      if (filters.from) params.append('from', filters.from);
-      if (filters.to) params.append('to', filters.to);
       if (filters.method !== 'all') params.append('method', filters.method);
       if (filters.status !== 'pending') params.append('status', filters.status);
       const url = `/admin/withdrawals?${params.toString()}`;
@@ -1490,7 +1463,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (mobile-friendly)');
+      console.log('✅ Dashboard initialized (no date filters)');
     }
 
     document.addEventListener('keydown', (e) => {
