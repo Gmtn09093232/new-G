@@ -1,7 +1,7 @@
 // ============================================================
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
 //  Super Admin supports secret‑based access and date/admin filters
-//  Includes deposit balance adjustment for super admin
+//  Includes deposit balance adjustment for super admin & admin view
 // ============================================================
 
 require('dotenv').config();
@@ -1698,7 +1698,7 @@ app.post('/api/request-withdraw', async (req, res) => {
 // ---------- Admin endpoints (session-based) ----------
 
 // ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters
+//  UPDATED: /admin/deposits with date, method, status filters + depositBalance
 // ============================================================
 app.get('/admin/deposits', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1745,11 +1745,18 @@ app.get('/admin/deposits', async (req, res) => {
     const playerCount = await getAdminPlayerCount(admin.id);
     const totalDeposits = await getAdminDeposits(admin.id);
     const approvedToday = await getAdminDeposits(admin.id, 'approved');
+    const depositBalance = await getAdminHoldingBalance(admin.id);
 
     res.json({
       requests: data,
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-      stats: { playerCount, totalDeposits, pendingCount: data.filter(d => d.status === 'pending').length, approvedToday }
+      stats: {
+        playerCount,
+        totalDeposits,
+        depositBalance,
+        pendingCount: data.filter(d => d.status === 'pending').length,
+        approvedToday
+      }
     });
   } catch (err) {
     console.error('Error fetching deposits:', err.message);
@@ -1907,7 +1914,94 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- Other admin endpoints (withdrawals, players, stats) unchanged ----
+// ---- UPDATED: /admin/stats – now includes depositBalance ----
+app.get('/admin/stats', async (req, res) => {
+  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, phone, deposit_number')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+
+    const playerCount = await getAdminPlayerCount(admin.id);
+    const { data: deposits } = await supabase
+      .from('deposit_requests')
+      .select('amount, status, created_at')
+      .eq('admin_id', admin.id);
+    
+    const totalDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDeposits = deposits.filter(d => d.status === 'approved' && new Date(d.created_at) >= today).reduce((sum, d) => sum + Number(d.amount), 0);
+    
+    const { data: withdrawals } = await supabase
+      .from('withdrawal_requests')
+      .select('amount, status')
+      .eq('admin_id', admin.id);
+    
+    const totalWithdrawals = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + Number(w.amount), 0);
+    const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
+    const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
+
+    // ---- NEW: Get adjusted deposit balance ----
+    const depositBalance = await getAdminHoldingBalance(admin.id);
+
+    res.json({
+      success: true,
+      admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
+      stats: {
+        playerCount,
+        totalDeposits,        // raw deposits (for audit)
+        depositBalance,       // adjusted balance (shown to admin)
+        todayDeposits,
+        totalWithdrawals,
+        pendingWithdrawals,
+        pendingDeposits
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching admin stats:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Other admin endpoints (players) unchanged ----
+app.get('/admin/players', async (req, res) => {
+  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, phone')
+      .eq('id', req.session.adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+    const players = await getAdminPlayers(admin.id);
+    const playersWithStats = await Promise.all(players.map(async (player) => {
+      const { data: deposits } = await supabase
+        .from('deposit_requests')
+        .select('amount, status, created_at')
+        .eq('telegram_id', player.telegram_id)
+        .eq('admin_id', admin.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      return { ...player, recentDeposits: deposits || [] };
+    }));
+    res.json({
+      success: true,
+      admin: { id: admin.id, name: admin.name, phone: admin.phone },
+      players: playersWithStats,
+      count: playersWithStats.length
+    });
+  } catch (err) {
+    console.error('Error fetching admin players:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/admin/process-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
@@ -1970,76 +2064,6 @@ app.post('/admin/process-withdrawal', async (req, res) => {
     }
   } catch (err) {
     console.error('Process withdrawal error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/admin/players', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-    const players = await getAdminPlayers(admin.id);
-    const playersWithStats = await Promise.all(players.map(async (player) => {
-      const { data: deposits } = await supabase
-        .from('deposit_requests')
-        .select('amount, status, created_at')
-        .eq('telegram_id', player.telegram_id)
-        .eq('admin_id', admin.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return { ...player, recentDeposits: deposits || [] };
-    }));
-    res.json({
-      success: true,
-      admin: { id: admin.id, name: admin.name, phone: admin.phone },
-      players: playersWithStats,
-      count: playersWithStats.length
-    });
-  } catch (err) {
-    console.error('Error fetching admin players:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/admin/stats', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone, deposit_number')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-    const playerCount = await getAdminPlayerCount(admin.id);
-    const { data: deposits } = await supabase
-      .from('deposit_requests')
-      .select('amount, status, created_at')
-      .eq('admin_id', admin.id);
-    const totalDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayDeposits = deposits.filter(d => d.status === 'approved' && new Date(d.created_at) >= today).reduce((sum, d) => sum + Number(d.amount), 0);
-    const { data: withdrawals } = await supabase
-      .from('withdrawal_requests')
-      .select('amount, status')
-      .eq('admin_id', admin.id);
-    const totalWithdrawals = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + Number(w.amount), 0);
-    const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
-    const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
-    res.json({
-      success: true,
-      admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-      stats: { playerCount, totalDeposits, todayDeposits, totalWithdrawals, pendingWithdrawals, pendingDeposits }
-    });
-  } catch (err) {
-    console.error('Error fetching admin stats:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
