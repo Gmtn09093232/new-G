@@ -516,17 +516,17 @@
       }
     }
 
-    // ---------- Reduce Deposit Balance (deducts from adjusted balance) ----------
-    async function reduceDepositBalance(adminId, currentBalance) {
-      const amountStr = prompt(`Enter amount to deduct from deposit balance (current balance: ${currentBalance.toFixed(0)} ETB):`, '');
+    // ---------- Reduce Deposit Balance (deducts from the adjusted deposit) ----------
+    async function reduceDepositBalance(adminId, currentDeposit) {
+      const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentDeposit.toFixed(0)} ETB):`, '');
       if (amountStr === null) return;
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
         showToast('❌ Please enter a valid positive amount.', 'error');
         return;
       }
-      if (amount > currentBalance) {
-        showToast(`❌ Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
+      if (amount > currentDeposit) {
+        showToast(`❌ Amount cannot exceed current deposit balance (${currentDeposit.toFixed(0)} ETB).`, 'error');
         return;
       }
       if (!confirm(`Are you sure you want to deduct ${amount.toFixed(0)} ETB from ${adminId}?`)) return;
@@ -543,10 +543,10 @@
         });
         const data = await res.json();
         if (data.success) {
-          showToast(`✅ Balance reduced by ${amount.toFixed(0)} ETB. New balance: ${data.newBalance.toFixed(0)} ETB`, 'success');
+          showToast(`✅ Deposit reduced by ${amount.toFixed(0)} ETB. New deposit: ${data.newBalance.toFixed(0)} ETB`, 'success');
           refreshAll();
         } else {
-          throw new Error(data.error || 'Failed to reduce balance');
+          throw new Error(data.error || 'Failed to reduce deposit');
         }
       } catch (err) {
         showToast('❌ ' + err.message, 'error');
@@ -571,8 +571,8 @@
         }
 
         container.innerHTML = data.admins.map(admin => {
-          const rawDeposits = admin.stats.totalDeposits || 0;
-          const balance = admin.stats.holdingBalance || 0; // adjusted
+          // Use holdingBalance as the adjusted deposit
+          const deposit = admin.stats.holdingBalance || 0;
           return `
           <div class="admin-card">
             <div class="admin-header">
@@ -590,8 +590,7 @@
             </div>
             <div class="admin-stats">
               <div><strong>${admin.stats.playerCount}</strong> Players</div>
-              <div><strong>${rawDeposits.toFixed(0)} ETB</strong> Deposits</div>
-              <div><strong>${balance.toFixed(0)} ETB</strong> Balance</div>
+              <div><strong>${deposit.toFixed(0)} ETB</strong> Deposits</div>
               <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
               <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
             </div>
@@ -605,7 +604,7 @@
               <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
                 ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
               </button>
-              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">💰 Reduce</button>
+              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${deposit})">💰 Reduce</button>
             </div>
           </div>
         `}).join('');
@@ -628,7 +627,7 @@
     }
 
     // ============================================================
-    //  loadAdminDetail – shows both raw Deposits and adjusted Balance
+    //  loadAdminDetail – shows both raw and adjusted deposits
     // ============================================================
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
@@ -645,7 +644,7 @@
 
         const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
         const rawDeposits = stats.totalDeposits || 0;
-        const balance = stats.holdingBalance || 0;
+        const adjustedDeposits = stats.holdingBalance || 0;
         const adjustments = stats.adjustments || [];
 
         body.innerHTML = `
@@ -657,7 +656,7 @@
             <div><strong>Super Admin:</strong> ${a.is_super_admin ? '✅ Yes' : '❌ No'}</div>
             <div><strong>Players:</strong> ${stats.players}</div>
             <div><strong>Deposits (raw):</strong> ${rawDeposits.toFixed(0)} ETB</div>
-            <div><strong>Balance (adjusted):</strong> <strong>${balance.toFixed(0)} ETB</strong></div>
+            <div><strong>Deposits (adjusted):</strong> <strong>${adjustedDeposits.toFixed(0)} ETB</strong></div>
           </div>
 
           <hr style="margin:12px 0;">
