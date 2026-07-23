@@ -516,9 +516,9 @@
       }
     }
 
-    // ---------- Reduce Deposit Balance ----------
+    // ---------- Reduce Deposit Balance (deducts from adjusted balance) ----------
     async function reduceDepositBalance(adminId, currentBalance) {
-      const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
+      const amountStr = prompt(`Enter amount to deduct from deposit balance (current balance: ${currentBalance.toFixed(0)} ETB):`, '');
       if (amountStr === null) return;
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
@@ -526,7 +526,7 @@
         return;
       }
       if (amount > currentBalance) {
-        showToast(`❌ Amount cannot exceed current deposit balance (${currentBalance.toFixed(0)} ETB).`, 'error');
+        showToast(`❌ Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
         return;
       }
       if (!confirm(`Are you sure you want to deduct ${amount.toFixed(0)} ETB from ${adminId}?`)) return;
@@ -571,8 +571,8 @@
         }
 
         container.innerHTML = data.admins.map(admin => {
-          // Use holdingBalance as the deposit balance (adjusted)
-          const depositBalance = admin.stats.holdingBalance || 0;
+          const rawDeposits = admin.stats.totalDeposits || 0;
+          const balance = admin.stats.holdingBalance || 0; // adjusted
           return `
           <div class="admin-card">
             <div class="admin-header">
@@ -590,7 +590,8 @@
             </div>
             <div class="admin-stats">
               <div><strong>${admin.stats.playerCount}</strong> Players</div>
-              <div><strong>${depositBalance.toFixed(0)} ETB</strong> Deposit Balance</div>
+              <div><strong>${rawDeposits.toFixed(0)} ETB</strong> Deposits</div>
+              <div><strong>${balance.toFixed(0)} ETB</strong> Balance</div>
               <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
               <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
             </div>
@@ -604,7 +605,7 @@
               <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
                 ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
               </button>
-              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${depositBalance})">💰 Reduce</button>
+              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">💰 Reduce</button>
             </div>
           </div>
         `}).join('');
@@ -627,7 +628,7 @@
     }
 
     // ============================================================
-    //  UPDATED: loadAdminDetail – shows "Deposit Balance" and adjustments
+    //  loadAdminDetail – shows both raw Deposits and adjusted Balance
     // ============================================================
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
@@ -643,7 +644,8 @@
         document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
 
         const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-        const depositBalance = stats.holdingBalance || 0;
+        const rawDeposits = stats.totalDeposits || 0;
+        const balance = stats.holdingBalance || 0;
         const adjustments = stats.adjustments || [];
 
         body.innerHTML = `
@@ -654,7 +656,8 @@
             <div><strong>Commission Rate:</strong> ${(a.commission_rate * 100)}%</div>
             <div><strong>Super Admin:</strong> ${a.is_super_admin ? '✅ Yes' : '❌ No'}</div>
             <div><strong>Players:</strong> ${stats.players}</div>
-            <div><strong>Deposit Balance:</strong> <strong>${depositBalance.toFixed(0)} ETB</strong></div>
+            <div><strong>Deposits (raw):</strong> ${rawDeposits.toFixed(0)} ETB</div>
+            <div><strong>Balance (adjusted):</strong> <strong>${balance.toFixed(0)} ETB</strong></div>
           </div>
 
           <hr style="margin:12px 0;">
