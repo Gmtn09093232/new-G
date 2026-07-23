@@ -516,21 +516,17 @@
       }
     }
 
-    // ---------- NEW: Reduce Deposit Balance ----------
-    async function reduceDepositBalance(adminId, currentHolding) {
-      if (currentHolding === undefined) {
-        // Fetch current holding from admin list? We'll pass it from the card.
-        // If not, we can prompt anyway.
-      }
-      const amountStr = prompt(`Enter amount to deduct from holding balance (current: ${currentHolding.toFixed(0)} ETB):`, '');
+    // ---------- Reduce Deposit Balance ----------
+    async function reduceDepositBalance(adminId, currentBalance) {
+      const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
       if (amountStr === null) return;
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
         showToast('❌ Please enter a valid positive amount.', 'error');
         return;
       }
-      if (amount > currentHolding) {
-        showToast(`❌ Amount cannot exceed current holding (${currentHolding.toFixed(0)} ETB).`, 'error');
+      if (amount > currentBalance) {
+        showToast(`❌ Amount cannot exceed current deposit balance (${currentBalance.toFixed(0)} ETB).`, 'error');
         return;
       }
       if (!confirm(`Are you sure you want to deduct ${amount.toFixed(0)} ETB from ${adminId}?`)) return;
@@ -541,7 +537,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             adminId,
-            amount: -amount, // negative to deduct
+            amount: -amount,
             description: `Super admin deduction of ${amount.toFixed(0)} ETB`
           })
         });
@@ -575,7 +571,8 @@
         }
 
         container.innerHTML = data.admins.map(admin => {
-          const holding = admin.stats.holdingBalance || 0;
+          // Use holdingBalance as the deposit balance (adjusted)
+          const depositBalance = admin.stats.holdingBalance || 0;
           return `
           <div class="admin-card">
             <div class="admin-header">
@@ -593,10 +590,9 @@
             </div>
             <div class="admin-stats">
               <div><strong>${admin.stats.playerCount}</strong> Players</div>
-              <div><strong>${admin.stats.totalDeposits.toFixed(0)} ETB</strong> Deposits</div>
+              <div><strong>${depositBalance.toFixed(0)} ETB</strong> Deposit Balance</div>
               <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
               <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
-              <div><strong>${holding.toFixed(0)} ETB</strong> Holding</div>
             </div>
             <div style="font-size:13px;color:#94a3b8;margin:4px 0;">
               Commission: <strong>${(admin.commission_rate * 100)}%</strong> | 
@@ -608,7 +604,7 @@
               <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
                 ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
               </button>
-              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${holding})">💰 Reduce</button>
+              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${depositBalance})">💰 Reduce</button>
             </div>
           </div>
         `}).join('');
@@ -631,7 +627,7 @@
     }
 
     // ============================================================
-    //  UPDATED: loadAdminDetail – now includes Holding Balance & Adjustments
+    //  UPDATED: loadAdminDetail – shows "Deposit Balance" and adjustments
     // ============================================================
     async function loadAdminDetail(adminId) {
       const body = document.getElementById('modalBody');
@@ -647,7 +643,7 @@
         document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
 
         const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-        const holding = stats.holdingBalance || 0;
+        const depositBalance = stats.holdingBalance || 0;
         const adjustments = stats.adjustments || [];
 
         body.innerHTML = `
@@ -658,7 +654,7 @@
             <div><strong>Commission Rate:</strong> ${(a.commission_rate * 100)}%</div>
             <div><strong>Super Admin:</strong> ${a.is_super_admin ? '✅ Yes' : '❌ No'}</div>
             <div><strong>Players:</strong> ${stats.players}</div>
-            <div><strong>Holding Balance:</strong> <strong>${holding.toFixed(0)} ETB</strong></div>
+            <div><strong>Deposit Balance:</strong> <strong>${depositBalance.toFixed(0)} ETB</strong></div>
           </div>
 
           <hr style="margin:12px 0;">
