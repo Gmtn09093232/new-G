@@ -1743,7 +1743,7 @@ app.get('/admin/deposits', async (req, res) => {
     if (error) throw error;
 
     const playerCount = await getAdminPlayerCount(admin.id);
-    const totalDeposits = await getAdminDeposits(admin.id);
+    const rawDeposits = await getAdminDeposits(admin.id);
     const approvedToday = await getAdminDeposits(admin.id, 'approved');
     const depositBalance = await getAdminHoldingBalance(admin.id);
 
@@ -1752,8 +1752,9 @@ app.get('/admin/deposits', async (req, res) => {
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        totalDeposits,
-        depositBalance,
+        totalDeposits: depositBalance, // <-- adjusted balance
+        rawDeposits: rawDeposits,     // raw total (for reference)
+        depositBalance,               // same as above
         pendingCount: data.filter(d => d.status === 'pending').length,
         approvedToday
       }
@@ -1914,7 +1915,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – now includes depositBalance ----
+// ---- UPDATED: /admin/stats – now totalDeposits is the adjusted balance ----
 app.get('/admin/stats', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -1932,7 +1933,7 @@ app.get('/admin/stats', async (req, res) => {
       .select('amount, status, created_at')
       .eq('admin_id', admin.id);
     
-    const totalDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
+    const rawDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayDeposits = deposits.filter(d => d.status === 'approved' && new Date(d.created_at) >= today).reduce((sum, d) => sum + Number(d.amount), 0);
@@ -1954,8 +1955,9 @@ app.get('/admin/stats', async (req, res) => {
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        totalDeposits,        // raw deposits (for audit)
-        depositBalance,       // adjusted balance (shown to admin)
+        totalDeposits: depositBalance,     // adjusted balance (shown to admin)
+        rawDeposits: rawDeposits,          // raw total (for audit)
+        depositBalance,                    // same as above
         todayDeposits,
         totalWithdrawals,
         pendingWithdrawals,
@@ -2467,7 +2469,7 @@ app.get('/super-admin/admins', async (req, res) => {
 
     const adminsWithStats = await Promise.all(admins.map(async (admin) => {
       const playerCount = await getAdminPlayerCount(admin.id);
-      const totalDeposits = await getAdminDeposits(admin.id); // raw
+      const rawDeposits = await getAdminDeposits(admin.id);
       const { data: pendingDeposits } = await supabase
         .from('deposit_requests')
         .select('count')
@@ -2487,15 +2489,16 @@ app.get('/super-admin/admins', async (req, res) => {
       
       const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
       
-      // ---- NEW: Get adjusted deposit balance ----
+      // ---- Get adjusted deposit balance ----
       const holdingBalance = await getAdminHoldingBalance(admin.id);
       
       return {
         ...admin,
         stats: {
           playerCount,
-          totalDeposits,          // raw deposits from deposit_requests
-          holdingBalance,         // adjusted (deposits + adjustments)
+          totalDeposits: holdingBalance,   // adjusted (shown as "Deposits")
+          rawDeposits: rawDeposits,         // raw for reference
+          holdingBalance,                   // same as above
           pendingDeposits: pendingDeposits?.[0]?.count || 0,
           totalWithdrawals,
           pendingWithdrawals,
