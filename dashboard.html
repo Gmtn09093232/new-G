@@ -285,7 +285,7 @@
 
     /* ---------- TABLES ---------- */
     .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px; }
     table th { background: #f8fafc; text-align: left; padding: 10px 10px; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
     table td { padding: 10px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 13px; }
     table tr:active td { background: #f8fafc; }
@@ -340,6 +340,29 @@
     @media (max-width: 480px) {
       .btn { min-height: 40px; font-size: 12px; padding: 6px 12px; }
       .btn-sm { min-height: 34px; font-size: 11px; padding: 4px 8px; }
+    }
+
+    /* ---------- PROOF THUMBNAIL ---------- */
+    .proof-thumb {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      transition: 0.15s;
+    }
+    .proof-thumb:hover { transform: scale(1.05); border-color: #667eea; }
+    .proof-thumb-placeholder {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      background: #f1f5f9;
+      border-radius: 4px;
+      text-align: center;
+      line-height: 40px;
+      color: #94a3b8;
+      font-size: 12px;
     }
 
     /* ---------- PROFILE PAGE ---------- */
@@ -495,7 +518,7 @@
       .refresh-btn { width: 48px; height: 48px; font-size: 16px; bottom: 12px; right: 12px; }
     }
 
-    /* ---------- MODAL ---------- */
+    /* ---------- MODALS ---------- */
     .modal {
       position: fixed;
       top: 0;
@@ -529,6 +552,41 @@
     .modal-content .modal-buttons { display: flex; gap: 12px; margin-top: 16px; }
     .modal-content .modal-buttons button { flex: 1; padding: 12px; border-radius: 60px; font-weight: 700; border: none; min-height: 48px; font-size: 14px; }
     .import-status { margin-top:12px; font-size:13px; max-height:200px; overflow-y:auto; background:#f8fafc; padding:8px; border-radius:8px; display:none; }
+
+    /* Proof modal */
+    #proofModal .modal-content {
+      max-width: 600px;
+      background: transparent;
+      padding: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    #proofModal img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 80vh;
+      object-fit: contain;
+    }
+    #proofModal .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 22px;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #proofModal .close-btn:active { transform: scale(0.9); }
 
     /* ---------- SCROLLBAR ---------- */
     ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -801,13 +859,21 @@
     </div>
   </div>
 
+  <!-- Proof Modal -->
+  <div id="proofModal" class="modal" onclick="if(event.target===this) closeProofModal()">
+    <div class="modal-content" style="position:relative; max-width:600px; background:transparent; padding:0; border-radius:12px; overflow:hidden;">
+      <button class="close-btn" onclick="closeProofModal()">✕</button>
+      <img id="proofImage" src="" alt="Payment Proof">
+    </div>
+  </div>
+
   <!-- Socket.IO client -->
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
     // ============================================================
     //  FULL ADMIN DASHBOARD JAVASCRIPT – two pages (Game / Profile)
-    //  Removed date filters
+    //  Removed date filters, added proof photo column
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1003,7 +1069,20 @@
       loadWithdrawals();
     }
 
-    // ---------- LOAD DEPOSITS ----------
+    // ---------- PROOF MODAL ----------
+    function viewProof(url) {
+      if (!url) return;
+      const modal = document.getElementById('proofModal');
+      const img = document.getElementById('proofImage');
+      img.src = url;
+      modal.classList.add('active');
+    }
+    function closeProofModal() {
+      document.getElementById('proofModal').classList.remove('active');
+      document.getElementById('proofImage').src = '';
+    }
+
+    // ---------- LOAD DEPOSITS (with proof column) ----------
     async function loadDeposits() {
       const container = document.getElementById('depositsList');
       const filters = getDepositFilters();
@@ -1023,13 +1102,19 @@
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Proof</th><th>Date</th><th>Actions</th></tr></thead>
               <tbody>${data.requests.map(req => `
                 <tr>
                   <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
                   <td><strong>${req.amount} ETB</strong></td>
                   <td><span class="status-badge ${req.payment_type}">${req.payment_type}</span></td>
                   <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                  <td>
+                    ${req.proof_photo_url ? 
+                      `<img src="${req.proof_photo_url}" class="proof-thumb" onclick="viewProof('${req.proof_photo_url}')" alt="proof">` :
+                      `<span class="proof-thumb-placeholder">—</span>`
+                    }
+                  </td>
                   <td>${new Date(req.created_at).toLocaleDateString()}</td>
                   <td>
                     ${req.status === 'pending' ? `
@@ -1463,7 +1548,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (no date filters)');
+      console.log('✅ Dashboard initialized (with proof photo column)');
     }
 
     document.addEventListener('keydown', (e) => {
