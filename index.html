@@ -544,6 +544,14 @@
             font-size: 0.85rem;
             font-family: inherit;
         }
+        .input-group input[type="file"] {
+            padding: 8px;
+            border-radius: 60px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
         .input-group textarea {
             border-radius: 24px;
             resize: vertical;
@@ -788,8 +796,8 @@
         <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
         <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
         <div class="input-group"><label data-key="refLabel">📝 Transaction Reference (optional)</label><input type="text" id="depositRef" placeholder="Reference from SMS"></div>
-        <div class="input-group"><label data-key="proofLabel">📋 Photo Proof (optional)</label><textarea id="depositProof" placeholder="Paste photo link or describe your proof"></textarea></div>
-        <div class="transaction-summary" data-key="depositHint">💡 After sending payment, upload a photo of your payment confirmation or paste a link. Admin will verify your deposit using your phone number.</div>
+        <div class="input-group"><label data-key="proofLabel">📷 Upload Photo Proof (required)</label><input type="file" id="depositPhoto" accept="image/*" required></div>
+        <div class="transaction-summary" data-key="depositHint">💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.</div>
         <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
     </div></div>
 
@@ -944,7 +952,7 @@
                 accountName: "የአካውንት ስም",
                 yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
                 amountLabel: "💰 መጠን (ETB)",
-                depositHint: "💡 ክፍያ ከላኩ በኋላ የክፍያ ማረጋገጫ ፎቶ ያስገቡ ወይም አገናኝ ይለጥፉ። አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+                depositHint: "💡 ክፍያ ከላኩ በኋላ ግልጽ የሆነ የክፍያ ማረጋገጫ ፎቶ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
                 requestDeposit: "✔ ተቀማጭ ጠይቅ",
                 back: "← ተመለስ",
                 withdrawTitle: "ገንዘብ አውጣ",
@@ -1003,7 +1011,7 @@
                 claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦",
                 claimValueShort: "ወዲያው “CLAIM BINGO!”",
                 refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)",
-                proofLabel: "📋 የፎቶ ማስረጃ (አማራጭ)"
+                proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)"
             },
             en: {
                 depositTitle: "Deposit",
@@ -1014,7 +1022,7 @@
                 accountName: "ACCOUNT NAME",
                 yourPhone: "📞 Your Phone Number (for verification)",
                 amountLabel: "💰 Amount (ETB)",
-                depositHint: "💡 After sending payment, upload a photo of your payment confirmation or paste a link. Admin will verify your deposit using your phone number.",
+                depositHint: "💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.",
                 requestDeposit: "✔ Request Deposit",
                 back: "← Back",
                 withdrawTitle: "Withdraw Funds",
@@ -1073,7 +1081,7 @@
                 claimLabelShort: "⏱️ Claim:",
                 claimValueShort: "Immediately 'CLAIM BINGO!'",
                 refLabel: "📝 Transaction Reference (optional)",
-                proofLabel: "📋 Photo Proof (optional)"
+                proofLabel: "📷 Upload Photo Proof (required)"
             }
         };
 
@@ -1202,7 +1210,7 @@
             document.getElementById('depositPlayerPhone').value = '';
             document.getElementById('depositAmount').value = '';
             document.getElementById('depositRef').value = '';
-            document.getElementById('depositProof').value = '';
+            document.getElementById('depositPhoto').value = '';
 
             document.getElementById('depositDetailsModal').classList.add('active');
             closeDepositTypeModal();
@@ -1221,7 +1229,8 @@
             const phone = document.getElementById('depositPlayerPhone').value.trim();
             const amount = document.getElementById('depositAmount').value.trim();
             const ref = document.getElementById('depositRef').value.trim();
-            const proof = document.getElementById('depositProof').value.trim();
+            const photoInput = document.getElementById('depositPhoto');
+            const photoFile = photoInput.files[0];
 
             if (!phone.match(/^(09|07)\d{8}$/)) {
                 alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.');
@@ -1231,6 +1240,10 @@
                 alert('Minimum deposit is 10 ETB');
                 return;
             }
+            if (!photoFile) {
+                alert('Please upload a photo proof of your payment.');
+                return;
+            }
 
             isSubmittingDeposit = true;
             const submitBtn = document.getElementById('submitDepositBtn');
@@ -1238,18 +1251,18 @@
             submitBtn.disabled = true;
             submitBtn.innerText = '⏳ Sending...';
 
+            const formData = new FormData();
+            formData.append('phone', phone);
+            formData.append('amount', Number(amount));
+            formData.append('payment_type', selectedDepositType);
+            formData.append('transaction_reference', ref || '');
+            formData.append('admin_id', selectedAdminId);
+            formData.append('photo', photoFile);
+
             try {
                 const response = await fetch('/api/request-deposit', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: phone,
-                        amount: Number(amount),
-                        payment_type: selectedDepositType,
-                        transaction_reference: ref || null,
-                        proof_text: proof || null,
-                        admin_id: selectedAdminId
-                    })
+                    body: formData
                 });
 
                 const result = await response.json();
