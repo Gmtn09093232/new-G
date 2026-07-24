@@ -712,6 +712,7 @@
 
       <!-- Stats Grid -->
       <div class="stats-grid" id="statsGrid">
+        <!-- Changed: Deposits now shows adjusted balance (depositBalance) -->
         <div class="stat-card"><div class="label">💰 Deposits</div><div class="value green" id="statDeposits">-</div></div>
         <div class="stat-card"><div class="label">📈 Today</div><div class="value orange" id="statTodayDeposits">-</div></div>
         <div class="stat-card"><div class="label">⏳ Pending Dep.</div><div class="value red" id="statPendingDeposits">-</div></div>
@@ -963,10 +964,7 @@
 
   <script>
     // ============================================================
-    //  FULL ADMIN DASHBOARD JAVASCRIPT
-    //  Features: Deposits, Withdrawals, Players, Profile,
-    //  Receipt links, OCR scan for alphanumeric transaction IDs
-    //  NOW INCLUDES DATE + TIME in the Date column
+    //  ADMIN DASHBOARD – Deposits stat now shows adjusted balance
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1054,7 +1052,7 @@
       }
     }
 
-    // ---------- LOAD STATS ----------
+    // ---------- LOAD STATS (NOW USING adjusted deposit balance) ----------
     async function loadStats() {
       try {
         const res = await fetch('/admin/stats');
@@ -1069,7 +1067,8 @@
         `;
 
         document.getElementById('statPlayers').textContent = data.stats.playerCount;
-        document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`;
+        // **** CHANGED: use depositBalance (adjusted) ****
+        document.getElementById('statDeposits').textContent = `${data.stats.depositBalance.toFixed(0)} ETB`;
         document.getElementById('statTodayDeposits').textContent = `${data.stats.todayDeposits.toFixed(0)} ETB`;
         document.getElementById('statPendingDeposits').textContent = data.stats.pendingDeposits;
         document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
@@ -1200,7 +1199,7 @@
       scannedNumber = null;
     }
 
-    // ---------- SCAN LOGIC (alphanumeric with mixed filter) ----------
+    // ---------- SCAN LOGIC ----------
     function runScan() {
       const img = document.getElementById('scanImage');
       const statusEl = document.getElementById('scanStatus');
@@ -1300,7 +1299,7 @@
       }
     }
 
-    // ---------- LOAD DEPOSITS (with DATE + TIME) ----------
+    // ---------- LOAD DEPOSITS ----------
     async function loadDeposits() {
       const container = document.getElementById('depositsList');
       const filters = getDepositFilters();
@@ -1370,7 +1369,7 @@
       }
     }
 
-    // ---------- LOAD WITHDRAWALS (with DATE + TIME) ----------
+    // ---------- LOAD WITHDRAWALS ----------
     async function loadWithdrawals() {
       const container = document.getElementById('withdrawalsList');
       const filters = getWithdrawFilters();
@@ -1786,7 +1785,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (date+time added)');
+      console.log('✅ Dashboard initialized with adjusted deposit balance');
     }
 
     document.addEventListener('keydown', (e) => {
