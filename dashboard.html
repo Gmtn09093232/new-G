@@ -966,7 +966,7 @@
     //  FULL ADMIN DASHBOARD JAVASCRIPT
     //  Features: Deposits, Withdrawals, Players, Profile,
     //  Receipt links, OCR scan for alphanumeric transaction IDs
-    //  FIXED: now correctly extracts alphanumeric IDs like DE26GU1TFU and B000K9F9L
+    //  NOW INCLUDES DATE + TIME in the Date column
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1200,7 +1200,7 @@
       scannedNumber = null;
     }
 
-    // ---------- FIXED SCAN LOGIC (prioritises labelled IDs, then mixed alphanumeric) ----------
+    // ---------- SCAN LOGIC (alphanumeric with mixed filter) ----------
     function runScan() {
       const img = document.getElementById('scanImage');
       const statusEl = document.getElementById('scanStatus');
@@ -1222,29 +1222,22 @@
         let found = null;
 
         // ---- STEP 1: Look for explicit labels ----
-        // Try "Transaction Number:" or "Transaction ID:" or "Transaction ID" (with or without colon)
         const labelMatches = text.match(/(?:Transaction\s*(?:Number|ID)|Transaction\s*ID)\s*[:|]\s*([A-Za-z0-9]+)/i);
         if (labelMatches && labelMatches[1]) {
           found = labelMatches[1].trim();
           console.log('Found via label:', found);
         }
 
-        // ---- STEP 2: If no label, look for alphanumeric tokens that contain both letters and digits ----
+        // ---- STEP 2: Mixed alphanumeric tokens ----
         if (!found) {
-          // Find all alphanumeric tokens of length 8-16
           const allTokens = text.match(/\b[A-Za-z0-9]{8,16}\b/g);
           if (allTokens && allTokens.length > 0) {
-            // Filter to those that have at least one letter and one digit (mixed)
             const mixedTokens = allTokens.filter(t => /[A-Za-z]/.test(t) && /\d/.test(t));
             if (mixedTokens.length > 0) {
-              // Pick the longest, or if tie, the first
               found = mixedTokens.reduce((a, b) => a.length >= b.length ? a : b);
               console.log('Found via mixed alphanumeric:', found);
             } else {
-              // If no mixed, pick the longest overall (but we might get 'transaction' etc.)
-              // But we'll skip if the token is a common word like 'transaction'
               const sorted = allTokens.sort((a,b) => b.length - a.length);
-              // pick the first that is not a common word (optional)
               const commonWords = ['transaction','transfer','successful','finished','amount','type','time','date'];
               for (let t of sorted) {
                 if (!commonWords.includes(t.toLowerCase())) {
@@ -1252,16 +1245,13 @@
                   break;
                 }
               }
-              if (!found) {
-                // fallback to the longest
-                found = sorted[0];
-              }
+              if (!found) found = sorted[0];
               console.log('Found via alphanumeric fallback:', found);
             }
           }
         }
 
-        // ---- STEP 3: Fallback to pure numeric (8+ digits) ----
+        // ---- STEP 3: Numeric fallback ----
         if (!found) {
           const numMatches = text.match(/\b\d{8,}\b/g);
           if (numMatches && numMatches.length > 0) {
@@ -1310,7 +1300,7 @@
       }
     }
 
-    // ---------- LOAD DEPOSITS (with proof column + receipt link + scan) ----------
+    // ---------- LOAD DEPOSITS (with DATE + TIME) ----------
     async function loadDeposits() {
       const container = document.getElementById('depositsList');
       const filters = getDepositFilters();
@@ -1330,12 +1320,13 @@
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Proof</th><th>Receipt</th><th>Scan</th><th>Date</th><th>Actions</th></tr></thead>
+              <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Proof</th><th>Receipt</th><th>Scan</th><th>Date & Time</th><th>Actions</th></tr></thead>
               <tbody>${data.requests.map(req => {
                 const receiptLink = req.transaction_reference 
                   ? `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(req.transaction_reference)}`
                   : null;
                 const hasProof = !!req.proof_photo_url;
+                const formattedDate = new Date(req.created_at).toLocaleString();
                 return `
                 <tr>
                   <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
@@ -1360,7 +1351,7 @@
                       `<span style="color:#94a3b8;font-size:11px;">—</span>`
                     }
                   </td>
-                  <td>${new Date(req.created_at).toLocaleDateString()}</td>
+                  <td>${formattedDate}</td>
                   <td>
                     ${req.status === 'pending' ? `
                       <div class="action-buttons">
@@ -1379,7 +1370,7 @@
       }
     }
 
-    // ---------- LOAD WITHDRAWALS ----------
+    // ---------- LOAD WITHDRAWALS (with DATE + TIME) ----------
     async function loadWithdrawals() {
       const container = document.getElementById('withdrawalsList');
       const filters = getWithdrawFilters();
@@ -1399,8 +1390,10 @@
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
-              <thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-              <tbody>${data.requests.map(req => `
+              <thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th><th>Type</th><th>Status</th><th>Date & Time</th><th>Actions</th></tr></thead>
+              <tbody>${data.requests.map(req => {
+                const formattedDate = new Date(req.created_at).toLocaleString();
+                return `
                 <tr>
                   <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
                   <td><strong>${req.amount} ETB</strong></td>
@@ -1408,7 +1401,7 @@
                   <td>${req.receiver_name || 'N/A'}</td>
                   <td><span class="status-badge ${req.withdrawal_type}">${req.withdrawal_type}</span></td>
                   <td><span class="status-badge ${req.status}">${req.status}</span></td>
-                  <td>${new Date(req.created_at).toLocaleDateString()}</td>
+                  <td>${formattedDate}</td>
                   <td>
                     ${req.status === 'pending' ? `
                       <div class="action-buttons">
@@ -1418,7 +1411,7 @@
                     ` : '—'}
                   </td>
                 </tr>
-              `).join('')}</tbody>
+              `}).join('')}</tbody>
             </table>
           </div>
         `;
@@ -1793,7 +1786,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (fixed alphanumeric scan)');
+      console.log('✅ Dashboard initialized (date+time added)');
     }
 
     document.addEventListener('keydown', (e) => {
