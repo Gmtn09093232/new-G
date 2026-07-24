@@ -1,13 +1,3 @@
-// ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
-//  Super Admin supports secret‑based access and date/admin filters
-//  Includes deposit balance adjustment for super admin & admin view
-//  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
-//  NEW: fallback admin for deposits when assigned admin declines deposits
-//  REMOVED: special admin login functionality entirely
-//  FIXED: /admin/stats now returns totalDeposits for frontend compatibility
-// ============================================================
-
 require('dotenv').config();
 
 const express = require('express');
@@ -1963,7 +1953,7 @@ app.get('/admin/holding-balance', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/process-deposit with holding limit (based on adjusted balance) ----
+// ---- UPDATED: /admin/process-deposit with holding limit 1500 ETB ----
 app.post('/admin/process-deposit', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -1987,9 +1977,10 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (action === 'approve') {
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
-      if (newHolding > 2000) {
+      // Deposit limit changed to 1500 ETB
+      if (newHolding > 1500) {
         return res.status(400).json({
-          error: `Admin's total approved deposits exceeds 2000 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
+          error: `Admin's total approved deposits exceeds 1500 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
         });
       }
 
