@@ -1,5 +1,7 @@
 // ============================================================
 //  FULL SERVER.JS – Bingo + Multi-Admin + Special Admin Failover
+//  FIXED: session cookie security (secure: false for development)
+//  FIXED: req.session.save() in admin login
 // ============================================================
 
 require('dotenv').config();
@@ -94,7 +96,7 @@ async function ensureSpecialAdmin() {
         name: SPECIAL_ADMIN_NAME,
         phone: SPECIAL_ADMIN_PHONE,
         secret_key: secretKey,
-        pin: '0000', // won't be used for special admin login
+        pin: '0000',
         invite_code: inviteCode,
         commission_rate: 0.40,
         is_active: true,
@@ -180,20 +182,21 @@ const upload = multer({
 
 app.use(express.json());
 
+// ========== FIXED: Session configuration ==========
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'bingo_mega_secret',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,
+    secure: process.env.NODE_ENV === 'production' ? true : false,
     httpOnly: true,
-    sameSite: 'none'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 });
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger (unchanged) ----------
+// ---------- Audit Logger ----------
 async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
   try {
     const { error } = await supabase
@@ -221,7 +224,7 @@ const Audit = {
   suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
 };
 
-// ---------- Suspicious Activity Detector (unchanged) ----------
+// ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
 const WINDOW_MS = 120_000;
 const MAX_WINS_IN_WINDOW = 3;
@@ -244,7 +247,7 @@ function detectRapidWins(roomId, userId, ip) {
   return false;
 }
 
-// ---------- Admin Helper Functions (unchanged) ----------
+// ---------- Admin Helper Functions ----------
 const adminCache = {};
 async function loadAdmin(secretKey) {
   if (adminCache[secretKey] && (Date.now() - adminCache[secretKey].cachedAt < 60000)) return adminCache[secretKey];
@@ -459,7 +462,7 @@ async function isSuperAdmin(adminId) {
   } catch { return false; }
 }
 
-// ---------- Static endpoints (unchanged) ----------
+// ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
@@ -531,7 +534,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser (unchanged) ----------
+// ---------- loadUser ----------
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -635,7 +638,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
   }
 }
 
-// ---------- Telegram verification (unchanged) ----------
+// ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
     const params = new URLSearchParams(initData);
@@ -689,7 +692,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   }
 });
 
-// ---------- Admin Login (unchanged) ----------
+// ========== FIXED: Admin Login with req.session.save() ==========
 app.post('/admin/login', async (req, res) => {
   const { phone, pin } = req.body;
   if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
@@ -707,14 +710,20 @@ app.post('/admin/login', async (req, res) => {
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
     req.session.isSpecialAdmin = false;
-    res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
+    req.session.save((err) => {
+      if (err) {
+        console.error('❌ Session save error:', err);
+        return res.status(500).json({ success: false, error: 'Session save failed' });
+      }
+      res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
+    });
   } catch (err) {
     console.error('Admin login error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ---------- Admin Registration (unchanged) ----------
+// ---------- Admin Registration ----------
 app.post('/admin/register', async (req, res) => {
   const { 
     phone, name, deposit_number, payment_type, pin, confirm_pin, 
@@ -790,7 +799,7 @@ app.get('/admin/registration-config', (req, res) => {
   res.json({ requiresSecret });
 });
 
-// ---------- Get Admin Invite Info (unchanged) ----------
+// ---------- Get Admin Invite Info ----------
 app.get('/admin/invite-info', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -825,7 +834,7 @@ app.get('/admin/invite-info', async (req, res) => {
   }
 });
 
-// ---------- Legacy admin balance management (unchanged) ----------
+// ---------- Legacy admin balance management ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -924,7 +933,7 @@ app.post('/admin/delete-user', async (req, res) => {
   }
 });
 
-// ---------- Bingo Game Logic (unchanged) ----------
+// ---------- Bingo Game Logic ----------
 function generateCard() {
   const columns = [
     [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
@@ -977,7 +986,7 @@ const games = {
   30: createGameState(30)
 };
 
-// Bot constants (unchanged)
+// Bot constants
 const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
 const botBalances = new Map();
 BOT_IDS.forEach(id => botBalances.set(id, 1000));
@@ -1417,7 +1426,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- endGameWithWinners (unchanged) ----------
+// ---------- endGameWithWinners ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1613,7 +1622,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Bot Admin Endpoints (unchanged) ----------
+// ---------- Bot Admin Endpoints ----------
 app.get('/admin/bots-status', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -1695,7 +1704,7 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints (unchanged, but photo upload already present) ----------
+// ---------- Player deposit endpoints ----------
 app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1818,7 +1827,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   }
 });
 
-// ---------- Player withdrawal endpoints (unchanged) ----------
+// ---------- Player withdrawal endpoints ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -2245,7 +2254,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Daily Commission Calculation (unchanged) ----------
+// ---------- Daily Commission Calculation ----------
 const DAILY_COMMISSION_HOUR = 0;
 const DAILY_COMMISSION_MINUTE = 0;
 
@@ -2331,7 +2340,7 @@ function scheduleDailyCommission() {
 }
 scheduleDailyCommission();
 
-// ---------- Admin Earnings (Daily Commissions) (unchanged) ----------
+// ---------- Admin Earnings (Daily Commissions) ----------
 app.get('/admin/daily-commissions', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -2388,7 +2397,7 @@ app.get('/admin/daily-commissions', async (req, res) => {
   }
 });
 
-// ---------- LIVE COMMISSION – Real-time (unchanged) ----------
+// ---------- LIVE COMMISSION – Real-time ----------
 app.get('/admin/live-commission', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
@@ -2505,7 +2514,7 @@ app.get('/admin/live-commission', async (req, res) => {
   }
 });
 
-// ---------- Admin Request Withdrawal (unchanged) ----------
+// ---------- Admin Request Withdrawal ----------
 app.post('/admin/request-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { amount, phone, withdrawal_type, receiver_name } = req.body;
@@ -2608,7 +2617,7 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 });
 
 // ============================================================
-//  SUPER ADMIN ENDPOINTS – with secret support and filters
+//  SUPER ADMIN ENDPOINTS
 // ============================================================
 
 async function authSuperAdmin(req, res) {
@@ -2820,7 +2829,7 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
-// ---------- Update commission (unchanged) ----------
+// ---------- Update commission ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2848,7 +2857,7 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- Super admin adjust deposit balance (unchanged) ----------
+// ---------- Super admin adjust deposit balance ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2936,7 +2945,7 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Process admin withdrawal (unchanged) ----------
+// ---------- Process admin withdrawal ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2988,7 +2997,7 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- GET platform stats (unchanged) ----------
+// ---------- GET platform stats ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3144,7 +3153,7 @@ app.post('/special-admin/login', async (req, res) => {
     req.session.adminId = specialAdmin.id;
     req.session.adminName = specialAdmin.name;
     req.session.adminPhone = specialAdmin.phone;
-    req.session.isSpecialAdmin = true; // flag for dashboard
+    req.session.isSpecialAdmin = true;
     req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err);
@@ -3158,7 +3167,7 @@ app.post('/special-admin/login', async (req, res) => {
   }
 });
 
-// ---------- Import Players (unchanged) ----------
+// ---------- Import Players ----------
 app.post('/admin/import-players', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
@@ -3325,7 +3334,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Referral endpoints (unchanged) ----------
+// ---------- Referral endpoints ----------
 app.get('/api/invite-stats', async (req, res) => {
   const { secret } = req.query;
   if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -3379,7 +3388,7 @@ app.get('/api/invite-details', async (req, res) => {
   }
 });
 
-// ---------- Audit endpoints (unchanged) ----------
+// ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -3526,7 +3535,7 @@ io.on('connection', async (socket) => {
   });
 });
 
-// ---------- Admin namespace (unchanged) ----------
+// ---------- Admin namespace ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
