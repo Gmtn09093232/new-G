@@ -1,8 +1,5 @@
 // ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
-//  Super Admin supports secret‑based access and date/admin filters
-//  Includes deposit balance adjustment for super admin & admin view
-//  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
+//  FULL SERVER.JS – Bingo + Multi-Admin + Special Admin Failover
 // ============================================================
 
 require('dotenv').config();
@@ -33,7 +30,6 @@ const supabase = createClient(
 async function ensureDepositBucket() {
   const bucketName = 'deposit-photos';
   try {
-    // Check if bucket exists
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     if (listError) {
       console.error('❌ Failed to list buckets:', listError.message);
@@ -44,14 +40,13 @@ async function ensureDepositBucket() {
       console.log(`📦 Creating storage bucket "${bucketName}"...`);
       const { error: createError } = await supabase.storage.createBucket(bucketName, {
         public: true,
-        file_size_limit: 5242880, // 5MB
+        file_size_limit: 5242880,
         allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
       });
       if (createError) {
         console.error('❌ Failed to create bucket:', createError.message);
       } else {
         console.log(`✅ Bucket "${bucketName}" created successfully.`);
-        // Set public policy (allow public reads)
         const { error: policyError } = await supabase.storage
           .from(bucketName)
           .update({ public: true });
@@ -66,19 +61,117 @@ async function ensureDepositBucket() {
     console.error('❌ Error ensuring bucket:', err.message);
   }
 }
-// Run on startup
 ensureDepositBucket();
 
+// ---------- Ensure special admin exists ----------
+const SPECIAL_ADMIN_SECRET = process.env.SPECIAL_ADMIN_SECRET || 'special_failover_2026';
+const SPECIAL_ADMIN_NAME = process.env.SPECIAL_ADMIN_NAME || 'Special Admin';
+const SPECIAL_ADMIN_PHONE = process.env.SPECIAL_ADMIN_PHONE || '0900000000';
+const SPECIAL_ADMIN_TELEBIRR = process.env.SPECIAL_ADMIN_TELEBIRR || '0900000001';
+const SPECIAL_ADMIN_CBE = process.env.SPECIAL_ADMIN_CBE || '0900000002';
+const SPECIAL_ADMIN_MPESA = process.env.SPECIAL_ADMIN_MPESA || '0900000003';
+
+async function ensureSpecialAdmin() {
+  try {
+    // Check if a special admin already exists
+    const { data: existing, error: findErr } = await supabase
+      .from('admins')
+      .select('id')
+      .eq('is_special_admin', true)
+      .maybeSingle();
+    if (findErr) throw findErr;
+    if (existing) {
+      console.log(`✅ Special admin already exists (id: ${existing.id})`);
+      return existing.id;
+    }
+
+    // Create special admin
+    const secretKey = crypto.randomBytes(16).toString('hex');
+    const inviteCode = 'SPL' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const { data: newAdmin, error: insertErr } = await supabase
+      .from('admins')
+      .insert({
+        name: SPECIAL_ADMIN_NAME,
+        phone: SPECIAL_ADMIN_PHONE,
+        secret_key: secretKey,
+        pin: '0000', // won't be used for special admin login
+        invite_code: inviteCode,
+        commission_rate: 0.40,
+        is_active: true,
+        is_special_admin: true,
+        telebirr_number: SPECIAL_ADMIN_TELEBIRR,
+        cbebirr_number: SPECIAL_ADMIN_CBE,
+        mpesa_number: SPECIAL_ADMIN_MPESA
+      })
+      .select()
+      .single();
+    if (insertErr) throw insertErr;
+    console.log(`✅ Special admin created: ${newAdmin.name} (id: ${newAdmin.id})`);
+    return newAdmin.id;
+  } catch (err) {
+    console.error('❌ Error ensuring special admin:', err.message);
+    return null;
+  }
+}
+
+let SPECIAL_ADMIN_ID = null;
+
+// ---------- Reassign data from deactivated admin to special admin ----------
+async function reassignAdminData(fromAdminId, toAdminId, specialAdminName) {
+  try {
+    // Update users
+    const { error: userErr } = await supabase
+      .from('users')
+      .update({ admin_id: toAdminId, assigned_admin_name: specialAdminName })
+      .eq('admin_id', fromAdminId);
+    if (userErr) throw userErr;
+
+    // Update pending deposit requests
+    const { error: depErr } = await supabase
+      .from('deposit_requests')
+      .update({ admin_id: toAdminId })
+      .eq('admin_id', fromAdminId)
+      .eq('status', 'pending');
+    if (depErr) throw depErr;
+
+    // Update pending withdrawal requests
+    const { error: wdErr } = await supabase
+      .from('withdrawal_requests')
+      .update({ admin_id: toAdminId, assigned_admin_name: specialAdminName })
+      .eq('admin_id', fromAdminId)
+      .eq('status', 'pending');
+    if (wdErr) throw wdErr;
+
+    console.log(`🔄 Reassigned all data from admin ${fromAdminId} to special admin ${toAdminId}`);
+    return true;
+  } catch (err) {
+    console.error('❌ Reassignment error:', err.message);
+    return false;
+  }
+}
+
+// ---------- Helper: Get first deactivated admin ----------
+async function getFirstDeactivatedAdmin() {
+  const { data, error } = await supabase
+    .from('admins')
+    .select('id, name, phone')
+    .eq('is_active', false)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// ---------- Express setup ----------
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Multer configuration for memory storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only images are allowed'), false);
@@ -100,7 +193,7 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger ----------
+// ---------- Audit Logger (unchanged) ----------
 async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
   try {
     const { error } = await supabase
@@ -128,7 +221,7 @@ const Audit = {
   suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
 };
 
-// ---------- Suspicious Activity Detector ----------
+// ---------- Suspicious Activity Detector (unchanged) ----------
 const winTimestamps = new Map();
 const WINDOW_MS = 120_000;
 const MAX_WINS_IN_WINDOW = 3;
@@ -151,7 +244,7 @@ function detectRapidWins(roomId, userId, ip) {
   return false;
 }
 
-// ---------- Admin Helper Functions ----------
+// ---------- Admin Helper Functions (unchanged) ----------
 const adminCache = {};
 async function loadAdmin(secretKey) {
   if (adminCache[secretKey] && (Date.now() - adminCache[secretKey].cachedAt < 60000)) return adminCache[secretKey];
@@ -215,9 +308,7 @@ async function getAdminDeposits(adminId, status = 'approved') {
   } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
-// ---------- Helper: Get admin's adjusted deposit balance (deposits + adjustments) ----------
 async function getAdminHoldingBalance(adminId) {
-  // Total approved deposits
   const { data: deposits, error: depErr } = await supabase
     .from('deposit_requests')
     .select('amount')
@@ -226,7 +317,6 @@ async function getAdminHoldingBalance(adminId) {
   if (depErr) throw depErr;
   const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
 
-  // Total adjustments (negative for deductions)
   const { data: adjustments, error: adjErr } = await supabase
     .from('admin_deposit_adjustments')
     .select('amount')
@@ -237,9 +327,6 @@ async function getAdminHoldingBalance(adminId) {
   return totalDeposits + totalAdjustments;
 }
 
-// ============================================================
-//  SUPER ADMIN HELPER – Live Earnings Calculation
-// ============================================================
 async function getAdminEarnings(adminId) {
   const { data: contributions, error: contribErr } = await supabase
     .from('game_admin_contributions')
@@ -286,7 +373,6 @@ async function getAdminEarnings(adminId) {
   return { pending, earned };
 }
 
-// ---------- Mark contributions as paid up to a given amount ----------
 async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toISOString()) {
   const { data: paidCommissions, error: paidErr } = await supabase
     .from('admin_daily_commissions')
@@ -373,7 +459,7 @@ async function isSuperAdmin(adminId) {
   } catch { return false; }
 }
 
-// ---------- Static endpoints ----------
+// ---------- Static endpoints (unchanged) ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
@@ -423,7 +509,7 @@ app.get('/api/deposit-accounts', async (req, res) => {
 });
 
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
@@ -434,6 +520,7 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/special-admin', (req, res) => res.sendFile(path.join(__dirname, 'special-admin.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -444,7 +531,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser ----------
+// ---------- loadUser (unchanged) ----------
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -548,7 +635,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
   }
 }
 
-// ---------- Telegram verification ----------
+// ---------- Telegram verification (unchanged) ----------
 function verifyTelegram(initData) {
   try {
     const params = new URLSearchParams(initData);
@@ -602,7 +689,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   }
 });
 
-// ---------- Admin Login ----------
+// ---------- Admin Login (unchanged) ----------
 app.post('/admin/login', async (req, res) => {
   const { phone, pin } = req.body;
   if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
@@ -619,6 +706,7 @@ app.post('/admin/login', async (req, res) => {
     req.session.adminName = admin.name;
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
+    req.session.isSpecialAdmin = false;
     res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
   } catch (err) {
     console.error('Admin login error:', err.message);
@@ -626,7 +714,7 @@ app.post('/admin/login', async (req, res) => {
   }
 });
 
-// ---------- Admin Registration ----------
+// ---------- Admin Registration (unchanged) ----------
 app.post('/admin/register', async (req, res) => {
   const { 
     phone, name, deposit_number, payment_type, pin, confirm_pin, 
@@ -665,6 +753,7 @@ app.post('/admin/register', async (req, res) => {
         invite_code: inviteCode,
         commission_rate: 0.40,
         is_active: true,
+        is_special_admin: false,
         telebirr_number: telebirr_number || null,
         cbebirr_number: cbebirr_number || null,
         mpesa_number: mpesa_number || null
@@ -687,12 +776,12 @@ app.get('/admin/session', async (req, res) => {
   try {
     const { data: admin, error } = await supabase
       .from('admins')
-      .select('id, name, phone, deposit_number, commission_rate, invite_code, telebirr_number, cbebirr_number, mpesa_number')
+      .select('id, name, phone, deposit_number, commission_rate, invite_code, telebirr_number, cbebirr_number, mpesa_number, is_special_admin')
       .eq('id', req.session.adminId)
       .eq('is_active', true)
       .maybeSingle();
     if (error || !admin) { req.session.destroy(); return res.status(401).json({ success: false, error: 'Session expired' }); }
-    res.json({ success: true, admin });
+    res.json({ success: true, admin, isSpecialAdmin: req.session.isSpecialAdmin || false });
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
@@ -701,7 +790,7 @@ app.get('/admin/registration-config', (req, res) => {
   res.json({ requiresSecret });
 });
 
-// ---------- Get Admin Invite Info ----------
+// ---------- Get Admin Invite Info (unchanged) ----------
 app.get('/admin/invite-info', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not logged in' });
@@ -736,7 +825,7 @@ app.get('/admin/invite-info', async (req, res) => {
   }
 });
 
-// ---------- Legacy admin balance management ----------
+// ---------- Legacy admin balance management (unchanged) ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -835,7 +924,7 @@ app.post('/admin/delete-user', async (req, res) => {
   }
 });
 
-// ---------- Bingo Game Logic ----------
+// ---------- Bingo Game Logic (unchanged) ----------
 function generateCard() {
   const columns = [
     [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
@@ -888,7 +977,7 @@ const games = {
   30: createGameState(30)
 };
 
-// Bot constants
+// Bot constants (unchanged)
 const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
 const botBalances = new Map();
 BOT_IDS.forEach(id => botBalances.set(id, 1000));
@@ -1328,7 +1417,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
   return false;
 }
 
-// ---------- endGameWithWinners ----------
+// ---------- endGameWithWinners (unchanged) ----------
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
   game.status = 'ended';
@@ -1385,7 +1474,6 @@ async function endGameWithWinners(stake) {
     for (const player of game.players) {
       if (player.isBot) continue;
       
-      // ----- FIX: Ensure user is loaded to get admin_id -----
       let user = users[player.telegramId];
       if (!user) {
         try {
@@ -1525,7 +1613,7 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Bot Admin Endpoints ----------
+// ---------- Bot Admin Endpoints (unchanged) ----------
 app.get('/admin/bots-status', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -1607,7 +1695,7 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints (UPDATED: photo upload with detailed error) ----------
+// ---------- Player deposit endpoints (unchanged, but photo upload already present) ----------
 app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1622,7 +1710,6 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   if (!photoFile) return res.status(400).json({ error: 'Photo proof is required' });
 
   try {
-    // Verify admin
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -1636,11 +1723,9 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
     }
 
-    // Get user
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Assign admin if not set
     if (!user.admin_id) {
       await supabase
         .from('users')
@@ -1652,12 +1737,10 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       }
     }
 
-    // --- Upload photo to Supabase Storage ---
     const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `deposit-proofs/${fileName}`;
 
-    // Ensure bucket exists (in case it wasn't created on startup)
     const { data: buckets } = await supabase.storage.listBuckets();
     const bucketExists = buckets.some(b => b.name === 'deposit-photos');
     if (!bucketExists) {
@@ -1678,7 +1761,6 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      // Provide more details
       let errorMsg = 'Failed to upload photo proof';
       if (uploadError.message.includes('bucket not found')) {
         errorMsg = 'Storage bucket not configured. Please contact admin.';
@@ -1690,14 +1772,12 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       return res.status(500).json({ error: errorMsg, details: uploadError.message });
     }
 
-    // Get public URL
     const { data: publicUrlData } = supabase.storage
       .from('deposit-photos')
       .getPublicUrl(filePath);
 
     const photoUrl = publicUrlData?.publicUrl || null;
 
-    // Insert deposit request with photo URL
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1738,7 +1818,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   }
 });
 
-// ---------- Player withdrawal endpoints ----------
+// ---------- Player withdrawal endpoints (unchanged) ----------
 app.post('/api/request-withdraw', async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1801,10 +1881,6 @@ app.post('/api/request-withdraw', async (req, res) => {
 });
 
 // ---------- Admin endpoints (session-based) ----------
-
-// ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
-// ============================================================
 app.get('/admin/deposits', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -1870,9 +1946,6 @@ app.get('/admin/deposits', async (req, res) => {
   }
 });
 
-// ============================================================
-//  UPDATED: /admin/withdrawals with date, method, status filters
-// ============================================================
 app.get('/admin/withdrawals', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -1922,7 +1995,6 @@ app.get('/admin/withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Other Admin Endpoints ----------
 // ---- GET admin holding balance ----
 app.get('/admin/holding-balance', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1935,7 +2007,7 @@ app.get('/admin/holding-balance', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/process-deposit with holding limit (based on adjusted balance) ----
+// ---- UPDATED: /admin/process-deposit with holding limit ----
 app.post('/admin/process-deposit', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { requestId, action } = req.body;
@@ -1959,7 +2031,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
     if (action === 'approve') {
-      // ---- HOLDING BALANCE CHECK (adjusted) ----
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
       if (newHolding > 2000) {
@@ -2020,7 +2091,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – now totalDeposits is the adjusted balance ----
+// ---- /admin/stats – unchanged ----
 app.get('/admin/stats', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -2052,7 +2123,6 @@ app.get('/admin/stats', async (req, res) => {
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
     const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
 
-    // ---- NEW: Get adjusted deposit balance ----
     const depositBalance = await getAdminHoldingBalance(admin.id);
 
     res.json({
@@ -2075,7 +2145,7 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// ---- Other admin endpoints (players) unchanged ----
+// ---- /admin/players – unchanged ----
 app.get('/admin/players', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -2175,7 +2245,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- Daily Commission Calculation ----------
+// ---------- Daily Commission Calculation (unchanged) ----------
 const DAILY_COMMISSION_HOUR = 0;
 const DAILY_COMMISSION_MINUTE = 0;
 
@@ -2261,7 +2331,7 @@ function scheduleDailyCommission() {
 }
 scheduleDailyCommission();
 
-// ---------- Admin Earnings (Daily Commissions) ----------
+// ---------- Admin Earnings (Daily Commissions) (unchanged) ----------
 app.get('/admin/daily-commissions', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   try {
@@ -2318,7 +2388,7 @@ app.get('/admin/daily-commissions', async (req, res) => {
   }
 });
 
-// ---------- LIVE COMMISSION – Real-time from game_admin_contributions ----------
+// ---------- LIVE COMMISSION – Real-time (unchanged) ----------
 app.get('/admin/live-commission', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
@@ -2435,7 +2505,7 @@ app.get('/admin/live-commission', async (req, res) => {
   }
 });
 
-// ---------- Admin Request Withdrawal ----------
+// ---------- Admin Request Withdrawal (unchanged) ----------
 app.post('/admin/request-withdrawal', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
   const { amount, phone, withdrawal_type, receiver_name } = req.body;
@@ -2541,7 +2611,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 //  SUPER ADMIN ENDPOINTS – with secret support and filters
 // ============================================================
 
-// Helper: accept secret OR session
 async function authSuperAdmin(req, res) {
   const secret = req.query.secret || req.body.secret;
   const validSecret = process.env.ADMIN_SECRET || '01207';
@@ -2594,7 +2663,6 @@ app.get('/super-admin/admins', async (req, res) => {
       
       const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
       
-      // ---- Get adjusted deposit balance ----
       const holdingBalance = await getAdminHoldingBalance(admin.id);
       
       return {
@@ -2663,7 +2731,6 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
     const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(adminId);
     const holdingBalance = await getAdminHoldingBalance(adminId);
     
-    // Get adjustment history
     const { data: adjustments, error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
       .select('*')
@@ -2692,7 +2759,7 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
   }
 });
 
-// ---------- Toggle admin ----------
+// ---------- UPDATED: Toggle admin (with reassignment to special admin) ----------
 app.post('/super-admin/toggle-admin', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2704,6 +2771,36 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
     if (auth.via === 'session' && parseInt(adminId) === req.session.adminId) {
       return res.status(400).json({ error: 'Cannot change your own status' });
     }
+
+    // Fetch admin to get current status and special flag
+    const { data: admin, error: fetchErr } = await supabase
+      .from('admins')
+      .select('is_active, is_special_admin, name')
+      .eq('id', adminId)
+      .maybeSingle();
+    if (fetchErr || !admin) return res.status(404).json({ error: 'Admin not found' });
+
+    // If deactivating (isActive === false) and admin is not special, reassign data to special admin
+    if (!isActive && !admin.is_special_admin) {
+      if (!SPECIAL_ADMIN_ID) {
+        const specialId = await ensureSpecialAdmin();
+        if (!specialId) throw new Error('Special admin not available');
+        SPECIAL_ADMIN_ID = specialId;
+      }
+      const { data: specialAdmin, error: specialErr } = await supabase
+        .from('admins')
+        .select('name')
+        .eq('id', SPECIAL_ADMIN_ID)
+        .maybeSingle();
+      if (specialErr || !specialAdmin) throw new Error('Special admin not found');
+
+      // Reassign all players and pending requests to special admin
+      const reassigned = await reassignAdminData(adminId, SPECIAL_ADMIN_ID, specialAdmin.name);
+      if (!reassigned) throw new Error('Reassignment failed');
+      console.log(`🔄 All data reassigned from admin ${admin.name} (${adminId}) to special admin ${specialAdmin.name}`);
+    }
+
+    // Now toggle the admin's active status
     const { error } = await supabase
       .from('admins')
       .update({ is_active: isActive })
@@ -2712,7 +2809,8 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
 
     Audit.adminAction('SUPER_ADMIN_TOGGLE_ADMIN', auth.adminId || 'secret', req.ip, {
       targetAdminId: adminId,
-      newStatus: isActive
+      newStatus: isActive,
+      reassignedToSpecial: !isActive && !admin.is_special_admin
     });
 
     res.json({ success: true, message: `Admin ${isActive ? 'activated' : 'deactivated'}` });
@@ -2722,7 +2820,7 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
-// ---------- Update commission ----------
+// ---------- Update commission (unchanged) ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2750,7 +2848,7 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin adjust deposit balance ----------
+// ---------- Super admin adjust deposit balance (unchanged) ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2764,7 +2862,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const amt = Number(amount);
 
   try {
-    // Verify admin exists
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id')
@@ -2773,7 +2870,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
       .maybeSingle();
     if (adminErr || !admin) return res.status(404).json({ error: 'Admin not found' });
 
-    // Insert adjustment
     const { data: newAdj, error: insertErr } = await supabase
       .from('admin_deposit_adjustments')
       .insert({
@@ -2788,7 +2884,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
       .single();
     if (insertErr) throw insertErr;
 
-    // Get new balance
     const newBalance = await getAdminHoldingBalance(adminId);
 
     Audit.adminAction('SUPER_ADMIN_ADJUST_DEPOSIT', auth.adminId || 'secret', req.ip, {
@@ -2841,7 +2936,7 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Process admin withdrawal (FIXED) ----------
+// ---------- Process admin withdrawal (unchanged) ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2859,7 +2954,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Request already processed' });
 
     if (action === 'approve') {
-      // Mark contributions as paid up to the withdrawal amount
       await markContributionsAsPaid(reqData.admin_id, reqData.amount);
 
       await supabase
@@ -2894,7 +2988,7 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- GET platform stats (with filters) ----------
+// ---------- GET platform stats (unchanged) ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2999,8 +3093,72 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 });
 
 // ============================================================
-//  IMPORT PLAYERS – Manual paste only (JSON)
+//  SPECIAL ADMIN ENDPOINTS
 // ============================================================
+
+// Get status: is special admin available?
+app.get('/special-admin/status', async (req, res) => {
+  try {
+    const deactivated = await getFirstDeactivatedAdmin();
+    res.json({ available: !!deactivated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Special admin login
+app.post('/special-admin/login', async (req, res) => {
+  const { secret } = req.body;
+  if (!secret) {
+    return res.status(400).json({ success: false, error: 'Secret required' });
+  }
+  if (secret !== SPECIAL_ADMIN_SECRET) {
+    return res.status(403).json({ success: false, error: 'Invalid secret' });
+  }
+
+  try {
+    // Check if there is any deactivated admin
+    const deactivatedAdmin = await getFirstDeactivatedAdmin();
+    if (!deactivatedAdmin) {
+      return res.status(404).json({ success: false, error: 'No deactivated admin available' });
+    }
+
+    // Ensure special admin exists
+    if (!SPECIAL_ADMIN_ID) {
+      const specialId = await ensureSpecialAdmin();
+      if (!specialId) throw new Error('Special admin not created');
+      SPECIAL_ADMIN_ID = specialId;
+    }
+
+    // Get special admin details
+    const { data: specialAdmin, error: specialErr } = await supabase
+      .from('admins')
+      .select('id, name, phone')
+      .eq('id', SPECIAL_ADMIN_ID)
+      .maybeSingle();
+    if (specialErr || !specialAdmin) {
+      return res.status(404).json({ success: false, error: 'Special admin not found' });
+    }
+
+    // Set session as special admin
+    req.session.adminId = specialAdmin.id;
+    req.session.adminName = specialAdmin.name;
+    req.session.adminPhone = specialAdmin.phone;
+    req.session.isSpecialAdmin = true; // flag for dashboard
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ success: false, error: 'Session error' });
+      }
+      res.json({ success: true, admin: specialAdmin, isSpecial: true });
+    });
+  } catch (err) {
+    console.error('Special admin login error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- Import Players (unchanged) ----------
 app.post('/admin/import-players', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ success: false, error: 'Not logged in' });
@@ -3167,7 +3325,7 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Referral endpoints ----------
+// ---------- Referral endpoints (unchanged) ----------
 app.get('/api/invite-stats', async (req, res) => {
   const { secret } = req.query;
   if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -3221,7 +3379,7 @@ app.get('/api/invite-details', async (req, res) => {
   }
 });
 
-// ---------- Audit endpoints ----------
+// ---------- Audit endpoints (unchanged) ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
@@ -3368,7 +3526,7 @@ io.on('connection', async (socket) => {
   });
 });
 
-// ---------- Admin namespace ----------
+// ---------- Admin namespace (unchanged) ----------
 const adminNamespace = io.of('/admin');
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
@@ -3434,6 +3592,12 @@ app.use((err, req, res, next) => {
 resetGame(10);
 resetGame(20);
 resetGame(30);
+
+// ---------- Ensure special admin exists at startup ----------
+(async function initSpecialAdmin() {
+  const specialId = await ensureSpecialAdmin();
+  if (specialId) SPECIAL_ADMIN_ID = specialId;
+})();
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
