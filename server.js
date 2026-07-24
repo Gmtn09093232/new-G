@@ -1,13 +1,3 @@
-// ============================================================
-//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
-//  Super Admin supports secret‑based access and date/admin filters
-//  Includes deposit balance adjustment for super admin & admin view
-//  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
-//  NEW: fallback admin for deposits when assigned admin declines deposits
-//  NEW: Special Admin login – allows login to deactivated admin accounts via special secret
-//  FIXED: /admin/stats now returns availableBalance (pending earnings) and depositBalance (holding)
-// ============================================================
-
 require('dotenv').config();
 
 const express = require('express');
@@ -32,7 +22,7 @@ const supabase = createClient(
   else console.log('✅ Supabase connected');
 })();
 
-// ---------- Ensure deposit-photos bucket exists ----------
+// ---------- Ensure deposit-photos bucket ----------
 async function ensureDepositBucket() {
   const bucketName = 'deposit-photos';
   try {
@@ -74,7 +64,6 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Multer configuration for memory storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -371,7 +360,7 @@ async function isSuperAdmin(adminId) {
 }
 
 // ============================================================
-//  HELPER: getAdminFromSession – allows deactivated admins if special session
+//  HELPER: getAdminFromSession – only active admins allowed
 // ============================================================
 async function getAdminFromSession(req) {
   if (!req.session.adminId) return null;
@@ -379,10 +368,13 @@ async function getAdminFromSession(req) {
     .from('admins')
     .select('*')
     .eq('id', req.session.adminId)
+    .eq('is_active', true)
     .maybeSingle();
-  if (error || !data) return null;
-  // If inactive, only allow if session is marked special
-  if (!data.is_active && !req.session.isSpecialAdmin) return null;
+  if (error || !data) {
+    // If inactive, destroy session
+    req.session.destroy();
+    return null;
+  }
   return data;
 }
 
@@ -484,8 +476,6 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/special-admin', (req, res) => res.sendFile(path.join(__dirname, 'special-admin.html')));
-app.get('/special-admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'special-admin-dashboard.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -671,7 +661,6 @@ app.post('/admin/login', async (req, res) => {
     req.session.adminName = admin.name;
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
-    req.session.isSpecialAdmin = false;
     res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
   } catch (err) {
     console.error('Admin login error:', err.message);
@@ -755,8 +744,7 @@ app.get('/admin/session', async (req, res) => {
       telebirr_number: admin.telebirr_number,
       cbebirr_number: admin.cbebirr_number,
       mpesa_number: admin.mpesa_number
-    },
-    isSpecial: req.session.isSpecialAdmin || false
+    }
   });
 });
 
@@ -2558,76 +2546,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
   } catch (err) {
     console.error('Process admin withdrawal error:', err.message);
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-//  SPECIAL ADMIN LOGIN (Failover when main admin is deactivated)
-// ============================================================
-const SPECIAL_ADMIN_SECRET = process.env.SPECIAL_ADMIN_SECRET || 'special123';
-
-// GET /special-admin/status – check if any deactivated admin exists
-app.get('/special-admin/status', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('admins')
-      .select('id')
-      .eq('is_active', false)
-      .limit(1);
-    if (error) throw error;
-    res.json({ available: data && data.length > 0 });
-  } catch (err) {
-    res.status(500).json({ available: false, error: err.message });
-  }
-});
-
-// POST /special-admin/login – login as a deactivated admin using special secret
-app.post('/special-admin/login', async (req, res) => {
-  const { secret } = req.body;
-  if (!secret) return res.status(400).json({ success: false, error: 'Secret required' });
-  if (secret !== SPECIAL_ADMIN_SECRET) {
-    return res.status(401).json({ success: false, error: 'Invalid special secret' });
-  }
-
-  try {
-    // Find a deactivated admin – prefer the fallback if any
-    let { data: deactivatedAdmin, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('is_active', false)
-      .order('is_fallback', { ascending: false }) // fallback first
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!deactivatedAdmin) {
-      return res.status(404).json({ success: false, error: 'No deactivated admin available' });
-    }
-
-    // Set session as this admin, mark as special
-    req.session.adminId = deactivatedAdmin.id;
-    req.session.adminName = deactivatedAdmin.name;
-    req.session.adminPhone = deactivatedAdmin.phone;
-    req.session.adminSecret = deactivatedAdmin.secret_key;
-    req.session.isSpecialAdmin = true;
-
-    Audit.adminAction('SPECIAL_ADMIN_LOGIN', deactivatedAdmin.id, req.ip, {
-      message: `Special admin login to deactivated account ${deactivatedAdmin.name}`
-    });
-
-    res.json({
-      success: true,
-      admin: {
-        id: deactivatedAdmin.id,
-        name: deactivatedAdmin.name,
-        phone: deactivatedAdmin.phone,
-        deposit_number: deactivatedAdmin.deposit_number
-      },
-      isSpecial: true
-    });
-  } catch (err) {
-    console.error('Special admin login error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
   }
 });
 
