@@ -3,6 +3,8 @@
 //  Super Admin supports secret‑based access and date/admin filters
 //  Includes deposit balance adjustment for super admin & admin view
 //  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
+//  NEW: fallback admin for deposits when assigned admin declines deposits
+//  NEW: Special Admin login – allows login to deactivated admin accounts via special secret
 // ============================================================
 
 require('dotenv').config();
@@ -33,7 +35,6 @@ const supabase = createClient(
 async function ensureDepositBucket() {
   const bucketName = 'deposit-photos';
   try {
-    // Check if bucket exists
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     if (listError) {
       console.error('❌ Failed to list buckets:', listError.message);
@@ -44,14 +45,13 @@ async function ensureDepositBucket() {
       console.log(`📦 Creating storage bucket "${bucketName}"...`);
       const { error: createError } = await supabase.storage.createBucket(bucketName, {
         public: true,
-        file_size_limit: 5242880, // 5MB
+        file_size_limit: 5242880,
         allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
       });
       if (createError) {
         console.error('❌ Failed to create bucket:', createError.message);
       } else {
         console.log(`✅ Bucket "${bucketName}" created successfully.`);
-        // Set public policy (allow public reads)
         const { error: policyError } = await supabase.storage
           .from(bucketName)
           .update({ public: true });
@@ -66,7 +66,6 @@ async function ensureDepositBucket() {
     console.error('❌ Error ensuring bucket:', err.message);
   }
 }
-// Run on startup
 ensureDepositBucket();
 
 const app = express();
@@ -78,7 +77,7 @@ const io = new Server(server);
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only images are allowed'), false);
@@ -215,9 +214,8 @@ async function getAdminDeposits(adminId, status = 'approved') {
   } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
 }
 
-// ---------- Helper: Get admin's adjusted deposit balance (deposits + adjustments) ----------
+// ---------- Helper: Get admin's adjusted deposit balance ----------
 async function getAdminHoldingBalance(adminId) {
-  // Total approved deposits
   const { data: deposits, error: depErr } = await supabase
     .from('deposit_requests')
     .select('amount')
@@ -226,7 +224,6 @@ async function getAdminHoldingBalance(adminId) {
   if (depErr) throw depErr;
   const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
 
-  // Total adjustments (negative for deductions)
   const { data: adjustments, error: adjErr } = await supabase
     .from('admin_deposit_adjustments')
     .select('amount')
@@ -286,7 +283,6 @@ async function getAdminEarnings(adminId) {
   return { pending, earned };
 }
 
-// ---------- Mark contributions as paid up to a given amount ----------
 async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toISOString()) {
   const { data: paidCommissions, error: paidErr } = await supabase
     .from('admin_daily_commissions')
@@ -373,6 +369,22 @@ async function isSuperAdmin(adminId) {
   } catch { return false; }
 }
 
+// ============================================================
+//  HELPER: getAdminFromSession – allows deactivated admins if special session
+// ============================================================
+async function getAdminFromSession(req) {
+  if (!req.session.adminId) return null;
+  const { data, error } = await supabase
+    .from('admins')
+    .select('*')
+    .eq('id', req.session.adminId)
+    .maybeSingle();
+  if (error || !data) return null;
+  // If inactive, only allow if session is marked special
+  if (!data.is_active && !req.session.isSpecialAdmin) return null;
+  return data;
+}
+
 // ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
@@ -392,20 +404,57 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins;
     if (adminId) {
-      const { data, error } = await supabase
+      // Fetch the assigned admin including the new columns
+      const { data: admin, error } = await supabase
         .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
         .eq('id', adminId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .maybeSingle();
       if (error) throw error;
-      admins = data || [];
+
+      if (admin) {
+        // If admin accepts deposits, use them; otherwise fallback
+        if (admin.accept_deposits !== false) {
+          admins = [admin];
+        } else {
+          // Find the fallback admin
+          const { data: fallback, error: fallbackErr } = await supabase
+            .from('admins')
+            .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+            .eq('is_fallback', true)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (fallbackErr) throw fallbackErr;
+          if (fallback) {
+            admins = [fallback];
+          } else {
+            admins = [];
+          }
+        }
+      } else {
+        // Admin not found or inactive -> use fallback
+        const { data: fallback, error: fallbackErr } = await supabase
+          .from('admins')
+          .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+          .eq('is_fallback', true)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (fallbackErr) throw fallbackErr;
+        if (fallback) {
+          admins = [fallback];
+        } else {
+          admins = [];
+        }
+      }
     } else {
-      const { data, error } = await supabase
+      // No assigned admin: return all active admins that accept deposits
+      const { data: allAdmins, error: allErr } = await supabase
         .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
         .eq('is_active', true);
-      if (error) throw error;
-      admins = data || [];
+      if (allErr) throw allErr;
+      admins = allAdmins.filter(a => a.accept_deposits !== false);
     }
 
     const result = admins.map(a => ({
@@ -434,6 +483,7 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
+app.get('/special-admin', (req, res) => res.sendFile(path.join(__dirname, 'special-admin.html'))); // added
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -619,6 +669,7 @@ app.post('/admin/login', async (req, res) => {
     req.session.adminName = admin.name;
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
+    req.session.isSpecialAdmin = false;
     res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
   } catch (err) {
     console.error('Admin login error:', err.message);
@@ -667,7 +718,9 @@ app.post('/admin/register', async (req, res) => {
         is_active: true,
         telebirr_number: telebirr_number || null,
         cbebirr_number: cbebirr_number || null,
-        mpesa_number: mpesa_number || null
+        mpesa_number: mpesa_number || null,
+        accept_deposits: true,
+        is_fallback: false
       })
       .select()
       .single();
@@ -683,17 +736,26 @@ app.post('/admin/register', async (req, res) => {
 app.post('/admin/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
 
 app.get('/admin/session', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ success: false, error: 'Not logged in' });
-  try {
-    const { data: admin, error } = await supabase
-      .from('admins')
-      .select('id, name, phone, deposit_number, commission_rate, invite_code, telebirr_number, cbebirr_number, mpesa_number')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (error || !admin) { req.session.destroy(); return res.status(401).json({ success: false, error: 'Session expired' }); }
-    res.json({ success: true, admin });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
+  }
+  res.json({
+    success: true,
+    admin: {
+      id: admin.id,
+      name: admin.name,
+      phone: admin.phone,
+      deposit_number: admin.deposit_number,
+      commission_rate: admin.commission_rate,
+      invite_code: admin.invite_code,
+      telebirr_number: admin.telebirr_number,
+      cbebirr_number: admin.cbebirr_number,
+      mpesa_number: admin.mpesa_number
+    },
+    isSpecial: req.session.isSpecialAdmin || false
+  });
 });
 
 app.get('/admin/registration-config', (req, res) => {
@@ -703,20 +765,12 @@ app.get('/admin/registration-config', (req, res) => {
 
 // ---------- Get Admin Invite Info ----------
 app.get('/admin/invite-info', async (req, res) => {
-  if (!req.session.adminId) {
-    return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
   }
   try {
-    const { data: admin, error } = await supabase
-      .from('admins')
-      .select('id, name, invite_code, phone, deposit_number')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (error || !admin) {
-      req.session.destroy();
-      return res.status(401).json({ error: 'Session expired' });
-    }
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'bingomkmk0120_bot';
     const inviteLink = `https://t.me/${botUsername}?start=${admin.invite_code}`;
     res.json({
@@ -1385,7 +1439,6 @@ async function endGameWithWinners(stake) {
     for (const player of game.players) {
       if (player.isBot) continue;
       
-      // ----- FIX: Ensure user is loaded to get admin_id -----
       let user = users[player.telegramId];
       if (!user) {
         try {
@@ -1622,7 +1675,6 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   if (!photoFile) return res.status(400).json({ error: 'Photo proof is required' });
 
   try {
-    // Verify admin
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -1636,11 +1688,9 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
     }
 
-    // Get user
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Assign admin if not set
     if (!user.admin_id) {
       await supabase
         .from('users')
@@ -1652,12 +1702,10 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       }
     }
 
-    // --- Upload photo to Supabase Storage ---
     const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `deposit-proofs/${fileName}`;
 
-    // Ensure bucket exists (in case it wasn't created on startup)
     const { data: buckets } = await supabase.storage.listBuckets();
     const bucketExists = buckets.some(b => b.name === 'deposit-photos');
     if (!bucketExists) {
@@ -1678,7 +1726,6 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      // Provide more details
       let errorMsg = 'Failed to upload photo proof';
       if (uploadError.message.includes('bucket not found')) {
         errorMsg = 'Storage bucket not configured. Please contact admin.';
@@ -1690,14 +1737,12 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       return res.status(500).json({ error: errorMsg, details: uploadError.message });
     }
 
-    // Get public URL
     const { data: publicUrlData } = supabase.storage
       .from('deposit-photos')
       .getPublicUrl(filePath);
 
     const photoUrl = publicUrlData?.publicUrl || null;
 
-    // Insert deposit request with photo URL
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1806,128 +1851,116 @@ app.post('/api/request-withdraw', async (req, res) => {
 //  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
 // ============================================================
 app.get('/admin/deposits', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone, deposit_number')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-
-    let query = supabase
-      .from('deposit_requests')
-      .select('*')
-      .eq('admin_id', admin.id);
-
-    const { from, to, method, status } = req.query;
-
-    if (from) {
-      const fromDate = new Date(from);
-      fromDate.setHours(0,0,0,0);
-      query = query.gte('created_at', fromDate.toISOString());
-    }
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23,59,59,999);
-      query = query.lte('created_at', toDate.toISOString());
-    }
-    if (method && method !== 'all') {
-      query = query.eq('payment_type', method);
-    }
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    } else {
-      query = query.eq('status', 'pending');
-    }
-
-    query = query.order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const playerCount = await getAdminPlayerCount(admin.id);
-    const rawDeposits = await getAdminDeposits(admin.id);
-    const approvedToday = await getAdminDeposits(admin.id, 'approved');
-    const depositBalance = await getAdminHoldingBalance(admin.id);
-
-    res.json({
-      requests: data,
-      admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-      stats: {
-        playerCount,
-        totalDeposits: depositBalance,
-        rawDeposits: rawDeposits,
-        depositBalance,
-        pendingCount: data.filter(d => d.status === 'pending').length,
-        approvedToday
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching deposits:', err.message);
-    res.status(500).json({ error: err.message });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
   }
+
+  let query = supabase
+    .from('deposit_requests')
+    .select('*')
+    .eq('admin_id', admin.id);
+
+  const { from, to, method, status } = req.query;
+
+  if (from) {
+    const fromDate = new Date(from);
+    fromDate.setHours(0,0,0,0);
+    query = query.gte('created_at', fromDate.toISOString());
+  }
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23,59,59,999);
+    query = query.lte('created_at', toDate.toISOString());
+  }
+  if (method && method !== 'all') {
+    query = query.eq('payment_type', method);
+  }
+  if (status && status !== 'all') {
+    query = query.eq('status', status);
+  } else {
+    query = query.eq('status', 'pending');
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const playerCount = await getAdminPlayerCount(admin.id);
+  const rawDeposits = await getAdminDeposits(admin.id);
+  const approvedToday = await getAdminDeposits(admin.id, 'approved');
+  const depositBalance = await getAdminHoldingBalance(admin.id);
+
+  res.json({
+    requests: data,
+    admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
+    stats: {
+      playerCount,
+      totalDeposits: depositBalance,
+      rawDeposits: rawDeposits,
+      depositBalance,
+      pendingCount: data.filter(d => d.status === 'pending').length,
+      approvedToday
+    }
+  });
 });
 
 // ============================================================
 //  UPDATED: /admin/withdrawals with date, method, status filters
 // ============================================================
 app.get('/admin/withdrawals', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
-
-    let query = supabase
-      .from('withdrawal_requests')
-      .select('*')
-      .eq('admin_id', admin.id);
-
-    const { from, to, method, status } = req.query;
-
-    if (from) {
-      const fromDate = new Date(from);
-      fromDate.setHours(0,0,0,0);
-      query = query.gte('created_at', fromDate.toISOString());
-    }
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23,59,59,999);
-      query = query.lte('created_at', toDate.toISOString());
-    }
-    if (method && method !== 'all') {
-      query = query.eq('withdrawal_type', method);
-    }
-    if (status && status !== 'all') {
-      query = query.eq('status', status);
-    } else {
-      query = query.eq('status', 'pending');
-    }
-
-    query = query.order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
-  } catch (err) {
-    console.error('Error fetching withdrawals:', err.message);
-    res.status(500).json({ error: err.message });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
   }
+
+  let query = supabase
+    .from('withdrawal_requests')
+    .select('*')
+    .eq('admin_id', admin.id);
+
+  const { from, to, method, status } = req.query;
+
+  if (from) {
+    const fromDate = new Date(from);
+    fromDate.setHours(0,0,0,0);
+    query = query.gte('created_at', fromDate.toISOString());
+  }
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23,59,59,999);
+    query = query.lte('created_at', toDate.toISOString());
+  }
+  if (method && method !== 'all') {
+    query = query.eq('withdrawal_type', method);
+  }
+  if (status && status !== 'all') {
+    query = query.eq('status', status);
+  } else {
+    query = query.eq('status', 'pending');
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
 });
 
 // ---------- Other Admin Endpoints ----------
 // ---- GET admin holding balance ----
 app.get('/admin/holding-balance', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
   try {
-    const holding = await getAdminHoldingBalance(req.session.adminId);
+    const holding = await getAdminHoldingBalance(admin.id);
     res.json({ success: true, holding });
   } catch (err) {
     console.error('Error fetching holding balance:', err.message);
@@ -1937,18 +1970,16 @@ app.get('/admin/holding-balance', async (req, res) => {
 
 // ---- UPDATED: /admin/process-deposit with holding limit (based on adjusted balance) ----
 app.post('/admin/process-deposit', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
   const { requestId, action } = req.body;
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
 
+  try {
     const { data: reqData, error: fetchErr } = await supabase
       .from('deposit_requests')
       .select('*')
@@ -1959,7 +1990,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
     if (action === 'approve') {
-      // ---- HOLDING BALANCE CHECK (adjusted) ----
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
       if (newHolding > 2000) {
@@ -2022,16 +2052,13 @@ app.post('/admin/process-deposit', async (req, res) => {
 
 // ---- UPDATED: /admin/stats – now totalDeposits is the adjusted balance ----
 app.get('/admin/stats', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone, deposit_number')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
 
+  try {
     const playerCount = await getAdminPlayerCount(admin.id);
     const { data: deposits } = await supabase
       .from('deposit_requests')
@@ -2052,7 +2079,6 @@ app.get('/admin/stats', async (req, res) => {
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
     const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
 
-    // ---- NEW: Get adjusted deposit balance ----
     const depositBalance = await getAdminHoldingBalance(admin.id);
 
     res.json({
@@ -2077,15 +2103,13 @@ app.get('/admin/stats', async (req, res) => {
 
 // ---- Other admin endpoints (players) unchanged ----
 app.get('/admin/players', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
   try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, phone')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
     const players = await getAdminPlayers(admin.id);
     const playersWithStats = await Promise.all(players.map(async (player) => {
       const { data: deposits } = await supabase
@@ -2110,17 +2134,16 @@ app.get('/admin/players', async (req, res) => {
 });
 
 app.post('/admin/process-withdrawal', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
   const { requestId, action } = req.body;
   if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
+
   try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
     const { data: reqData, error: fetchErr } = await supabase
       .from('withdrawal_requests')
       .select('*')
@@ -2263,16 +2286,13 @@ scheduleDailyCommission();
 
 // ---------- Admin Earnings (Daily Commissions) ----------
 app.get('/admin/daily-commissions', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, commission_rate')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
 
+  try {
     const { data: dailyCommissions, error } = await supabase
       .from('admin_daily_commissions')
       .select('*')
@@ -2320,23 +2340,13 @@ app.get('/admin/daily-commissions', async (req, res) => {
 
 // ---------- LIVE COMMISSION – Real-time from game_admin_contributions ----------
 app.get('/admin/live-commission', async (req, res) => {
-  if (!req.session.adminId) {
-    return res.status(401).json({ success: false, error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
   }
 
   try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, commission_rate')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (adminErr || !admin) {
-      req.session.destroy();
-      return res.status(401).json({ success: false, error: 'Session expired' });
-    }
-
     const { data: contributions, error: contribErr } = await supabase
       .from('game_admin_contributions')
       .select('house_profit_share, total_entry_fees, created_at, game_round_id')
@@ -2437,7 +2447,12 @@ app.get('/admin/live-commission', async (req, res) => {
 
 // ---------- Admin Request Withdrawal ----------
 app.post('/admin/request-withdrawal', async (req, res) => {
-  if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
   const { amount, phone, withdrawal_type, receiver_name } = req.body;
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
@@ -2447,14 +2462,14 @@ app.post('/admin/request-withdrawal', async (req, res) => {
     const { data: contributions, error: contribErr } = await supabase
       .from('game_admin_contributions')
       .select('house_profit_share, created_at')
-      .eq('admin_id', req.session.adminId);
+      .eq('admin_id', admin.id);
 
     if (contribErr) throw contribErr;
 
     const { data: paidCommissions, error: paidErr } = await supabase
       .from('admin_daily_commissions')
       .select('date')
-      .eq('admin_id', req.session.adminId)
+      .eq('admin_id', admin.id)
       .eq('status', 'paid');
 
     if (paidErr) throw paidErr;
@@ -2480,7 +2495,7 @@ app.post('/admin/request-withdrawal', async (req, res) => {
     const { data, error } = await supabase
       .from('admin_withdrawal_requests')
       .insert({
-        admin_id: req.session.adminId,
+        admin_id: admin.id,
         amount: amt,
         phone,
         withdrawal_type,
@@ -2534,6 +2549,76 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
   } catch (err) {
     console.error('Process admin withdrawal error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+//  SPECIAL ADMIN LOGIN (Failover when main admin is deactivated)
+// ============================================================
+const SPECIAL_ADMIN_SECRET = process.env.SPECIAL_ADMIN_SECRET || 'special123';
+
+// GET /special-admin/status – check if any deactivated admin exists
+app.get('/special-admin/status', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('admins')
+      .select('id')
+      .eq('is_active', false)
+      .limit(1);
+    if (error) throw error;
+    res.json({ available: data && data.length > 0 });
+  } catch (err) {
+    res.status(500).json({ available: false, error: err.message });
+  }
+});
+
+// POST /special-admin/login – login as a deactivated admin using special secret
+app.post('/special-admin/login', async (req, res) => {
+  const { secret } = req.body;
+  if (!secret) return res.status(400).json({ success: false, error: 'Secret required' });
+  if (secret !== SPECIAL_ADMIN_SECRET) {
+    return res.status(401).json({ success: false, error: 'Invalid special secret' });
+  }
+
+  try {
+    // Find a deactivated admin – prefer the fallback if any
+    let { data: deactivatedAdmin, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('is_active', false)
+      .order('is_fallback', { ascending: false }) // fallback first
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!deactivatedAdmin) {
+      return res.status(404).json({ success: false, error: 'No deactivated admin available' });
+    }
+
+    // Set session as this admin, mark as special
+    req.session.adminId = deactivatedAdmin.id;
+    req.session.adminName = deactivatedAdmin.name;
+    req.session.adminPhone = deactivatedAdmin.phone;
+    req.session.adminSecret = deactivatedAdmin.secret_key;
+    req.session.isSpecialAdmin = true;
+
+    Audit.adminAction('SPECIAL_ADMIN_LOGIN', deactivatedAdmin.id, req.ip, {
+      message: `Special admin login to deactivated account ${deactivatedAdmin.name}`
+    });
+
+    res.json({
+      success: true,
+      admin: {
+        id: deactivatedAdmin.id,
+        name: deactivatedAdmin.name,
+        phone: deactivatedAdmin.phone,
+        deposit_number: deactivatedAdmin.deposit_number
+      },
+      isSpecial: true
+    });
+  } catch (err) {
+    console.error('Special admin login error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -2594,7 +2679,6 @@ app.get('/super-admin/admins', async (req, res) => {
       
       const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
       
-      // ---- Get adjusted deposit balance ----
       const holdingBalance = await getAdminHoldingBalance(admin.id);
       
       return {
@@ -2663,7 +2747,6 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
     const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(adminId);
     const holdingBalance = await getAdminHoldingBalance(adminId);
     
-    // Get adjustment history
     const { data: adjustments, error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
       .select('*')
@@ -2750,7 +2833,66 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin adjust deposit balance ----------
+// ---------- NEW: Super admin toggle deposit acceptance ----------
+app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { adminId, acceptDeposits } = req.body;
+  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
+  if (acceptDeposits === undefined) return res.status(400).json({ error: 'acceptDeposits boolean required' });
+
+  try {
+    const { error } = await supabase
+      .from('admins')
+      .update({ accept_deposits: acceptDeposits })
+      .eq('id', adminId);
+    if (error) throw error;
+
+    Audit.adminAction('SUPER_ADMIN_TOGGLE_DEPOSIT_ACCEPTANCE', auth.adminId || 'secret', req.ip, {
+      targetAdminId: adminId,
+      acceptDeposits
+    });
+
+    res.json({ success: true, message: `Deposit acceptance ${acceptDeposits ? 'enabled' : 'disabled'}` });
+  } catch (err) {
+    console.error('Error toggling deposit acceptance:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- NEW: Super admin set fallback admin ----------
+app.post('/super-admin/set-fallback-admin', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { adminId } = req.body;
+  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
+
+  try {
+    // Reset all admins' is_fallback to false, then set the chosen one
+    await supabase
+      .from('admins')
+      .update({ is_fallback: false });
+
+    const { error } = await supabase
+      .from('admins')
+      .update({ is_fallback: true })
+      .eq('id', adminId);
+    if (error) throw error;
+
+    Audit.adminAction('SUPER_ADMIN_SET_FALLBACK', auth.adminId || 'secret', req.ip, {
+      targetAdminId: adminId
+    });
+
+    res.json({ success: true, message: `Admin ${adminId} set as fallback` });
+  } catch (err) {
+    console.error('Error setting fallback admin:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Super admin adjust deposit balance ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2764,7 +2906,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const amt = Number(amount);
 
   try {
-    // Verify admin exists
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id')
@@ -2773,7 +2914,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
       .maybeSingle();
     if (adminErr || !admin) return res.status(404).json({ error: 'Admin not found' });
 
-    // Insert adjustment
     const { data: newAdj, error: insertErr } = await supabase
       .from('admin_deposit_adjustments')
       .insert({
@@ -2788,7 +2928,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
       .single();
     if (insertErr) throw insertErr;
 
-    // Get new balance
     const newBalance = await getAdminHoldingBalance(adminId);
 
     Audit.adminAction('SUPER_ADMIN_ADJUST_DEPOSIT', auth.adminId || 'secret', req.ip, {
@@ -2859,7 +2998,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Request already processed' });
 
     if (action === 'approve') {
-      // Mark contributions as paid up to the withdrawal amount
       await markContributionsAsPaid(reqData.admin_id, reqData.amount);
 
       await supabase
@@ -3002,8 +3140,10 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 //  IMPORT PLAYERS – Manual paste only (JSON)
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
-  if (!req.session.adminId) {
-    return res.status(401).json({ success: false, error: 'Not logged in' });
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
   }
 
   const { telegramIds, overwrite = false } = req.body;
@@ -3013,18 +3153,6 @@ app.post('/admin/import-players', async (req, res) => {
   }
 
   try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name')
-      .eq('id', req.session.adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (adminErr || !admin) {
-      req.session.destroy();
-      return res.status(401).json({ success: false, error: 'Session expired' });
-    }
-
     const results = [];
     let successCount = 0;
 
