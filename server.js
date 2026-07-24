@@ -2,6 +2,7 @@
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
 //  Super Admin supports secret‑based access and date/admin filters
 //  Includes deposit balance adjustment for super admin & admin view
+//  UPDATED: mandatory photo proof upload with Supabase Storage
 // ============================================================
 
 require('dotenv').config();
@@ -13,6 +14,8 @@ const crypto = require('crypto');
 const { Server } = require('socket.io');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -30,6 +33,17 @@ const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Multer configuration for memory storage (or disk)
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only images are allowed'), false);
+  }
+});
 
 app.use(express.json());
 
@@ -1553,19 +1567,22 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints ----------
-app.post('/api/request-deposit', async (req, res) => {
+// ---------- Player deposit endpoints (UPDATED: photo upload) ----------
+app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { phone, amount, payment_type, transaction_reference, proof_text, admin_id } = req.body;
+  const { phone, amount, payment_type, transaction_reference, admin_id } = req.body;
   const amt = Number(amount);
+  const photoFile = req.file;
 
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
+  if (!photoFile) return res.status(400).json({ error: 'Photo proof is required' });
 
   try {
+    // Verify admin
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -1579,9 +1596,11 @@ app.post('/api/request-deposit', async (req, res) => {
       return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
     }
 
+    // Get user
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Assign admin if not set
     if (!user.admin_id) {
       await supabase
         .from('users')
@@ -1593,6 +1612,32 @@ app.post('/api/request-deposit', async (req, res) => {
       }
     }
 
+    // --- Upload photo to Supabase Storage ---
+    const fileExt = photoFile.originalname.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `deposit-proofs/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('deposit-photos')
+      .upload(filePath, photoFile.buffer, {
+        contentType: photoFile.mimetype,
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      return res.status(500).json({ error: 'Failed to upload photo proof' });
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('deposit-photos')
+      .getPublicUrl(filePath);
+
+    const photoUrl = publicUrlData?.publicUrl;
+
+    // Insert deposit request with photo URL
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1601,7 +1646,7 @@ app.post('/api/request-deposit', async (req, res) => {
       phone: phone || null,
       payment_type,
       transaction_reference: transaction_reference || null,
-      proof_text: proof_text || null,
+      proof_photo_url: photoUrl || null,
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
     }).select().single();
@@ -1617,7 +1662,7 @@ app.post('/api/request-deposit', async (req, res) => {
       adminName: admin.name,
       adminNumber: admin[methodField],
       transactionReference: transaction_reference,
-      proofLength: proof_text ? proof_text.length : 0
+      photoUrl: photoUrl || 'uploaded'
     });
 
     res.json({
@@ -1698,7 +1743,7 @@ app.post('/api/request-withdraw', async (req, res) => {
 // ---------- Admin endpoints (session-based) ----------
 
 // ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters + depositBalance
+//  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
 // ============================================================
 app.get('/admin/deposits', async (req, res) => {
   if (!req.session.adminId) return res.status(401).json({ error: 'Not logged in' });
@@ -1985,7 +2030,7 @@ app.get('/admin/players', async (req, res) => {
     const playersWithStats = await Promise.all(players.map(async (player) => {
       const { data: deposits } = await supabase
         .from('deposit_requests')
-        .select('amount, status, created_at')
+        .select('amount, status, created_at, proof_photo_url')
         .eq('telegram_id', player.telegram_id)
         .eq('admin_id', admin.id)
         .order('created_at', { ascending: false })
