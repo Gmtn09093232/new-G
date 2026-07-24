@@ -965,6 +965,7 @@
     // ============================================================
     //  FULL ADMIN DASHBOARD JAVASCRIPT – two pages (Game / Profile)
     //  Added "Receipt" column with transaction link, plus OCR scan
+    //  Improved scan: detects alphanumeric transaction IDs like DE26GU1TFU
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1198,6 +1199,7 @@
       scannedNumber = null;
     }
 
+    // ---------- UPDATED SCAN LOGIC (alphanumeric support) ----------
     function runScan() {
       const img = document.getElementById('scanImage');
       const statusEl = document.getElementById('scanStatus');
@@ -1207,7 +1209,6 @@
       statusEl.textContent = '⏳ Scanning...';
       resultEl.textContent = 'Processing...';
 
-      // Use Tesseract to recognize text
       Tesseract.recognize(img.src, 'amh+eng', {
         logger: m => {
           if (m.status === 'recognizing text') {
@@ -1216,25 +1217,40 @@
         }
       }).then(({ data: { text } }) => {
         statusEl.textContent = '✅ Scan complete.';
-        // Look for 10-16 digit number
-        const matches = text.match(/\b\d{10,16}\b/g);
-        if (matches && matches.length > 0) {
-          // pick longest
-          scannedNumber = matches.reduce((a, b) => a.length >= b.length ? a : b);
+        let found = null;
+
+        // 1. Look for "Transaction Number:" label
+        const txLabelMatch = text.match(/Transaction\s*Number\s*[:|]\s*([A-Za-z0-9]+)/i);
+        if (txLabelMatch && txLabelMatch[1]) {
+          found = txLabelMatch[1].trim();
+        }
+
+        // 2. If not found, look for alphanumeric tokens of length 8-16
+        if (!found) {
+          const alphaNumMatches = text.match(/\b[A-Za-z0-9]{8,16}\b/g);
+          if (alphaNumMatches && alphaNumMatches.length > 0) {
+            // pick the longest or the one that looks like a transaction ID (mix of letters and digits)
+            // we'll pick the longest as best guess
+            found = alphaNumMatches.reduce((a, b) => a.length >= b.length ? a : b);
+          }
+        }
+
+        // 3. Fallback: look for numeric only (old logic)
+        if (!found) {
+          const numMatches = text.match(/\b\d{8,}\b/g);
+          if (numMatches && numMatches.length > 0) {
+            found = numMatches.reduce((a, b) => a.length >= b.length ? a : b);
+          }
+        }
+
+        if (found) {
+          scannedNumber = found;
           resultEl.textContent = scannedNumber;
           showToast('✅ Transaction number found!', 'success');
         } else {
-          // fallback: 8+ digits
-          const fallback = text.match(/\b\d{8,}\b/g);
-          if (fallback && fallback.length > 0) {
-            scannedNumber = fallback.reduce((a, b) => a.length >= b.length ? a : b);
-            resultEl.textContent = scannedNumber + ' (verify)';
-            showToast('⚠️ Found a number, please verify', 'info');
-          } else {
-            resultEl.textContent = '❌ No transaction number found.';
-            scannedNumber = null;
-            showToast('❌ No number detected', 'error');
-          }
+          resultEl.textContent = '❌ No transaction number found.';
+          scannedNumber = null;
+          showToast('❌ No number detected', 'error');
         }
         btn.disabled = false;
       }).catch(err => {
@@ -1750,7 +1766,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (with scan & receipt)');
+      console.log('✅ Dashboard initialized (with alphanumeric scan)');
     }
 
     document.addEventListener('keydown', (e) => {
