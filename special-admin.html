@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Special Admin Login</title>
+  <title>Special Admin</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -19,13 +19,15 @@
       background: white;
       border-radius: 48px;
       padding: 40px 32px;
-      max-width: 420px;
+      max-width: 500px;
       width: 100%;
       box-shadow: 0 30px 60px rgba(0,0,0,0.3);
-      text-align: center;
+      transition: all 0.3s ease;
     }
-    h1 { font-size: 24px; margin-bottom: 6px; color: #1e293b; }
-    .sub { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    /* Login view */
+    #loginView { display: block; }
+    #loginView h1 { font-size: 24px; margin-bottom: 6px; color: #1e293b; text-align: center; }
+    #loginView .sub { color: #64748b; font-size: 14px; text-align: center; margin-bottom: 24px; }
     .input-group { margin: 16px 0; text-align: left; }
     .input-group label { font-weight: 600; font-size: 14px; color: #334155; display: block; margin-bottom: 4px; }
     .input-group input {
@@ -71,37 +73,158 @@
       margin-right: 8px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .footer { margin-top: 20px; font-size: 13px; color: #94a3b8; }
+    .footer { margin-top: 20px; font-size: 13px; color: #94a3b8; text-align: center; }
     .footer a { color: #8b5cf6; text-decoration: none; }
+
+    /* Dashboard view */
+    #dashboardView { display: none; }
+    #dashboardView h1 {
+      font-size: 28px;
+      margin-bottom: 4px;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      background: #f59e0b;
+      color: #1e293b;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 30px;
+      margin-left: 10px;
+    }
+    .sub { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    .info-card {
+      background: #f8fafc;
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid #e2e8f0;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef2f6;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .label { font-weight: 600; color: #334155; }
+    .value { color: #0f172a; font-weight: 500; }
+    .value.special { color: #8b5cf6; font-weight: 700; }
+    .deposit-numbers {
+      background: #f1f5f9;
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .deposit-numbers .label { font-size: 14px; }
+    .deposit-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+    .deposit-item .method {
+      font-weight: 600;
+      color: #475569;
+    }
+    .deposit-item .number {
+      color: #1e293b;
+      font-family: monospace;
+      font-weight: 600;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+    .stat-box {
+      background: #f1f5f9;
+      border-radius: 16px;
+      padding: 14px 10px;
+      text-align: center;
+    }
+    .stat-box .stat-num {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .stat-box .stat-label {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .footer-actions {
+      margin-top: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .logout-btn {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 60px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .logout-btn:active { transform: scale(0.96); }
+    .loading { text-align: center; color: #64748b; padding: 20px; }
+    .loading .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #8b5cf6;
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>🔐 Special Admin</h1>
-    <div class="sub">Failover access when main admin is deactivated</div>
+  <div class="container" id="app">
+    <!-- LOGIN VIEW -->
+    <div id="loginView">
+      <h1>🔐 Special Admin</h1>
+      <div class="sub">Failover access when main admin is deactivated</div>
 
-    <div class="input-group">
-      <label for="secret">Special Secret Key</label>
-      <input type="password" id="secret" placeholder="Enter your special secret">
+      <div class="input-group">
+        <label for="secret">Special Secret Key</label>
+        <input type="password" id="secret" placeholder="Enter your special secret">
+      </div>
+
+      <button class="btn" id="loginBtn" onclick="login()">Login</button>
+
+      <div id="statusMsg" class="info"></div>
+      <div id="errorMsg" class="error"></div>
+
+      <div class="footer">
+        <a href="/admin-auth">Return to Admin Login</a>
+      </div>
     </div>
 
-    <button class="btn" id="loginBtn" onclick="login()">Login</button>
-
-    <div id="statusMsg" class="info"></div>
-    <div id="errorMsg" class="error"></div>
-
-    <div class="footer">
-      <a href="/admin-auth">Return to Admin Login</a>
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboardView">
+      <div id="dashboardContent">
+        <!-- Filled by JavaScript -->
+      </div>
     </div>
   </div>
 
   <script>
-    const loginBtn = document.getElementById('loginBtn');
+    // DOM references
+    const loginView = document.getElementById('loginView');
+    const dashboardView = document.getElementById('dashboardView');
+    const dashboardContent = document.getElementById('dashboardContent');
     const secretInput = document.getElementById('secret');
+    const loginBtn = document.getElementById('loginBtn');
     const statusMsg = document.getElementById('statusMsg');
     const errorMsg = document.getElementById('errorMsg');
 
+    // ---- LOGIN ----
     async function login() {
       const secret = secretInput.value.trim();
       if (!secret) {
@@ -123,9 +246,9 @@
         const data = await res.json();
 
         if (data.success) {
-          statusMsg.textContent = `✅ Logged in as ${data.admin.name} (${data.admin.phone})`;
-          // 🔁 REDIRECT TO DASHBOARD (instead of /admin)
-          window.location.href = '/dashboard';
+          statusMsg.textContent = `✅ Logged in as ${data.admin.name}`;
+          // Switch to dashboard
+          showDashboard();
         } else {
           if (data.error === 'No deactivated admin available') {
             errorMsg.textContent = '❌ No deactivated admin found. Special admin is not available.';
@@ -146,6 +269,115 @@
       if (e.key === 'Enter') login();
     });
 
+    // ---- DASHBOARD ----
+    async function showDashboard() {
+      loginView.style.display = 'none';
+      dashboardView.style.display = 'block';
+      dashboardContent.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p style="margin-top: 12px;">Loading special admin data...</p>
+        </div>
+      `;
+      await loadDashboardData();
+    }
+
+    async function loadDashboardData() {
+      try {
+        const res = await fetch('/admin/session');
+        const data = await res.json();
+
+        if (!data.success) {
+          // Session expired – go back to login
+          logout();
+          return;
+        }
+
+        const admin = data.admin;
+        const isSpecial = data.isSpecial || false;
+
+        dashboardContent.innerHTML = `
+          <h1>
+            🔐 ${admin.name}
+            <span class="badge">${isSpecial ? 'SPECIAL' : 'ADMIN'}</span>
+          </h1>
+          <div class="sub">${admin.phone || ''} • ${isSpecial ? 'Failover access' : 'Standard admin'}</div>
+
+          <div class="info-card">
+            <div class="info-row">
+              <span class="label">📞 Phone</span>
+              <span class="value">${admin.phone || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">🏷️ Invite Code</span>
+              <span class="value special">${admin.invite_code || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">💰 Commission Rate</span>
+              <span class="value">${(admin.commission_rate * 100)}%</span>
+            </div>
+          </div>
+
+          <div class="deposit-numbers">
+            <div class="label" style="margin-bottom: 8px;">📲 Payment Numbers</div>
+            ${admin.telebirr_number ? `<div class="deposit-item"><span class="method">Telebirr</span><span class="number">${admin.telebirr_number}</span></div>` : ''}
+            ${admin.cbebirr_number ? `<div class="deposit-item"><span class="method">CBE Birr</span><span class="number">${admin.cbebirr_number}</span></div>` : ''}
+            ${admin.mpesa_number ? `<div class="deposit-item"><span class="method">M-Pesa</span><span class="number">${admin.mpesa_number}</span></div>` : ''}
+            ${!admin.telebirr_number && !admin.cbebirr_number && !admin.mpesa_number ? '<div class="deposit-item"><span class="method" style="color:#94a3b8;">No payment numbers set</span></div>' : ''}
+          </div>
+
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-box"><div class="stat-num">—</div><div class="stat-label">Players</div></div>
+            <div class="stat-box"><div class="stat-num">—</div><div class="stat-label">Deposits</div></div>
+            <div class="stat-box"><div class="stat-num">—</div><div class="stat-label">Pending</div></div>
+          </div>
+
+          <div class="footer-actions">
+            <a href="/admin" class="btn">📋 Full Admin Panel</a>
+            <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+          </div>
+        `;
+
+        // Load stats
+        loadStats();
+
+      } catch (err) {
+        dashboardContent.innerHTML = `<div class="error">❌ Error loading dashboard: ${err.message}</div>`;
+      }
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/admin/stats');
+        const data = await res.json();
+        if (data.success) {
+          const stats = data.stats;
+          const boxes = document.querySelectorAll('.stat-box');
+          if (boxes.length >= 3) {
+            boxes[0].querySelector('.stat-num').textContent = stats.playerCount || 0;
+            boxes[1].querySelector('.stat-num').textContent = stats.totalDeposits || 0;
+            boxes[2].querySelector('.stat-num').textContent = stats.pendingDeposits || 0;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not load stats:', e);
+      }
+    }
+
+    // ---- LOGOUT ----
+    async function logout() {
+      await fetch('/admin/logout', { method: 'POST' });
+      // Reset to login view
+      loginView.style.display = 'block';
+      dashboardView.style.display = 'none';
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+      secretInput.value = '';
+      statusMsg.textContent = '';
+      errorMsg.textContent = '';
+    }
+
+    // ---- Check availability on load ----
     async function checkAvailability() {
       try {
         const res = await fetch('/special-admin/status');
@@ -160,7 +392,26 @@
         statusMsg.textContent = '⚠️ Could not check status.';
       }
     }
-    checkAvailability();
+
+    // On page load, check if already logged in (session exists)
+    (async function init() {
+      // Check if there is an active admin session
+      try {
+        const res = await fetch('/admin/session');
+        const data = await res.json();
+        if (data.success && data.isSpecial) {
+          // Already logged in as special admin – show dashboard
+          showDashboard();
+          return;
+        }
+      } catch (e) {
+        // Session check failed, show login
+      }
+      // Show login by default
+      loginView.style.display = 'block';
+      dashboardView.style.display = 'none';
+      checkAvailability();
+    })();
   </script>
 </body>
 </html>
