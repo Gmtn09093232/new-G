@@ -2,7 +2,7 @@
 //  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
 //  Super Admin supports secret‑based access and date/admin filters
 //  Includes deposit balance adjustment for super admin & admin view
-//  UPDATED: mandatory photo proof upload with Supabase Storage
+//  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
 // ============================================================
 
 require('dotenv').config();
@@ -29,12 +29,52 @@ const supabase = createClient(
   else console.log('✅ Supabase connected');
 })();
 
+// ---------- Ensure deposit-photos bucket exists ----------
+async function ensureDepositBucket() {
+  const bucketName = 'deposit-photos';
+  try {
+    // Check if bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) {
+      console.error('❌ Failed to list buckets:', listError.message);
+      return;
+    }
+    const exists = buckets.some(b => b.name === bucketName);
+    if (!exists) {
+      console.log(`📦 Creating storage bucket "${bucketName}"...`);
+      const { error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        file_size_limit: 5242880, // 5MB
+        allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+      });
+      if (createError) {
+        console.error('❌ Failed to create bucket:', createError.message);
+      } else {
+        console.log(`✅ Bucket "${bucketName}" created successfully.`);
+        // Set public policy (allow public reads)
+        const { error: policyError } = await supabase.storage
+          .from(bucketName)
+          .update({ public: true });
+        if (policyError) {
+          console.error('❌ Failed to set bucket public:', policyError.message);
+        }
+      }
+    } else {
+      console.log(`✅ Bucket "${bucketName}" already exists.`);
+    }
+  } catch (err) {
+    console.error('❌ Error ensuring bucket:', err.message);
+  }
+}
+// Run on startup
+ensureDepositBucket();
+
 const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Multer configuration for memory storage (or disk)
+// Multer configuration for memory storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -1567,7 +1607,7 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints (UPDATED: photo upload) ----------
+// ---------- Player deposit endpoints (UPDATED: photo upload with detailed error) ----------
 app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1613,9 +1653,20 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
     }
 
     // --- Upload photo to Supabase Storage ---
-    const fileExt = photoFile.originalname.split('.').pop();
+    const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
     const fileName = `${uuidv4()}.${fileExt}`;
     const filePath = `deposit-proofs/${fileName}`;
+
+    // Ensure bucket exists (in case it wasn't created on startup)
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets.some(b => b.name === 'deposit-photos');
+    if (!bucketExists) {
+      await supabase.storage.createBucket('deposit-photos', {
+        public: true,
+        file_size_limit: 5242880,
+        allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+      });
+    }
 
     const { error: uploadError } = await supabase.storage
       .from('deposit-photos')
@@ -1627,7 +1678,16 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError);
-      return res.status(500).json({ error: 'Failed to upload photo proof' });
+      // Provide more details
+      let errorMsg = 'Failed to upload photo proof';
+      if (uploadError.message.includes('bucket not found')) {
+        errorMsg = 'Storage bucket not configured. Please contact admin.';
+      } else if (uploadError.message.includes('permission')) {
+        errorMsg = 'Permission denied. Check Supabase storage policies.';
+      } else if (uploadError.message.includes('duplicate')) {
+        errorMsg = 'File already exists. Please rename and retry.';
+      }
+      return res.status(500).json({ error: errorMsg, details: uploadError.message });
     }
 
     // Get public URL
@@ -1635,7 +1695,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       .from('deposit-photos')
       .getPublicUrl(filePath);
 
-    const photoUrl = publicUrlData?.publicUrl;
+    const photoUrl = publicUrlData?.publicUrl || null;
 
     // Insert deposit request with photo URL
     const { data, error } = await supabase.from('deposit_requests').insert({
@@ -1646,7 +1706,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       phone: phone || null,
       payment_type,
       transaction_reference: transaction_reference || null,
-      proof_photo_url: photoUrl || null,
+      proof_photo_url: photoUrl,
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
     }).select().single();
@@ -1797,9 +1857,9 @@ app.get('/admin/deposits', async (req, res) => {
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        totalDeposits: depositBalance, // <-- adjusted balance
-        rawDeposits: rawDeposits,     // raw total (for reference)
-        depositBalance,               // same as above
+        totalDeposits: depositBalance,
+        rawDeposits: rawDeposits,
+        depositBalance,
         pendingCount: data.filter(d => d.status === 'pending').length,
         approvedToday
       }
@@ -2000,9 +2060,9 @@ app.get('/admin/stats', async (req, res) => {
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        totalDeposits: depositBalance,     // adjusted balance (shown to admin)
-        rawDeposits: rawDeposits,          // raw total (for audit)
-        depositBalance,                    // same as above
+        totalDeposits: depositBalance,
+        rawDeposits: rawDeposits,
+        depositBalance,
         todayDeposits,
         totalWithdrawals,
         pendingWithdrawals,
@@ -2541,9 +2601,9 @@ app.get('/super-admin/admins', async (req, res) => {
         ...admin,
         stats: {
           playerCount,
-          totalDeposits: holdingBalance,   // adjusted (shown as "Deposits")
-          rawDeposits: rawDeposits,         // raw for reference
-          holdingBalance,                   // same as above
+          totalDeposits: holdingBalance,
+          rawDeposits: rawDeposits,
+          holdingBalance,
           pendingDeposits: pendingDeposits?.[0]?.count || 0,
           totalWithdrawals,
           pendingWithdrawals,
