@@ -1,3 +1,13 @@
+// ============================================================
+//  FULL SERVER.JS – Bingo + Multi-Admin + Daily Commissions + Invite + Payment Methods + Super Admin + Import Players + Live Commission + Filters
+//  Super Admin supports secret‑based access and date/admin filters
+//  Includes deposit balance adjustment for super admin & admin view
+//  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
+//  NEW: fallback admin for deposits when assigned admin declines deposits
+//  REMOVED: special admin login functionality entirely
+//  FIXED: /admin/stats now returns totalDeposits for frontend compatibility
+// ============================================================
+
 require('dotenv').config();
 
 const express = require('express');
@@ -397,7 +407,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins;
     if (adminId) {
-      // Fetch the assigned admin including the new columns
       const { data: admin, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
@@ -407,11 +416,9 @@ app.get('/api/deposit-accounts', async (req, res) => {
       if (error) throw error;
 
       if (admin) {
-        // If admin accepts deposits, use them; otherwise fallback
         if (admin.accept_deposits !== false) {
           admins = [admin];
         } else {
-          // Find the fallback admin
           const { data: fallback, error: fallbackErr } = await supabase
             .from('admins')
             .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -426,7 +433,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
           }
         }
       } else {
-        // Admin not found or inactive -> use fallback
         const { data: fallback, error: fallbackErr } = await supabase
           .from('admins')
           .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -441,7 +447,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
         }
       }
     } else {
-      // No assigned admin: return all active admins that accept deposits
       const { data: allAdmins, error: allErr } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
@@ -2040,7 +2045,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – now returns availableBalance (pending earnings) AND depositBalance (holding) ----
+// ---- UPDATED: /admin/stats – now returns availableBalance (pending earnings) AND depositBalance (holding) + totalDeposits for compatibility ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2084,8 +2089,9 @@ app.get('/admin/stats', async (req, res) => {
         availableBalance: pendingEarnings,    // <-- this is the 3 ETB
         totalEarned: totalEarned,              // 19 ETB
         // Deposit-related stats (for reference)
-        depositBalance,                        // 0 ETB
-        rawDeposits,
+        depositBalance,                        // 0 ETB (adjusted holding)
+        rawDeposits,                           // total approved deposits (raw)
+        totalDeposits: rawDeposits,            // <-- ADDED for frontend compatibility
         todayDeposits,
         totalWithdrawals,
         pendingWithdrawals,
