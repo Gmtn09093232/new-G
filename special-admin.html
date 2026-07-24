@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Special Admin Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .container {
+      background: white;
+      border-radius: 48px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    h1 { font-size: 24px; margin-bottom: 6px; color: #1e293b; }
+    .sub { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+    .input-group { margin: 16px 0; text-align: left; }
+    .input-group label { font-weight: 600; font-size: 14px; color: #334155; display: block; margin-bottom: 4px; }
+    .input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 16px;
+      transition: 0.15s;
+      min-height: 52px;
+    }
+    .input-group input:focus {
+      outline: none;
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 3px rgba(139,92,246,0.1);
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 60px;
+      font-size: 18px;
+      font-weight: 700;
+      background: #8b5cf6;
+      color: white;
+      cursor: pointer;
+      transition: 0.15s;
+      min-height: 52px;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { color: #ef4444; font-size: 14px; margin-top: 12px; }
+    .info { color: #3b82f6; font-size: 14px; margin-top: 12px; }
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .footer { margin-top: 20px; font-size: 13px; color: #94a3b8; }
+    .footer a { color: #8b5cf6; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>🔐 Special Admin</h1>
+    <div class="sub">Failover access when main admin is deactivated</div>
+
+    <div class="input-group">
+      <label for="secret">Special Secret Key</label>
+      <input type="password" id="secret" placeholder="Enter your special secret">
+    </div>
+
+    <button class="btn" id="loginBtn" onclick="login()">Login</button>
+
+    <div id="statusMsg" class="info"></div>
+    <div id="errorMsg" class="error"></div>
+
+    <div class="footer">
+      <a href="/admin-auth">Return to Admin Login</a>
+    </div>
+  </div>
+
+  <script>
+    const loginBtn = document.getElementById('loginBtn');
+    const secretInput = document.getElementById('secret');
+    const statusMsg = document.getElementById('statusMsg');
+    const errorMsg = document.getElementById('errorMsg');
+
+    async function login() {
+      const secret = secretInput.value.trim();
+      if (!secret) {
+        errorMsg.textContent = 'Please enter the special secret.';
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<span class="spinner"></span> Logging in...';
+      errorMsg.textContent = '';
+      statusMsg.textContent = '';
+
+      try {
+        const res = await fetch('/special-admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          statusMsg.textContent = `✅ Logged in as ${data.admin.name} (${data.admin.phone})`;
+          window.location.href = '/admin';
+        } else {
+          if (data.error === 'No deactivated admin available') {
+            errorMsg.textContent = '❌ No deactivated admin found. Special admin is not available.';
+          } else {
+            errorMsg.textContent = '❌ ' + (data.error || 'Login failed');
+          }
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Login';
+        }
+      } catch (err) {
+        errorMsg.textContent = '❌ Network error: ' + err.message;
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
+      }
+    }
+
+    secretInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') login();
+    });
+
+    async function checkAvailability() {
+      try {
+        const res = await fetch('/special-admin/status');
+        const data = await res.json();
+        if (data.available) {
+          statusMsg.textContent = '✅ Special admin is available.';
+        } else {
+          statusMsg.textContent = '⛔ Special admin is not available (no deactivated admin).';
+          loginBtn.disabled = true;
+        }
+      } catch (e) {
+        statusMsg.textContent = '⚠️ Could not check status.';
+      }
+    }
+    checkAvailability();
+  </script>
+</body>
+</html>
