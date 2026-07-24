@@ -963,9 +963,9 @@
 
   <script>
     // ============================================================
-    //  FULL ADMIN DASHBOARD JAVASCRIPT – two pages (Game / Profile)
-    //  Added "Receipt" column with transaction link, plus OCR scan
-    //  Improved scan: detects alphanumeric transaction IDs like DE26GU1TFU
+    //  FULL ADMIN DASHBOARD JAVASCRIPT
+    //  Features: Deposits, Withdrawals, Players, Profile,
+    //  Receipt links, OCR scan for alphanumeric transaction IDs
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1199,7 +1199,7 @@
       scannedNumber = null;
     }
 
-    // ---------- UPDATED SCAN LOGIC (alphanumeric support) ----------
+    // ---------- ENHANCED SCAN LOGIC (alphanumeric support) ----------
     function runScan() {
       const img = document.getElementById('scanImage');
       const statusEl = document.getElementById('scanStatus');
@@ -1219,19 +1219,22 @@
         statusEl.textContent = '✅ Scan complete.';
         let found = null;
 
+        console.log('OCR Text:', text);
+
         // 1. Look for "Transaction Number:" label
         const txLabelMatch = text.match(/Transaction\s*Number\s*[:|]\s*([A-Za-z0-9]+)/i);
         if (txLabelMatch && txLabelMatch[1]) {
           found = txLabelMatch[1].trim();
+          console.log('Found via label:', found);
         }
 
         // 2. If not found, look for alphanumeric tokens of length 8-16
         if (!found) {
           const alphaNumMatches = text.match(/\b[A-Za-z0-9]{8,16}\b/g);
           if (alphaNumMatches && alphaNumMatches.length > 0) {
-            // pick the longest or the one that looks like a transaction ID (mix of letters and digits)
-            // we'll pick the longest as best guess
+            // pick the longest one (most likely the transaction ID)
             found = alphaNumMatches.reduce((a, b) => a.length >= b.length ? a : b);
+            console.log('Found via alphanumeric match:', found);
           }
         }
 
@@ -1240,6 +1243,7 @@
           const numMatches = text.match(/\b\d{8,}\b/g);
           if (numMatches && numMatches.length > 0) {
             found = numMatches.reduce((a, b) => a.length >= b.length ? a : b);
+            console.log('Found via numeric fallback:', found);
           }
         }
 
@@ -1766,7 +1770,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (with alphanumeric scan)');
+      console.log('✅ Dashboard initialized (with alphanumeric scan support)');
     }
 
     document.addEventListener('keydown', (e) => {
