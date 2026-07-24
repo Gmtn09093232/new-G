@@ -5,6 +5,7 @@
 //  UPDATED: mandatory photo proof upload with Supabase Storage + auto‑create bucket
 //  NEW: fallback admin for deposits when assigned admin declines deposits
 //  NEW: Special Admin login – allows login to deactivated admin accounts via special secret
+//  FIXED: /admin/stats now returns availableBalance (pending earnings) and depositBalance (holding)
 // ============================================================
 
 require('dotenv').config();
@@ -483,7 +484,8 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/special-admin', (req, res) => res.sendFile(path.join(__dirname, 'special-admin.html'))); // added
+app.get('/special-admin', (req, res) => res.sendFile(path.join(__dirname, 'special-admin.html')));
+app.get('/special-admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'special-admin-dashboard.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -2050,7 +2052,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – now totalDeposits is the adjusted balance ----
+// ---- UPDATED: /admin/stats – now returns availableBalance (pending earnings) AND depositBalance (holding) ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2079,16 +2081,23 @@ app.get('/admin/stats', async (req, res) => {
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
     const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
 
+    // ---- Deposit holding balance (money from players) ----
     const depositBalance = await getAdminHoldingBalance(admin.id);
+
+    // ---- Earnings balances ----
+    const { pending: pendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
 
     res.json({
       success: true,
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        totalDeposits: depositBalance,
-        rawDeposits: rawDeposits,
-        depositBalance,
+        // Main balance that admin should see (available to withdraw)
+        availableBalance: pendingEarnings,    // <-- this is the 3 ETB
+        totalEarned: totalEarned,              // 19 ETB
+        // Deposit-related stats (for reference)
+        depositBalance,                        // 0 ETB
+        rawDeposits,
         todayDeposits,
         totalWithdrawals,
         pendingWithdrawals,
