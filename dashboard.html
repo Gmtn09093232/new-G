@@ -966,6 +966,7 @@
     //  FULL ADMIN DASHBOARD JAVASCRIPT
     //  Features: Deposits, Withdrawals, Players, Profile,
     //  Receipt links, OCR scan for alphanumeric transaction IDs
+    //  FIXED: now correctly extracts alphanumeric IDs like DE26GU1TFU and B000K9F9L
     // ============================================================
 
     // ---------- CONSTANTS ----------
@@ -1199,7 +1200,7 @@
       scannedNumber = null;
     }
 
-    // ---------- ENHANCED SCAN LOGIC (alphanumeric support) ----------
+    // ---------- FIXED SCAN LOGIC (prioritises labelled IDs, then mixed alphanumeric) ----------
     function runScan() {
       const img = document.getElementById('scanImage');
       const statusEl = document.getElementById('scanStatus');
@@ -1217,28 +1218,50 @@
         }
       }).then(({ data: { text } }) => {
         statusEl.textContent = '✅ Scan complete.';
+        console.log('OCR extracted text:', text);
         let found = null;
 
-        console.log('OCR Text:', text);
-
-        // 1. Look for "Transaction Number:" label
-        const txLabelMatch = text.match(/Transaction\s*Number\s*[:|]\s*([A-Za-z0-9]+)/i);
-        if (txLabelMatch && txLabelMatch[1]) {
-          found = txLabelMatch[1].trim();
+        // ---- STEP 1: Look for explicit labels ----
+        // Try "Transaction Number:" or "Transaction ID:" or "Transaction ID" (with or without colon)
+        const labelMatches = text.match(/(?:Transaction\s*(?:Number|ID)|Transaction\s*ID)\s*[:|]\s*([A-Za-z0-9]+)/i);
+        if (labelMatches && labelMatches[1]) {
+          found = labelMatches[1].trim();
           console.log('Found via label:', found);
         }
 
-        // 2. If not found, look for alphanumeric tokens of length 8-16
+        // ---- STEP 2: If no label, look for alphanumeric tokens that contain both letters and digits ----
         if (!found) {
-          const alphaNumMatches = text.match(/\b[A-Za-z0-9]{8,16}\b/g);
-          if (alphaNumMatches && alphaNumMatches.length > 0) {
-            // pick the longest one (most likely the transaction ID)
-            found = alphaNumMatches.reduce((a, b) => a.length >= b.length ? a : b);
-            console.log('Found via alphanumeric match:', found);
+          // Find all alphanumeric tokens of length 8-16
+          const allTokens = text.match(/\b[A-Za-z0-9]{8,16}\b/g);
+          if (allTokens && allTokens.length > 0) {
+            // Filter to those that have at least one letter and one digit (mixed)
+            const mixedTokens = allTokens.filter(t => /[A-Za-z]/.test(t) && /\d/.test(t));
+            if (mixedTokens.length > 0) {
+              // Pick the longest, or if tie, the first
+              found = mixedTokens.reduce((a, b) => a.length >= b.length ? a : b);
+              console.log('Found via mixed alphanumeric:', found);
+            } else {
+              // If no mixed, pick the longest overall (but we might get 'transaction' etc.)
+              // But we'll skip if the token is a common word like 'transaction'
+              const sorted = allTokens.sort((a,b) => b.length - a.length);
+              // pick the first that is not a common word (optional)
+              const commonWords = ['transaction','transfer','successful','finished','amount','type','time','date'];
+              for (let t of sorted) {
+                if (!commonWords.includes(t.toLowerCase())) {
+                  found = t;
+                  break;
+                }
+              }
+              if (!found) {
+                // fallback to the longest
+                found = sorted[0];
+              }
+              console.log('Found via alphanumeric fallback:', found);
+            }
           }
         }
 
-        // 3. Fallback: look for numeric only (old logic)
+        // ---- STEP 3: Fallback to pure numeric (8+ digits) ----
         if (!found) {
           const numMatches = text.match(/\b\d{8,}\b/g);
           if (numMatches && numMatches.length > 0) {
@@ -1770,7 +1793,7 @@
       switchPage('game');
       startAutoRefresh();
       connectAdminWebSocket();
-      console.log('✅ Dashboard initialized (with alphanumeric scan support)');
+      console.log('✅ Dashboard initialized (fixed alphanumeric scan)');
     }
 
     document.addEventListener('keydown', (e) => {
