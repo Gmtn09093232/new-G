@@ -2,6 +2,7 @@
 //  FULL SERVER.JS – Bingo + Multi-Admin + Special Admin Failover
 //  FIXED: session cookie security (secure: false for development)
 //  FIXED: req.session.save() in admin login
+//  ADDED: Trim phone/pin, extra logging, CORS helper
 // ============================================================
 
 require('dotenv').config();
@@ -692,10 +693,16 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   }
 });
 
-// ========== FIXED: Admin Login with req.session.save() ==========
+// ========== FIXED: Admin Login with trim and extra logs ==========
 app.post('/admin/login', async (req, res) => {
-  const { phone, pin } = req.body;
-  if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
+  let { phone, pin } = req.body;
+  phone = phone ? phone.trim() : '';
+  pin = pin ? pin.trim() : '';
+  console.log(`🔐 Login attempt: phone="${phone}", pin="${pin}"`);
+
+  if (!phone || !pin) {
+    return res.status(400).json({ success: false, error: 'Phone and PIN required' });
+  }
   try {
     const { data: admin, error } = await supabase
       .from('admins')
@@ -704,21 +711,36 @@ app.post('/admin/login', async (req, res) => {
       .eq('pin', pin)
       .eq('is_active', true)
       .maybeSingle();
-    if (error || !admin) return res.status(401).json({ success: false, error: 'Invalid phone or PIN' });
+    if (error || !admin) {
+      console.log(`❌ Admin not found with phone=${phone} and pin=${pin}`);
+      return res.status(401).json({ success: false, error: 'Invalid phone or PIN' });
+    }
+    console.log(`✅ Admin found: ID=${admin.id}, Name=${admin.name}`);
+
     req.session.adminId = admin.id;
     req.session.adminName = admin.name;
     req.session.adminPhone = admin.phone;
     req.session.adminSecret = admin.secret_key;
     req.session.isSpecialAdmin = false;
+
     req.session.save((err) => {
       if (err) {
         console.error('❌ Session save error:', err);
         return res.status(500).json({ success: false, error: 'Session save failed' });
       }
-      res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
+      console.log(`✅ Session saved for admin ID: ${req.session.adminId}`);
+      res.json({
+        success: true,
+        admin: {
+          id: admin.id,
+          name: admin.name,
+          phone: admin.phone,
+          deposit_number: admin.deposit_number
+        }
+      });
     });
   } catch (err) {
-    console.error('Admin login error:', err.message);
+    console.error('❌ Admin login error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
