@@ -709,7 +709,6 @@ app.post('/admin/login', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // ---------- Admin Registration ----------
 app.post('/admin/register', async (req, res) => {
   const { 
