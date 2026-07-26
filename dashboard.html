@@ -1363,6 +1363,7 @@
     // ---------- WEBSOCKET ----------
     let adminSocket = null;
 
+    // ---------- MODIFIED: connectAdminWebSocket (added playerAdded listener) ----------
     function connectAdminWebSocket() {
       if (adminSocket && adminSocket.connected) return;
       adminSocket = io('/admin', { transports: ['websocket', 'polling'] });
@@ -1376,6 +1377,21 @@
           document.getElementById('profileTotalEarned').textContent = `${data.totalEarned.toFixed(0)} ETB`;
           document.getElementById('profileCommissionRate').textContent = `${(data.rate * 100).toFixed(0)}%`;
         }
+      });
+      // ----- NEW: listen for player added -----
+      adminSocket.on('admin:playerAdded', (data) => {
+        console.log('🆕 New player assigned:', data);
+        showToast(`👤 New player ${data.username} added!`, 'info');
+        if (currentTab === 'players') {
+          loadPlayers();
+        } else {
+          const badge = document.getElementById('playerBadge');
+          if (badge) {
+            const current = parseInt(badge.textContent) || 0;
+            badge.textContent = current + 1;
+          }
+        }
+        loadStats();
       });
       adminSocket.on('disconnect', () => console.log('⚠️ Admin WebSocket disconnected'));
     }
