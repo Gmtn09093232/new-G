@@ -622,10 +622,10 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const user = await loadUser(id, displayName, handle, startParam, false);
 
     // ------------------------------------------------------------
-    // NEW: If an invite code (start_param) exists and the user has
-    // no admin yet, assign them to the admin who owns that code.
+    // ALWAYS assign the player to the admin who owns the invite code
+    // (no longer checks if user already has an admin)
     // ------------------------------------------------------------
-    if (startParam && !user.admin_id) {
+    if (startParam) {
       const { data: adminData, error: adminErr } = await supabase
         .from('admins')
         .select('id, name')
@@ -646,11 +646,20 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
           users[id].assigned_admin_name = adminData.name;
         }
 
-        // Update local user object for the response
+        // Update local user object
         user.admin_id = adminData.id;
         user.assigned_admin_name = adminData.name;
 
-        console.log(`🔗 Existing user ${id} assigned to admin ${adminData.name} via invite code: ${startParam}`);
+        console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code: ${startParam}`);
+
+        // ----- NOTIFY ALL ADMIN CLIENTS -----
+        const adminNamespace = io.of('/admin');
+        adminNamespace.emit('admin:playerAdded', {
+          telegramId: id,
+          username: user.username,
+          adminId: adminData.id,
+          adminName: adminData.name
+        });
       }
     }
 
