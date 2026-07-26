@@ -378,33 +378,24 @@ async function getAdminFromSession(req) {
 }
 
 // ---------- Static endpoints ----------
-// ---- MODIFIED: deposit-accounts – return only the player's admin ----
+// ---- MODIFIED: deposit-accounts – always fetch fresh user from Supabase ----
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
-    let adminId = null;
-    let user = null;
-
-    if (userId) {
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('admin_id, username')
-        .eq('telegram_id', userId)
-        .maybeSingle();
-      if (error) throw error;
-      if (userData) {
-        adminId = userData.admin_id;
-        user = userData;
-      }
-    }
-
-    // If user is not logged in, return empty list
     if (!userId) {
       return res.json({ success: true, admins: [], message: 'Please login first' });
     }
 
-    // If user has no admin assigned, return empty list with a message
-    if (!adminId) {
+    // Always fetch user from Supabase (do not rely on cache)
+    const { data: userData, error: userErr } = await supabase
+      .from('users')
+      .select('admin_id, username')
+      .eq('telegram_id', userId)
+      .maybeSingle();
+
+    if (userErr) throw userErr;
+
+    if (!userData || !userData.admin_id) {
       return res.json({ 
         success: true, 
         admins: [], 
@@ -412,7 +403,8 @@ app.get('/api/deposit-accounts', async (req, res) => {
       });
     }
 
-    // Fetch the admin
+    const adminId = userData.admin_id;
+
     const { data: admin, error } = await supabase
       .from('admins')
       .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
@@ -427,7 +419,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
       if (admin.accept_deposits !== false) {
         admins = [admin];
       } else {
-        // If the admin is not accepting deposits, try fallback
         const { data: fallback, error: fallbackErr } = await supabase
           .from('admins')
           .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -451,8 +442,10 @@ app.get('/api/deposit-accounts', async (req, res) => {
       mpesa: a.mpesa_number || null
     }));
 
+    console.log(`📞 Deposit accounts for user ${userId}: found ${result.length} admin(s)`);
     res.json({ success: true, admins: result });
   } catch (err) {
+    console.error('❌ Deposit accounts error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -581,7 +574,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- MODIFIED: /api/telegram-miniapp-auth with enhanced logging ----------
+// ---------- MODIFIED: /api/telegram-miniapp-auth with re-fetch after update ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -599,7 +592,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     console.log(`🔍 Auth request for user ${id}, startParam: ${startParam || 'none'}`);
 
     // Load (or create) the user
-    const user = await loadUser(id, displayName, handle, startParam, false);
+    let user = await loadUser(id, displayName, handle, startParam, false);
 
     // ------------------------------------------------------------
     // ALWAYS assign the player to the admin who owns the invite code
@@ -631,15 +624,27 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         } else {
           console.log(`✅ User ${id} assigned to admin ${adminData.name} (${adminData.id})`);
 
-          // Update in‑memory cache
-          if (users[id]) {
-            users[id].admin_id = adminData.id;
-            users[id].assigned_admin_name = adminData.name;
-          }
+          // Re-fetch the user from DB to get the fresh admin_id
+          const { data: freshUser, error: freshErr } = await supabase
+            .from('users')
+            .select('*')
+            .eq('telegram_id', id)
+            .maybeSingle();
 
-          // Update local user object
-          user.admin_id = adminData.id;
-          user.assigned_admin_name = adminData.name;
+          if (!freshErr && freshUser) {
+            // Update cache and local user object
+            users[id] = {
+              id: freshUser.telegram_id,
+              username: freshUser.username,
+              balance: Number(freshUser.balance),
+              telegram_handle: freshUser.telegram_handle,
+              admin_id: freshUser.admin_id,
+              assigned_admin_name: freshUser.assigned_admin_name,
+              first_deposit_amount: freshUser.first_deposit_amount || 0
+            };
+            user = users[id];
+            console.log(`🔄 Re-fetched user ${id}, admin now: ${user.assigned_admin_name}`);
+          }
 
           // ----- NOTIFY ALL ADMIN CLIENTS -----
           const adminNamespace = io.of('/admin');
