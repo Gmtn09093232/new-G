@@ -604,7 +604,6 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- MODIFIED: /api/telegram-miniapp-auth ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -617,53 +616,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
-
-    // Load (or create) the user
     const user = await loadUser(id, displayName, handle, startParam, false);
-
-    // ------------------------------------------------------------
-    // ALWAYS assign the player to the admin who owns the invite code
-    // (no longer checks if user already has an admin)
-    // ------------------------------------------------------------
-    if (startParam) {
-      const { data: adminData, error: adminErr } = await supabase
-        .from('admins')
-        .select('id, name')
-        .eq('invite_code', startParam)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (!adminErr && adminData) {
-        // Update database
-        await supabase
-          .from('users')
-          .update({ admin_id: adminData.id, assigned_admin_name: adminData.name })
-          .eq('telegram_id', id);
-
-        // Update in‑memory cache
-        if (users[id]) {
-          users[id].admin_id = adminData.id;
-          users[id].assigned_admin_name = adminData.name;
-        }
-
-        // Update local user object
-        user.admin_id = adminData.id;
-        user.assigned_admin_name = adminData.name;
-
-        console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code: ${startParam}`);
-
-        // ----- NOTIFY ALL ADMIN CLIENTS -----
-        const adminNamespace = io.of('/admin');
-        adminNamespace.emit('admin:playerAdded', {
-          telegramId: id,
-          username: user.username,
-          adminId: adminData.id,
-          adminName: adminData.name
-        });
-      }
-    }
-
-    // Save session and respond
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
