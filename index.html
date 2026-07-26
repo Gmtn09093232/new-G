@@ -1122,13 +1122,23 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED) ==========
+        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED: auto-select if only one admin) ==========
         async function loadDepositAccounts() {
             try {
                 const res = await fetch('/api/deposit-accounts');
                 const data = await res.json();
                 if (data.success) {
-                    renderDepositAccounts(data.admins);
+                    const admins = data.admins;
+                    if (admins.length === 1) {
+                        // Only one admin -> auto-open deposit details with the first available method
+                        const admin = admins[0];
+                        autoOpenDepositForAdmin(admin);
+                    } else if (admins.length > 1) {
+                        renderDepositAccounts(admins);
+                    } else {
+                        document.getElementById('depositAccountsList').innerHTML =
+                            '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
+                    }
                 } else {
                     document.getElementById('depositAccountsList').innerHTML =
                         '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
@@ -1137,6 +1147,25 @@
                 console.error('Error loading deposit accounts:', e);
                 document.getElementById('depositAccountsList').innerHTML =
                     '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+            }
+        }
+
+        // NEW: Auto-open deposit details for a single admin
+        function autoOpenDepositForAdmin(admin) {
+            // Find the first available payment method
+            let method = null;
+            let number = null;
+            if (admin.telebirr) { method = 'telebirr';
+                number = admin.telebirr; } else if (admin.cbebirr) { method = 'cbebirr';
+                number = admin.cbebirr; } else if (admin.mpesa) { method = 'mpesa';
+                number = admin.mpesa; }
+            if (method && number) {
+                // Close the type modal (it's open) and directly open details
+                closeDepositTypeModal();
+                openDepositDetailsModal(method, admin.id, number, admin.name);
+            } else {
+                // If no method, show the list (should not happen if admin has at least one)
+                renderDepositAccounts([admin]);
             }
         }
 
