@@ -378,50 +378,56 @@ async function getAdminFromSession(req) {
 }
 
 // ---------- Static endpoints ----------
+// ---- MODIFIED: deposit-accounts – return only the player's admin ----
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
     let adminId = null;
+    let user = null;
 
     if (userId) {
-      const { data: user, error } = await supabase
+      const { data: userData, error } = await supabase
         .from('users')
-        .select('admin_id')
+        .select('admin_id, username')
         .eq('telegram_id', userId)
         .maybeSingle();
-      if (!error && user) {
-        adminId = user.admin_id;
+      if (error) throw error;
+      if (userData) {
+        adminId = userData.admin_id;
+        user = userData;
       }
     }
 
-    let admins;
-    if (adminId) {
-      const { data: admin, error } = await supabase
-        .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
-        .eq('id', adminId)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (error) throw error;
+    // If user is not logged in, return empty list
+    if (!userId) {
+      return res.json({ success: true, admins: [], message: 'Please login first' });
+    }
 
-      if (admin) {
-        if (admin.accept_deposits !== false) {
-          admins = [admin];
-        } else {
-          const { data: fallback, error: fallbackErr } = await supabase
-            .from('admins')
-            .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-            .eq('is_fallback', true)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (fallbackErr) throw fallbackErr;
-          if (fallback) {
-            admins = [fallback];
-          } else {
-            admins = [];
-          }
-        }
+    // If user has no admin assigned, return empty list with a message
+    if (!adminId) {
+      return res.json({ 
+        success: true, 
+        admins: [], 
+        message: 'No admin assigned yet. Please use the invite link from your admin to register.' 
+      });
+    }
+
+    // Fetch the admin
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
+      .eq('id', adminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    let admins = [];
+    if (admin) {
+      if (admin.accept_deposits !== false) {
+        admins = [admin];
       } else {
+        // If the admin is not accepting deposits, try fallback
         const { data: fallback, error: fallbackErr } = await supabase
           .from('admins')
           .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
@@ -435,13 +441,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
           admins = [];
         }
       }
-    } else {
-      const { data: allAdmins, error: allErr } = await supabase
-        .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
-        .eq('is_active', true);
-      if (allErr) throw allErr;
-      admins = allAdmins.filter(a => a.accept_deposits !== false);
     }
 
     const result = admins.map(a => ({
@@ -480,7 +479,7 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser (removed referral bonus, kept admin assignment for new users) ----------
+// ---------- loadUser (no referral logic) ----------
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -512,7 +511,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       let finalAdminId = adminId || null;
       let adminName = null;
       
-      // For new users, assign admin if inviteCode is provided
       if (!finalAdminId && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
@@ -583,10 +581,11 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- MODIFIED: /api/telegram-miniapp-auth ----------
+// ---------- MODIFIED: /api/telegram-miniapp-auth with enhanced logging ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
+    console.error('❌ Invalid initData');
     return res.status(403).json({ success: false, error: 'Invalid initData' });
   }
   try {
@@ -597,14 +596,16 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
+    console.log(`🔍 Auth request for user ${id}, startParam: ${startParam || 'none'}`);
+
     // Load (or create) the user
     const user = await loadUser(id, displayName, handle, startParam, false);
 
     // ------------------------------------------------------------
     // ALWAYS assign the player to the admin who owns the invite code
-    // (this overrides any previous admin assignment)
     // ------------------------------------------------------------
     if (startParam) {
+      console.log(`🔍 Looking for admin with invite_code: ${startParam}`);
       const { data: adminData, error: adminErr } = await supabase
         .from('admins')
         .select('id, name')
@@ -612,36 +613,52 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         .eq('is_active', true)
         .maybeSingle();
 
+      if (adminErr) {
+        console.error('❌ Admin lookup error:', adminErr.message);
+      }
+
       if (!adminErr && adminData) {
+        console.log(`✅ Found admin: ${adminData.name} (${adminData.id})`);
+
         // Update database
-        await supabase
+        const { error: updateErr } = await supabase
           .from('users')
           .update({ admin_id: adminData.id, assigned_admin_name: adminData.name })
           .eq('telegram_id', id);
 
-        // Update in‑memory cache
-        if (users[id]) {
-          users[id].admin_id = adminData.id;
-          users[id].assigned_admin_name = adminData.name;
+        if (updateErr) {
+          console.error('❌ Failed to update user admin:', updateErr.message);
+        } else {
+          console.log(`✅ User ${id} assigned to admin ${adminData.name} (${adminData.id})`);
+
+          // Update in‑memory cache
+          if (users[id]) {
+            users[id].admin_id = adminData.id;
+            users[id].assigned_admin_name = adminData.name;
+          }
+
+          // Update local user object
+          user.admin_id = adminData.id;
+          user.assigned_admin_name = adminData.name;
+
+          // ----- NOTIFY ALL ADMIN CLIENTS -----
+          const adminNamespace = io.of('/admin');
+          adminNamespace.emit('admin:playerAdded', {
+            telegramId: id,
+            username: user.username,
+            adminId: adminData.id,
+            adminName: adminData.name
+          });
+          console.log(`📢 Emitted admin:playerAdded for ${user.username}`);
         }
-
-        // Update local user object
-        user.admin_id = adminData.id;
-        user.assigned_admin_name = adminData.name;
-
-        console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code: ${startParam}`);
-
-        // ----- NOTIFY ALL ADMIN CLIENTS -----
-        const adminNamespace = io.of('/admin');
-        adminNamespace.emit('admin:playerAdded', {
-          telegramId: id,
-          username: user.username,
-          adminId: adminData.id,
-          adminName: adminData.name
-        });
+      } else {
+        console.warn(`⚠️ No active admin found for invite code: ${startParam}`);
       }
+    } else {
+      console.log(`ℹ️ No startParam, skipping admin assignment`);
     }
 
+    // Save session
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
@@ -2003,7 +2020,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (action === 'approve') {
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
-      // Deposit limit 1500 ETB
       if (newHolding > 1500) {
         return res.status(400).json({
           error: `Admin's total approved deposits exceeds 1500 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
