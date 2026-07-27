@@ -1234,6 +1234,36 @@
             transform: scale(0.94);
             background: #d97706;
         }
+
+        /* Search input */
+        .player-search {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .player-search input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            min-height: 44px;
+            background: white;
+        }
+        .player-search input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+        }
+        .player-search .btn {
+            min-height: 44px;
+        }
+        @media (max-width: 480px) {
+            .player-search input {
+                min-width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1374,6 +1404,13 @@
                         <button class="btn btn-primary" onclick="addPlayer()" style="min-height:48px;">➕ Add Player</button>
                     </div>
                     <div id="addPlayerStatus" style="font-size:13px; margin-bottom:10px;"></div>
+
+                    <!-- Search bar for players -->
+                    <div class="player-search">
+                        <input type="text" id="playerSearchInput" placeholder="🔍 Search by username or Telegram ID..." oninput="filterPlayers()">
+                        <button class="btn btn-outline" onclick="document.getElementById('playerSearchInput').value=''; filterPlayers();">✕ Clear</button>
+                    </div>
+
                     <div id="playersList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:13px;">Loading players...</p></div></div>
                 </div>
 
@@ -1708,7 +1745,7 @@
         </div>
     </div>
 
-    <!-- Scan Modal -->
+    <!-- Scan Modal (with details restored) -->
     <div id="scanModal" class="modal" onclick="if(event.target===this) closeScanModal()">
         <div class="modal-content" style="max-width:620px;">
             <div class="bank-header">
@@ -1749,7 +1786,7 @@
 
     <script>
         // ============================================================
-        //  ADMIN DASHBOARD – Enhanced with manual balance adjustment
+        //  ADMIN DASHBOARD – Enhanced with player search & scan details
         // ============================================================
 
         // ---------- CONSTANTS ----------
@@ -2331,6 +2368,30 @@
             }
         }
 
+        // ---------- PLAYER SEARCH ----------
+        function filterPlayers() {
+            const input = document.getElementById('playerSearchInput');
+            const filter = input.value.toLowerCase().trim();
+            const table = document.querySelector('#playersList table');
+            if (!table) return;
+            const rows = table.querySelectorAll('tbody tr');
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(filter)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            // Update the total count display if present
+            const countEl = document.querySelector('#playersList p');
+            if (countEl) {
+                countEl.textContent = `Showing ${visibleCount} of ${rows.length} players`;
+            }
+        }
+
         // ---------- LOAD DEPOSITS ----------
         async function loadDeposits() {
             const container = document.getElementById('depositsList');
@@ -2455,7 +2516,7 @@
             }
         }
 
-        // ---------- LOAD PLAYERS (with Adjust button) ----------
+        // ---------- LOAD PLAYERS (with Adjust button and search support) ----------
         async function loadPlayers() {
             const container = document.getElementById('playersList');
             try {
@@ -2466,6 +2527,8 @@
                 if (data.players.length === 0) {
                     container.innerHTML =
                         `<div class="empty-state"><div class="icon">👤</div><p>No players assigned yet</p></div>`;
+                    // Clear any search filter state
+                    document.getElementById('playerSearchInput').value = '';
                     return;
                 }
                 container.innerHTML = `
@@ -2486,6 +2549,11 @@
               </div>
               <p style="margin-top:8px;color:#94a3b8;font-size:12px;">Total: <strong>${data.count}</strong> players</p>
             `;
+                // Re-apply filter if search input has value
+                const searchInput = document.getElementById('playerSearchInput');
+                if (searchInput.value.trim() !== '') {
+                    filterPlayers();
+                }
             } catch (err) {
                 container.innerHTML =
                     `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
@@ -2835,7 +2903,7 @@
             switchPage('game');
             startAutoRefresh();
             connectAdminWebSocket();
-            console.log('✅ Dashboard initialized with manual balance adjustment');
+            console.log('✅ Dashboard initialized with player search and scan details restored');
         }
 
         document.addEventListener('keydown', (e) => {
