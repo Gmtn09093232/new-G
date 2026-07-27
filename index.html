@@ -716,71 +716,144 @@
         .telegram-links a:hover {
             text-decoration: underline;
         }
-        .admin-option {
+        /* === NEW DEPOSIT ADMIN CARD STYLES === */
+        .admin-card {
             background: #f8fafc;
-            border-radius: 16px;
-            padding: 12px 16px;
-            margin: 8px 0;
+            border-radius: 24px;
+            padding: 16px;
+            margin: 12px 0;
             border: 2px solid #e2e8f0;
-            cursor: pointer;
             transition: all 0.2s;
+        }
+        .admin-card:hover {
+            border-color: #f97316;
+        }
+        .admin-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .admin-card-name {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #1e293b;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
-        .admin-option:hover {
-            border-color: #f97316;
-            background: #fff7ed;
+        .admin-card-name .admin-emoji {
+            font-size: 1.3rem;
         }
-        .admin-option.selected {
-            border-color: #f97316;
-            background: #fff7ed;
-            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.2);
-        }
-        .admin-option input[type="radio"] {
-            width: 20px;
-            height: 20px;
-            accent-color: #f97316;
-            flex-shrink: 0;
-        }
-        .admin-option .admin-info {
-            flex: 1;
-        }
-        .admin-option .admin-name {
-            font-weight: 600;
-            color: #1e293b;
-        }
-        .admin-option .admin-number {
-            font-size: 0.8rem;
-            color: #64748b;
-            font-family: monospace;
-        }
-        .admin-option .admin-badge {
-            font-size: 0.65rem;
+        .admin-invite-badge {
+            font-size: 0.7rem;
             background: #fef3c7;
             color: #92400e;
-            padding: 2px 10px;
+            padding: 3px 12px;
             border-radius: 20px;
-        }
-        .payment-method-label {
-            font-size: 0.8rem;
             font-weight: 600;
-            color: #64748b;
-            margin: 12px 0 6px;
-            text-transform: uppercase;
+            font-family: monospace;
             letter-spacing: 0.5px;
+            border: 1px solid #fde68a;
+        }
+        .admin-methods-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .admin-method-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+        .admin-method-row:hover {
+            border-color: #f97316;
+            background: #fff7ed;
+        }
+        .admin-method-row .method-icon {
+            font-size: 1.1rem;
+            margin-right: 8px;
+        }
+        .admin-method-row .method-label {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #334155;
+            min-width: 70px;
+        }
+        .admin-method-row .method-number {
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #1e293b;
+            font-weight: 500;
+            background: #f1f5f9;
+            padding: 2px 12px;
+            border-radius: 40px;
+            letter-spacing: 0.5px;
+        }
+        .admin-method-row .method-select-btn {
+            background: #f97316;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            padding: 4px 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.1s;
+            min-height: 30px;
+        }
+        .admin-method-row .method-select-btn:active {
+            transform: scale(0.94);
+        }
+        .admin-method-row .method-select-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .admin-method-row .method-check {
+            color: #22c55e;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .no-methods-msg {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            padding: 6px 0;
+            text-align: center;
         }
         .deposit-fallback-note {
             font-size: 0.7rem;
             color: #94a3b8;
             text-align: center;
-            margin-top: 6px;
-            padding: 4px 8px;
+            margin-top: 8px;
+            padding: 6px 12px;
             background: #f1f5f9;
             border-radius: 20px;
         }
-        .admin-option .admin-emoji {
-            font-size: 1.5rem;
+        .deposit-accounts-loading {
+            text-align: center;
+            padding: 30px 0;
+            color: #94a3b8;
+        }
+        .deposit-accounts-empty {
+            text-align: center;
+            padding: 20px 0;
+            color: #94a3b8;
+        }
+        .admin-card .admin-id-hint {
+            font-size: 0.6rem;
+            color: #94a3b8;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -791,7 +864,7 @@
     <div id="depositTypeModal" class="modal"><div class="modal-content">
         <div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div>
         <div id="depositAccountsList">
-            <div style="text-align:center; padding:20px; color:#94a3b8;">Loading accounts...</div>
+            <div class="deposit-accounts-loading">⏳ Loading accounts...</div>
         </div>
         <button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9; margin-top:8px;"><span data-key="cancel">Cancel</span></button>
     </div></div>
@@ -804,6 +877,7 @@
             <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
             <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
             <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
+            <div style="margin-top:4px;font-size:0.7rem;color:#94a3b8;font-family:monospace;" id="depositInviteCode">🔑 Invite: —</div>
         </div>
         <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
         <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
@@ -1141,15 +1215,23 @@
         const FALLBACK_ADMINS = [{
             id: 'fallback_admin_1',
             name: 'DOT BINGO Official',
+            invite_code: 'DOT001',
             telebirr: '0924839730',
             cbebirr: '0924839730',
             mpesa: '0924839730'
+        }, {
+            id: 'fallback_admin_2',
+            name: 'DOT BINGO Backup',
+            invite_code: 'DOT002',
+            telebirr: '0912345678',
+            cbebirr: '0912345678',
+            mpesa: null
         }];
 
         // ========== LOAD DEPOSIT ACCOUNTS WITH FALLBACK ==========
         async function loadDepositAccounts() {
             const container = document.getElementById('depositAccountsList');
-            container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">⏳ Loading accounts...</div>';
+            container.innerHTML = '<div class="deposit-accounts-loading">⏳ Loading accounts...</div>';
 
             let admins = null;
             let apiFailed = false;
@@ -1181,16 +1263,9 @@
             container.innerHTML = '';
 
             if (!admins || admins.length === 0) {
-                // Last resort: show a single default option
                 container.innerHTML = `
-                        <div class="admin-option selected" onclick="selectDepositAccount('fallback_default', 'telebirr', '0924839730', 'DOT BINGO')">
-                            <div class="admin-info">
-                                <div class="admin-name">📱 Telebirr</div>
-                                <div class="admin-number">📞 0924839730</div>
-                            </div>
-                            <span class="admin-badge">DEFAULT</span>
-                        </div>
-                        <div class="deposit-fallback-note">💡 Using default payment account. Your deposit will be verified manually.</div>
+                        <div class="deposit-accounts-empty">❌ No deposit accounts available</div>
+                        <div class="deposit-fallback-note">💡 Please contact support to add payment methods.</div>
                     `;
                 return;
             }
@@ -1199,56 +1274,130 @@
 
             admins.forEach(admin => {
                 const methods = [];
-                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr, emoji: '📱' });
-                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr, emoji: '🏦' });
-                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa, emoji: '📲' });
+                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr, icon: '📱',
+                    label: 'Telebirr' });
+                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr, icon: '🏦',
+                    label: 'CBE Birr' });
+                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa, icon: '📲', label: 'M-Pesa' });
 
                 if (methods.length === 0) return;
                 hasAnyMethod = true;
 
-                const adminHeader = document.createElement('div');
-                adminHeader.style.cssText =
-                    'font-weight:700; color:#1e293b; margin-top:14px; margin-bottom:6px; font-size:1rem; display:flex; align-items:center; gap:8px;';
-                adminHeader.innerHTML = `👤 ${admin.name}`;
-                container.appendChild(adminHeader);
+                // Build admin card
+                const card = document.createElement('div');
+                card.className = 'admin-card';
+
+                // Header: name + invite code
+                const header = document.createElement('div');
+                header.className = 'admin-card-header';
+
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'admin-card-name';
+                nameDiv.innerHTML = `<span class="admin-emoji">👤</span> ${admin.name}`;
+                header.appendChild(nameDiv);
+
+                const inviteBadge = document.createElement('span');
+                inviteBadge.className = 'admin-invite-badge';
+                const inviteCode = admin.invite_code || admin.inviteCode || 'N/A';
+                inviteBadge.textContent = `🔑 ${inviteCode}`;
+                header.appendChild(inviteBadge);
+
+                card.appendChild(header);
+
+                // Methods grid
+                const grid = document.createElement('div');
+                grid.className = 'admin-methods-grid';
 
                 methods.forEach(method => {
-                    const div = document.createElement('div');
-                    div.className = 'admin-option';
-                    div.innerHTML = `
-                            <div class="admin-info">
-                                <div class="admin-name">${method.emoji} ${method.type.toUpperCase()}</div>
-                                <div class="admin-number">📞 ${method.number}</div>
-                            </div>
-                            <span class="admin-badge">${method.type}</span>
+                    const row = document.createElement('div');
+                    row.className = 'admin-method-row';
+
+                    row.innerHTML = `
+                            <span class="method-icon">${method.icon}</span>
+                            <span class="method-label">${method.label}</span>
+                            <span class="method-number">📞 ${method.number}</span>
+                            <button class="method-select-btn" data-admin-id="${admin.id}" data-method-type="${method.type}" data-method-number="${method.number}" data-admin-name="${admin.name}" data-invite-code="${inviteCode}">
+                                Select
+                            </button>
                         `;
-                    div.addEventListener('click', () => {
-                        document.querySelectorAll('.admin-option').forEach(el => el.classList.remove('selected'));
-                        div.classList.add('selected');
-                        selectDepositAccount(admin.id, method.type, method.number, admin.name);
+
+                    // Click on row also triggers selection
+                    row.addEventListener('click', (e) => {
+                        // If the click is on the button itself, it will handle it separately
+                        if (e.target.tagName === 'BUTTON') return;
+                        const btn = row.querySelector('.method-select-btn');
+                        if (btn) btn.click();
                     });
-                    container.appendChild(div);
+
+                    const btn = row.querySelector('.method-select-btn');
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const adminId = btn.dataset.adminId;
+                        const methodType = btn.dataset.methodType;
+                        const methodNumber = btn.dataset.methodNumber;
+                        const adminName = btn.dataset.adminName;
+                        const inviteCode = btn.dataset.inviteCode;
+
+                        // Deselect all rows
+                        document.querySelectorAll('.admin-method-row').forEach(r => {
+                            r.style.borderColor = '#e2e8f0';
+                            r.style.background = 'white';
+                            const b = r.querySelector('.method-select-btn');
+                            if (b) b.textContent = 'Select';
+                        });
+
+                        // Select this row
+                        row.style.borderColor = '#f97316';
+                        row.style.background = '#fff7ed';
+                        btn.textContent = '✅ Selected';
+
+                        // Open deposit details
+                        selectDepositAccount(adminId, methodType, methodNumber, adminName, inviteCode);
+                    });
+
+                    grid.appendChild(row);
                 });
+
+                card.appendChild(grid);
+                container.appendChild(card);
             });
 
             if (!hasAnyMethod) {
                 container.innerHTML = `
-                        <div class="admin-option selected" onclick="selectDepositAccount('fallback_default', 'telebirr', '0924839730', 'DOT BINGO')">
-                            <div class="admin-info">
-                                <div class="admin-name">📱 Telebirr</div>
-                                <div class="admin-number">📞 0924839730</div>
-                            </div>
-                            <span class="admin-badge">DEFAULT</span>
-                        </div>
-                        <div class="deposit-fallback-note">💡 Using default payment account. Your deposit will be verified manually.</div>
+                        <div class="deposit-accounts-empty">⚠️ No payment methods configured for any admin.</div>
+                        <div class="deposit-fallback-note">💡 Please contact support to set up payment methods.</div>
                     `;
             }
         }
 
         // Global function for inline onclick
-        window.selectDepositAccount = function(adminId, type, number, name) {
+        window.selectDepositAccount = function(adminId, type, number, name, inviteCode) {
             selectedAdminId = adminId;
-            openDepositDetailsModal(type, adminId, number, name);
+            selectedDepositType = type;
+
+            // Update the deposit details modal with the selected admin info
+            const title = type.charAt(0).toUpperCase() + type.slice(1);
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
+
+            const copyDiv = document.getElementById('depositAccountNumber');
+            if (copyDiv) copyDiv.innerHTML = `📋 ${number}`;
+            copyDiv.setAttribute('onclick', `copyToClipboard('${number}')`);
+
+            document.getElementById('depositAccountName').textContent = name || 'DOT BINGO OFFICIAL';
+            document.getElementById('depositAdminInfo').textContent = `Admin: ${name || 'N/A'}`;
+
+            const inviteDisplay = inviteCode || 'N/A';
+            document.getElementById('depositInviteCode').textContent = `🔑 Invite: ${inviteDisplay}`;
+
+            // Clear previous inputs
+            document.getElementById('depositPlayerPhone').value = '';
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositRef').value = '';
+            document.getElementById('depositPhoto').value = '';
+
+            document.getElementById('depositDetailsModal').classList.add('active');
+            document.getElementById('depositTypeModal').classList.remove('active');
+            unlockSpeech();
         };
 
         // ========== DEPOSIT FUNCTIONS ==========
@@ -1260,30 +1409,6 @@
 
         function closeDepositTypeModal() {
             document.getElementById('depositTypeModal').classList.remove('active');
-        }
-
-        function openDepositDetailsModal(type, adminId, accountNumber, accountName) {
-            selectedDepositType = type;
-            selectedAdminId = adminId;
-
-            let title = type.charAt(0).toUpperCase() + type.slice(1);
-            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
-
-            const copyDiv = document.getElementById('depositAccountNumber');
-            if (copyDiv) copyDiv.innerHTML = `📋 ${accountNumber}`;
-            copyDiv.setAttribute('onclick', `copyToClipboard('${accountNumber}')`);
-
-            document.getElementById('depositAccountName').textContent = accountName || 'DOT BINGO OFFICIAL';
-            document.getElementById('depositAdminInfo').textContent = `Admin: ${accountName}`;
-
-            document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmount').value = '';
-            document.getElementById('depositRef').value = '';
-            document.getElementById('depositPhoto').value = '';
-
-            document.getElementById('depositDetailsModal').classList.add('active');
-            closeDepositTypeModal();
-            unlockSpeech();
         }
 
         let isSubmittingDeposit = false;
