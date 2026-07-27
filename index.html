@@ -770,6 +770,18 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        .deposit-fallback-note {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 6px;
+            padding: 4px 8px;
+            background: #f1f5f9;
+            border-radius: 20px;
+        }
+        .admin-option .admin-emoji {
+            font-size: 1.5rem;
+        }
     </style>
 </head>
 <body>
@@ -893,17 +905,20 @@
         const stake30CountEl = document.getElementById('stake30Count');
 
         // ---- GLOBAL PLAYER-COUNT SOCKET (public) ----
-        const stakeCountSocket = io('/public');
-        stakeCountSocket.on('playersCount', (data) => {
-            if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
-            if (data.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${data.count} players`;
-            if (data.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${data.count} players`;
-        });
-        stakeCountSocket.on('lobbyState', (state) => {
-            if (state.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${state.playersCount} players`;
-            if (state.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${state.playersCount} players`;
-            if (state.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${state.playersCount} players`;
-        });
+        let stakeCountSocket = null;
+        try {
+            stakeCountSocket = io('/public');
+            stakeCountSocket.on('playersCount', (data) => {
+                if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
+                if (data.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${data.count} players`;
+                if (data.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${data.count} players`;
+            });
+            stakeCountSocket.on('lobbyState', (state) => {
+                if (state.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${state.playersCount} players`;
+                if (state.stake === 20 && stake20CountEl) stake20CountEl.innerText = `👥 ${state.playersCount} players`;
+                if (state.stake === 30 && stake30CountEl) stake30CountEl.innerText = `👥 ${state.playersCount} players`;
+            });
+        } catch (e) { console.warn('Public socket not available'); }
 
         function copyToClipboard(text) { if (!text) return; navigator.clipboard.writeText(text).then(() => alert("✅ Phone number copied to clipboard!")).catch(() => alert("❌ Could not copy.")); }
 
@@ -1122,22 +1137,43 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED) ==========
+        // ========== FALLBACK DEPOSIT ACCOUNTS (always available) ==========
+        const FALLBACK_ADMINS = [{
+            id: 'fallback_admin_1',
+            name: 'DOT BINGO Official',
+            telebirr: '0924839730',
+            cbebirr: '0924839730',
+            mpesa: '0924839730'
+        }];
+
+        // ========== LOAD DEPOSIT ACCOUNTS WITH FALLBACK ==========
         async function loadDepositAccounts() {
+            const container = document.getElementById('depositAccountsList');
+            container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">⏳ Loading accounts...</div>';
+
+            let admins = null;
+            let apiFailed = false;
+
             try {
                 const res = await fetch('/api/deposit-accounts');
                 const data = await res.json();
-                if (data.success) {
-                    renderDepositAccounts(data.admins);
+                if (data.success && data.admins && data.admins.length > 0) {
+                    admins = data.admins;
                 } else {
-                    document.getElementById('depositAccountsList').innerHTML =
-                        '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+                    apiFailed = true;
                 }
             } catch (e) {
-                console.error('Error loading deposit accounts:', e);
-                document.getElementById('depositAccountsList').innerHTML =
-                    '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+                console.warn('⚠️ Deposit API failed, using fallback accounts:', e);
+                apiFailed = true;
             }
+
+            // If API failed or returned empty, use fallback
+            if (apiFailed || !admins || admins.length === 0) {
+                admins = FALLBACK_ADMINS;
+                console.log('📱 Using fallback deposit accounts');
+            }
+
+            renderDepositAccounts(admins);
         }
 
         function renderDepositAccounts(admins) {
@@ -1145,21 +1181,35 @@
             container.innerHTML = '';
 
             if (!admins || admins.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
+                // Last resort: show a single default option
+                container.innerHTML = `
+                        <div class="admin-option selected" onclick="selectDepositAccount('fallback_default', 'telebirr', '0924839730', 'DOT BINGO')">
+                            <div class="admin-info">
+                                <div class="admin-name">📱 Telebirr</div>
+                                <div class="admin-number">📞 0924839730</div>
+                            </div>
+                            <span class="admin-badge">DEFAULT</span>
+                        </div>
+                        <div class="deposit-fallback-note">💡 Using default payment account. Your deposit will be verified manually.</div>
+                    `;
                 return;
             }
 
+            let hasAnyMethod = false;
+
             admins.forEach(admin => {
                 const methods = [];
-                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr });
-                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr });
-                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa });
+                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr, emoji: '📱' });
+                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr, emoji: '🏦' });
+                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa, emoji: '📲' });
+
                 if (methods.length === 0) return;
+                hasAnyMethod = true;
 
                 const adminHeader = document.createElement('div');
                 adminHeader.style.cssText =
-                'font-weight:700; color:#1e293b; margin-top:12px; margin-bottom:6px; font-size:1rem;';
-                adminHeader.textContent = `👤 ${admin.name}`;
+                    'font-weight:700; color:#1e293b; margin-top:14px; margin-bottom:6px; font-size:1rem; display:flex; align-items:center; gap:8px;';
+                adminHeader.innerHTML = `👤 ${admin.name}`;
                 container.appendChild(adminHeader);
 
                 methods.forEach(method => {
@@ -1167,20 +1217,39 @@
                     div.className = 'admin-option';
                     div.innerHTML = `
                             <div class="admin-info">
-                                <div class="admin-name">${method.type.toUpperCase()}</div>
-                                <div class="admin-number">📱 ${method.number}</div>
+                                <div class="admin-name">${method.emoji} ${method.type.toUpperCase()}</div>
+                                <div class="admin-number">📞 ${method.number}</div>
                             </div>
                             <span class="admin-badge">${method.type}</span>
                         `;
                     div.addEventListener('click', () => {
                         document.querySelectorAll('.admin-option').forEach(el => el.classList.remove('selected'));
                         div.classList.add('selected');
-                        openDepositDetailsModal(method.type, admin.id, method.number, admin.name);
+                        selectDepositAccount(admin.id, method.type, method.number, admin.name);
                     });
                     container.appendChild(div);
                 });
             });
+
+            if (!hasAnyMethod) {
+                container.innerHTML = `
+                        <div class="admin-option selected" onclick="selectDepositAccount('fallback_default', 'telebirr', '0924839730', 'DOT BINGO')">
+                            <div class="admin-info">
+                                <div class="admin-name">📱 Telebirr</div>
+                                <div class="admin-number">📞 0924839730</div>
+                            </div>
+                            <span class="admin-badge">DEFAULT</span>
+                        </div>
+                        <div class="deposit-fallback-note">💡 Using default payment account. Your deposit will be verified manually.</div>
+                    `;
+            }
         }
+
+        // Global function for inline onclick
+        window.selectDepositAccount = function(adminId, type, number, name) {
+            selectedAdminId = adminId;
+            openDepositDetailsModal(type, adminId, number, name);
+        };
 
         // ========== DEPOSIT FUNCTIONS ==========
         function openDepositTypeModal() {
