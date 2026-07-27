@@ -1,31 +1,3 @@
-You’re right – the assignment still isn’t working, and the deposit modal shows all admins.
-We need to debug the data flow and force a fresh user lookup in the deposit endpoint.
-
----
-
-🔍 What’s happening (and why)
-
-1. Assignment happens in /api/telegram-miniapp-auth when start_param is present.
-   · The update to users is executed, but we don’t re‑fetch the user from Supabase before returning the response – so the frontend may still see the old admin_id.
-   · The users cache is updated, but if the deposit modal opens later, /api/deposit-accounts still uses the cached users object (which might be stale) instead of querying Supabase directly.
-2. Deposit accounts endpoint currently uses the cache – we need to always query Supabase for the user’s admin_id.
-
----
-
-✅ Fixes applied
-
-· /api/deposit-accounts – now always fetches the user from Supabase using session.userId (no cache).
-· /api/telegram-miniapp-auth – after the update, we re‑fetch the user from Supabase to get the fresh admin_id and return it in the response.
-· Added detailed logging to track the assignment and the deposit‑accounts flow.
-· All referral/bonus code is removed.
-
----
-
-📦 Full corrected server.js (with fixes)
-
-Place this file on your server, restart, and test again.
-
-```javascript
 require('dotenv').config();
 
 const express = require('express');
@@ -3504,16 +3476,3 @@ resetGame(30);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
-```
-
----
-
-🧪 What to test
-
-1. Open the mini‑app with an admin’s link (e.g., https://t.me/bingomkmk0120_bot?start=ABC123).
-   · Server logs should show 🔍 Auth request ... startParam: ABC123, ✅ Found admin: ..., and ✅ User ... assigned to admin ....
-   · The admin dashboard should show a toast and the player count update.
-2. Open the deposit modal – you should see only that admin’s payment numbers.
-3. If it still doesn’t work, check your server logs for errors – the added console.log statements will help pinpoint where the issue is.
-
-No frontend changes are required.
