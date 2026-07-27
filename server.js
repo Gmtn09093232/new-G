@@ -387,84 +387,73 @@ app.get('/api/deposit-accounts', async (req, res) => {
     }
 
     // Fetch user from Supabase
-    let { data: userData, error: userErr } = await supabase
+    const { data: userData, error: userErr } = await supabase
       .from('users')
       .select('admin_id, username')
       .eq('telegram_id', userId)
       .maybeSingle();
 
-    if (userErr) throw userErr;
-
-    // ========== FALLBACK: no admin assigned yet ==========
-    if (!userData || !userData.admin_id) {
-      console.log(`⚠️ User ${userId} has no admin, attempting fallback assignment...`);
-
-      // Pick the first active admin (or you can pick a specific fallback)
-      const { data: fallbackAdmin, error: fallbackErr } = await supabase
-        .from('admins')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('id', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (!fallbackErr && fallbackAdmin) {
-        // Update the user
-        const { error: updateErr } = await supabase
-          .from('users')
-          .update({ admin_id: fallbackAdmin.id, assigned_admin_name: fallbackAdmin.name })
-          .eq('telegram_id', userId);
-
-        if (!updateErr) {
-          console.log(`✅ Fallback: assigned user ${userId} to admin ${fallbackAdmin.name}`);
-          // Refresh userData
-          const { data: freshUser } = await supabase
-            .from('users')
-            .select('admin_id')
-            .eq('telegram_id', userId)
-            .maybeSingle();
-          userData = freshUser;
-        } else {
-          console.error('❌ Fallback update failed:', updateErr.message);
-        }
-      } else {
-        console.warn('⚠️ No active admin available for fallback');
-      }
+    if (userErr) {
+      console.error('❌ Error fetching user:', userErr.message);
+      return res.status(500).json({ error: 'Database error' });
     }
 
-    // If still no admin, return empty
+    // If user doesn't exist, create them (but still no admin)
+    if (!userData) {
+      console.log(`⚠️ User ${userId} not found, creating...`);
+      const { error: createErr } = await supabase
+        .from('users')
+        .insert({ telegram_id: userId, username: 'Player', balance: 10 });
+      if (createErr) {
+        console.error('❌ Failed to create user:', createErr.message);
+        return res.status(500).json({ error: 'Failed to create user' });
+      }
+      // Re‑fetch user data
+      const { data: newUser } = await supabase
+        .from('users')
+        .select('admin_id')
+        .eq('telegram_id', userId)
+        .maybeSingle();
+      userData = newUser;
+    }
+
+    // If no admin assigned, return empty list with instruction
     if (!userData || !userData.admin_id) {
       return res.json({
         success: true,
         admins: [],
-        message: 'No admin assigned yet. Please use the invite link from your admin to register.'
+        message: 'No admin assigned. Please use the invite link from your admin.'
       });
     }
 
     const adminId = userData.admin_id;
 
-    const { data: admin, error } = await supabase
+    // Fetch admin details
+    const { data: admin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
       .eq('id', adminId)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (error) throw error;
+    if (adminErr) {
+      console.error('❌ Admin fetch error:', adminErr.message);
+      return res.status(500).json({ error: 'Database error' });
+    }
 
     let admins = [];
     if (admin) {
       if (admin.accept_deposits !== false) {
         admins = [admin];
       } else {
-        const { data: fallback, error: fallbackErr } = await supabase
+        // If main admin doesn't accept deposits, try fallback admin
+        const { data: fallback, error: fbErr } = await supabase
           .from('admins')
           .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
           .eq('is_fallback', true)
           .eq('is_active', true)
           .maybeSingle();
-        if (fallbackErr) throw fallbackErr;
-        if (fallback) admins = [fallback];
+        if (!fbErr && fallback) admins = [fallback];
       }
     }
 
@@ -483,7 +472,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
