@@ -3447,16 +3447,31 @@ io.on('connection', async (socket) => {
   });
 });
 
-// ---------- Admin namespace ----------
+// ================================================================
+//  🔧 CORRECTED ADMIN NAMESPACE – with session support
+// ================================================================
 const adminNamespace = io.of('/admin');
+
+// STEP 1: Attach session middleware so `socket.request.session` works
+adminNamespace.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next);
+});
+
+// STEP 2: Authenticate – allow secret OR valid admin session
 adminNamespace.use((socket, next) => {
   const secret = socket.handshake.query.secret;
   if (secret === process.env.ADMIN_SECRET) return next();
+
+  const session = socket.request.session;
+  if (session && session.adminId) {
+    return next();
+  }
+
   next(new Error('Unauthorized admin access'));
 });
 
 adminNamespace.on('connection', (socket) => {
-  console.log('Admin connected to live view');
+  console.log('✅ Admin connected to live view');
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
     gameStatus: {
