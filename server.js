@@ -574,7 +574,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- MODIFIED: /api/telegram-miniapp-auth with re-fetch after update ----------
+// ---------- CORRECTED: /api/telegram-miniapp-auth ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -584,21 +584,25 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   try {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
-    const startParam = params.get('start_param');
+    let startParam = params.get('start_param') || '';
+    startParam = startParam.trim(); // Remove accidental whitespace
+
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
     console.log(`🔍 Auth request for user ${id}, startParam: ${startParam || 'none'}`);
 
-    // Load (or create) the user
+    // Load (or create) the user – this will assign admin only for new users
     let user = await loadUser(id, displayName, handle, startParam, false);
 
     // ------------------------------------------------------------
-    // ALWAYS assign the player to the admin who owns the invite code
+    // ALWAYS try to assign the player to an admin if they don't have one
     // ------------------------------------------------------------
+    let adminAssigned = false;
+
     if (startParam) {
-      console.log(`🔍 Looking for admin with invite_code: ${startParam}`);
+      console.log(`🔍 Looking for admin with invite_code: "${startParam}"`);
       const { data: adminData, error: adminErr } = await supabase
         .from('admins')
         .select('id, name')
@@ -610,10 +614,10 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         console.error('❌ Admin lookup error:', adminErr.message);
       }
 
-      if (!adminErr && adminData) {
+      if (adminData) {
         console.log(`✅ Found admin: ${adminData.name} (${adminData.id})`);
 
-        // Update database
+        // Update the user's admin_id in the database
         const { error: updateErr } = await supabase
           .from('users')
           .update({ admin_id: adminData.id, assigned_admin_name: adminData.name })
@@ -623,8 +627,9 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
           console.error('❌ Failed to update user admin:', updateErr.message);
         } else {
           console.log(`✅ User ${id} assigned to admin ${adminData.name} (${adminData.id})`);
+          adminAssigned = true;
 
-          // Re-fetch the user from DB to get the fresh admin_id
+          // ------------------- FORCE CACHE REFRESH -------------------
           const { data: freshUser, error: freshErr } = await supabase
             .from('users')
             .select('*')
@@ -632,7 +637,6 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
             .maybeSingle();
 
           if (!freshErr && freshUser) {
-            // Update cache and local user object
             users[id] = {
               id: freshUser.telegram_id,
               username: freshUser.username,
@@ -644,9 +648,11 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
             };
             user = users[id];
             console.log(`🔄 Re-fetched user ${id}, admin now: ${user.assigned_admin_name}`);
+          } else {
+            console.warn(`⚠️ Re-fetch failed, using existing cache (admin may be stale)`);
           }
 
-          // ----- NOTIFY ALL ADMIN CLIENTS -----
+          // Notify admin clients
           const adminNamespace = io.of('/admin');
           adminNamespace.emit('admin:playerAdded', {
             telegramId: id,
@@ -657,13 +663,45 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
           console.log(`📢 Emitted admin:playerAdded for ${user.username}`);
         }
       } else {
-        console.warn(`⚠️ No active admin found for invite code: ${startParam}`);
+        console.warn(`⚠️ No active admin found for invite code: "${startParam}"`);
       }
     } else {
-      console.log(`ℹ️ No startParam, skipping admin assignment`);
+      console.log(`ℹ️ No startParam, skipping explicit admin assignment`);
     }
 
-    // Save session
+    // ---------- OPTIONAL FALLBACK: assign to first active admin if still unassigned ----------
+    // Enable this if you want every new/returning player to get a default admin
+    // even when they don't use an invite link.
+    /*
+    if (!user.admin_id) {
+      const { data: fallbackAdmin, error: fallbackErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!fallbackErr && fallbackAdmin) {
+        await supabase
+          .from('users')
+          .update({ admin_id: fallbackAdmin.id, assigned_admin_name: fallbackAdmin.name })
+          .eq('telegram_id', id);
+        // Refresh cache again
+        const { data: freshUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('telegram_id', id)
+          .maybeSingle();
+        if (freshUser) {
+          users[id] = { ...users[id], admin_id: freshUser.admin_id, assigned_admin_name: freshUser.assigned_admin_name };
+          user = users[id];
+          console.log(`🔄 Fallback: assigned ${id} to admin ${fallbackAdmin.name}`);
+        }
+      }
+    }
+    */
+
+    // Save session and return
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
@@ -680,6 +718,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         assigned_admin_name: user.assigned_admin_name
       });
     });
+
   } catch (err) {
     console.error('❌ Auth error:', err.message);
     res.status(500).json({ success: false, error: err.message });
