@@ -378,7 +378,7 @@ async function getAdminFromSession(req) {
 }
 
 // ---------- Static endpoints ----------
-// ---- MODIFIED: deposit-accounts – always fetch fresh user from Supabase ----
+// ---- MODIFIED: deposit-accounts with fallback assignment ----
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
@@ -386,8 +386,8 @@ app.get('/api/deposit-accounts', async (req, res) => {
       return res.json({ success: true, admins: [], message: 'Please login first' });
     }
 
-    // Always fetch user from Supabase (do not rely on cache)
-    const { data: userData, error: userErr } = await supabase
+    // Fetch user from Supabase
+    let { data: userData, error: userErr } = await supabase
       .from('users')
       .select('admin_id, username')
       .eq('telegram_id', userId)
@@ -395,11 +395,49 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     if (userErr) throw userErr;
 
+    // ========== FALLBACK: no admin assigned yet ==========
     if (!userData || !userData.admin_id) {
-      return res.json({ 
-        success: true, 
-        admins: [], 
-        message: 'No admin assigned yet. Please use the invite link from your admin to register.' 
+      console.log(`⚠️ User ${userId} has no admin, attempting fallback assignment...`);
+
+      // Pick the first active admin (or you can pick a specific fallback)
+      const { data: fallbackAdmin, error: fallbackErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('id', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (!fallbackErr && fallbackAdmin) {
+        // Update the user
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({ admin_id: fallbackAdmin.id, assigned_admin_name: fallbackAdmin.name })
+          .eq('telegram_id', userId);
+
+        if (!updateErr) {
+          console.log(`✅ Fallback: assigned user ${userId} to admin ${fallbackAdmin.name}`);
+          // Refresh userData
+          const { data: freshUser } = await supabase
+            .from('users')
+            .select('admin_id')
+            .eq('telegram_id', userId)
+            .maybeSingle();
+          userData = freshUser;
+        } else {
+          console.error('❌ Fallback update failed:', updateErr.message);
+        }
+      } else {
+        console.warn('⚠️ No active admin available for fallback');
+      }
+    }
+
+    // If still no admin, return empty
+    if (!userData || !userData.admin_id) {
+      return res.json({
+        success: true,
+        admins: [],
+        message: 'No admin assigned yet. Please use the invite link from your admin to register.'
       });
     }
 
@@ -426,11 +464,7 @@ app.get('/api/deposit-accounts', async (req, res) => {
           .eq('is_active', true)
           .maybeSingle();
         if (fallbackErr) throw fallbackErr;
-        if (fallback) {
-          admins = [fallback];
-        } else {
-          admins = [];
-        }
+        if (fallback) admins = [fallback];
       }
     }
 
@@ -3448,7 +3482,7 @@ io.on('connection', async (socket) => {
 });
 
 // ================================================================
-//  🔧 CORRECTED ADMIN NAMESPACE – with session support
+//  CORRECTED ADMIN NAMESPACE – with session support
 // ================================================================
 const adminNamespace = io.of('/admin');
 
