@@ -2963,7 +2963,6 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 
   try {
     const { from, to, adminId } = req.query;
-
     let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
     let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
     let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
