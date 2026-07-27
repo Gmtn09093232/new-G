@@ -600,32 +600,27 @@ function verifyTelegram(initData) {
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
-    console.error('❌ Invalid initData');
     return res.status(403).json({ success: false, error: 'Invalid initData' });
   }
+
   try {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
-    let startParam = params.get('start_param') || '';
-    startParam = startParam.trim(); // Remove accidental whitespace
+    const startParam = (params.get('start_param') || '').trim();
 
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
-    console.log(`🔍 Auth request for user ${id}, startParam: ${startParam || 'none'}`);
+    console.log(`🔍 Auth for ${id}, startParam: "${startParam}"`);
 
-    // Load (or create) the user – this will assign admin only for new users
-    let user = await loadUser(id, displayName, handle, startParam, false);
+    // Load or create user (without assigning admin yet)
+    let user = await loadUser(id, displayName, handle, null, false, null);
 
-    // ------------------------------------------------------------
-    // ALWAYS try to assign the player to an admin if they don't have one
-    // ------------------------------------------------------------
-    let adminAssigned = false;
-
+    // ----- ONLY ASSIGN IF startParam IS PRESENT -----
     if (startParam) {
       console.log(`🔍 Looking for admin with invite_code: "${startParam}"`);
-      const { data: adminData, error: adminErr } = await supabase
+      const { data: admin, error: adminErr } = await supabase
         .from('admins')
         .select('id, name')
         .eq('invite_code', startParam)
@@ -636,94 +631,56 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         console.error('❌ Admin lookup error:', adminErr.message);
       }
 
-      if (adminData) {
-        console.log(`✅ Found admin: ${adminData.name} (${adminData.id})`);
+      if (admin) {
+        console.log(`✅ Found admin: ${admin.name} (${admin.id})`);
 
-        // Update the user's admin_id in the database
+        // Update the user
         const { error: updateErr } = await supabase
           .from('users')
-          .update({ admin_id: adminData.id, assigned_admin_name: adminData.name })
+          .update({ admin_id: admin.id, assigned_admin_name: admin.name })
           .eq('telegram_id', id);
 
         if (updateErr) {
-          console.error('❌ Failed to update user admin:', updateErr.message);
+          console.error('❌ Update failed:', updateErr.message);
         } else {
-          console.log(`✅ User ${id} assigned to admin ${adminData.name} (${adminData.id})`);
-          adminAssigned = true;
+          console.log('✅ Admin assigned successfully');
 
-          // ------------------- FORCE CACHE REFRESH -------------------
-          const { data: freshUser, error: freshErr } = await supabase
+          // Refresh cache
+          const { data: fresh } = await supabase
             .from('users')
             .select('*')
             .eq('telegram_id', id)
             .maybeSingle();
 
-          if (!freshErr && freshUser) {
+          if (fresh) {
             users[id] = {
-              id: freshUser.telegram_id,
-              username: freshUser.username,
-              balance: Number(freshUser.balance),
-              telegram_handle: freshUser.telegram_handle,
-              admin_id: freshUser.admin_id,
-              assigned_admin_name: freshUser.assigned_admin_name,
-              first_deposit_amount: freshUser.first_deposit_amount || 0
+              id: fresh.telegram_id,
+              username: fresh.username,
+              balance: Number(fresh.balance),
+              telegram_handle: fresh.telegram_handle,
+              admin_id: fresh.admin_id,
+              assigned_admin_name: fresh.assigned_admin_name,
+              first_deposit_amount: fresh.first_deposit_amount || 0
             };
             user = users[id];
-            console.log(`🔄 Re-fetched user ${id}, admin now: ${user.assigned_admin_name}`);
-          } else {
-            console.warn(`⚠️ Re-fetch failed, using existing cache (admin may be stale)`);
           }
 
-          // Notify admin clients
-          const adminNamespace = io.of('/admin');
-          adminNamespace.emit('admin:playerAdded', {
+          // Notify admin dashboard
+          io.of('/admin').emit('admin:playerAdded', {
             telegramId: id,
             username: user.username,
-            adminId: adminData.id,
-            adminName: adminData.name
+            adminId: admin.id,
+            adminName: admin.name
           });
-          console.log(`📢 Emitted admin:playerAdded for ${user.username}`);
         }
       } else {
-        console.warn(`⚠️ No active admin found for invite code: "${startParam}"`);
+        console.warn(`⚠️ No active admin found for code: "${startParam}"`);
       }
     } else {
-      console.log(`ℹ️ No startParam, skipping explicit admin assignment`);
+      console.log('ℹ️ No startParam – skipping admin assignment');
     }
 
-    // ---------- OPTIONAL FALLBACK: assign to first active admin if still unassigned ----------
-    // Enable this if you want every new/returning player to get a default admin
-    // even when they don't use an invite link.
-    /*
-    if (!user.admin_id) {
-      const { data: fallbackAdmin, error: fallbackErr } = await supabase
-        .from('admins')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('id', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (!fallbackErr && fallbackAdmin) {
-        await supabase
-          .from('users')
-          .update({ admin_id: fallbackAdmin.id, assigned_admin_name: fallbackAdmin.name })
-          .eq('telegram_id', id);
-        // Refresh cache again
-        const { data: freshUser } = await supabase
-          .from('users')
-          .select('*')
-          .eq('telegram_id', id)
-          .maybeSingle();
-        if (freshUser) {
-          users[id] = { ...users[id], admin_id: freshUser.admin_id, assigned_admin_name: freshUser.assigned_admin_name };
-          user = users[id];
-          console.log(`🔄 Fallback: assigned ${id} to admin ${fallbackAdmin.name}`);
-        }
-      }
-    }
-    */
-
-    // Save session and return
+    // Save session
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
@@ -740,7 +697,6 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         assigned_admin_name: user.assigned_admin_name
       });
     });
-
   } catch (err) {
     console.error('❌ Auth error:', err.message);
     res.status(500).json({ success: false, error: err.message });
