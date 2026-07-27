@@ -2127,6 +2127,82 @@ app.get('/admin/players', async (req, res) => {
   }
 });
 
+// ============================================================
+//  NEW: MANUAL PLAYER BALANCE ADJUSTMENT (session-based admin)
+// ============================================================
+app.post('/admin/update-player-balance', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  const { telegramId, amount, operation } = req.body;
+  if (!telegramId) return res.status(400).json({ error: 'Telegram ID required' });
+  const amt = Number(amount);
+  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Amount must be a positive number' });
+  if (!['add', 'subtract'].includes(operation)) return res.status(400).json({ error: 'Operation must be "add" or "subtract"' });
+
+  try {
+    // 1. Verify the player exists and is assigned to this admin
+    const { data: user, error: userErr } = await supabase
+      .from('users')
+      .select('*')
+      .eq('telegram_id', telegramId)
+      .maybeSingle();
+    if (userErr || !user) return res.status(404).json({ error: 'Player not found' });
+    if (user.admin_id !== admin.id) {
+      return res.status(403).json({ error: 'This player is not assigned to you' });
+    }
+
+    let oldBalance = Number(user.balance);
+    let newBalance = oldBalance;
+    if (operation === 'add') {
+      newBalance += amt;
+    } else {
+      if (oldBalance < amt) return res.status(400).json({ error: 'Insufficient balance' });
+      newBalance -= amt;
+    }
+
+    // 2. Update the balance in the database
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ balance: newBalance })
+      .eq('telegram_id', telegramId);
+    if (updateErr) throw updateErr;
+
+    // 3. Update in‑memory cache
+    if (users[telegramId]) {
+      users[telegramId].balance = newBalance;
+    } else {
+      // Reload from DB to refresh cache
+      await loadUser(telegramId, user.username, user.telegram_handle, null, true);
+    }
+
+    // 4. Audit log
+    await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
+      targetUserId: telegramId,
+      operation,
+      amount: amt,
+      oldBalance,
+      newBalance
+    });
+
+    // 5. Notify the player via WebSocket if connected
+    const playerSocket = await getSocketByUserId(telegramId);
+    if (playerSocket) {
+      playerSocket.emit('balanceUpdate', newBalance);
+    }
+
+    res.json({ success: true, newBalance, message: `Balance ${operation}ed by ${amt} ETB` });
+  } catch (err) {
+    console.error('Error updating player balance:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+
 app.post('/admin/process-withdrawal', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
