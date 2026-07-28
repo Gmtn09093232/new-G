@@ -601,16 +601,20 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
   try {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
-    const startParam = params.get('start_param');
+    let startParam = params.get('start_param');
+    if (startParam) startParam = startParam.trim().toUpperCase(); // Normalise
+
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
+    console.log(`🔍 Auth for ${id}, startParam: "${startParam || 'none'}"`);
+
     // Load or create user
     let user = await loadUser(id, displayName, handle, startParam, false);
 
-    // If startParam provided, try to assign admin if not already assigned
-    if (startParam) {
+    // If startParam provided and user has no admin, assign it
+    if (startParam && !user.admin_id) {
       console.log(`🔍 Looking for admin with invite_code: "${startParam}"`);
       const { data: admin, error: adminErr } = await supabase
         .from('admins')
@@ -623,7 +627,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         console.error('❌ Admin lookup error:', adminErr.message);
       }
 
-      if (admin && !user.admin_id) {
+      if (admin) {
         console.log(`✅ Found admin: ${admin.name} (${admin.id}) – assigning to user ${id}`);
         // Update user's admin_id
         const { error: updateErr } = await supabase
@@ -650,13 +654,11 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         } else {
           console.error('❌ Failed to assign admin:', updateErr.message);
         }
-      } else if (admin && user.admin_id) {
-        console.log(`ℹ️ User ${id} already has admin assigned (${user.admin_id}), ignoring link.`);
       } else {
         console.warn(`⚠️ No active admin found for code: "${startParam}"`);
       }
-    } else {
-      console.log('ℹ️ No startParam – skipping admin assignment');
+    } else if (startParam && user.admin_id) {
+      console.log(`ℹ️ User ${id} already has admin (${user.admin_id}), ignoring link.`);
     }
 
     req.session.userId = id;
@@ -1718,6 +1720,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // If the user somehow has no admin assigned, assign them to the one they selected for deposit
     if (!user.admin_id) {
       await supabase
         .from('users')
