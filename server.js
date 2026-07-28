@@ -592,7 +592,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---- CORRECTED: /api/telegram-miniapp-auth – assign admin to existing users ----
+// ---- CORRECTED: /api/telegram-miniapp-auth – normalise startParam and assign admin ----
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -602,7 +602,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
     let startParam = params.get('start_param');
-    if (startParam) startParam = startParam.trim().toUpperCase(); // Normalise
+    // NORMALISE: trim and uppercase
+    if (startParam) startParam = startParam.trim().toUpperCase();
 
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
@@ -610,10 +611,10 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 
     console.log(`🔍 Auth for ${id}, startParam: "${startParam || 'none'}"`);
 
-    // Load or create user
+    // Load or create user – this sets admin_id for NEW users
     let user = await loadUser(id, displayName, handle, startParam, false);
 
-    // If startParam provided and user has no admin, assign it
+    // ---- FOR EXISTING USERS OR FALLBACK: always try to assign if startParam is present and user has no admin ----
     if (startParam && !user.admin_id) {
       console.log(`🔍 Looking for admin with invite_code: "${startParam}"`);
       const { data: admin, error: adminErr } = await supabase
@@ -629,21 +630,21 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 
       if (admin) {
         console.log(`✅ Found admin: ${admin.name} (${admin.id}) – assigning to user ${id}`);
-        // Update user's admin_id
         const { error: updateErr } = await supabase
           .from('users')
           .update({ admin_id: admin.id, assigned_admin_name: admin.name })
           .eq('telegram_id', id);
 
-        if (!updateErr) {
+        if (updateErr) {
+          console.error('❌ Failed to assign admin:', updateErr.message);
+        } else {
+          console.log(`✅ Admin assigned successfully to user ${id}`);
           // Update cache
           if (users[id]) {
             users[id].admin_id = admin.id;
             users[id].assigned_admin_name = admin.name;
           }
-          user = users[id] || user; // refresh
-          console.log(`✅ Admin assigned successfully to user ${id}`);
-
+          user = users[id] || user;
           // Notify admin clients
           io.of('/admin').emit('admin:playerAdded', {
             telegramId: id,
@@ -651,8 +652,6 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
             adminId: admin.id,
             adminName: admin.name
           });
-        } else {
-          console.error('❌ Failed to assign admin:', updateErr.message);
         }
       } else {
         console.warn(`⚠️ No active admin found for code: "${startParam}"`);
