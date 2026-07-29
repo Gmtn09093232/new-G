@@ -770,44 +770,203 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        /* ── admin deposit dropdown ── */
+        .deposit-method-select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 60px;
+            border: 2px solid #fed7aa;
+            background: #ffffff;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e293b;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f97316' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 20px;
+        }
+        .deposit-method-select:focus {
+            outline: none;
+            border-color: #f97316;
+            box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.15);
+        }
+        .deposit-method-select option {
+            padding: 10px;
+            font-weight: 500;
+        }
+        .deposit-admin-detail {
+            background: #f8fafc;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 16px 0 8px;
+            border-left: 4px solid #f97316;
+            text-align: left;
+        }
+        .deposit-admin-detail .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .deposit-admin-detail .detail-row:last-child {
+            border-bottom: none;
+        }
+        .deposit-admin-detail .detail-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        .deposit-admin-detail .detail-value {
+            color: #1e293b;
+            font-weight: 600;
+            font-family: monospace;
+        }
+        .deposit-admin-detail .detail-value.copyable {
+            cursor: pointer;
+            background: #f1f5f9;
+            padding: 2px 12px;
+            border-radius: 30px;
+            transition: 0.1s;
+        }
+        .deposit-admin-detail .detail-value.copyable:active {
+            background: #e2e8f0;
+            transform: scale(0.96);
+        }
+        .no-admin-msg {
+            text-align: center;
+            padding: 20px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        .admin-deposit-btn {
+            width: 100%;
+            margin-top: 12px;
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: 0.1s;
+        }
+        .admin-deposit-btn:active {
+            transform: scale(0.96);
+        }
+        .admin-deposit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .modal-content.deposit-modal {
+            max-width: 400px;
+        }
     </style>
 </head>
 <body>
     <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
 
     <!-- MODALS -->
-    <div id="depositTypeModal" class="modal"><div class="modal-content">
-        <div class="bank-header"><span class="bank-icon">🏦</span><div><div class="bank-title" data-key="depositTitle">Deposit</div><div class="bank-sub" data-key="chooseMethod">Choose payment method</div></div></div>
-        <div id="depositAccountsList">
-            <div style="text-align:center; padding:20px; color:#94a3b8;">Loading accounts...</div>
+    <div id="depositTypeModal" class="modal">
+        <div class="modal-content deposit-modal">
+            <div class="bank-header">
+                <span class="bank-icon">🏦</span>
+                <div>
+                    <div class="bank-title" data-key="depositTitle">Deposit</div>
+                    <div class="bank-sub" data-key="chooseMethod">Choose payment method</div>
+                </div>
+            </div>
+
+            <!-- admin deposit DROPDOWN -->
+            <div class="payment-method-label" data-key="selectMethod">⬇ Select deposit method</div>
+            <select id="depositMethodSelect" class="deposit-method-select">
+                <option value="">— Select —</option>
+                <option value="telebirr">📱 Telebirr</option>
+                <option value="cbebirr">🏦 CBE Birr</option>
+                <option value="mpesa">📲 M-Pesa</option>
+            </select>
+
+            <!-- admin details will be shown here -->
+            <div id="depositAdminDetailContainer" class="deposit-admin-detail hidden">
+                <div class="detail-row">
+                    <span class="detail-label">👤 Admin</span>
+                    <span class="detail-value" id="adminDetailName">—</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">📞 Account</span>
+                    <span class="detail-value copyable" id="adminDetailNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g,''))">—</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">💳 Method</span>
+                    <span class="detail-value" id="adminDetailMethod">—</span>
+                </div>
+            </div>
+
+            <button id="continueDepositBtn" class="admin-deposit-btn" disabled data-key="continue">➡ Continue</button>
+            <button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9; margin-top:8px;"><span data-key="cancel">Cancel</span></button>
         </div>
-        <button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9; margin-top:8px;"><span data-key="cancel">Cancel</span></button>
-    </div></div>
+    </div>
 
-    <div id="depositDetailsModal" class="modal"><div class="modal-content">
-        <div class="bank-header"><span class="bank-icon">💸</span><div><div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div><div class="bank-sub" data-key="sendPayment">Send payment to the number below</div></div></div>
-        <div class="account-card">
-            <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
-            <div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div>
-            <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
-            <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
-            <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
+    <div id="depositDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header">
+                <span class="bank-icon">💸</span>
+                <div>
+                    <div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div>
+                    <div class="bank-sub" data-key="sendPayment">Send payment to the number below</div>
+                </div>
+            </div>
+            <div class="account-card">
+                <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
+                <div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div>
+                <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
+                <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
+                <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
+            </div>
+            <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
+            <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
+            <div class="input-group"><label data-key="refLabel">📝 Transaction Reference (optional)</label><input type="text" id="depositRef" placeholder="Reference from SMS"></div>
+            <div class="input-group"><label data-key="proofLabel">📷 Upload Photo Proof (required)</label><input type="file" id="depositPhoto" accept="image/*" required></div>
+            <div class="transaction-summary" data-key="depositHint">💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.</div>
+            <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
         </div>
-        <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
-        <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
-        <div class="input-group"><label data-key="refLabel">📝 Transaction Reference (optional)</label><input type="text" id="depositRef" placeholder="Reference from SMS"></div>
-        <div class="input-group"><label data-key="proofLabel">📷 Upload Photo Proof (required)</label><input type="file" id="depositPhoto" accept="image/*" required></div>
-        <div class="transaction-summary" data-key="depositHint">💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.</div>
-        <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
-    </div></div>
+    </div>
 
-    <div id="withdrawTypeModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div><button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button><button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button><button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button><button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button></div></div>
+    <div id="withdrawTypeModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div>
+            <button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button>
+            <button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button>
+            <button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button>
+            <button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button>
+        </div>
+    </div>
 
-    <div id="withdrawDetailsModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div><div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div><div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div><div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div><div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div><div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div></div></div>
+    <div id="withdrawDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div>
+            <div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div>
+            <div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div>
+            <div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div>
+            <div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div>
+            <div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div>
+        </div>
+    </div>
 
-    <div id="rulesModal" class="modal"><div class="modal-content"><div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div><div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div><button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button></div></div>
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div>
+            <div class="rules-text"><p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p><p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p><p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p><p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p></div>
+            <button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button>
+        </div>
+    </div>
 
-    <div id="winnerOverlay" class="winner-modal"><div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div></div>
+    <div id="winnerOverlay" class="winner-modal">
+        <div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div>
+    </div>
 
     <!-- STAKE PAGE -->
     <div id="stakePage" class="page">
@@ -873,7 +1032,12 @@
             <div></div>
             <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
         </div>
-        <div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="deposit">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="withdraw">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;" data-key="rulesBtn">📜 Rules</button></div><div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div><div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div><div id="gameCard" class="card-container"></div><button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button><div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
+        <div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button onclick="openDepositTypeModal()" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="deposit">+Deposit</button><button onclick="openWithdrawTypeModal()" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="withdraw">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;" data-key="rulesBtn">📜 Rules</button></div>
+        <div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
+        <div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div>
+        <div id="gameCard" class="card-container"></div>
+        <button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button>
+        <div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
     </div>
 
     <script>
@@ -1011,7 +1175,8 @@
                 claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦",
                 claimValueShort: "ወዲያው “CLAIM BINGO!”",
                 refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)",
-                proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)"
+                proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)",
+                continue: "➡ ቀጥል"
             },
             en: {
                 depositTitle: "Deposit",
@@ -1081,7 +1246,8 @@
                 claimLabelShort: "⏱️ Claim:",
                 claimValueShort: "Immediately 'CLAIM BINGO!'",
                 refLabel: "📝 Transaction Reference (optional)",
-                proofLabel: "📷 Upload Photo Proof (required)"
+                proofLabel: "📷 Upload Photo Proof (required)",
+                continue: "➡ Continue"
             }
         };
 
@@ -1122,69 +1288,137 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED) ==========
+        // ========== LOAD DEPOSIT ACCOUNTS (UPDATED with dropdown) ==========
+        let depositAdmins = [];
+
         async function loadDepositAccounts() {
             try {
                 const res = await fetch('/api/deposit-accounts');
                 const data = await res.json();
                 if (data.success) {
-                    renderDepositAccounts(data.admins);
+                    depositAdmins = data.admins || [];
+                    // populate dropdown is already static; we just need to show details when selected
                 } else {
-                    document.getElementById('depositAccountsList').innerHTML =
-                        '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+                    depositAdmins = [];
                 }
             } catch (e) {
                 console.error('Error loading deposit accounts:', e);
-                document.getElementById('depositAccountsList').innerHTML =
-                    '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Failed to load accounts</div>';
+                depositAdmins = [];
             }
         }
 
-        function renderDepositAccounts(admins) {
-            const container = document.getElementById('depositAccountsList');
-            container.innerHTML = '';
+        // ── show admin details for selected method ──
+        function showAdminForMethod(method) {
+            const container = document.getElementById('depositAdminDetailContainer');
+            const nameEl = document.getElementById('adminDetailName');
+            const numberEl = document.getElementById('adminDetailNumber');
+            const methodEl = document.getElementById('adminDetailMethod');
+            const continueBtn = document.getElementById('continueDepositBtn');
 
-            if (!admins || admins.length === 0) {
-                container.innerHTML = '<div style="text-align:center; padding:20px; color:#94a3b8;">No deposit accounts available</div>';
+            if (!method) {
+                container.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
                 return;
             }
 
-            admins.forEach(admin => {
-                const methods = [];
-                if (admin.telebirr) methods.push({ type: 'telebirr', number: admin.telebirr });
-                if (admin.cbebirr) methods.push({ type: 'cbebirr', number: admin.cbebirr });
-                if (admin.mpesa) methods.push({ type: 'mpesa', number: admin.mpesa });
-                if (methods.length === 0) return;
-
-                const adminHeader = document.createElement('div');
-                adminHeader.style.cssText =
-                'font-weight:700; color:#1e293b; margin-top:12px; margin-bottom:6px; font-size:1rem;';
-                adminHeader.textContent = `👤 ${admin.name}`;
-                container.appendChild(adminHeader);
-
-                methods.forEach(method => {
-                    const div = document.createElement('div');
-                    div.className = 'admin-option';
-                    div.innerHTML = `
-                            <div class="admin-info">
-                                <div class="admin-name">${method.type.toUpperCase()}</div>
-                                <div class="admin-number">📱 ${method.number}</div>
-                            </div>
-                            <span class="admin-badge">${method.type}</span>
-                        `;
-                    div.addEventListener('click', () => {
-                        document.querySelectorAll('.admin-option').forEach(el => el.classList.remove('selected'));
-                        div.classList.add('selected');
-                        openDepositDetailsModal(method.type, admin.id, method.number, admin.name);
-                    });
-                    container.appendChild(div);
-                });
+            // find first admin that has this method
+            const admin = depositAdmins.find(a => {
+                if (method === 'telebirr' && a.telebirr) return true;
+                if (method === 'cbebirr' && a.cbebirr) return true;
+                if (method === 'mpesa' && a.mpesa) return true;
+                return false;
             });
+
+            if (!admin) {
+                container.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                return;
+            }
+
+            // get the number for this method
+            let number = '';
+            if (method === 'telebirr') number = admin.telebirr;
+            else if (method === 'cbebirr') number = admin.cbebirr;
+            else if (method === 'mpesa') number = admin.mpesa;
+
+            if (!number) {
+                container.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                return;
+            }
+
+            // show details
+            nameEl.textContent = admin.name || 'Admin';
+            numberEl.textContent = number;
+            methodEl.textContent = method.toUpperCase();
+
+            // store for later use
+            selectedAdminId = admin.id;
+            selectedDepositType = method;
+
+            container.classList.remove('hidden');
+            continueBtn.disabled = false;
+        }
+
+        // ── open deposit details modal with selected admin ──
+        function proceedToDepositDetails() {
+            if (!selectedAdminId || !selectedDepositType) {
+                alert('Please select a deposit method first.');
+                return;
+            }
+
+            const admin = depositAdmins.find(a => a.id === selectedAdminId);
+            if (!admin) {
+                alert('Admin not found. Please try again.');
+                return;
+            }
+
+            let number = '';
+            if (selectedDepositType === 'telebirr') number = admin.telebirr;
+            else if (selectedDepositType === 'cbebirr') number = admin.cbebirr;
+            else if (selectedDepositType === 'mpesa') number = admin.mpesa;
+
+            if (!number) {
+                alert('No account number found for this method.');
+                return;
+            }
+
+            // populate deposit details modal
+            let title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
+
+            const copyDiv = document.getElementById('depositAccountNumber');
+            if (copyDiv) copyDiv.innerHTML = `📋 ${number}`;
+            copyDiv.setAttribute('onclick', `copyToClipboard('${number}')`);
+
+            document.getElementById('depositAccountName').textContent = admin.name || 'DOT BINGO OFFICIAL';
+            document.getElementById('depositAdminInfo').textContent = `Admin: ${admin.name || 'DOT BINGO OFFICIAL'}`;
+
+            // reset form fields
+            document.getElementById('depositPlayerPhone').value = '';
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositRef').value = '';
+            document.getElementById('depositPhoto').value = '';
+
+            // close the type modal, open details modal
+            document.getElementById('depositTypeModal').classList.remove('active');
+            document.getElementById('depositDetailsModal').classList.add('active');
+            unlockSpeech();
         }
 
         // ========== DEPOSIT FUNCTIONS ==========
         function openDepositTypeModal() {
             document.getElementById('depositTypeModal').classList.add('active');
+            // reset dropdown and details
+            const select = document.getElementById('depositMethodSelect');
+            select.value = '';
+            document.getElementById('depositAdminDetailContainer').classList.add('hidden');
+            document.getElementById('continueDepositBtn').disabled = true;
+            selectedAdminId = null;
+            selectedDepositType = null;
             loadDepositAccounts();
             unlockSpeech();
         }
@@ -1193,31 +1427,8 @@
             document.getElementById('depositTypeModal').classList.remove('active');
         }
 
-        function openDepositDetailsModal(type, adminId, accountNumber, accountName) {
-            selectedDepositType = type;
-            selectedAdminId = adminId;
-
-            let title = type.charAt(0).toUpperCase() + type.slice(1);
-            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
-
-            const copyDiv = document.getElementById('depositAccountNumber');
-            if (copyDiv) copyDiv.innerHTML = `📋 ${accountNumber}`;
-            copyDiv.setAttribute('onclick', `copyToClipboard('${accountNumber}')`);
-
-            document.getElementById('depositAccountName').textContent = accountName || 'DOT BINGO OFFICIAL';
-            document.getElementById('depositAdminInfo').textContent = `Admin: ${accountName}`;
-
-            document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmount').value = '';
-            document.getElementById('depositRef').value = '';
-            document.getElementById('depositPhoto').value = '';
-
-            document.getElementById('depositDetailsModal').classList.add('active');
-            closeDepositTypeModal();
-            unlockSpeech();
-        }
-
         let isSubmittingDeposit = false;
+
         async function submitDepositRequest() {
             if (isSubmittingDeposit) return;
 
@@ -1311,6 +1522,7 @@
         }
 
         let isSubmittingWithdraw = false;
+
         async function submitWithdrawRequest() {
             if (isSubmittingWithdraw) return;
             const receiver = document.getElementById('withdrawReceiver').value.trim();
@@ -1712,6 +1924,14 @@
         document.getElementById('backDepositBtn')?.addEventListener('click', () => { document.getElementById(
                 'depositDetailsModal').classList.remove('active'); openDepositTypeModal(); });
         document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
+
+        // ── NEW: deposit dropdown events ──
+        document.getElementById('depositMethodSelect')?.addEventListener('change', function() {
+            const method = this.value;
+            showAdminForMethod(method);
+        });
+
+        document.getElementById('continueDepositBtn')?.addEventListener('click', proceedToDepositDetails);
 
         document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click', () =>
             openWithdrawDetailsModal(btn.dataset.type)));
