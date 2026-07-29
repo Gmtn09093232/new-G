@@ -2,6 +2,7 @@
 //  server.js – Full Bingo Server with Admin Link Open Tracking
 //             & Manual Balance Adjustments Affecting Deposit Stats
 //             & 1500 ETB Limit for Manual Additions
+//             & Import Players by Username/Handle
 // ================================================================
 
 require('dotenv').config();
@@ -3213,7 +3214,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 });
 
 // ============================================================
-//  IMPORT PLAYERS – Manual paste only (JSON)
+//  UPDATED: IMPORT PLAYERS – accepts username/handle as well as numeric ID
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -3225,7 +3226,7 @@ app.post('/admin/import-players', async (req, res) => {
   const { telegramIds, overwrite = false } = req.body;
 
   if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
-    return res.status(400).json({ success: false, error: 'At least one Telegram ID required' });
+    return res.status(400).json({ success: false, error: 'At least one Telegram ID or username required' });
   }
 
   try {
@@ -3233,33 +3234,57 @@ app.post('/admin/import-players', async (req, res) => {
     let successCount = 0;
 
     for (const rawId of telegramIds) {
-      const tgId = String(rawId).trim();
-      if (!tgId || !/^\d+$/.test(tgId)) {
-        results.push({ telegramId: tgId, success: false, error: 'Invalid ID (must be numeric)' });
+      const identifier = String(rawId).trim();
+      if (!identifier) {
+        results.push({ telegramId: identifier, success: false, error: 'Empty identifier' });
         continue;
       }
 
+      let telegramId = null;
+      // Check if it's a numeric ID
+      if (/^\d+$/.test(identifier)) {
+        telegramId = identifier;
+      } else {
+        // Try to find by telegram_handle or username (case-insensitive)
+        const searchTerm = identifier.startsWith('@') ? identifier.slice(1) : identifier;
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('telegram_id')
+          .or(`telegram_handle.ilike.${searchTerm},username.ilike.${searchTerm}`)
+          .maybeSingle();
+        if (error) {
+          results.push({ telegramId: identifier, success: false, error: error.message });
+          continue;
+        }
+        if (!user) {
+          results.push({ telegramId: identifier, success: false, error: 'User not found by username/handle' });
+          continue;
+        }
+        telegramId = user.telegram_id;
+      }
+
+      // Proceed with assignment/creation using the resolved telegramId
       try {
         let { data: existingUser, error: findErr } = await supabase
           .from('users')
           .select('telegram_id, admin_id')
-          .eq('telegram_id', tgId)
+          .eq('telegram_id', telegramId)
           .maybeSingle();
 
         if (findErr) {
-          results.push({ telegramId: tgId, success: false, error: findErr.message });
+          results.push({ telegramId, success: false, error: findErr.message });
           continue;
         }
 
         if (!overwrite && existingUser && existingUser.admin_id !== null) {
-          results.push({ telegramId: tgId, success: false, error: 'Already assigned to another admin (skipped)' });
+          results.push({ telegramId, success: false, error: 'Already assigned to another admin (skipped)' });
           continue;
         }
 
         if (!existingUser) {
           const newUser = {
-            telegram_id: tgId,
-            username: `Player_${tgId.slice(-4)}`,
+            telegram_id: telegramId,
+            username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
             referred_by: null,
             first_deposit_amount: 0,
@@ -3269,11 +3294,11 @@ app.post('/admin/import-players', async (req, res) => {
           };
           const { error: insertErr } = await supabase.from('users').insert(newUser);
           if (insertErr) {
-            results.push({ telegramId: tgId, success: false, error: insertErr.message });
+            results.push({ telegramId, success: false, error: insertErr.message });
             continue;
           }
-          users[tgId] = {
-            id: tgId,
+          users[telegramId] = {
+            id: telegramId,
             username: newUser.username,
             balance: newUser.balance,
             telegram_handle: null,
@@ -3282,7 +3307,7 @@ app.post('/admin/import-players', async (req, res) => {
             admin_id: newUser.admin_id,
             assigned_admin_name: newUser.assigned_admin_name
           };
-          results.push({ telegramId: tgId, success: true, created: true });
+          results.push({ telegramId, success: true, created: true });
           successCount++;
         } else {
           const { error: updateErr } = await supabase
@@ -3291,20 +3316,20 @@ app.post('/admin/import-players', async (req, res) => {
               admin_id: admin.id,
               assigned_admin_name: admin.name
             })
-            .eq('telegram_id', tgId);
+            .eq('telegram_id', telegramId);
           if (updateErr) {
-            results.push({ telegramId: tgId, success: false, error: updateErr.message });
+            results.push({ telegramId, success: false, error: updateErr.message });
             continue;
           }
-          if (users[tgId]) {
-            users[tgId].admin_id = admin.id;
-            users[tgId].assigned_admin_name = admin.name;
+          if (users[telegramId]) {
+            users[telegramId].admin_id = admin.id;
+            users[telegramId].assigned_admin_name = admin.name;
           }
-          results.push({ telegramId: tgId, success: true, updated: true });
+          results.push({ telegramId, success: true, updated: true });
           successCount++;
         }
       } catch (err) {
-        results.push({ telegramId: tgId, success: false, error: err.message });
+        results.push({ telegramId, success: false, error: err.message });
       }
     }
 
