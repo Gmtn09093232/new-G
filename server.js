@@ -1,3 +1,7 @@
+// ================================================================
+//  server.js – Full Bingo Server with Admin Link Open Tracking
+// ================================================================
+
 require('dotenv').config();
 
 const express = require('express');
@@ -116,6 +120,37 @@ const Audit = {
   adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details: d }),
   suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
 };
+
+// ================================================================
+//  NEW: Log Admin Link Open (for tracking invite link clicks)
+// ================================================================
+async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
+  try {
+    // Find admin_id for this invite code (if any)
+    let adminId = null;
+    if (inviteCode) {
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('id')
+        .eq('invite_code', inviteCode)
+        .maybeSingle();
+      if (admin) adminId = admin.id;
+    }
+
+    const { error } = await supabase
+      .from('admin_link_opens')
+      .insert({
+        admin_id: adminId,
+        invite_code: inviteCode || null,
+        user_id: userId || null,
+        ip_address: ip,
+        user_agent: userAgent || null
+      });
+    if (error) console.error('Failed to log admin link open:', error.message);
+  } catch (err) {
+    console.error('Error logging admin link open:', err.message);
+  }
+}
 
 // ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
@@ -604,6 +639,7 @@ function verifyTelegram(initData) {
   }
 }
 
+// ---------- Telegram auth (with link open logging) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -616,6 +652,13 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
+
+    // ---- Log the admin link open (new) ----
+    const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || null;
+    await logAdminLinkOpen(startParam, id, ip, userAgent);
+    // ---------------------------------------
+
     const user = await loadUser(id, displayName, handle, startParam, false);
     req.session.userId = id;
     req.session.save((err) => {
@@ -1645,7 +1688,7 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints (UPDATED: photo upload with detailed error) ----------
+// ---------- Player deposit endpoints ----------
 app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -3385,6 +3428,37 @@ app.get('/admin/audit-summary', async (req, res) => {
     res.json({ success: true, totalDeposits, totalWithdrawals, totalHouseProfit });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- NEW: Admin link stats endpoint (optional) ----------
+app.get('/admin/link-stats', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  try {
+    const { data: opens, error } = await supabase
+      .from('admin_link_opens')
+      .select('*')
+      .eq('admin_id', admin.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+
+    const totalOpens = opens.length;
+    const uniqueUsers = new Set(opens.map(o => o.user_id).filter(Boolean)).size;
+
+    res.json({
+      success: true,
+      stats: { totalOpens, uniqueUsers },
+      recentOpens: opens
+    });
+  } catch (err) {
+    console.error('Error fetching link stats:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
