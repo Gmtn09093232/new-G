@@ -1,5 +1,6 @@
 // ================================================================
 //  server.js – Full Bingo Server with Admin Link Open Tracking
+//             & Manual Balance Adjustments Affecting Deposit Stats
 // ================================================================
 
 require('dotenv').config();
@@ -122,11 +123,10 @@ const Audit = {
 };
 
 // ================================================================
-//  NEW: Log Admin Link Open (for tracking invite link clicks)
+//  Log Admin Link Open (for tracking invite link clicks)
 // ================================================================
 async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
   try {
-    // Find admin_id for this invite code (if any)
     let adminId = null;
     if (inviteCode) {
       const { data: admin } = await supabase
@@ -406,7 +406,6 @@ async function getAdminFromSession(req) {
     .eq('is_active', true)
     .maybeSingle();
   if (error || !data) {
-    // If inactive, destroy session
     req.session.destroy();
     return null;
   }
@@ -653,11 +652,9 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
-    // ---- Log the admin link open (new) ----
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
     await logAdminLinkOpen(startParam, id, ip, userAgent);
-    // ---------------------------------------
 
     const user = await loadUser(id, displayName, handle, startParam, false);
     req.session.userId = id;
@@ -2020,7 +2017,6 @@ app.post('/admin/process-deposit', async (req, res) => {
     if (action === 'approve') {
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + reqData.amount;
-      // Deposit limit changed to 1500 ETB
       if (newHolding > 1500) {
         return res.status(400).json({
           error: `Admin's total approved deposits exceeds 1500 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
@@ -2079,7 +2075,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – now returns availableBalance (pending earnings) AND depositBalance (holding) + totalDeposits for compatibility ----
+// ---- UPDATED: /admin/stats – NOW INCLUDES POSITIVE ADJUSTMENTS IN DEPOSIT TOTALS ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2089,6 +2085,8 @@ app.get('/admin/stats', async (req, res) => {
 
   try {
     const playerCount = await getAdminPlayerCount(admin.id);
+    
+    // ----- Get deposit requests -----
     const { data: deposits } = await supabase
       .from('deposit_requests')
       .select('amount, status, created_at')
@@ -2097,8 +2095,28 @@ app.get('/admin/stats', async (req, res) => {
     const rawDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayDeposits = deposits.filter(d => d.status === 'approved' && new Date(d.created_at) >= today).reduce((sum, d) => sum + Number(d.amount), 0);
-    
+    const todayDepositsFromRequests = deposits
+      .filter(d => d.status === 'approved' && new Date(d.created_at) >= today)
+      .reduce((sum, d) => sum + Number(d.amount), 0);
+
+    // ----- Get positive manual adjustments (additions) -----
+    const { data: adjustments, error: adjErr } = await supabase
+      .from('admin_deposit_adjustments')
+      .select('amount, created_at')
+      .eq('admin_id', admin.id)
+      .gt('amount', 0); // only positive adjustments count as deposits
+
+    if (adjErr) throw adjErr;
+    const adjustmentTotal = adjustments.reduce((sum, a) => sum + Number(a.amount), 0);
+    const adjustmentToday = adjustments
+      .filter(a => new Date(a.created_at) >= today)
+      .reduce((sum, a) => sum + Number(a.amount), 0);
+
+    // ----- Combine totals -----
+    const totalDeposits = rawDeposits + adjustmentTotal;
+    const todayDeposits = todayDepositsFromRequests + adjustmentToday;
+
+    // ----- Withdrawals -----
     const { data: withdrawals } = await supabase
       .from('withdrawal_requests')
       .select('amount, status')
@@ -2108,7 +2126,7 @@ app.get('/admin/stats', async (req, res) => {
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
     const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
 
-    // ---- Deposit holding balance (money from players) ----
+    // ---- Deposit holding balance (includes all adjustments, positive and negative) ----
     const depositBalance = await getAdminHoldingBalance(admin.id);
 
     // ---- Earnings balances ----
@@ -2119,14 +2137,12 @@ app.get('/admin/stats', async (req, res) => {
       admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
       stats: {
         playerCount,
-        // Main balance that admin should see (available to withdraw)
-        availableBalance: pendingEarnings,    // <-- this is the 3 ETB
-        totalEarned: totalEarned,              // 19 ETB
-        // Deposit-related stats (for reference)
-        depositBalance,                        // 0 ETB (adjusted holding)
-        rawDeposits,                           // total approved deposits (raw)
-        totalDeposits: rawDeposits,            // <-- ADDED for frontend compatibility
-        todayDeposits,
+        availableBalance: pendingEarnings,
+        totalEarned: totalEarned,
+        depositBalance,               // holding balance (including all adjustments)
+        rawDeposits,                  // only approved deposit_requests
+        totalDeposits,                // rawDeposits + positive adjustments
+        todayDeposits,                // approved deposits today + positive adjustments today
         totalWithdrawals,
         pendingWithdrawals,
         pendingDeposits
@@ -2171,7 +2187,7 @@ app.get('/admin/players', async (req, res) => {
 });
 
 // ============================================================
-//  NEW: MANUAL PLAYER BALANCE ADJUSTMENT (session-based admin)
+//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT – records adjustment
 // ============================================================
 app.post('/admin/update-player-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -2214,15 +2230,28 @@ app.post('/admin/update-player-balance', async (req, res) => {
       .eq('telegram_id', telegramId);
     if (updateErr) throw updateErr;
 
-    // 3. Update in‑memory cache
+    // 3. Record the adjustment in admin_deposit_adjustments
+    const adjustmentAmount = operation === 'add' ? amt : -amt;
+    const { error: adjErr } = await supabase
+      .from('admin_deposit_adjustments')
+      .insert({
+        admin_id: admin.id,
+        amount: adjustmentAmount,
+        type: 'manual_balance_adjustment',
+        description: `Manual ${operation} of ${amt} ETB for player ${telegramId}`,
+        created_by: admin.id,
+        created_at: new Date().toISOString()
+      });
+    if (adjErr) console.error('Failed to record adjustment:', adjErr.message); // non-critical
+
+    // 4. Update in‑memory cache
     if (users[telegramId]) {
       users[telegramId].balance = newBalance;
     } else {
-      // Reload from DB to refresh cache
       await loadUser(telegramId, user.username, user.telegram_handle, null, true);
     }
 
-    // 4. Audit log
+    // 5. Audit log
     await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
       targetUserId: telegramId,
       operation,
@@ -2231,7 +2260,7 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance
     });
 
-    // 5. Notify the player via WebSocket if connected
+    // 6. Notify the player via WebSocket if connected
     const playerSocket = await getSocketByUserId(telegramId);
     if (playerSocket) {
       playerSocket.emit('balanceUpdate', newBalance);
