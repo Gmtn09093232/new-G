@@ -1400,7 +1400,8 @@
                         <span style="font-size:12px; color:#94a3b8; align-self:center;">(Paste list or CSV)</span>
                     </div>
                     <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
-                        <input type="text" id="addPlayerInput" placeholder="Enter Telegram ID" style="flex:1; min-width:150px; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; min-height:48px; font-size:14px;">
+                        <!-- UPDATED: placeholder now accepts username/handle -->
+                        <input type="text" id="addPlayerInput" placeholder="Enter Telegram ID or @username" style="flex:1; min-width:150px; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px; min-height:48px; font-size:14px;">
                         <button class="btn btn-primary" onclick="addPlayer()" style="min-height:48px;">➕ Add Player</button>
                     </div>
                     <div id="addPlayerStatus" style="font-size:13px; margin-bottom:10px;"></div>
@@ -1676,11 +1677,12 @@
                 <span class="bank-icon">📥</span>
                 <div>
                     <div class="bank-title">Import Players</div>
-                    <div class="bank-sub">Paste Telegram IDs (one per line)</div>
+                    <div class="bank-sub">Paste Telegram IDs or @usernames (one per line)</div>
                 </div>
             </div>
             <div class="input-group">
-                <textarea id="importTextarea" placeholder="Enter Telegram IDs, one per line&#10;Example:&#10;123456789&#10;987654321"></textarea>
+                <!-- UPDATED placeholder -->
+                <textarea id="importTextarea" placeholder="Enter Telegram IDs or @usernames, one per line&#10;Example:&#10;123456789&#10;@john_doe"></textarea>
             </div>
             <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
                 <label style="font-size:13px; cursor:pointer; background:#f1f5f9; padding:8px 12px; border-radius:8px; display:flex; align-items:center; gap:4px;">
@@ -1787,6 +1789,7 @@
     <script>
         // ============================================================
         //  ADMIN DASHBOARD – Enhanced with player search & scan details
+        //  & username/handle support for adding players
         // ============================================================
 
         // ---------- CONSTANTS ----------
@@ -2701,18 +2704,16 @@
             }
         }
 
-        // ---------- ADD PLAYER ----------
+        // ================================================================
+        //  UPDATED: ADD PLAYER – accepts username/handle as well as numeric ID
+        // ================================================================
         async function addPlayer() {
             const input = document.getElementById('addPlayerInput');
             const statusDiv = document.getElementById('addPlayerStatus');
-            const telegramId = input.value.trim();
+            const identifier = input.value.trim();
 
-            if (!telegramId) {
-                statusDiv.innerHTML = '<span style="color:#ef4444;">Please enter a Telegram ID.</span>';
-                return;
-            }
-            if (!/^\d+$/.test(telegramId)) {
-                statusDiv.innerHTML = '<span style="color:#ef4444;">Invalid Telegram ID. Must be numeric.</span>';
+            if (!identifier) {
+                statusDiv.innerHTML = '<span style="color:#ef4444;">Please enter a Telegram ID or @username.</span>';
                 return;
             }
 
@@ -2723,7 +2724,7 @@
                 const response = await fetch('/admin/import-players', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegramIds: [telegramId], overwrite: false })
+                    body: JSON.stringify({ telegramIds: [identifier], overwrite: false })
                 });
 
                 const data = await response.json();
@@ -2732,7 +2733,7 @@
                     const result = data.results[0];
                     if (result.success) {
                         const msg = result.created ? 'created' : 'updated';
-                        statusDiv.innerHTML = `<span style="color:#10b981;">✅ Player ${telegramId} ${msg} successfully!</span>`;
+                        statusDiv.innerHTML = `<span style="color:#10b981;">✅ Player ${result.telegramId} ${msg} successfully!</span>`;
                         input.value = '';
                         loadPlayers();
                     } else {
@@ -2741,17 +2742,15 @@
                                 const overwriteRes = await fetch('/admin/import-players', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ telegramIds: [telegramId], overwrite: true })
+                                    body: JSON.stringify({ telegramIds: [identifier], overwrite: true })
                                 });
                                 const overwriteData = await overwriteRes.json();
                                 if (overwriteData.success && overwriteData.results[0].success) {
-                                    statusDiv.innerHTML =
-                                        `<span style="color:#10b981;">✅ Player ${telegramId} reassigned to you!</span>`;
+                                    statusDiv.innerHTML = `<span style="color:#10b981;">✅ Player ${overwriteData.results[0].telegramId} reassigned to you!</span>`;
                                     input.value = '';
                                     loadPlayers();
                                 } else {
-                                    statusDiv.innerHTML =
-                                        `<span style="color:#ef4444;">❌ Failed to reassign: ${overwriteData.error}</span>`;
+                                    statusDiv.innerHTML = `<span style="color:#ef4444;">❌ Failed to reassign: ${overwriteData.error}</span>`;
                                 }
                             } else {
                                 statusDiv.innerHTML = '<span style="color:#f59e0b;">Cancelled.</span>';
@@ -2782,28 +2781,30 @@
             document.getElementById('importModal').classList.remove('active');
         }
 
+        // UPDATED: accept any non-empty line (not just numeric)
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 const content = e.target.result;
-                const lines = content.split(/\r?\n/).map(line => line.trim()).filter(line => line && /^\d+$/.test(line));
+                const lines = content.split(/\r?\n/).map(line => line.trim()).filter(line => line);
                 document.getElementById('importTextarea').value = lines.join('\n');
             };
             reader.readAsText(file);
             event.target.value = '';
         }
 
+        // UPDATED: import now sends whatever is in the textarea (usernames or IDs)
         async function submitImport() {
             const textarea = document.getElementById('importTextarea');
             const statusDiv = document.getElementById('importStatus');
             const overwrite = document.getElementById('importOverwrite').checked;
 
-            const ids = textarea.value.split(/\r?\n/).map(line => line.trim()).filter(line => line && /^\d+$/.test(line));
+            const ids = textarea.value.split(/\r?\n/).map(line => line.trim()).filter(line => line);
 
             if (ids.length === 0) {
-                alert('Please enter at least one valid Telegram ID.');
+                alert('Please enter at least one Telegram ID or username.');
                 return;
             }
 
@@ -2903,7 +2904,7 @@
             switchPage('game');
             startAutoRefresh();
             connectAdminWebSocket();
-            console.log('✅ Dashboard initialized with player search and scan details restored');
+            console.log('✅ Dashboard initialized with username/handle support');
         }
 
         document.addEventListener('keydown', (e) => {
