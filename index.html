@@ -771,7 +771,7 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        /* deposit dropdown */
+        /* deposit dropdowns */
         .deposit-method-select {
             width: 100%;
             padding: 14px 16px;
@@ -875,10 +875,15 @@
                 </div>
             </div>
 
-            <!-- SINGLE DROPDOWN: Admin + Method combo -->
-            <div class="payment-method-label" data-key="selectMethod">⬇ Select Admin &amp; Payment Method</div>
-            <select id="depositMethodSelect" class="deposit-method-select">
-                <option value="">— Select —</option>
+            <!-- TWO DROPDOWNS: Admin first, then Method -->
+            <div class="payment-method-label" data-key="selectAdmin">⬇ Select Admin</div>
+            <select id="depositAdminSelect" class="deposit-method-select">
+                <option value="">— Select Admin —</option>
+            </select>
+
+            <div class="payment-method-label" data-key="selectMethod">⬇ Select Payment Method</div>
+            <select id="depositMethodSelect" class="deposit-method-select" disabled>
+                <option value="">— Select Method —</option>
             </select>
 
             <!-- Admin details display -->
@@ -1169,7 +1174,8 @@
                 refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)",
                 proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)",
                 continue: "➡ ቀጥል",
-                selectMethod: "⬇ አስተዳዳሪ እና የክፍያ ዘዴ ይምረጡ"
+                selectAdmin: "⬇ አስተዳዳሪ ይምረጡ",
+                selectMethod: "⬇ የክፍያ ዘዴ ይምረጡ"
             },
             en: {
                 depositTitle: "Deposit",
@@ -1241,7 +1247,8 @@
                 refLabel: "📝 Transaction Reference (optional)",
                 proofLabel: "📷 Upload Photo Proof (required)",
                 continue: "➡ Continue",
-                selectMethod: "⬇ Select Admin &amp; Payment Method"
+                selectAdmin: "⬇ Select Admin",
+                selectMethod: "⬇ Select Payment Method"
             }
         };
 
@@ -1282,7 +1289,7 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS (single dropdown with admin+method) ==========
+        // ========== LOAD DEPOSIT ACCOUNTS (two-step: admin then method) ==========
         let depositAdmins = [];
 
         async function loadDepositAccounts() {
@@ -1291,7 +1298,7 @@
                 const data = await res.json();
                 if (data.success) {
                     depositAdmins = data.admins || [];
-                    populateMethodDropdown(depositAdmins);
+                    populateAdminDropdown(depositAdmins);
                 } else {
                     depositAdmins = [];
                 }
@@ -1301,47 +1308,39 @@
             }
         }
 
-        function populateMethodDropdown(admins) {
-            const select = document.getElementById('depositMethodSelect');
-            select.innerHTML = '<option value="">— Select —</option>';
-            let hasOptions = false;
+        function populateAdminDropdown(admins) {
+            const adminSelect = document.getElementById('depositAdminSelect');
+            adminSelect.innerHTML = '<option value="">— Select Admin —</option>';
             admins.forEach(admin => {
-                const methods = [];
-                if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr });
-                if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr });
-                if (admin.mpesa) methods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa });
-                methods.forEach(m => {
+                // Check if admin has at least one method
+                const hasMethod = admin.telebirr || admin.cbebirr || admin.mpesa;
+                if (hasMethod) {
                     const opt = document.createElement('option');
-                    opt.value = admin.id + '|' + m.type;
-                    opt.textContent = admin.name + ' – ' + m.label;
-                    opt.dataset.adminId = admin.id;
-                    opt.dataset.method = m.type;
-                    opt.dataset.adminName = admin.name;
-                    opt.dataset.number = m.number;
-                    select.appendChild(opt);
-                    hasOptions = true;
-                });
+                    opt.value = admin.id;
+                    opt.textContent = admin.name || 'Admin ' + admin.id;
+                    adminSelect.appendChild(opt);
+                }
             });
-            if (!hasOptions) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = '— No methods available —';
-                select.appendChild(opt);
-            }
-            // Reset details and continue button
+            // Reset method dropdown and details
+            const methodSelect = document.getElementById('depositMethodSelect');
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            methodSelect.disabled = true;
             document.getElementById('depositAdminDetailContainer').classList.add('hidden');
             document.getElementById('continueDepositBtn').disabled = true;
             selectedAdminId = null;
             selectedDepositType = null;
         }
 
-        // On dropdown change, show admin details and enable continue
-        document.getElementById('depositMethodSelect').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
+        // Admin selection change -> populate methods
+        document.getElementById('depositAdminSelect').addEventListener('change', function() {
+            const adminId = this.value;
+            const methodSelect = document.getElementById('depositMethodSelect');
             const detailContainer = document.getElementById('depositAdminDetailContainer');
             const continueBtn = document.getElementById('continueDepositBtn');
 
-            if (!selectedOption || !selectedOption.value) {
+            if (!adminId) {
+                methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+                methodSelect.disabled = true;
                 detailContainer.classList.add('hidden');
                 continueBtn.disabled = true;
                 selectedAdminId = null;
@@ -1349,36 +1348,101 @@
                 return;
             }
 
-            const adminId = selectedOption.dataset.adminId;
-            const method = selectedOption.dataset.method;
-            const adminName = selectedOption.dataset.adminName;
-            const number = selectedOption.dataset.number;
-
-            if (!adminId || !method || !number) {
+            const admin = depositAdmins.find(a => a.id == adminId);
+            if (!admin) {
+                methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+                methodSelect.disabled = true;
                 detailContainer.classList.add('hidden');
                 continueBtn.disabled = true;
                 selectedAdminId = null;
+                return;
+            }
+
+            // Build method options
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            const methods = [];
+            if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr });
+            if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr });
+            if (admin.mpesa) methods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa });
+
+            if (methods.length === 0) {
+                methodSelect.innerHTML = '<option value="">— No methods —</option>';
+                methodSelect.disabled = true;
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                return;
+            }
+
+            methodSelect.disabled = false;
+            methods.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.type;
+                opt.textContent = m.label + ' (' + m.number + ')';
+                opt.dataset.number = m.number;
+                methodSelect.appendChild(opt);
+            });
+
+            // Clear details until method selected
+            detailContainer.classList.add('hidden');
+            continueBtn.disabled = true;
+            selectedAdminId = parseInt(admin.id);
+            selectedDepositType = null;
+        });
+
+        // Method selection change -> show details and enable continue
+        document.getElementById('depositMethodSelect').addEventListener('change', function() {
+            const method = this.value;
+            const detailContainer = document.getElementById('depositAdminDetailContainer');
+            const continueBtn = document.getElementById('continueDepositBtn');
+            const adminId = document.getElementById('depositAdminSelect').value;
+
+            if (!method || !adminId) {
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedDepositType = null;
+                return;
+            }
+
+            const admin = depositAdmins.find(a => a.id == adminId);
+            if (!admin) {
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedDepositType = null;
+                return;
+            }
+
+            let number = '';
+            if (method === 'telebirr') number = admin.telebirr;
+            else if (method === 'cbebirr') number = admin.cbebirr;
+            else if (method === 'mpesa') number = admin.mpesa;
+
+            if (!number) {
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
                 selectedDepositType = null;
                 return;
             }
 
             // Update details
-            document.getElementById('adminDetailName').textContent = adminName || 'Admin';
+            document.getElementById('adminDetailName').textContent = admin.name || 'Admin';
             document.getElementById('adminDetailNumber').textContent = number;
             document.getElementById('adminDetailMethod').textContent = method.toUpperCase();
 
             detailContainer.classList.remove('hidden');
             continueBtn.disabled = false;
-            selectedAdminId = parseInt(adminId);
             selectedDepositType = method;
         });
 
         // ========== DEPOSIT FUNCTIONS ==========
         function openDepositTypeModal() {
             document.getElementById('depositTypeModal').classList.add('active');
-            // Reset dropdown to first option
-            const select = document.getElementById('depositMethodSelect');
-            select.selectedIndex = 0;
+            // Reset dropdowns
+            const adminSelect = document.getElementById('depositAdminSelect');
+            adminSelect.value = '';
+            const methodSelect = document.getElementById('depositMethodSelect');
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            methodSelect.disabled = true;
             document.getElementById('depositAdminDetailContainer').classList.add('hidden');
             document.getElementById('continueDepositBtn').disabled = true;
             selectedAdminId = null;
@@ -1394,7 +1458,7 @@
         // Proceed to deposit details
         function proceedToDepositDetails() {
             if (!selectedAdminId || !selectedDepositType) {
-                alert('Please select a payment method.');
+                alert('Please select an admin and a payment method.');
                 return;
             }
 
