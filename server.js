@@ -1,6 +1,7 @@
 // ================================================================
 //  server.js – Full Bingo Server with Admin Link Open Tracking
 //             & Manual Balance Adjustments Affecting Deposit Stats
+//             & 1500 ETB Limit for Manual Additions
 // ================================================================
 
 require('dotenv').config();
@@ -2075,7 +2076,7 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – NOW INCLUDES POSITIVE ADJUSTMENTS IN DEPOSIT TOTALS ----
+// ---- UPDATED: /admin/stats – includes positive adjustments in deposit totals ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2086,7 +2087,6 @@ app.get('/admin/stats', async (req, res) => {
   try {
     const playerCount = await getAdminPlayerCount(admin.id);
     
-    // ----- Get deposit requests -----
     const { data: deposits } = await supabase
       .from('deposit_requests')
       .select('amount, status, created_at')
@@ -2099,12 +2099,11 @@ app.get('/admin/stats', async (req, res) => {
       .filter(d => d.status === 'approved' && new Date(d.created_at) >= today)
       .reduce((sum, d) => sum + Number(d.amount), 0);
 
-    // ----- Get positive manual adjustments (additions) -----
     const { data: adjustments, error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
       .select('amount, created_at')
       .eq('admin_id', admin.id)
-      .gt('amount', 0); // only positive adjustments count as deposits
+      .gt('amount', 0);
 
     if (adjErr) throw adjErr;
     const adjustmentTotal = adjustments.reduce((sum, a) => sum + Number(a.amount), 0);
@@ -2112,11 +2111,9 @@ app.get('/admin/stats', async (req, res) => {
       .filter(a => new Date(a.created_at) >= today)
       .reduce((sum, a) => sum + Number(a.amount), 0);
 
-    // ----- Combine totals -----
     const totalDeposits = rawDeposits + adjustmentTotal;
     const todayDeposits = todayDepositsFromRequests + adjustmentToday;
 
-    // ----- Withdrawals -----
     const { data: withdrawals } = await supabase
       .from('withdrawal_requests')
       .select('amount, status')
@@ -2126,10 +2123,7 @@ app.get('/admin/stats', async (req, res) => {
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
     const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
 
-    // ---- Deposit holding balance (includes all adjustments, positive and negative) ----
     const depositBalance = await getAdminHoldingBalance(admin.id);
-
-    // ---- Earnings balances ----
     const { pending: pendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
 
     res.json({
@@ -2139,10 +2133,10 @@ app.get('/admin/stats', async (req, res) => {
         playerCount,
         availableBalance: pendingEarnings,
         totalEarned: totalEarned,
-        depositBalance,               // holding balance (including all adjustments)
-        rawDeposits,                  // only approved deposit_requests
-        totalDeposits,                // rawDeposits + positive adjustments
-        todayDeposits,                // approved deposits today + positive adjustments today
+        depositBalance,
+        rawDeposits,
+        totalDeposits,
+        todayDeposits,
         totalWithdrawals,
         pendingWithdrawals,
         pendingDeposits
@@ -2187,7 +2181,8 @@ app.get('/admin/players', async (req, res) => {
 });
 
 // ============================================================
-//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT – records adjustment
+//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT 
+//  – now checks 1500 ETB holding limit for additions
 // ============================================================
 app.post('/admin/update-player-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -2214,23 +2209,33 @@ app.post('/admin/update-player-balance', async (req, res) => {
       return res.status(403).json({ error: 'This player is not assigned to you' });
     }
 
+    // 2. Enforce 1500 ETB holding limit for additions
+    if (operation === 'add') {
+      const currentHolding = await getAdminHoldingBalance(admin.id);
+      if (currentHolding + amt > 1500) {
+        return res.status(400).json({
+          error: `Cannot add ${amt} ETB. Admin holding balance would exceed 1500 ETB (current: ${currentHolding.toFixed(0)} ETB). Please withdraw excess to super admin.`
+        });
+      }
+    }
+
     let oldBalance = Number(user.balance);
     let newBalance = oldBalance;
     if (operation === 'add') {
       newBalance += amt;
     } else {
-      if (oldBalance < amt) return res.status(400).json({ error: 'Insufficient balance' });
+      if (oldBalance < amt) return res.status(400).json({ error: 'Insufficient player balance' });
       newBalance -= amt;
     }
 
-    // 2. Update the balance in the database
+    // 3. Update the balance in the database
     const { error: updateErr } = await supabase
       .from('users')
       .update({ balance: newBalance })
       .eq('telegram_id', telegramId);
     if (updateErr) throw updateErr;
 
-    // 3. Record the adjustment in admin_deposit_adjustments
+    // 4. Record the adjustment in admin_deposit_adjustments
     const adjustmentAmount = operation === 'add' ? amt : -amt;
     const { error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
@@ -2242,16 +2247,16 @@ app.post('/admin/update-player-balance', async (req, res) => {
         created_by: admin.id,
         created_at: new Date().toISOString()
       });
-    if (adjErr) console.error('Failed to record adjustment:', adjErr.message); // non-critical
+    if (adjErr) console.error('Failed to record adjustment:', adjErr.message);
 
-    // 4. Update in‑memory cache
+    // 5. Update in‑memory cache
     if (users[telegramId]) {
       users[telegramId].balance = newBalance;
     } else {
       await loadUser(telegramId, user.username, user.telegram_handle, null, true);
     }
 
-    // 5. Audit log
+    // 6. Audit log
     await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
       targetUserId: telegramId,
       operation,
@@ -2260,7 +2265,7 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance
     });
 
-    // 6. Notify the player via WebSocket if connected
+    // 7. Notify the player via WebSocket if connected
     const playerSocket = await getSocketByUserId(telegramId);
     if (playerSocket) {
       playerSocket.emit('balanceUpdate', newBalance);
