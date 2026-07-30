@@ -826,9 +826,9 @@
             font-size: 3rem;
             margin-bottom: 12px;
         }
-        /* remove preview class */
+        /* hide method preview in admin list */
         .admin-methods-preview {
-            display: none;
+            display: none !important;
         }
     </style>
 </head>
@@ -869,7 +869,7 @@
         </div>
     </div>
 
-    <!-- DEPOSIT DETAILS (unchanged) -->
+    <!-- DEPOSIT DETAILS -->
     <div id="depositDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
@@ -881,7 +881,7 @@
             </div>
             <div class="account-card">
                 <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
-                <div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g, ''))">📋 0924839730</div>
+                <div class="copy-number" id="depositAccountNumber">📋 Contact admin for number</div>
                 <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
                 <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
                 <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
@@ -1244,6 +1244,19 @@
         else currentLang = 'am';
         applyLanguage();
 
+        // ========== SAFE DISPLAY NUMBER ==========
+        function getSafeDisplayNumber(number) {
+            if (!number) return '📞 Contact admin for number';
+            // Remove any non-digit characters
+            const digits = number.replace(/\D/g, '');
+            // Check if it's a valid Ethiopian phone number (09 or 07 + 8 digits)
+            if (digits.length === 10 && (digits.startsWith('09') || digits.startsWith('07'))) {
+                return number; // keep as-is if valid
+            }
+            // Otherwise, return a safe placeholder
+            return '📞 Contact admin for number';
+        }
+
         // ========== DEPOSIT ACCOUNTS ==========
         let depositAdmins = [];
 
@@ -1316,11 +1329,12 @@
             }
 
             container.innerHTML = methods.map(m => {
+                const displayNumber = getSafeDisplayNumber(m.number);
                 return `<div class="method-list-item" data-method="${m.type}" data-number="${m.number}">
                             <div class="method-icon">${m.icon}</div>
                             <div class="method-info">
                                 <div class="method-name">${m.label}</div>
-                                <div class="method-number">${m.number}</div>
+                                <div class="method-number">${displayNumber}</div>
                             </div>
                             <div class="method-select-badge">Select</div>
                         </div>`;
@@ -1366,9 +1380,18 @@
             let title = method.charAt(0).toUpperCase() + method.slice(1);
             document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
 
+            const displayNumber = getSafeDisplayNumber(number);
             const copyDiv = document.getElementById('depositAccountNumber');
-            if (copyDiv) copyDiv.innerHTML = `📋 ${number}`;
-            copyDiv.setAttribute('onclick', `copyToClipboard('${number}')`);
+            if (copyDiv) {
+                copyDiv.innerHTML = `📋 ${displayNumber}`;
+                // Only enable copy if it's a valid phone number
+                const digits = number.replace(/\D/g, '');
+                if (digits.length === 10 && (digits.startsWith('09') || digits.startsWith('07'))) {
+                    copyDiv.onclick = function() { copyToClipboard(number); };
+                } else {
+                    copyDiv.onclick = function() { alert('No valid account number available. Please contact admin.'); };
+                }
+            }
 
             document.getElementById('depositAccountName').textContent = admin.name || 'DOT BINGO OFFICIAL';
             document.getElementById('depositAdminInfo').textContent = `Admin: ${admin.name || 'DOT BINGO OFFICIAL'}`;
