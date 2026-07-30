@@ -770,7 +770,6 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        /* admin deposit dropdowns */
         .deposit-method-select {
             width: 100%;
             padding: 14px 16px;
@@ -858,6 +857,39 @@
         .modal-content.deposit-modal {
             max-width: 400px;
         }
+
+        /* Admin dropdown numbered list - extra polish */
+        #depositAdminSelect option {
+            padding: 8px 12px;
+            font-weight: 500;
+        }
+        #depositAdminSelect optgroup {
+            font-weight: 700;
+            color: #ea580c;
+        }
+        .method-tag {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 0.6rem;
+            padding: 1px 8px;
+            border-radius: 20px;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+        .admin-number-badge {
+            display: inline-block;
+            background: #f97316;
+            color: white;
+            font-size: 0.6rem;
+            font-weight: 700;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            line-height: 20px;
+            margin-right: 6px;
+        }
     </style>
 </head>
 <body>
@@ -874,7 +906,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Admin and Method dropdowns -->
+            <!-- Admin dropdown with numbered list -->
             <div class="payment-method-label" data-key="selectAdmin">⬇ Select Admin</div>
             <select id="depositAdminSelect" class="deposit-method-select">
                 <option value="">— Select Admin —</option>
@@ -1287,7 +1319,7 @@
         }
         applyLanguage();
 
-        // ========== LOAD DEPOSIT ACCOUNTS (NEW: populate admin dropdown) ==========
+        // ========== LOAD DEPOSIT ACCOUNTS with numbered admin list ==========
         let depositAdmins = [];
 
         async function loadDepositAccounts() {
@@ -1299,26 +1331,52 @@
                     populateAdminDropdown(depositAdmins);
                 } else {
                     depositAdmins = [];
+                    populateAdminDropdown([]);
                 }
             } catch (e) {
                 console.error('Error loading deposit accounts:', e);
                 depositAdmins = [];
+                populateAdminDropdown([]);
             }
         }
 
         function populateAdminDropdown(admins) {
             const select = document.getElementById('depositAdminSelect');
+            // Keep the placeholder
             select.innerHTML = '<option value="">— Select Admin —</option>';
-            admins.forEach(admin => {
-                // Check if admin has any method
-                const hasMethod = admin.telebirr || admin.cbebirr || admin.mpesa;
-                if (hasMethod) {
-                    const opt = document.createElement('option');
-                    opt.value = admin.id;
-                    opt.textContent = admin.name || 'Admin ' + admin.id;
-                    select.appendChild(opt);
-                }
+
+            // Filter admins that have at least one payment method
+            const validAdmins = admins.filter(a => a.telebirr || a.cbebirr || a.mpesa);
+
+            if (validAdmins.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '⚠️ No admins available';
+                opt.disabled = true;
+                select.appendChild(opt);
+                return;
+            }
+
+            // Add each admin with a number prefix and method tags
+            validAdmins.forEach((admin, index) => {
+                const methods = [];
+                if (admin.telebirr) methods.push('📱 Telebirr');
+                if (admin.cbebirr) methods.push('🏦 CBE Birr');
+                if (admin.mpesa) methods.push('📲 M-Pesa');
+
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                // Format: "1. John Doe (Telebirr, CBE Birr)"
+                const methodDisplay = methods.length > 0 ? ` (${methods.join(', ')})` : '';
+                const nameDisplay = admin.name || `Admin ${admin.id}`;
+                opt.textContent = `${index + 1}. ${nameDisplay}${methodDisplay}`;
+                // Store extra data for the option
+                opt.dataset.adminId = admin.id;
+                opt.dataset.adminName = admin.name || `Admin ${admin.id}`;
+                opt.dataset.methods = JSON.stringify(methods.map(m => m.replace(/[📱🏦📲]\s*/, '')));
+                select.appendChild(opt);
             });
+
             // Reset method dropdown and details
             const methodSelect = document.getElementById('depositMethodSelect');
             methodSelect.innerHTML = '<option value="">— Select Method —</option>';
@@ -1329,7 +1387,7 @@
             selectedDepositType = null;
         }
 
-        // On admin change, populate method dropdown
+        // On admin change, populate method dropdown from the selected admin's methods
         document.getElementById('depositAdminSelect').addEventListener('change', function() {
             const adminId = this.value;
             const methodSelect = document.getElementById('depositMethodSelect');
@@ -1356,12 +1414,12 @@
                 return;
             }
 
-            // Build method options
+            // Build method options from the admin's available methods
             methodSelect.innerHTML = '<option value="">— Select Method —</option>';
             const methods = [];
-            if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr });
-            if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr });
-            if (admin.mpesa) methods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa });
+            if (admin.telebirr) methods.push({ type: 'telebirr', label: '📱 Telebirr', number: admin.telebirr });
+            if (admin.cbebirr) methods.push({ type: 'cbebirr', label: '🏦 CBE Birr', number: admin.cbebirr });
+            if (admin.mpesa) methods.push({ type: 'mpesa', label: '📲 M-Pesa', number: admin.mpesa });
 
             if (methods.length === 0) {
                 methodSelect.innerHTML = '<option value="">— No methods —</option>';
@@ -1376,12 +1434,18 @@
             methods.forEach(m => {
                 const opt = document.createElement('option');
                 opt.value = m.type;
-                opt.textContent = m.label + ' (' + m.number + ')';
+                opt.textContent = `${m.label} (${m.number})`;
                 opt.dataset.number = m.number;
                 methodSelect.appendChild(opt);
             });
 
-            // Clear details until method selected
+            // Show admin details (name only, method details shown after method selection)
+            const adminName = admin.name || `Admin ${admin.id}`;
+            document.getElementById('adminDetailName').textContent = adminName;
+
+            // Clear method details until method selected
+            document.getElementById('adminDetailNumber').textContent = '—';
+            document.getElementById('adminDetailMethod').textContent = '—';
             detailContainer.classList.add('hidden');
             continueBtn.disabled = true;
             selectedAdminId = admin.id;
@@ -1423,7 +1487,7 @@
             }
 
             // Update details
-            document.getElementById('adminDetailName').textContent = admin.name || 'Admin';
+            document.getElementById('adminDetailName').textContent = admin.name || `Admin ${admin.id}`;
             document.getElementById('adminDetailNumber').textContent = number;
             document.getElementById('adminDetailMethod').textContent = method.toUpperCase();
 
@@ -1644,8 +1708,8 @@
                 '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
 
         function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(
-            ' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(),
-            100); }
+                ' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(),
+                100); }
 
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted);
             updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance =
