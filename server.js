@@ -1,3699 +1,2166 @@
-// ================================================================
-//  server.js – Full Bingo Server with Admin Link Open Tracking
-//             & Manual Balance Adjustments Affecting Deposit Stats
-//             & 1500 ETB Limit for Manual Additions
-//             & Import Players by Username/Handle
-// ================================================================
-
-require('dotenv').config();
-
-const express = require('express');
-const http = require('http');
-const session = require('express-session');
-const crypto = require('crypto');
-const { Server } = require('socket.io');
-const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
-const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
-
-// ---------- Supabase ----------
-console.log('Connecting to Supabase...');
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-(async () => {
-  const { error } = await supabase.from('users').select('count', { count: 'exact', head: true });
-  if (error) console.error('❌ Supabase error:', error.message);
-  else console.log('✅ Supabase connected');
-})();
-
-// ---------- Ensure deposit-photos bucket ----------
-async function ensureDepositBucket() {
-  const bucketName = 'deposit-photos';
-  try {
-    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-    if (listError) {
-      console.error('❌ Failed to list buckets:', listError.message);
-      return;
-    }
-    const exists = buckets.some(b => b.name === bucketName);
-    if (!exists) {
-      console.log(`📦 Creating storage bucket "${bucketName}"...`);
-      const { error: createError } = await supabase.storage.createBucket(bucketName, {
-        public: true,
-        file_size_limit: 5242880,
-        allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-      });
-      if (createError) {
-        console.error('❌ Failed to create bucket:', createError.message);
-      } else {
-        console.log(`✅ Bucket "${bucketName}" created successfully.`);
-        const { error: policyError } = await supabase.storage
-          .from(bucketName)
-          .update({ public: true });
-        if (policyError) {
-          console.error('❌ Failed to set bucket public:', policyError.message);
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0" />
+    <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
+    <script src="https://telegram.org/js/telegram-web-app.js">
+    </script>
+    <script src="/socket.io/socket.io.js">
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        /* ── Reset & base ── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-      }
-    } else {
-      console.log(`✅ Bucket "${bucketName}" already exists.`);
-    }
-  } catch (err) {
-    console.error('❌ Error ensuring bucket:', err.message);
-  }
-}
-ensureDepositBucket();
 
-const app = express();
-app.set('trust proxy', 1);
-const server = http.createServer(app);
-const io = new Server(server);
-
-const storage = multer.memoryStorage();
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Only images are allowed'), false);
-  }
-});
-
-app.use(express.json());
-
-const sessionMiddleware = session({
-  secret: process.env.SESSION_SECRET || 'bingo_mega_secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: true,
-    httpOnly: true,
-    sameSite: 'none'
-  }
-});
-app.use(sessionMiddleware);
-io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
-
-// ---------- Audit Logger ----------
-async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
-  try {
-    const { error } = await supabase
-      .from('audit_logs')
-      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: ipAddress, details });
-    if (error) throw error;
-  } catch (err) {
-    console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message);
-  }
-}
-
-const Audit = {
-  depositInitiated: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId: u, ipAddress: ip, details: d }),
-  depositCompleted: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId: u, ipAddress: ip, details: d }),
-  depositFailed: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId: u, ipAddress: ip, details: d }),
-  withdrawalRequested: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId: u, ipAddress: ip, details: d }),
-  withdrawalCompleted: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId: u, ipAddress: ip, details: d }),
-  withdrawalRejected: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId: u, ipAddress: ip, details: d }),
-  bingoCalled: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId: u, ipAddress: ip, details: d }),
-  bingoRejected: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId: u, ipAddress: ip, details: d }),
-  winPaidOut: (roomId, u, ip, d) => logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId: u, ipAddress: ip, details: d }),
-  numberDrawn: (roomId, d) => logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: d }),
-  cardAssigned: (roomId, u, ip, d) => logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId: u, ipAddress: ip, details: d }),
-  adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details: d }),
-  suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
-};
-
-// ================================================================
-//  Log Admin Link Open (for tracking invite link clicks)
-// ================================================================
-async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
-  try {
-    let adminId = null;
-    if (inviteCode) {
-      const { data: admin } = await supabase
-        .from('admins')
-        .select('id')
-        .eq('invite_code', inviteCode)
-        .maybeSingle();
-      if (admin) adminId = admin.id;
-    }
-
-    const { error } = await supabase
-      .from('admin_link_opens')
-      .insert({
-        admin_id: adminId,
-        invite_code: inviteCode || null,
-        user_id: userId || null,
-        ip_address: ip,
-        user_agent: userAgent || null
-      });
-    if (error) console.error('Failed to log admin link open:', error.message);
-  } catch (err) {
-    console.error('Error logging admin link open:', err.message);
-  }
-}
-
-// ---------- Suspicious Activity Detector ----------
-const winTimestamps = new Map();
-const WINDOW_MS = 120_000;
-const MAX_WINS_IN_WINDOW = 3;
-
-function detectRapidWins(roomId, userId, ip) {
-  if (!winTimestamps.has(userId)) winTimestamps.set(userId, []);
-  const times = winTimestamps.get(userId);
-  const now = Date.now();
-  times.push(now);
-  const recent = times.filter(t => now - t <= WINDOW_MS);
-  winTimestamps.set(userId, recent);
-  if (recent.length > MAX_WINS_IN_WINDOW) {
-    Audit.suspicious(roomId, userId, ip, {
-      detectionSource: 'win_velocity_check',
-      reason: `More than ${MAX_WINS_IN_WINDOW} wins in ${WINDOW_MS/1000}s`,
-      evidence: { recentWinCount: recent.length, windowMs: WINDOW_MS }
-    });
-    return true;
-  }
-  return false;
-}
-
-// ---------- Admin Helper Functions ----------
-const adminCache = {};
-async function loadAdmin(secretKey) {
-  if (adminCache[secretKey] && (Date.now() - adminCache[secretKey].cachedAt < 60000)) return adminCache[secretKey];
-  try {
-    const { data, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('secret_key', secretKey)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (error) throw error;
-    if (data) { adminCache[secretKey] = { ...data, cachedAt: Date.now() }; return adminCache[secretKey]; }
-    return null;
-  } catch (err) { console.error('Error loading admin:', err.message); return null; }
-}
-
-async function getAllAdmins() {
-  try {
-    const { data, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-    if (error) throw error;
-    return data || [];
-  } catch (err) { console.error('Error fetching admins:', err.message); return []; }
-}
-
-async function getAdminPlayers(adminId) {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('username');
-    if (error) throw error;
-    return data || [];
-  } catch (err) { console.error('Error fetching admin players:', err.message); return []; }
-}
-
-async function getAdminPlayerCount(adminId) {
-  try {
-    const { count, error } = await supabase
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('admin_id', adminId);
-    if (error) throw error;
-    return count || 0;
-  } catch (err) { console.error('Error counting admin players:', err.message); return 0; }
-}
-
-async function getAdminDeposits(adminId, status = 'approved') {
-  try {
-    const { data, error } = await supabase
-      .from('deposit_requests')
-      .select('amount')
-      .eq('admin_id', adminId)
-      .eq('status', status);
-    if (error) throw error;
-    return data.reduce((sum, d) => sum + Number(d.amount), 0);
-  } catch (err) { console.error('Error fetching admin deposits:', err.message); return 0; }
-}
-
-// ---------- Helper: Get admin's adjusted deposit balance ----------
-async function getAdminHoldingBalance(adminId) {
-  const { data: deposits, error: depErr } = await supabase
-    .from('deposit_requests')
-    .select('amount')
-    .eq('admin_id', adminId)
-    .eq('status', 'approved');
-  if (depErr) throw depErr;
-  const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
-
-  const { data: adjustments, error: adjErr } = await supabase
-    .from('admin_deposit_adjustments')
-    .select('amount')
-    .eq('admin_id', adminId);
-  if (adjErr) throw adjErr;
-  const totalAdjustments = adjustments.reduce((sum, a) => sum + Number(a.amount), 0);
-
-  return totalDeposits + totalAdjustments;
-}
-
-// ============================================================
-//  SUPER ADMIN HELPER – Live Earnings Calculation
-// ============================================================
-async function getAdminEarnings(adminId) {
-  const { data: contributions, error: contribErr } = await supabase
-    .from('game_admin_contributions')
-    .select('house_profit_share, created_at')
-    .eq('admin_id', adminId);
-
-  if (contribErr) {
-    console.error('Error fetching contributions:', contribErr.message);
-    return { pending: 0, earned: 0 };
-  }
-
-  const { data: paidCommissions, error: paidErr } = await supabase
-    .from('admin_daily_commissions')
-    .select('commission_amount, date')
-    .eq('admin_id', adminId)
-    .eq('status', 'paid');
-
-  if (paidErr) {
-    console.error('Error fetching paid commissions:', paidErr.message);
-    return { pending: 0, earned: 0 };
-  }
-
-  const paidDates = new Set();
-  if (paidCommissions) {
-    paidCommissions.forEach(c => {
-      const dateStr = c.date;
-      paidDates.add(dateStr);
-    });
-  }
-
-  let pending = 0;
-  if (contributions) {
-    for (const contrib of contributions) {
-      const date = new Date(contrib.created_at);
-      const dateStr = date.toISOString().split('T')[0];
-      if (!paidDates.has(dateStr)) {
-        pending += Number(contrib.house_profit_share) || 0;
-      }
-    }
-  }
-
-  const earned = paidCommissions ? paidCommissions.reduce((sum, c) => sum + Number(c.commission_amount), 0) : 0;
-
-  return { pending, earned };
-}
-
-async function markContributionsAsPaid(adminId, amount, paidAt = new Date().toISOString()) {
-  const { data: paidCommissions, error: paidErr } = await supabase
-    .from('admin_daily_commissions')
-    .select('date')
-    .eq('admin_id', adminId)
-    .eq('status', 'paid');
-  if (paidErr) throw paidErr;
-  const paidDates = new Set(paidCommissions.map(d => d.date));
-
-  const { data: contributions, error: contribErr } = await supabase
-    .from('game_admin_contributions')
-    .select('created_at, house_profit_share')
-    .eq('admin_id', adminId)
-    .order('created_at', { ascending: true });
-  if (contribErr) throw contribErr;
-
-  const grouped = {};
-  for (const c of contributions) {
-    const date = new Date(c.created_at).toISOString().split('T')[0];
-    if (!paidDates.has(date)) {
-      if (!grouped[date]) grouped[date] = 0;
-      grouped[date] += Number(c.house_profit_share) || 0;
-    }
-  }
-
-  let remaining = amount;
-  const sortedDates = Object.keys(grouped).sort();
-
-  for (const date of sortedDates) {
-    if (remaining <= 0) break;
-    const available = grouped[date];
-    const toPay = Math.min(available, remaining);
-
-    const { data: existing, error: existErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('id')
-      .eq('admin_id', adminId)
-      .eq('date', date)
-      .maybeSingle();
-    if (existErr) throw existErr;
-
-    if (existing) {
-      const { error: updateErr } = await supabase
-        .from('admin_daily_commissions')
-        .update({ status: 'paid', paid_at: paidAt })
-        .eq('id', existing.id);
-      if (updateErr) throw updateErr;
-    } else {
-      const newEntry = {
-        admin_id: adminId,
-        date: date,
-        total_entry_fees: 0,
-        total_house_profit: grouped[date],
-        commission_amount: grouped[date],
-        status: 'paid',
-        paid_at: paidAt
-      };
-      const { error: insertErr } = await supabase
-        .from('admin_daily_commissions')
-        .insert(newEntry);
-      if (insertErr) throw insertErr;
-    }
-
-    remaining -= toPay;
-  }
-
-  if (remaining > 0) {
-    throw new Error(`Insufficient pending earnings: only ${amount - remaining} of ${amount} was covered`);
-  }
-
-  return true;
-}
-
-async function isSuperAdmin(adminId) {
-  try {
-    const { data, error } = await supabase
-      .from('admins')
-      .select('is_super_admin')
-      .eq('id', adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (error || !data) return false;
-    return data.is_super_admin === true;
-  } catch { return false; }
-}
-
-// ============================================================
-//  HELPER: getAdminFromSession – only active admins allowed
-// ============================================================
-async function getAdminFromSession(req) {
-  if (!req.session.adminId) return null;
-  const { data, error } = await supabase
-    .from('admins')
-    .select('*')
-    .eq('id', req.session.adminId)
-    .eq('is_active', true)
-    .maybeSingle();
-  if (error || !data) {
-    req.session.destroy();
-    return null;
-  }
-  return data;
-}
-
-// ---------- Static endpoints ----------
-app.get('/api/deposit-accounts', async (req, res) => {
-  try {
-    const userId = req.session?.userId;
-    let adminId = null;
-
-    if (userId) {
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('admin_id')
-        .eq('telegram_id', userId)
-        .maybeSingle();
-      if (!error && user) {
-        adminId = user.admin_id;
-      }
-    }
-
-    let admins;
-    if (adminId) {
-      const { data: admin, error } = await supabase
-        .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
-        .eq('id', adminId)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (error) throw error;
-
-      if (admin) {
-        if (admin.accept_deposits !== false) {
-          admins = [admin];
-        } else {
-          const { data: fallback, error: fallbackErr } = await supabase
-            .from('admins')
-            .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-            .eq('is_fallback', true)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (fallbackErr) throw fallbackErr;
-          if (fallback) {
-            admins = [fallback];
-          } else {
-            admins = [];
-          }
+        body {
+            min-height: 100vh;
+            background: #f5f3f0;
+            background-image: radial-gradient(circle at 20% 30%, rgba(0, 0, 0, 0.02) 2%, transparent 2.5%);
+            background-size: 40px 40px;
+            font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-      } else {
-        const { data: fallback, error: fallbackErr } = await supabase
-          .from('admins')
-          .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-          .eq('is_fallback', true)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (fallbackErr) throw fallbackErr;
-        if (fallback) {
-          admins = [fallback];
-        } else {
-          admins = [];
+
+        .page {
+            max-width: 600px;
+            width: 100%;
+            margin: 0 auto;
+            background: rgba(255, 255, 248, 0.96);
+            border-radius: 48px;
+            padding: 20px 18px 24px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(2px);
         }
-      }
-    } else {
-      const { data: allAdmins, error: allErr } = await supabase
-        .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
-        .eq('is_active', true);
-      if (allErr) throw allErr;
-      admins = allAdmins.filter(a => a.accept_deposits !== false);
-    }
 
-    const result = admins.map(a => ({
-      id: a.id,
-      name: a.name,
-      telebirr: a.telebirr_number || null,
-      cbebirr: a.cbebirr_number || null,
-      mpesa: a.mpesa_number || null
-    }));
-
-    res.json({ success: true, admins: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
-app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
-app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
-app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
-app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
-app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
-app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
-app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-
-app.get('/admin/live-players', (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).send('Forbidden');
-  res.sendFile(path.join(__dirname, 'admin-live-players.html'));
-});
-
-// ---------- User cache ----------
-const users = {};
-
-// ---------- loadUser ----------
-async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
-  const id = String(telegramId);
-  if (!refresh && users[id]) {
-    console.log(`👤 Cache hit for ${id}`);
-    return users[id];
-  }
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', id)
-      .maybeSingle();
-    if (error) throw error;
-    if (data) {
-      users[id] = {
-        id,
-        username: data.username,
-        balance: Number(data.balance),
-        telegram_handle: data.telegram_handle,
-        referred_by: data.referred_by,
-        first_deposit_amount: data.first_deposit_amount || 0,
-        admin_id: data.admin_id,
-        assigned_admin_name: data.assigned_admin_name
-      };
-      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
-      return users[id];
-    } else {
-      console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
-      
-      let finalAdminId = adminId || null;
-      let adminName = null;
-      
-      if (!finalAdminId && inviteCode) {
-        const { data: adminData, error: adminErr } = await supabase
-          .from('admins')
-          .select('id, name')
-          .eq('invite_code', inviteCode)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (!adminErr && adminData) {
-          finalAdminId = adminData.id;
-          adminName = adminData.name;
-          console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
+        .hidden {
+            display: none !important;
         }
-      } else if (adminId) {
-        const { data: adminData, error: adminErr } = await supabase
-          .from('admins')
-          .select('name')
-          .eq('id', adminId)
-          .maybeSingle();
-        if (!adminErr && adminData) adminName = adminData.name;
-      }
-      
-      const newUser = {
-        telegram_id: id,
-        username: username || 'Player',
-        telegram_handle: telegramHandle || null,
-        balance: 10,
-        referred_by: inviteCode || null,
-        first_deposit_amount: 0,
-        admin_id: finalAdminId,
-        assigned_admin_name: adminName
-      };
-      
-      const { error: insertError } = await supabase.from('users').insert(newUser);
-      if (insertError) throw insertError;
-      
-      if (inviteCode) {
-        const { data: inviteData, error: fetchError } = await supabase
-          .from('invite_stats')
-          .select('count')
-          .eq('invite_code', inviteCode)
-          .maybeSingle();
-        if (!fetchError && inviteData) {
-          await supabase
-            .from('invite_stats')
-            .update({ count: (inviteData.count || 0) + 1 })
-            .eq('invite_code', inviteCode);
-        } else if (!fetchError) {
-          await supabase
-            .from('invite_stats')
-            .insert({ invite_code: inviteCode, count: 1 });
+
+        .lang-toggle {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            background: #f97316;
+            color: #fff;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 16px;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: .8rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
         }
-      }
-      
-      users[id] = {
-        id,
-        username: newUser.username,
-        balance: 10,
-        telegram_handle: newUser.telegram_handle,
-        referred_by: newUser.referred_by,
-        first_deposit_amount: 0,
-        admin_id: newUser.admin_id,
-        assigned_admin_name: newUser.assigned_admin_name
-      };
-      return users[id];
-    }
-  } catch (err) {
-    console.error(`❌ loadUser error for ${id}:`, err.message);
-    throw err;
-  }
-}
-
-// ---------- Telegram verification ----------
-function verifyTelegram(initData) {
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    params.delete('hash');
-    const dataCheckString = [...params.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('\n');
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
-    const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-    return calculatedHash === hash;
-  } catch (err) {
-    console.error('❌ Verification error:', err.message);
-    return false;
-  }
-}
-
-// ---------- Telegram auth (with link open logging) ----------
-app.post('/api/telegram-miniapp-auth', async (req, res) => {
-  const { initData } = req.body;
-  if (!initData || !verifyTelegram(initData)) {
-    return res.status(403).json({ success: false, error: 'Invalid initData' });
-  }
-  try {
-    const params = new URLSearchParams(initData);
-    const userData = JSON.parse(params.get('user'));
-    const startParam = params.get('start_param');
-    const id = String(userData.id);
-    const displayName = userData.first_name || userData.username || 'Player';
-    const handle = userData.username || null;
-
-    const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers['user-agent'] || null;
-    await logAdminLinkOpen(startParam, id, ip, userAgent);
-
-    const user = await loadUser(id, displayName, handle, startParam, false);
-    req.session.userId = id;
-    req.session.save((err) => {
-      if (err) {
-        console.error('❌ Session save error:', err);
-        return res.status(500).json({ success: false, error: 'Session save failed' });
-      }
-      res.json({
-        success: true,
-        userId: id,
-        username: user.username,
-        balance: user.balance,
-        telegram_handle: user.telegram_handle,
-        admin_id: user.admin_id,
-        assigned_admin_name: user.assigned_admin_name
-      });
-    });
-  } catch (err) {
-    console.error('❌ Auth error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Admin Login ----------
-app.post('/admin/login', async (req, res) => {
-  const { phone, pin } = req.body;
-  if (!phone || !pin) return res.status(400).json({ success: false, error: 'Phone and PIN required' });
-  try {
-    const { data: admin, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('phone', phone)
-      .eq('pin', pin)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (error || !admin) return res.status(401).json({ success: false, error: 'Invalid phone or PIN' });
-    req.session.adminId = admin.id;
-    req.session.adminName = admin.name;
-    req.session.adminPhone = admin.phone;
-    req.session.adminSecret = admin.secret_key;
-    res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number } });
-  } catch (err) {
-    console.error('Admin login error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Admin Registration ----------
-app.post('/admin/register', async (req, res) => {
-  const { 
-    phone, name, deposit_number, payment_type, pin, confirm_pin, 
-    registration_secret,
-    telebirr_number, cbebirr_number, mpesa_number 
-  } = req.body;
-  if (!phone || !name || !pin || !confirm_pin) {
-    return res.status(400).json({ success: false, error: 'Phone, name, and PIN are required' });
-  }
-  if (pin !== confirm_pin) return res.status(400).json({ success: false, error: 'PINs do not match' });
-  if (pin.length < 4 || !/^\d+$/.test(pin)) return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits' });
-  if (!phone.match(/^(09|07)\d{8}$/)) return res.status(400).json({ success: false, error: 'Invalid phone number' });
-  if (payment_type && !['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) {
-    return res.status(400).json({ success: false, error: 'Invalid payment type' });
-  }
-  const requiredSecret = process.env.ADMIN_REGISTRATION_SECRET;
-  if (requiredSecret && registration_secret !== requiredSecret) return res.status(403).json({ success: false, error: 'Invalid registration secret' });
-  try {
-    const { data: existing } = await supabase
-      .from('admins')
-      .select('phone')
-      .eq('phone', phone)
-      .maybeSingle();
-    if (existing) return res.status(400).json({ success: false, error: 'Phone number already registered' });
-    const secretKey = crypto.randomBytes(16).toString('hex');
-    const inviteCode = name.substring(0, 3).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
-    const { data: newAdmin, error: insertErr } = await supabase
-      .from('admins')
-      .insert({
-        phone,
-        name,
-        deposit_number: deposit_number || null,
-        payment_type: payment_type || null,
-        secret_key: secretKey,
-        pin,
-        invite_code: inviteCode,
-        commission_rate: 0.40,
-        is_active: true,
-        telebirr_number: telebirr_number || null,
-        cbebirr_number: cbebirr_number || null,
-        mpesa_number: mpesa_number || null,
-        accept_deposits: true,
-        is_fallback: false
-      })
-      .select()
-      .single();
-    if (insertErr) throw insertErr;
-    console.log(`✅ New admin registered: ${name} (${phone}) with invite code: ${inviteCode}`);
-    res.json({ success: true, message: 'Registration successful!', admin: { id: newAdmin.id, name: newAdmin.name, phone: newAdmin.phone, deposit_number: newAdmin.deposit_number } });
-  } catch (err) {
-    console.error('Registration error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/admin/logout', (req, res) => { req.session.destroy(); res.json({ success: true }); });
-
-app.get('/admin/session', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
-  }
-  res.json({
-    success: true,
-    admin: {
-      id: admin.id,
-      name: admin.name,
-      phone: admin.phone,
-      deposit_number: admin.deposit_number,
-      commission_rate: admin.commission_rate,
-      invite_code: admin.invite_code,
-      telebirr_number: admin.telebirr_number,
-      cbebirr_number: admin.cbebirr_number,
-      mpesa_number: admin.mpesa_number
-    }
-  });
-});
-
-app.get('/admin/registration-config', (req, res) => {
-  const requiresSecret = !!process.env.ADMIN_REGISTRATION_SECRET;
-  res.json({ requiresSecret });
-});
-
-// ---------- Get Admin Invite Info ----------
-app.get('/admin/invite-info', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-  try {
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'bingomkmk0120_bot';
-    const inviteLink = `https://t.me/${botUsername}?start=${admin.invite_code}`;
-    res.json({
-      success: true,
-      admin: {
-        id: admin.id,
-        name: admin.name,
-        invite_code: admin.invite_code,
-        invite_link: inviteLink,
-        phone: admin.phone,
-        deposit_number: admin.deposit_number
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching invite info:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Legacy admin balance management ----------
-app.post('/admin/add-balance', async (req, res) => {
-  const { secret, telegramId, amount } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const strId = String(telegramId);
-  const amt = Number(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  try {
-    const user = await loadUser(strId, 'unknown', null, null, false);
-    user.balance += amt;
-    await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
-    await supabase.from('deposit_requests').insert({
-      telegram_id: strId,
-      username: user.username,
-      amount: amt,
-      status: 'approved',
-      phone: null,
-      payment_type: 'manual',
-      proof_path: null,
-      processed_at: new Date().toISOString()
-    });
-    Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === strId);
-    if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
-    res.json({ success: true, newBalance: user.balance });
-  } catch (err) {
-    console.error('Error in admin/add-balance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/admin/set-balance', async (req, res) => {
-  const { secret, userId, newBalance } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const strId = String(userId);
-  const newBal = Number(newBalance);
-  if (isNaN(newBal) || newBal < 0) return res.status(400).json({ error: 'Balance must be non-negative' });
-  try {
-    const { data: existing, error: fetchErr } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', strId)
-      .maybeSingle();
-    if (fetchErr || !existing) return res.status(404).json({ error: 'User not found' });
-    await supabase.from('users').update({ balance: newBal }).eq('telegram_id', strId);
-    if (users[strId]) users[strId].balance = newBal;
-    else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
-    await Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal });
-    const playerSocket = await getSocketByUserId(strId);
-    if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
-    res.json({ success: true, newBalance: newBal });
-  } catch (err) {
-    console.error('Error in admin/set-balance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/admin/delete-user', async (req, res) => {
-  const { secret, telegramId } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const strId = String(telegramId);
-  try {
-    const { data: user, error: findErr } = await supabase
-      .from('users')
-      .select('telegram_id')
-      .eq('telegram_id', strId)
-      .maybeSingle();
-    if (findErr || !user) return res.status(404).json({ error: 'User not found' });
-    await supabase.from('users').delete().eq('telegram_id', strId);
-    for (const stake of [10, 20, 30]) {
-      const game = games[stake];
-      if (!game) continue;
-      const playerIndex = game.players.findIndex(p => p.telegramId === strId);
-      if (playerIndex !== -1) {
-        const player = game.players[playerIndex];
-        if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
-        game.players.splice(playerIndex, 1);
-        io.to(`stake_${stake}`).emit('cardTaken', {
-          stake,
-          number: player.cardNumber,
-          takenNumbers: Array.from(game.takenCardNumbers)
-        });
-        broadcastPlayerCount(stake);
-        if (game.status === 'running' && game.players.length === 0) {
-          clearInterval(game.callInterval);
-          endGameWithWinners(stake);
+        @media (max-width:550px) {
+            .lang-toggle {
+                top: 8px;
+                left: 8px;
+                padding: 6px 12px;
+                font-size: .7rem;
+            }
         }
-      }
-    }
-    delete users[strId];
-    Audit.adminAction('ADMIN_DELETE_USER', 'admin', req.ip, { targetUserId: strId });
-    res.json({ success: true, message: `User ${strId} deleted` });
-  } catch (err) {
-    console.error('Error deleting user:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// ---------- Bingo Game Logic ----------
-function generateCard() {
-  const columns = [
-    [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
-    [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
-    [31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],
-    [46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
-    [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75]
-  ];
-  const card = [];
-  for (let col = 0; col < 5; col++) {
-    const colNumbers = [];
-    const available = [...columns[col]];
-    for (let row = 0; row < 5; row++) {
-      if (col === 2 && row === 2) { colNumbers.push('FREE'); }
-      else { colNumbers.push(available.splice(Math.floor(Math.random() * available.length), 1)[0]); }
-    }
-    card.push(colNumbers);
-  }
-  const transposed = [];
-  for (let r = 0; r < 5; r++) transposed.push([card[0][r], card[1][r], card[2][r], card[3][r], card[4][r]]);
-  return transposed;
-}
-
-function createGameState(entryFee) {
-  return {
-    status: 'lobby',
-    players: [],
-    takenCardNumbers: new Set(),
-    calledNumbers: [],
-    entryFee,
-    prizePool: 0,
-    lobbyTimer: null,
-    callInterval: null,
-    lobbyEndTime: 0,
-    cardSet: Array.from({ length: 100 }, () => generateCard()),
-    winners: [],
-    bingoGraceTimeout: null,
-    winningNumber: null,
-    botTimeouts: [],
-    bot3Added: false,
-    forceActive: false,
-    forcedBotId: null,
-    forcedCallCounter: 0
-  };
-}
-
-const games = {
-  10: createGameState(10),
-  20: createGameState(20),
-  30: createGameState(30)
-};
-
-// Bot constants
-const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
-const botBalances = new Map();
-BOT_IDS.forEach(id => botBalances.set(id, 1000));
-
-const ETHIOPIAN_MALE_NAMES = [
-  'Abe', 'Alex', 'mekia', 'Dawit', 'Fikru', 'Girma', 'Haile', 'zid',
-  'sura cr7', 'nega', 'Mekonnen', 'Nebiyu', 'baye', 'Robel', 'teddy',
-  'Tadesse', 'Wondia', 'Yared', 'Zemenu', 'Birukee', 'bura', 'Ermias',
-  'Fitsum', 'shaki', 'belaya', 'Mulugeta', 'Nati', 'dera',
-  'Tekle', 'Worku', 'jhone', 'Aman', 'Belete', 'Daniel', 'Endalk',
-  'Gashaw', 'Habtia', 'kassish', 'Lul', 'Mengistu', 'Mulu',
-  '@', 'abela', 'Tesfaye', 'Wolde'
-];
-
-function getRandomMaleEthiopianName() {
-  return ETHIOPIAN_MALE_NAMES[Math.floor(Math.random() * ETHIOPIAN_MALE_NAMES.length)];
-}
-
-let gameCounter = 0;
-const botLastWinGame = new Map();
-BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
-const forceBotWinNextGame = { 20: false, 10: false, 30: false };
-let globalForcedBotId = null;
-let botGameHistory = [];
-const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
-const botNameAssignments = new Map();
-
-function getBotName(botId) {
-  const now = Date.now();
-  const entry = botNameAssignments.get(botId);
-  if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) return entry.name;
-  const newName = getRandomMaleEthiopianName();
-  botNameAssignments.set(botId, { name: newName, assignedAt: now });
-  console.log(`🆕 Bot ${botId} assigned new name: ${newName} (valid for 12h)`);
-  return newName;
-}
-
-function addSingleBotToGame(botId, stake) {
-  if (stake !== 20) return false;
-  const game = getGame(stake);
-  if (!game || game.status !== 'lobby') return false;
-  if (game.players.find(p => p.telegramId === botId)) return false;
-  const balance = botBalances.get(botId) || 0;
-  if (balance < game.entryFee) {
-    console.log(`⚠️ Bot ${botId} insufficient balance (${balance}) to join stake ${stake}`);
-    return false;
-  }
-  const availableNumbers = [];
-  for (let i = 1; i <= 100; i++) {
-    if (!game.takenCardNumbers.has(i)) availableNumbers.push(i);
-  }
-  if (availableNumbers.length === 0) {
-    console.log('⚠️ No available numbers for bot');
-    return false;
-  }
-  const cardNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
-  const card = game.cardSet[cardNumber - 1];
-  const botName = getBotName(botId);
-  const botPlayer = {
-    telegramId: botId,
-    username: botName,
-    card: card,
-    markedNumbers: [],
-    cardNumber: cardNumber,
-    ip: '127.0.0.1',
-    isBot: true,
-    hasCalledBingo: false
-  };
-  game.players.push(botPlayer);
-  game.takenCardNumbers.add(cardNumber);
-  io.to(`stake_${stake}`).emit('cardTaken', {
-    stake,
-    number: cardNumber,
-    takenNumbers: Array.from(game.takenCardNumbers)
-  });
-  broadcastPlayerCount(stake);
-  notifyAdminClients();
-  console.log(`🤖 Bot ${botId} joined stake ${stake} with card ${cardNumber}`);
-  return true;
-}
-
-function removeBotFromGame(botId, stake) {
-  const game = getGame(stake);
-  if (!game) return false;
-  const idx = game.players.findIndex(p => p.telegramId === botId);
-  if (idx === -1) return false;
-  const player = game.players[idx];
-  if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
-  game.players.splice(idx, 1);
-  io.to(`stake_${stake}`).emit('cardTaken', {
-    stake,
-    number: player.cardNumber,
-    takenNumbers: Array.from(game.takenCardNumbers)
-  });
-  broadcastPlayerCount(stake);
-  notifyAdminClients();
-  console.log(`🤖 Bot ${botId} removed from stake ${stake}`);
-  return true;
-}
-
-function checkAndAddThirdBot(stake) {
-  if (stake !== 20) return;
-  const game = getGame(stake);
-  if (!game || game.status !== 'lobby') return;
-  if (game.bot3Added) return;
-  const realPlayers = game.players.filter(p => !p.isBot);
-  if (realPlayers.length >= 3) {
-    game.bot3Added = true;
-    setTimeout(() => {
-      if (game.status !== 'lobby') return;
-      if (game.players.find(p => p.telegramId === BOT_IDS[2])) return;
-      addSingleBotToGame(BOT_IDS[2], stake);
-      console.log(`🤖 Third bot (${BOT_IDS[2]}) added because 3 real players joined.`);
-    }, 500);
-  }
-}
-
-function updateBotsOnNumber(stake, number) {
-  if (stake !== 20) return;
-  const game = getGame(stake);
-  if (game.status !== 'running') return;
-  const bots = game.players.filter(p => p.isBot);
-  for (const bot of bots) {
-    const flat = bot.card.flat();
-    if (flat.includes(number) && !bot.markedNumbers.includes(number)) {
-      bot.markedNumbers.push(number);
-    }
-    const lastCalled = game.calledNumbers[game.calledNumbers.length - 1];
-    if (lastCalled === undefined) continue;
-    if (isBingoValidOnLastCall(bot.card, bot.markedNumbers, lastCalled)) {
-      if (!bot.hasCalledBingo && !game.winners.find(w => w.telegramId === bot.telegramId)) {
-        bot.hasCalledBingo = true;
-        const delay = Math.random() < 0.2 ? 0 : 500 + Math.random() * 1500;
-        setTimeout(() => {
-          if (game.status !== 'running') return;
-          if (game.winners.find(w => w.telegramId === bot.telegramId)) return;
-          handleBingoClaim(bot.telegramId, stake);
-        }, delay);
-      }
-    }
-  }
-}
-
-function handleBingoClaim(telegramId, stake, force = false) {
-  const game = getGame(stake);
-  if (game.status !== 'running') return;
-  const player = game.players.find(p => p.telegramId === telegramId);
-  if (!player) return;
-  if (game.winners.find(w => w.telegramId === telegramId)) return;
-
-  if (!force) {
-    const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
-    if (lastCalled === null) return;
-    if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) return;
-  }
-
-  if (game.winningNumber === null) {
-    game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
-  }
-  game.winners.push({
-    telegramId,
-    username: player.username,
-    isBot: player.isBot || false,
-    isForced: force
-  });
-
-  if (!player.isBot && !force) {
-    Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, {
-      cardId: player.cardNumber,
-      cardGrid: player.card,
-      calledNumber: game.winningNumber,
-      winType: 'bingo_line'
-    });
-  }
-
-  if (!game.bingoGraceTimeout) {
-    io.to(`stake_${stake}`).emit('multipleBingoPossible', { stake, message: 'Bingo claimed! Waiting for other potential winners...' });
-    game.bingoGraceTimeout = setTimeout(() => {
-      endGameWithWinners(stake);
-    }, 3000);
-  }
-}
-
-function getGame(stake) { return games[stake]; }
-
-function getAllPlayersList() {
-  const allPlayers = [];
-  for (const stake of [10, 20, 30]) {
-    const game = games[stake];
-    game.players.forEach(p => {
-      const user = users[p.telegramId];
-      allPlayers.push({
-        telegramId: p.telegramId,
-        username: p.username,
-        cardNumber: p.cardNumber,
-        stake,
-        telegram_handle: user ? user.telegram_handle : null,
-        isBot: p.isBot || false
-      });
-    });
-  }
-  return allPlayers;
-}
-
-function notifyAdminClients() {
-  const data = {
-    players: getAllPlayersList(),
-    gameStatus: {
-      10: games[10].status,
-      20: games[20].status,
-      30: games[30].status
-    }
-  };
-  adminNamespace.emit('admin:playersList', data);
-}
-
-const publicNamespace = io.of('/public');
-publicNamespace.on('connection', (socket) => {
-  for (const stake of [10, 20, 30]) {
-    const game = getGame(stake);
-    socket.emit('playersCount', { stake, count: game.players.length });
-  }
-});
-
-function broadcastPlayerCount(stake) {
-  const game = getGame(stake);
-  const count = game.players.length;
-  io.to(`stake_${stake}`).emit('playersCount', { stake, count });
-  io.emit('playersCount', { stake, count });
-  publicNamespace.emit('playersCount', { stake, count });
-}
-
-function resetGame(stake) {
-  const game = getGame(stake);
-  clearInterval(game.callInterval);
-  clearTimeout(game.lobbyTimer);
-  clearTimeout(game.bingoGraceTimeout);
-  for (const timeout of game.botTimeouts) clearTimeout(timeout);
-  game.botTimeouts = [];
-  game.bot3Added = false;
-  game.status = 'lobby';
-  game.players = [];
-  game.takenCardNumbers.clear();
-  game.calledNumbers = [];
-  game.prizePool = 0;
-  game.winners = [];
-  game.bingoGraceTimeout = null;
-  game.winningNumber = null;
-  game.lobbyEndTime = Date.now() + 45000;
-  game.cardSet = Array.from({ length: 100 }, () => generateCard());
-
-  if (stake === 20 && forceBotWinNextGame[20]) {
-    game.forceActive = true;
-    game.forcedBotId = globalForcedBotId;
-    game.forcedCallCounter = 0;
-    console.log(`⏳ Forced win active for bot ${game.forcedBotId} on 21st call.`);
-  } else {
-    game.forceActive = false;
-    game.forcedBotId = null;
-  }
-
-  if (stake === 20) {
-    const scheduleBotAtRemaining = (botIndex, remainingSeconds) => {
-      if (botIndex >= BOT_IDS.length) return;
-      const absoluteTime = game.lobbyEndTime - remainingSeconds * 1000;
-      const delay = absoluteTime - Date.now();
-      if (delay <= 0) return;
-      const timeout = setTimeout(() => {
-        if (game.status !== 'lobby') return;
-        const botId = BOT_IDS[botIndex];
-        if (game.players.find(p => p.telegramId === botId)) return;
-        addSingleBotToGame(botId, stake);
-      }, delay);
-      game.botTimeouts.push(timeout);
-    };
-    scheduleBotAtRemaining(0, 41);
-    scheduleBotAtRemaining(1, 39);
-  }
-
-  io.to(`stake_${stake}`).emit('lobbyState', {
-    stake,
-    startsIn: 45,
-    takenNumbers: Array.from(game.takenCardNumbers),
-    playersCount: game.players.length
-  });
-  io.emit('lobbyState', {
-    stake,
-    startsIn: 45,
-    takenNumbers: Array.from(game.takenCardNumbers),
-    playersCount: game.players.length
-  });
-  publicNamespace.emit('lobbyState', {
-    stake,
-    startsIn: 45,
-    takenNumbers: Array.from(game.takenCardNumbers),
-    playersCount: game.players.length
-  });
-
-  broadcastPlayerCount(stake);
-  game.lobbyTimer = setTimeout(() => startGame(stake), 45000);
-  notifyAdminClients();
-}
-
-async function startGame(stake) {
-  const game = getGame(stake);
-  for (const timeout of game.botTimeouts) clearTimeout(timeout);
-  game.botTimeouts = [];
-
-  const toRemove = [];
-  for (const p of game.players) {
-    if (p.isBot) {
-      const bal = botBalances.get(p.telegramId) || 0;
-      if (bal < game.entryFee) toRemove.push(p);
-    } else {
-      const user = users[p.telegramId];
-      if (!user || user.balance < game.entryFee) toRemove.push(p);
-    }
-  }
-  for (const p of toRemove) {
-    const idx = game.players.findIndex(pl => pl.telegramId === p.telegramId);
-    if (idx !== -1) {
-      game.players.splice(idx, 1);
-      if (p.cardNumber) game.takenCardNumbers.delete(p.cardNumber);
-    }
-  }
-  io.to(`stake_${stake}`).emit('cardTaken', { stake, takenNumbers: Array.from(game.takenCardNumbers) });
-  broadcastPlayerCount(stake);
-  notifyAdminClients();
-
-  if (game.players.length === 0) {
-    game.status = 'ended';
-    setTimeout(() => resetGame(stake), 3000);
-    notifyAdminClients();
-    return;
-  }
-
-  for (const p of game.players) {
-    if (p.isBot) {
-      const bal = botBalances.get(p.telegramId) || 0;
-      botBalances.set(p.telegramId, bal - game.entryFee);
-      console.log(`💸 Bot ${p.telegramId} paid entry fee ${game.entryFee}, balance now ${botBalances.get(p.telegramId)}`);
-      continue;
-    }
-    const user = users[p.telegramId];
-    if (user) {
-      user.balance -= game.entryFee;
-      await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
-      const playerSocket = await getSocketByUserId(p.telegramId);
-      if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
-      Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: game.entryFee, currency: 'ETB', stake });
-    }
-  }
-
-  const totalEntryFees = game.entryFee * game.players.length;
-  game.prizePool = game.players.length === 1 ? totalEntryFees : 0.8 * totalEntryFees;
-
-  game.status = 'running';
-  game.calledNumbers = [];
-  game.winningNumber = null;
-  for (const p of game.players) if (p.isBot) p.hasCalledBingo = false;
-  io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
-  notifyAdminClients();
-  startCalling(stake);
-}
-
-async function getSocketByUserId(userId) {
-  const sockets = await io.fetchSockets();
-  return sockets.find(s => s.userId === userId);
-}
-
-function startCalling(stake) {
-  const game = getGame(stake);
-  let callCount = 0;
-  game.callInterval = setInterval(() => {
-    if (game.status !== 'running') { clearInterval(game.callInterval); return; }
-    const allNums = Array.from({ length: 75 }, (_, i) => i + 1);
-    const available = allNums.filter(n => !game.calledNumbers.includes(n));
-    if (available.length === 0) {
-      clearInterval(game.callInterval);
-      endGameWithWinners(stake);
-      return;
-    }
-    const number = available[Math.floor(Math.random() * available.length)];
-    game.calledNumbers.push(number);
-    callCount++;
-    io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
-    Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
-
-    if (stake === 20 && game.forceActive && callCount === 21) {
-      if (game.winners.length === 0) {
-        const forcedBot = game.players.find(p => p.telegramId === game.forcedBotId);
-        if (forcedBot) {
-          const flat = forcedBot.card.flat();
-          if (flat.includes(number) && !forcedBot.markedNumbers.includes(number)) {
-            forcedBot.markedNumbers.push(number);
-          }
-          handleBingoClaim(game.forcedBotId, stake, true);
-          console.log(`🤖 Forced bot ${game.forcedBotId} claimed bingo on 21st call.`);
-          game.forceActive = false;
-          forceBotWinNextGame[20] = false;
-          return;
+        /* ── Bingo card ── */
+        .card-container {
+            margin: 20px 0 16px;
+            display: flex;
+            justify-content: center;
+            background: #fef7ef;
+            border-radius: 40px;
+            padding: 14px 8px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, .04), inset 0 1px 0 rgba(255, 255, 255, .8);
+            overflow-x: auto;
+            min-height: 200px;
         }
-      } else {
-        game.forceActive = false;
-        forceBotWinNextGame[20] = false;
-      }
-    }
-
-    if (stake === 20) {
-      updateBotsOnNumber(stake, number);
-    }
-  }, 4000);
-}
-
-function getLines(card) {
-  const lines = [];
-  for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
-  for (let c = 0; c < 5; c++) lines.push([card[0][c], card[1][c], card[2][c], card[3][c], card[4][c]]);
-  lines.push([card[0][0], card[1][1], card[2][2], card[3][3], card[4][4]]);
-  lines.push([card[0][4], card[1][3], card[2][2], card[3][1], card[4][0]]);
-  lines.push([card[0][0], card[0][4], card[4][0], card[4][4]]);
-  return lines;
-}
-
-function isLineComplete(line, marked) {
-  return line.every(val => val === 'FREE' || marked.includes(val));
-}
-
-function isBingoValidOnLastCall(card, marked, lastCalled) {
-  if (lastCalled === null) return false;
-  const lines = getLines(card);
-  for (const line of lines) {
-    if (!isLineComplete(line, marked)) continue;
-    if (!line.includes(lastCalled)) continue;
-    return true;
-  }
-  return false;
-}
-
-// ---------- endGameWithWinners ----------
-async function endGameWithWinners(stake) {
-  const game = getGame(stake);
-  game.status = 'ended';
-  clearInterval(game.callInterval);
-
-  gameCounter++;
-
-  if (stake === 20) {
-    const realWinners = game.winners.filter(w => !w.isBot);
-    const botWinners = game.winners.filter(w => w.isBot);
-    if (realWinners.length > 0 && botWinners.length === 0) {
-      forceBotWinNextGame[20] = true;
-      const eligibleBots = game.players.filter(p => p.isBot);
-      if (eligibleBots.length > 0) {
-        const forcedBot = eligibleBots.reduce((a, b) =>
-          (botBalances.get(a.telegramId) || 0) < (botBalances.get(b.telegramId) || 0) ? a : b
-        );
-        globalForcedBotId = forcedBot.telegramId;
-        console.log(`🤖 Next game will force bot ${globalForcedBotId} to win on the 21st call.`);
-      } else {
-        globalForcedBotId = null;
-      }
-    }
-    if (botWinners.length > 0) {
-      forceBotWinNextGame[20] = false;
-      console.log(`🤖 Bot won naturally in stake 20, forceBotWinNextGame[20] = false`);
-    }
-  }
-
-  const totalEntryFees = game.players.length * game.entryFee;
-  const houseProfit = totalEntryFees - game.prizePool;
-
-  let gameRoundId = null;
-  try {
-    const { data, error } = await supabase
-      .from('game_rounds')
-      .insert({
-        total_entry_fees: totalEntryFees,
-        prize_pool: game.prizePool,
-        house_profit: houseProfit,
-        stake
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    gameRoundId = data.id;
-    console.log(`✅ Game round recorded for stake ${stake} (entry: ${totalEntryFees}, profit: ${houseProfit})`);
-  } catch (err) {
-    console.error(`❌ Failed to insert game_round for stake ${stake}:`, err.message);
-  }
-
-  if (gameRoundId && houseProfit > 0) {
-    const adminGroups = {};
-    for (const player of game.players) {
-      if (player.isBot) continue;
-      
-      let user = users[player.telegramId];
-      if (!user) {
-        try {
-          user = await loadUser(player.telegramId, player.username, null, null, true);
-        } catch (e) {
-          console.error(`Failed to load user ${player.telegramId} for contribution:`, e);
-          continue;
+        .card-container table {
+            border-collapse: separate;
+            border-spacing: 10px;
+            margin: 0 auto;
         }
-      }
-      const adminId = user?.admin_id || null;
-      if (!adminId) {
-        console.warn(`User ${player.telegramId} has no admin assigned, skipping contribution.`);
-        continue;
-      }
-      
-      if (!adminGroups[adminId]) {
-        adminGroups[adminId] = { adminId, totalEntryFees: 0, playerCount: 0 };
-      }
-      adminGroups[adminId].totalEntryFees += game.entryFee;
-      adminGroups[adminId].playerCount++;
-    }
+        .card-container thead tr th {
+            font-family: 'Inter', monospace;
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ea580c, #f97316);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            padding: 8px 0;
+            text-align: center;
+            width: 58px;
+        }
+        .card-container td {
+            width: 58px;
+            height: 58px;
+            background: #fff;
+            border-radius: 24px;
+            text-align: center;
+            vertical-align: middle;
+            font-weight: 700;
+            font-size: 1.2rem;
+            font-family: 'Inter', monospace;
+            color: #1e293b;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .03), inset 0 1px 0 rgba(255, 255, 255, .6);
+            border: 1px solid #fed7aa;
+            transition: all .2s cubic-bezier(.2, .9, .4, 1.1);
+            cursor: pointer;
+        }
+        .card-container td.free {
+            background: #fff3e6;
+            color: #ea580c;
+            font-size: 1.5rem;
+            border-color: #fdba74;
+        }
+        .card-container td.marked {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: #fff;
+            box-shadow: 0 0 0 2px #ffedd5, inset 0 1px 2px rgba(0, 0, 0, .1);
+            border-color: #fbbf24;
+            transform: scale(.94);
+        }
 
-    const adminCommissionFraction = parseFloat(process.env.ADMIN_COMMISSION_PERCENTAGE) || 0.40;
-    const adminShareTotal = houseProfit * adminCommissionFraction;
+        /* ── Call area ── */
+        .last-call-area {
+            background: #1e1e24;
+            border-radius: 60px;
+            padding: 14px 18px;
+            margin: 12px 0 18px;
+            text-align: center;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, .05), 0 12px 25px -10px rgba(0, 0, 0, .2);
+            border: 1px solid #2d2d35;
+        }
+        .last-call-label {
+            font-size: .7rem;
+            letter-spacing: 3px;
+            font-weight: 600;
+            color: #facc15;
+            text-transform: uppercase;
+            background: #0a0a0c;
+            display: inline-block;
+            padding: 5px 18px;
+            border-radius: 40px;
+        }
+        .last-call-number {
+            font-size: 2.7rem;
+            font-weight: 800;
+            font-family: 'Inter', monospace;
+            color: #fef08a;
+            text-shadow: 0 0 6px #f97316;
+            letter-spacing: 5px;
+            margin: 8px 0 5px;
+            background: #0a0a0c;
+            border-radius: 60px;
+            padding: 6px;
+        }
+        .called-history {
+            background: #0a0a0c;
+            border-radius: 48px;
+            font-size: .7rem;
+            color: #fcd34d;
+            font-weight: 500;
+            overflow-x: auto;
+            white-space: nowrap;
+            font-family: monospace;
+            text-align: center;
+            margin-top: 8px;
+            border: 1px solid #2d2d35;
+            padding: 8px 14px;
+            scroll-behavior: smooth;
+        }
 
-    for (const [adminId, data] of Object.entries(adminGroups)) {
-      const share = totalEntryFees > 0
-        ? (data.totalEntryFees / totalEntryFees) * adminShareTotal
-        : 0;
-      if (share > 0) {
-        try {
-          await supabase
-            .from('game_admin_contributions')
-            .insert({
-              game_round_id: gameRoundId,
-              admin_id: parseInt(adminId),
-              total_entry_fees: data.totalEntryFees,
-              house_profit_share: share
+        /* ── Top bars ── */
+        .balance-top,
+        .game-top-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            background: #ffffffdd;
+            backdrop-filter: blur(4px);
+            padding: 6px 12px;
+            border-radius: 60px;
+            margin-bottom: 16px;
+            border: 1px solid #fed7aa;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .02);
+        }
+        .game-top-bar div:first-child {
+            font-size: .8rem;
+            font-weight: 600;
+            background: #fef3c7;
+            padding: 4px 8px;
+            border-radius: 40px;
+        }
+        .players-badge {
+            background: #f97316;
+            padding: 6px 18px;
+            border-radius: 40px;
+            color: #fff;
+            font-weight: 600;
+            font-size: .75rem;
+            box-shadow: 0 2px 8px rgba(249, 115, 22, .2);
+        }
+        .timer-badge {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: monospace;
+            color: #ea580c;
+            background: #fef3c7;
+            padding: 4px 18px;
+            border-radius: 50px;
+            letter-spacing: 1px;
+            border: 1px solid #fde68a;
+        }
+
+        /* ── Number grid ── */
+        .grid-100 {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+            background: #fef9f0;
+            padding: 14px;
+            border-radius: 40px;
+            box-shadow: inset 0 0 0 1px #fff6e5, 0 4px 12px rgba(0, 0, 0, .02);
+        }
+        .grid-cell {
+            background: #fff;
+            border-radius: 20px;
+            aspect-ratio: 1/1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: .75rem;
+            color: #334155;
+            border: 1px solid #fed7aa;
+            cursor: pointer;
+            transition: .1s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .02);
+        }
+        .grid-cell.taken {
+            background: #19b105;
+            color: #fff;
+            border-color: #2ecc71;
+            cursor: not-allowed;
+        }
+        .grid-cell.own-card {
+            background: #e74c3c;
+            color: #fff;
+            border-color: #f39c12;
+            box-shadow: 0 0 0 2px #fef3c7;
+            cursor: not-allowed;
+        }
+        .grid-cell.selected {
+            background: #e74c3c;
+            color: #fff;
+            box-shadow: 0 0 0 2px #fef3c7;
+            border-color: #f39c12;
+            transform: scale(.96);
+        }
+
+        /* ── Buttons ── */
+        button {
+            min-height: 44px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            transition: all .1s ease;
+            cursor: pointer;
+        }
+        button:active {
+            transform: scale(.96);
+        }
+        button:disabled {
+            opacity: .6;
+            transform: none;
+            cursor: not-allowed;
+        }
+        #bingoBtn {
+            display: block;
+            width: 90%;
+            max-width: 340px;
+            margin: 24px auto 20px;
+            background: linear-gradient(105deg, #f97316, #ea580c);
+            color: #fff;
+            font-size: 1.5rem;
+            font-weight: 800;
+            padding: 14px 12px;
+            border-radius: 80px;
+            border: none;
+            box-shadow: 0 10px 0 #9a3412, 0 0 20px rgba(249, 115, 22, .4);
+            letter-spacing: 2px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, .2);
+            transition: .08s linear;
+        }
+        #bingoBtn:active {
+            transform: translateY(5px);
+            box-shadow: 0 5px 0 #9a3412;
+        }
+
+        /* ── Tabs ── */
+        .tab-bar {
+            display: flex;
+            background: #ffffffcc;
+            backdrop-filter: blur(8px);
+            border-radius: 100px;
+            margin-top: 20px;
+            padding: 6px 8px;
+            gap: 8px;
+            border: 1px solid #fed7aa;
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 10px 0;
+            border-radius: 80px;
+            font-weight: 600;
+            font-size: .8rem;
+            color: #7c2d12;
+            cursor: pointer;
+            transition: .1s;
+        }
+        .tab-btn.active {
+            background: #f97316;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(249, 115, 22, .3);
+        }
+
+        /* ── Prize pool ── */
+        .prize-pool {
+            background: #fef3c7;
+            border-radius: 40px;
+            text-align: center;
+            padding: 6px 12px;
+            margin: 6px 0 12px;
+            border: 1px solid #fed7aa;
+        }
+        .prize-pool span {
+            font-size: .7rem;
+            font-weight: 600;
+            color: #b45309;
+            letter-spacing: .5px;
+        }
+        .prize-pool div {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ea580c;
+            line-height: 1.3;
+        }
+
+        /* ── Modals ── */
+        .winner-modal,
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, .75);
+            backdrop-filter: blur(16px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility .2s, opacity .2s;
+        }
+        .winner-modal.active,
+        .modal.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        .winner-card,
+        .modal-content {
+            background: rgba(255, 255, 245, .98);
+            backdrop-filter: blur(12px);
+            border-radius: 64px;
+            padding: 28px 24px;
+            text-align: center;
+            width: 88%;
+            max-width: 340px;
+            box-shadow: 0 30px 50px -20px rgba(0, 0, 0, .4), inset 0 1px 2px rgba(255, 255, 255, .8);
+            border: 2px solid rgba(249, 115, 22, .5);
+            animation: winnerPop .35s cubic-bezier(.34, 1.2, .64, 1);
+        }
+        @keyframes winnerPop {
+            0% {
+                transform: scale(.85);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        .winner-trophy {
+            font-size: 4rem;
+            filter: drop-shadow(0 8px 12px rgba(249, 115, 22, .4));
+            margin-bottom: 8px;
+            animation: floatTrophy 1.2s infinite alternate;
+        }
+        @keyframes floatTrophy {
+            0% {
+                transform: translateY(0);
+            }
+            100% {
+                transform: translateY(-8px);
+            }
+        }
+        .winner-title {
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 12px;
+        }
+        .winners-avatars {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin: 16px 0;
+            max-height: 140px;
+            overflow-y: auto;
+            padding: 8px;
+            background: rgba(255, 237, 213, .4);
+            border-radius: 48px;
+        }
+        .winner-badge {
+            background: #f97316;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: .8rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .winner-badge::before {
+            content: "👑";
+        }
+        .prize-amount {
+            background: linear-gradient(105deg, #fef3c7, #ffedd5);
+            border-radius: 60px;
+            padding: 12px;
+            margin: 18px 0 16px;
+            border: 1px solid #fed7aa;
+        }
+        .prize-number {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ea580c;
+        }
+        .celebrate-btn {
+            background: #f97316;
+            border: none;
+            width: 80%;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #fff;
+            margin-top: 8px;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, .4);
+            transition: .1s;
+        }
+
+        /* ── Confetti ── */
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            overflow: hidden;
+        }
+        .confetti-piece {
+            position: absolute;
+            width: 8px;
+            height: 16px;
+            background: #f97316;
+            top: -20px;
+            opacity: .8;
+            animation: fall 4s linear forwards;
+        }
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .mute-btn {
+            background: #334155 !important;
+            font-size: 1rem !important;
+            padding: 4px 10px !important;
+            min-width: 44px;
+        }
+
+        /* ── Deposit / Withdraw modals ── */
+        .modal-content {
+            background: #fff;
+            border-radius: 48px;
+            padding: 24px;
+            max-width: 92%;
+            width: 380px;
+            border: 1px solid #fed7aa;
+        }
+        .modal-content.deposit-modal {
+            max-width: 400px;
+        }
+        .bank-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ffedd5;
+            padding-bottom: 12px;
+        }
+        .account-card {
+            background: #f8fafc;
+            border-radius: 28px;
+            padding: 14px;
+            margin: 14px 0;
+            border-left: 4px solid #f97316;
+        }
+        .copy-number {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: .1s;
+            font-weight: 600;
+            color: #1e293b;
+            margin-top: 6px;
+            width: fit-content;
+        }
+        .copy-number:active {
+            background: #e2e8f0;
+            transform: scale(.96);
+        }
+        .input-group {
+            margin: 14px 0;
+        }
+        .input-group input,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 60px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            font-size: .85rem;
+            font-family: inherit;
+        }
+        .input-group input[type="file"] {
+            padding: 8px;
+            border-radius: 60px;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            font-size: .85rem;
+            font-family: inherit;
+        }
+        .input-group textarea {
+            border-radius: 24px;
+            resize: vertical;
+            min-height: 80px;
+        }
+        .transaction-summary {
+            background: #fef9e6;
+            border-radius: 28px;
+            padding: 12px;
+            font-size: .75rem;
+            color: #92400e;
+            margin: 12px 0;
+            text-align: center;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 60px;
+            font-weight: 700;
+            border: none;
+        }
+        .btn-primary {
+            background: #f97316;
+            color: #fff;
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .type-btn {
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 60px;
+            margin: 8px 0;
+            font-weight: 600;
+            border: 1px solid #e2e8f0;
+            width: 100%;
+            cursor: pointer;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .back-btn {
+            background: #f1f5f9;
+            border: 1px solid #fed7aa;
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: #7c2d12;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .profile-stat {
+            background: #fef9f0;
+            border-radius: 32px;
+            padding: 16px;
+            text-align: center;
+            margin: 12px 0;
+            border: 1px solid #fed7aa;
+        }
+
+        /* ── Stake page ── */
+        .stake-page-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        .stake-option {
+            background: #fef9f0;
+            border: 1px solid #fed7aa;
+            padding: 16px 24px;
+            border-radius: 60px;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ea580c;
+            box-shadow: 0 6px 0 #fed7aa;
+            cursor: pointer;
+            width: 150px;
+            text-align: center;
+            transition: .1s;
+            position: relative;
+        }
+        .stake-option:active {
+            transform: scale(.96);
+        }
+        .player-count-badge {
+            display: block;
+            font-size: .7rem;
+            font-weight: 400;
+            color: #facc15;
+            margin-top: 6px;
+            background: #1e2a36;
+            padding: 2px 8px;
+            border-radius: 40px;
+        }
+        .rules-text {
+            background: #fef9f0;
+            border-radius: 32px;
+            padding: 18px;
+            margin-top: 20px;
+            font-size: .85rem;
+            line-height: 1.5;
+            color: #1e293b;
+        }
+        .history-card {
+            background: #fef9f0;
+            border-radius: 28px;
+            padding: 14px;
+            margin-bottom: 12px;
+            border-left: 5px solid #f97316;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .02);
+        }
+        .history-card strong {
+            color: #ea580c;
+        }
+
+        @media (max-width:550px) {
+            .card-container td {
+                width: 48px;
+                height: 48px;
+                border-radius: 18px;
+                font-size: 1rem;
+            }
+            .card-container thead tr th {
+                width: 48px;
+                font-size: 1.2rem;
+            }
+            .grid-100 {
+                gap: 5px;
+            }
+            #bingoBtn {
+                font-size: 1.3rem;
+            }
+            .stake-option {
+                width: 130px;
+                font-size: 1.2rem;
+                padding: 12px 16px;
+            }
+            .player-count-badge {
+                font-size: .6rem;
+            }
+        }
+
+        .telegram-links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: .7rem;
+        }
+        .telegram-links a {
+            color: #ea580c;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .telegram-links a:hover {
+            text-decoration: underline;
+        }
+
+        .admin-option {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: all .2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .admin-option:hover {
+            border-color: #f97316;
+            background: #fff7ed;
+        }
+        .admin-option.selected {
+            border-color: #f97316;
+            background: #fff7ed;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, .2);
+        }
+        .admin-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #f97316;
+            flex-shrink: 0;
+        }
+        .admin-option .admin-info {
+            flex: 1;
+        }
+        .admin-option .admin-name {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .admin-option .admin-number {
+            font-size: .8rem;
+            color: #64748b;
+            font-family: monospace;
+        }
+        .admin-option .admin-badge {
+            font-size: .65rem;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+        .payment-method-label {
+            font-size: .8rem;
+            font-weight: 600;
+            color: #64748b;
+            margin: 12px 0 6px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .deposit-method-select {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 60px;
+            border: 2px solid #fed7aa;
+            background: #fff;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e293b;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f97316' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 20px;
+        }
+        .deposit-method-select:focus {
+            outline: none;
+            border-color: #f97316;
+            box-shadow: 0 0 0 4px rgba(249, 115, 22, .15);
+        }
+        .deposit-method-select option {
+            padding: 10px;
+            font-weight: 500;
+        }
+
+        .deposit-admin-detail {
+            background: #f8fafc;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 16px 0 8px;
+            border-left: 4px solid #f97316;
+            text-align: left;
+        }
+        .deposit-admin-detail .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: .9rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .deposit-admin-detail .detail-row:last-child {
+            border-bottom: none;
+        }
+        .deposit-admin-detail .detail-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        .deposit-admin-detail .detail-value {
+            color: #1e293b;
+            font-weight: 600;
+            font-family: monospace;
+        }
+        .deposit-admin-detail .detail-value.copyable {
+            cursor: pointer;
+            background: #f1f5f9;
+            padding: 2px 12px;
+            border-radius: 30px;
+            transition: .1s;
+        }
+        .deposit-admin-detail .detail-value.copyable:active {
+            background: #e2e8f0;
+            transform: scale(.96);
+        }
+
+        .admin-deposit-btn {
+            width: 100%;
+            margin-top: 12px;
+            background: #f97316;
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1rem;
+            transition: .1s;
+        }
+        .admin-deposit-btn:active {
+            transform: scale(.96);
+        }
+        .admin-deposit-btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
+
+    <!-- ─── MODALS ─── -->
+
+    <!-- Deposit Type (Admin + Method selection) -->
+    <div id="depositTypeModal" class="modal">
+        <div class="modal-content deposit-modal">
+            <div class="bank-header">
+                <span class="bank-icon">🏦</span>
+                <div>
+                    <div class="bank-title" data-key="depositTitle">Deposit</div>
+                    <div class="bank-sub" data-key="chooseMethod">Choose payment method</div>
+                </div>
+            </div>
+
+            <div class="payment-method-label" data-key="selectAdmin">⬇ Select Admin</div>
+            <select id="depositAdminSelect" class="deposit-method-select">
+                <option value="">— Select Admin —</option>
+            </select>
+
+            <div class="payment-method-label" data-key="selectMethod">⬇ Select Payment Method</div>
+            <select id="depositMethodSelect" class="deposit-method-select" disabled>
+                <option value="">— Select Method —</option>
+            </select>
+
+            <div id="depositAdminDetailContainer" class="deposit-admin-detail hidden">
+                <div class="detail-row">
+                    <span class="detail-label">👤 Admin</span>
+                    <span class="detail-value" id="adminDetailName">—</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">📞 Account</span>
+                    <span class="detail-value copyable" id="adminDetailNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g,''))">—</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">💳 Method</span>
+                    <span class="detail-value" id="adminDetailMethod">—</span>
+                </div>
+            </div>
+
+            <button id="continueDepositBtn" class="admin-deposit-btn" disabled data-key="continue">➡ Continue</button>
+            <button id="closeDepositTypeBtn" class="type-btn" style="background:#f1f5f9;margin-top:8px;"><span data-key="cancel">Cancel</span></button>
+        </div>
+    </div>
+
+    <!-- Deposit Details -->
+    <div id="depositDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header">
+                <span class="bank-icon">💸</span>
+                <div>
+                    <div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div>
+                    <div class="bank-sub" data-key="sendPayment">Send payment to the number below</div>
+                </div>
+            </div>
+            <div class="account-card">
+                <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
+                <div class="copy-number" id="depositAccountNumber" onclick="copyToClipboard(this.innerText.replace(/[^0-9]/g,''))">📋 0924839730</div>
+                <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
+                <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
+                <div style="margin-top:8px;font-size:.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
+            </div>
+            <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required /></div>
+            <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" /></div>
+            <div class="input-group"><label data-key="refLabel">📝 Transaction Reference (optional)</label><input type="text" id="depositRef" placeholder="Reference from SMS" /></div>
+            <div class="input-group"><label data-key="proofLabel">📷 Upload Photo Proof (required)</label><input type="file" id="depositPhoto" accept="image/*" required /></div>
+            <div class="transaction-summary" data-key="depositHint">💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.</div>
+            <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
+        </div>
+    </div>
+
+    <!-- Withdraw Type -->
+    <div id="withdrawTypeModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div>
+            <button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button>
+            <button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button>
+            <button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button>
+            <button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Withdraw Details -->
+    <div id="withdrawDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div>
+            <div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required /></div>
+            <div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required /></div>
+            <div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any" /></div>
+            <div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div>
+            <div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div>
+        </div>
+    </div>
+
+    <!-- Rules -->
+    <div id="rulesModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div>
+            <div class="rules-text">
+                <p><strong data-key="entryFeeLabel">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValue">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
+                <p><strong data-key="prizeLabel">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValue">80% (1 ተጫዋች ከሆነ 100%)</span></p>
+                <p><strong data-key="winLabel">🎯 ማሸነፍ፦</strong> <span data-key="winValue">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
+                <p><strong data-key="claimLabel">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValue">ወዲያው “CLAIM BINGO!”</span></p>
+            </div>
+            <button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button>
+        </div>
+    </div>
+
+    <!-- Winner Overlay -->
+    <div id="winnerOverlay" class="winner-modal">
+        <div class="winner-card">
+            <div class="winner-trophy">🏆✨</div>
+            <div class="winner-title" id="winTitle">BINGO!</div>
+            <div class="winner-sub" data-key="congrats">Congratulations</div>
+            <div class="winners-avatars" id="winListContainer"></div>
+            <div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div>
+            <button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button>
+        </div>
+    </div>
+
+    <!-- ─── STAKE PAGE ─── -->
+    <div id="stakePage" class="page">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="font-family:'Inter',monospace;font-weight:800;color:#ea580c;">🎲 ዶት ቢንጎ</h2>
+            <div class="players-badge">DOT BINGO</div>
+        </div>
+        <h3 style="text-align:center;margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
+        <div class="stake-page-buttons">
+            <div style="text-align:center;">
+                <button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button>
+                <div class="player-count-badge" id="stake10Count">👥 0 players</div>
+            </div>
+            <div style="text-align:center;">
+                <button id="stake20Btn" class="stake-option" data-stake="20">20 ETB</button>
+                <div class="player-count-badge" id="stake20Count">👥 0 players</div>
+            </div>
+            <div style="text-align:center;">
+                <button id="stake30Btn" class="stake-option" data-stake="30">30 ETB</button>
+                <div class="player-count-badge" id="stake30Count">👥 0 players</div>
+            </div>
+        </div>
+        <div class="rules-text">
+            <p><strong data-key="entryFeeLabelShort">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
+            <p><strong data-key="prizeLabelShort">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
+            <p><strong data-key="winLabelShort">🎯 ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
+            <p><strong data-key="claimLabelShort">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው “CLAIM BINGO!”</span></p>
+        </div>
+    </div>
+
+    <!-- ─── LOBBY PAGE ─── -->
+    <div id="lobbyPage" class="page hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div></div>
+            <div class="players-badge">👥 <span id="playersCount">0</span></div>
+        </div>
+        <div class="balance-top">
+            <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance">0</span> ETB</div>
+            <div style="display:flex;gap:8px;">
+                <button id="depositBtn" style="background:#f97316;border:none;border-radius:40px;padding:6px 14px;color:#fff;"><span data-key="deposit">+Deposit</span></button>
+                <button id="withdrawBtn" style="background:#334155;border:none;border-radius:40px;padding:6px 14px;color:#fff;"><span data-key="withdraw">-Withdraw</span></button>
+                <button id="backToStakeBtn" style="background:#6c757d;border:none;border-radius:40px;padding:6px 14px;color:#fff;"><span data-key="stakeBtn">↺ Stake</span></button>
+            </div>
+            <div class="timer-badge" id="lobbyTimer">30s</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin:12px 0;"><span data-key="pickCard">🎴 Pick card ID:</span><span><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span><button id="randomCardBtn" style="background:#ea580c;border:none;border-radius:40px;padding:6px 16px;color:#fff;" data-key="randomCard">✨ Random Card</button></div>
+        <div id="numberGrid" class="grid-100"></div>
+        <div data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
+        <div id="lobbyCardPreview" class="card-container"></div>
+        <div class="tab-bar"><button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
+        <button id="rulesBtn" style="width:100%;background:#f1f5f9;color:#7c2d12;border:1px solid #fed7aa;" data-key="rulesBtn">📜 Game Rules</button>
+        <div class="telegram-links">📢 Join our community:<br /><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
+    </div>
+
+    <!-- ─── HISTORY ─── -->
+    <div id="historyPage" class="page hidden">
+        <div class="page-header"><h2 data-key="gameHistory">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div>
+        <div><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div>
+        <div id="recentGamesList" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- ─── WALLET ─── -->
+    <div id="walletPage" class="page hidden">
+        <div class="page-header"><h2 data-key="myWallet">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div>
+        <div class="profile-stat"><div data-key="currentBalance">Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw">- Withdraw</button></div>
+    </div>
+
+    <!-- ─── PROFILE ─── -->
+    <div id="profilePage" class="page hidden">
+        <div class="page-header"><h2 data-key="myProfile">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div>
+        <div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div>
+        <div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div>
+    </div>
+
+    <!-- ─── GAME PAGE ─── -->
+    <div id="gamePage" class="page hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div></div>
+            <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
+        </div>
+        <div class="game-top-bar">
+            <div>💰 <span id="gameBalanceDisplay">0</span> ETB</div>
+            <div>
+                <button onclick="openDepositTypeModal()" style="background:#f97316;border:none;border-radius:40px;padding:4px 12px;color:#fff;" data-key="deposit">+Deposit</button>
+                <button onclick="openWithdrawTypeModal()" style="background:#334155;border:none;border-radius:40px;padding:4px 12px;color:#fff;" data-key="withdraw">-Withdraw</button>
+                <button id="muteToggleBtn" class="mute-btn">🔊</button>
+            </div>
+            <button id="rulesBtnGame" style="background:#f1f5f9;color:#7c2d12;border:1px solid #fed7aa;border-radius:40px;padding:4px 12px;" data-key="rulesBtn">📜 Rules</button>
+        </div>
+        <div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
+        <div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div>
+        <div id="gameCard" class="card-container"></div>
+        <button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button>
+        <div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
+    </div>
+
+    <!-- ─── JAVASCRIPT ─── -->
+    <script>
+        // ──────────────────────────────────────────────────────────────
+        //  LANGUAGE
+        // ──────────────────────────────────────────────────────────────
+        let currentLang = 'am';
+        const langData = {
+            am: {
+                depositTitle: "ተቀማጭ",
+                chooseMethod: "የክፍያ ዘዴ ይምረጡ",
+                cancel: "ይቅር",
+                sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
+                recipientLabel: "📞 ተቀባይ አካውንት (ለመቅዳት ይንኩ)",
+                accountName: "የአካውንት ስም",
+                yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
+                amountLabel: "💰 መጠን (ETB)",
+                depositHint: "💡 ክፍያ ከላኩ በኋላ ግልጽ የሆነ የክፍያ ማረጋገጫ ፎቶ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+                requestDeposit: "✔ ተቀማጭ ጠይቅ",
+                back: "← ተመለስ",
+                withdrawTitle: "ገንዘብ አውጣ",
+                selectMethod: "የማውጫ ዘዴ ይምረጡ",
+                yourDetails: "የአካውንትዎ ዝርዝሮች",
+                fullName: "👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)",
+                accountNumber: "📞 አካውንት / ስልክ ቁጥር",
+                amountWithdraw: "💰 መጠን (ETB) - ዝቅተኛ 20 ETB",
+                withdrawHint: "⏱️ ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።",
+                requestWithdrawal: "✔ ገንዘብ ማውጣት ጠይቅ",
+                rulesTitle: "የቢንጎ ሕጎች",
+                rulesSub: "75-ኳስ ክላሲክ",
+                entryFeeLabel: "💰 የመግቢያ ክፍያ፦",
+                entryFeeValue: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabel: "🏆 የሽልማት ገንዘብ፦",
+                prizeValue: "80% (1 ተጫዋች ከሆነ 100%)",
+                winLabel: "🎯 ማሸነፍ፦",
+                winValue: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabel: "⏱️ የይገባኛል ጥያቄ፦",
+                claimValue: "ወዲያው “CLAIM BINGO!”",
+                gotIt: "ገባኝ",
+                congrats: "እንኳን ደስ ያለዎት!",
+                winningPrize: "🎁 የሽልማት ገንዘብ",
+                amazing: "🎉 ደስ ያለኝ! 🎉",
+                chooseStake: "የመግቢያ ክፍያ ይምረጡ",
+                bal: "ቀሪ ሂሳብ",
+                deposit: "+ተቀማጭ",
+                withdraw: "-ማውጣት",
+                stakeBtn: "↺ ውርርድ",
+                pickCard: "🎴 የካርድ መለያ ይምረጡ:",
+                selected: "የተመረጠው:",
+                randomCard: "✨ በዘፈቀደ ካርድ",
+                yourCardPreview: "🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
+                gameTab: "🎮 ጨዋታ",
+                historyTab: "📜 ታሪክ",
+                walletTab: "💰 ቦርሳ",
+                profileTab: "👤 መገለጫ",
+                rulesBtn: "📜 የጨዋታ ሕጎች",
+                gameHistory: "📜 የጨዋታ ታሪክ",
+                totalGamesLabel: "ጠቅላላ ጨዋታዎች:",
+                myWallet: "💰 ቦርሳዬ",
+                currentBalance: "አሁን ያለው ቀሪ ሂሳብ",
+                myProfile: "👤 መገለጫዬ",
+                usernameLabel: "የተጠቃሚ ስም",
+                balanceLabel: "💰 ቀሪ ሂሳብ",
+                prizePoolLabel: "🏆 የሽልማት ገንዘብ",
+                lastCall: "🎲 የመጨረሻ ጥሪ",
+                calledPrefix: "የተጠሩ:",
+                claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆",
+                entryFeeLabelShort: "💰 የመግቢያ ክፍያ፦",
+                entryFeeValues: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabelShort: "🏆 የሽልማት ገንዘብ፦",
+                prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
+                winLabelShort: "🎯 ማሸነፍ፦",
+                winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦",
+                claimValueShort: "ወዲያው “CLAIM BINGO!”",
+                refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)",
+                proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)",
+                continue: "➡ ቀጥል",
+                selectAdmin: "⬇ አስተዳዳሪ ይምረጡ",
+                selectMethod: "⬇ የክፍያ ዘዴ ይምረጡ"
+            },
+            en: {
+                depositTitle: "Deposit",
+                chooseMethod: "Choose payment method",
+                cancel: "Cancel",
+                sendPayment: "Send payment to the number below",
+                recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)",
+                accountName: "ACCOUNT NAME",
+                yourPhone: "📞 Your Phone Number (for verification)",
+                amountLabel: "💰 Amount (ETB)",
+                depositHint: "💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.",
+                requestDeposit: "✔ Request Deposit",
+                back: "← Back",
+                withdrawTitle: "Withdraw Funds",
+                selectMethod: "Select withdrawal method",
+                yourDetails: "Your account details",
+                fullName: "👤 Full Name (as per bank/mobile money)",
+                accountNumber: "📞 Account / Phone Number",
+                amountWithdraw: "💰 Amount (ETB) - Min 20 ETB",
+                withdrawHint: "⏱️ Withdrawals processed within moment.",
+                requestWithdrawal: "✔ Request Withdrawal",
+                rulesTitle: "Bingo Rules",
+                rulesSub: "75-ball Classic",
+                entryFeeLabel: "💰 Entry Fee:",
+                entryFeeValue: "10/20/30 Birr (as per your choice)",
+                prizeLabel: "🏆 Prize Money:",
+                prizeValue: "80% (100% if 1 player)",
+                winLabel: "🎯 Winning:",
+                winValue: "Row, Column, Diagonal or 4 Corners",
+                claimLabel: "⏱️ Claim:",
+                claimValue: "Immediately 'CLAIM BINGO!'",
+                gotIt: "Got it",
+                congrats: "Congratulations!",
+                winningPrize: "🎁 WINNING PRIZE",
+                amazing: "🎉 Amazing! 🎉",
+                chooseStake: "Choose Your Stake",
+                bal: "BAL",
+                deposit: "+Deposit",
+                withdraw: "-Withdraw",
+                stakeBtn: "↺ Stake",
+                pickCard: "🎴 Pick card ID:",
+                selected: "Selected:",
+                randomCard: "✨ Random Card",
+                yourCardPreview: "🎴 Your Bingo Card Preview",
+                gameTab: "🎮 Game",
+                historyTab: "📜 History",
+                walletTab: "💰 Wallet",
+                profileTab: "👤 Profile",
+                rulesBtn: "📜 Game Rules",
+                gameHistory: "📜 Game History",
+                totalGamesLabel: "Total Games:",
+                myWallet: "💰 My Wallet",
+                currentBalance: "Current Balance",
+                myProfile: "👤 My Profile",
+                usernameLabel: "Username",
+                balanceLabel: "💰 Balance",
+                prizePoolLabel: "🏆 PRIZE POOL",
+                lastCall: "🎲 LAST CALL",
+                calledPrefix: "Called:",
+                claimBingo: "🏆 CLAIM BINGO! 🏆",
+                entryFeeLabelShort: "💰 Entry Fee:",
+                entryFeeValues: "10/20/30 Birr (as per your choice)",
+                prizeLabelShort: "🏆 Prize Money:",
+                prizeValueShort: "80% (100% if 1 player)",
+                winLabelShort: "🎯 Winning:",
+                winValueShort: "Row, Column, Diagonal or 4 Corners",
+                claimLabelShort: "⏱️ Claim:",
+                claimValueShort: "Immediately 'CLAIM BINGO!'",
+                refLabel: "📝 Transaction Reference (optional)",
+                proofLabel: "📷 Upload Photo Proof (required)",
+                continue: "➡ Continue",
+                selectAdmin: "⬇ Select Admin",
+                selectMethod: "⬇ Select Payment Method"
+            }
+        };
+
+        function applyLanguage() {
+            document.querySelectorAll('[data-key]').forEach(el => {
+                const key = el.getAttribute('data-key');
+                el.innerText = (currentLang === 'am' ? langData.am[key] : langData.en[key]) || '';
             });
-          console.log(`💰 Admin ${adminId} earned ${share.toFixed(2)} ETB profit share from game ${gameRoundId}`);
-        } catch (err) {
-          console.error(`❌ Failed to record admin contribution:`, err.message);
+            updateLangButton();
         }
-      }
-    }
-  }
 
-  if (stake === 20) {
-    const botsInGame = game.players.filter(p => p.isBot);
-    for (const bot of botsInGame) {
-      const winner = game.winners.find(w => w.telegramId === bot.telegramId);
-      const prizeWon = winner ? (game.prizePool / game.winners.length) : 0;
-      botGameHistory.push({
-        botId: bot.telegramId,
-        gameNumber: gameCounter,
-        date: new Date().toISOString(),
-        stake: game.entryFee,
-        prizeWon: prizeWon
-      });
-    }
-  }
+        function updateLangButton() {
+            langToggleBtn.textContent = currentLang === 'am' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
+        }
 
-  const realWinnersFinal = game.winners.filter(w => !w.isBot);
-  if (realWinnersFinal.length > 0) {
-    game.winners = game.winners.filter(w => !w.isBot || w.isForced);
-  }
+        function toggleLanguage() {
+            currentLang = currentLang === 'am' ? 'en' : 'am';
+            applyLanguage();
+            localStorage.setItem('dot_bingo_lang', currentLang);
+        }
+        const langToggleBtn = document.getElementById('langToggleBtn');
+        langToggleBtn.addEventListener('click', toggleLanguage);
+        const savedLang = localStorage.getItem('dot_bingo_lang');
+        if (savedLang === 'am' || savedLang === 'en') currentLang = savedLang;
+        applyLanguage();
 
-  if (game.winners.length > 0) {
-    const finalRealWinners = game.winners.filter(w => !w.isBot);
-    const finalBotWinners = game.winners.filter(w => w.isBot);
-    let prizeEachReal = 0, prizeEachBot = 0;
-    if (finalRealWinners.length > 0) {
-      prizeEachReal = Math.floor(game.prizePool / finalRealWinners.length);
-      prizeEachBot = 0;
-    } else {
-      prizeEachBot = Math.floor(game.prizePool / finalBotWinners.length);
-    }
+        // ──────────────────────────────────────────────────────────────
+        //  DOM refs
+        // ──────────────────────────────────────────────────────────────
+        const lobbyBalanceEl = document.getElementById('lobbyBalance');
+        const lobbyTimerEl = document.getElementById('lobbyTimer');
+        const playersCountEl = document.getElementById('playersCount');
+        const gamePlayersCountEl = document.getElementById('gamePlayersCount');
+        const winningBalanceEl = document.getElementById('winningBalance');
+        const currentCallEl = document.getElementById('currentCall');
+        const calledListEl = document.getElementById('calledList');
+        const selectedNumberEl = document.getElementById('selectedNumber');
+        const numberGrid = document.getElementById('numberGrid');
+        const stake10CountEl = document.getElementById('stake10Count');
+        const stake20CountEl = document.getElementById('stake20Count');
+        const stake30CountEl = document.getElementById('stake30Count');
 
-    for (const w of finalRealWinners) {
-      const user = users[w.telegramId];
-      if (user) {
-        user.balance += prizeEachReal;
-        await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
-        const winnerSocket = await getSocketByUserId(w.telegramId);
-        if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
-        Audit.winPaidOut(`stake_${stake}`, w.telegramId, null, {
-          amount: prizeEachReal,
-          currency: 'ETB',
-          totalPrizePool: game.prizePool,
-          totalWinners: game.winners.length,
-          stake
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let socket,
+            userCard = [],
+            markedNumbers = [],
+            isGameActive = false,
+            lobbyTimerInterval = null,
+            selectedCardNumber = null;
+        let selectedDepositType = null,
+            selectedWithdrawType = null;
+        let serverTakenNumbers = new Set(),
+            displayTakenNumbers = new Set();
+        let currentBalance = 0,
+            totalGames = 0,
+            totalWins = 0,
+            totalEarned = 0,
+            recentGames = [],
+            currentGameId = null;
+        let currentMainPage = 'lobby',
+            currentTimerSeconds = 30;
+        let currentUtterance = null,
+            soundMuted = false,
+            speechUnlocked = false;
+        let pendingSelection = null,
+            pendingRandom = false;
+        let currentStake = null;
+        let selectedAdminId = null;
+        try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (_) {}
+
+        // ──────────────────────────────────────────────────────────────
+        //  Helpers
+        // ──────────────────────────────────────────────────────────────
+        function copyToClipboard(text) { if (!text) return;
+            navigator.clipboard.writeText(text).then(() => alert('✅ Copied!')).catch(() => alert('❌ Could not copy.')); }
+
+        function scrollCalledHistoryToEnd() { if (calledListEl) calledListEl.scrollLeft = calledListEl.scrollWidth; }
+
+        function updateMuteButton() {
+            const btn = document.getElementById('muteToggleBtn');
+            if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊';
+                btn.style.background = soundMuted ? '#1e293b' : '#f97316'; }
+        }
+
+        function unlockSpeech() { if (speechUnlocked) return;
+            speechUnlocked = true; const d = new SpeechSynthesisUtterance(' ');
+            d.volume = 0;
+            window.speechSynthesis.speak(d);
+            setTimeout(() => window.speechSynthesis.cancel(), 100); }
+
+        function toggleMute() { soundMuted = !soundMuted;
+            localStorage.setItem('dot_bingo_sound_muted', soundMuted);
+            updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel();
+                currentUtterance = null; }
+            unlockSpeech(); }
+
+        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45) return "ኤን"; if (
+                num <= 60) return "ጂ"; return "ኦ"; }
+
+        function getAmharicNumberWord(n) {
+            const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"];
+            const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"];
+            if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; }
+            if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]);
+            let ten = Math.floor(n / 10),
+                unit = n % 10;
+            if (unit === 0) return tens[ten];
+            return tens[ten] + " " + ones[unit];
+        }
+
+        function speakAmharicNumberWithLetter(number) {
+            if (soundMuted || number < 1 || number > 75) return;
+            if (!speechUnlocked) { unlockSpeech();
+                setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; }
+            const fullText = getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number);
+            if (window.speechSynthesis) {
+                if (currentUtterance) window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(fullText);
+                utterance.lang = 'am-ET';
+                utterance.rate = .85;
+                const voices = window.speechSynthesis.getVoices();
+                const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am'));
+                if (amharicVoice) utterance.voice = amharicVoice;
+                currentUtterance = utterance;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function updatePlayerCountFromServer(count) {
+            const c = count !== undefined ? count : serverTakenNumbers.size;
+            if (playersCountEl) playersCountEl.innerText = c;
+            if (gamePlayersCountEl) gamePlayersCountEl.innerText = c;
+        }
+
+        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l =
+                'O'; return `${l}-${n}`; }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Stats (localStorage)
+        // ──────────────────────────────────────────────────────────────
+        function loadStats() {
+            try {
+                totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
+                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
+                totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0');
+                const stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
+                recentGames = stored.map(g => ({
+                    gameId: g.gameId,
+                    date: g.date,
+                    result: g.result,
+                    stake: g.stake,
+                    playerPrize: g.playerPrize || g.prize || 0,
+                    totalPrize: g.totalPrize || (g.prize || 0),
+                    winnersList: g.winnersList || (g.winner ? [g.winner] : []),
+                    winningNumber: g.winningNumber || null
+                }));
+            } catch (_) { recentGames = []; }
+            updateStatsUI();
+        }
+
+        function saveStats() {
+            localStorage.setItem('dot_bingo_total_games', totalGames);
+            localStorage.setItem('dot_bingo_total_wins', totalWins);
+            localStorage.setItem('dot_bingo_total_earned', totalEarned);
+            localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10)));
+        }
+
+        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) {
+            totalGames++;
+            if (win) { totalWins++;
+                totalEarned += playerPrize; }
+            recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize,
+                totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null });
+            if (recentGames.length > 10) recentGames.pop();
+            saveStats();
+            updateStatsUI();
+        }
+
+        function updateStatsUI() {
+            document.getElementById('totalGamesCount').innerText = totalGames;
+            const div = document.getElementById('recentGamesList');
+            if (!div) return;
+            if (recentGames.length) {
+                div.innerHTML = recentGames.map(g => {
+                    const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g
+                        .result === 'Win' ? 'You' : '—');
+                    let lastNumDisplay = '—';
+                    if (g.winningNumber) {
+                        let l = 'B';
+                        if (g.winningNumber > 15) l = 'I';
+                        if (g.winningNumber > 30) l = 'N';
+                        if (g.winningNumber > 45) l = 'G';
+                        if (g.winningNumber > 60) l = 'O';
+                        lastNumDisplay = `${l}-${g.winningNumber}`;
+                    }
+                    const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g
+                        .result === 'Win' ? `${g.playerPrize} ETB` : '—');
+                    return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:.7rem;color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
+                }).join('');
+            } else {
+                div.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>';
+            }
+        }
+
+        function syncBalance(v) { currentBalance = v;
+            lobbyBalanceEl.innerText = v; ['walletBalancePage', 'profileBalancePage', 'gameBalanceDisplay'].forEach(id => {
+                const el = document.getElementById(id); if (el) el.innerText = v; }); }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Render: Bingo card
+        // ──────────────────────────────────────────────────────────────
+        function renderCard(card, containerId, clickable) {
+            const cont = document.getElementById(containerId);
+            if (!cont) return;
+            cont.innerHTML = '';
+            if (!card || !Array.isArray(card) || card.length === 0) {
+                cont.innerHTML = '<div style="text-align:center;padding:20px;">🎴 Select a card number to see your Bingo card</div>';
+                return;
+            }
+            const table = document.createElement('table');
+            table.style.borderCollapse = 'separate';
+            table.style.borderSpacing = '10px';
+            const thead = document.createElement('thead');
+            const hr = document.createElement('tr');
+            ['B', 'I', 'N', 'G', 'O'].forEach(l => { const th = document.createElement('th');
+                th.textContent = l;
+                hr.appendChild(th); });
+            thead.appendChild(hr);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            for (let r = 0; r < 5; r++) {
+                const tr = document.createElement('tr');
+                for (let c = 0; c < 5; c++) {
+                    const val = card[r][c];
+                    const td = document.createElement('td');
+                    td.textContent = val === 'FREE' ? '★' : val;
+                    if (val === 'FREE') td.classList.add('free');
+                    if (markedNumbers.includes(val)) td.classList.add('marked');
+                    if (clickable && val !== 'FREE') {
+                        td.style.cursor = 'pointer';
+                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); };
+                    }
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody);
+            cont.appendChild(table);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Number grid
+        // ──────────────────────────────────────────────────────────────
+        function buildNumberGrid() {
+            if (!numberGrid) return;
+            numberGrid.innerHTML = '';
+            for (let i = 1; i <= 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.number = i;
+                cell.textContent = i;
+                const isTaken = displayTakenNumbers.has(i);
+                const isOwn = (selectedCardNumber === i);
+                if (isTaken && !isOwn) {
+                    cell.classList.add('taken');
+                    cell.onclick = null;
+                } else if (isOwn) {
+                    cell.classList.add('own-card');
+                    cell.onclick = null;
+                } else {
+                    cell.onclick = () => {
+                        if (!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)) {
+                            if (selectedCardNumber !== null && selectedCardNumber !== i) {
+                                serverTakenNumbers.delete(selectedCardNumber);
+                                displayTakenNumbers.delete(selectedCardNumber);
+                            }
+                            pendingSelection = i;
+                            selectedCardNumber = i;
+                            selectedNumberEl.textContent = i;
+                            buildNumberGrid();
+                            socket.emit('selectCardNumber', i);
+                        }
+                    };
+                }
+                numberGrid.appendChild(cell);
+            }
+        }
+
+        function updateGridWithTakenNumbers(takenArray) {
+            const newServerSet = new Set(takenArray);
+            serverTakenNumbers = newServerSet;
+            const newDisplaySet = new Set(takenArray);
+            if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
+            displayTakenNumbers = newDisplaySet;
+            buildNumberGrid();
+            updatePlayerCountFromServer(serverTakenNumbers.size);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Page navigation
+        // ──────────────────────────────────────────────────────────────
+        const stakePage = document.getElementById('stakePage');
+        const lobbyPage = document.getElementById('lobbyPage');
+        const gamePage = document.getElementById('gamePage');
+        const historyPage = document.getElementById('historyPage');
+        const walletPage = document.getElementById('walletPage');
+        const profilePage = document.getElementById('profilePage');
+
+        function showLobby(sec) {
+            currentMainPage = 'lobby';
+            currentTimerSeconds = sec;
+            stakePage.classList.add('hidden');
+            lobbyPage.classList.remove('hidden');
+            gamePage.classList.add('hidden');
+            historyPage.classList.add('hidden');
+            walletPage.classList.add('hidden');
+            profilePage.classList.add('hidden');
+            isGameActive = false;
+            markedNumbers = [];
+            if (socket) socket.emit('getBalance');
+            startTimer(sec);
+            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            updateStatsUI();
+        }
+
+        function showGame() {
+            currentMainPage = 'game';
+            stakePage.classList.add('hidden');
+            lobbyPage.classList.add('hidden');
+            gamePage.classList.remove('hidden');
+            historyPage.classList.add('hidden');
+            walletPage.classList.add('hidden');
+            profilePage.classList.add('hidden');
+            isGameActive = true;
+            clearInterval(lobbyTimerInterval);
+            if (socket) socket.emit('getBalance');
+            if (userCard.length) renderCard(userCard, 'gameCard', true);
+        }
+
+        function startTimer(sec) {
+            let left = sec;
+            lobbyTimerEl.textContent = left + 's';
+            clearInterval(lobbyTimerInterval);
+            lobbyTimerInterval = setInterval(() => { left--;
+                    currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval);
+                        showGame(); } else lobbyTimerEl.textContent = left + 's'; }, 1000);
+        }
+
+        function goBackToMain() {
+            if (currentMainPage === 'lobby') showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30);
+            else if (currentMainPage === 'game') showGame();
+            else showLobby(30);
+        }
+
+        function goToStakeSelection() {
+            if (socket) { socket.disconnect();
+                socket = null; }
+            isGameActive = false;
+            userCard = [];
+            markedNumbers = [];
+            selectedCardNumber = null;
+            serverTakenNumbers.clear();
+            displayTakenNumbers.clear();
+            currentStake = null;
+            localStorage.removeItem('dot_bingo_stake');
+            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+            lobbyPage.classList.add('hidden');
+            gamePage.classList.add('hidden');
+            stakePage.classList.remove('hidden');
+            if (selectedNumberEl) selectedNumberEl.textContent = '-';
+            pendingSelection = null;
+            pendingRandom = false;
+            currentGameId = null;
+            unlockSpeech();
+        }
+
+        function showWinnerOverlay(data) {
+            if (data.noWinner) {
+                if (currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0);
+                alert('No winner this round.');
+                return;
+            }
+            const winnersList = data.winners || [data.winner].filter(Boolean);
+            const winningNumber = data.winningNumber;
+            const totalPrize = data.totalPrize || 0;
+            const playerPrize = data.prizeEach || 0;
+            const title = winnersList.length > 1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉';
+            document.getElementById('winTitle').innerHTML = title;
+            document.getElementById('winListContainer').innerHTML = winnersList.map(w =>
+                `<span class="winner-badge">${w}</span>`).join('');
+            document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>';
+            document.getElementById('winnerOverlay').classList.add('active');
+            const confDiv = document.createElement('div');
+            confDiv.className = 'confetti';
+            for (let i = 0; i < 120; i++) {
+                const p = document.createElement('div');
+                p.className = 'confetti-piece';
+                p.style.left = Math.random() * 100 + '%';
+                p.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                p.style.backgroundColor = `hsl(${Math.random()*30+20},90%,60%)`;
+                confDiv.appendChild(p);
+            }
+            document.body.appendChild(confDiv);
+            setTimeout(() => confDiv.remove(), 4000);
+            if (currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber,
+                totalPrize);
+            unlockSpeech();
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Socket connection
+        // ──────────────────────────────────────────────────────────────
+        function connectToGame(stake) {
+            currentStake = stake;
+            localStorage.setItem('dot_bingo_stake', stake);
+            const initData = tg.initData;
+            if (!initData) { alert('Open inside Telegram'); return; }
+
+            let startParam = null;
+            if (initData) {
+                const params = new URLSearchParams(initData);
+                startParam = params.get('start_param');
+            }
+            if (!startParam) {
+                const urlParams = new URLSearchParams(window.location.search);
+                startParam = urlParams.get('start_param');
+            }
+            if (!startParam && tg.initDataUnsafe) startParam = tg.initDataUnsafe.start_param;
+
+            fetch('/api/telegram-miniapp-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) { alert('Auth failed'); return; }
+                    document.getElementById('profileUsername').innerText = data.username || 'Player';
+                })
+                .catch(() => { alert('Network error'); });
+
+            if (socket) socket.disconnect();
+            socket = io();
+            socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
+            socket.on('balanceUpdate', syncBalance);
+            socket.on('lobbyState', state => {
+                if (state.stake === currentStake) {
+                    selectedCardNumber = null;
+                    selectedNumberEl.textContent = '-';
+                    showLobby(state.startsIn);
+                    if (state.takenNumbers) updateGridWithTakenNumbers(state.takenNumbers);
+                    updatePlayerCountFromServer(state.playersCount);
+                }
+            });
+            socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true);
+                else renderCard(card, 'lobbyCardPreview', false); });
+            socket.on('cardTaken', data => {
+                if (data.stake !== currentStake) return;
+                const newServerSet = new Set(data.takenNumbers);
+                serverTakenNumbers = newServerSet;
+                const newDisplaySet = new Set(data.takenNumbers);
+                if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
+                displayTakenNumbers = newDisplaySet;
+                buildNumberGrid();
+                updatePlayerCountFromServer(serverTakenNumbers.size);
+                if (pendingSelection && data.number === pendingSelection) {
+                    selectedCardNumber = data.number;
+                    selectedNumberEl.textContent = data.number;
+                    pendingSelection = null;
+                    buildNumberGrid();
+                }
+                if (pendingRandom && data.number) {
+                    selectedCardNumber = data.number;
+                    selectedNumberEl.textContent = data.number;
+                    pendingRandom = false;
+                    buildNumberGrid();
+                }
+            });
+            socket.on('cardSelectionFailed', msg => {
+                alert(msg);
+                if (pendingSelection) { pendingSelection = null; if (selectedCardNumber) { selectedCardNumber =
+                        null;
+                        selectedNumberEl.textContent = '-';
+                        buildNumberGrid(); } }
+                if (pendingRandom) pendingRandom = false;
+            });
+            socket.on('playersCount', (data) => {
+                const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
+                    'dot_bingo_stake'));
+                if (data.stake === stake) updatePlayerCountFromServer(data.count);
+                if (stake && winningBalanceEl && !isGameActive) {
+                    const prize = Math.floor(data.count * stake * .8);
+                    winningBalanceEl.innerText = prize;
+                }
+            });
+            socket.on('gameStarted', data => {
+                if (data.stake !== currentStake) return;
+                if (data?.prizePool) winningBalanceEl.innerText = data.prizePool;
+                if (data?.playersCount) updatePlayerCountFromServer(data.playersCount);
+                showGame();
+                currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
+            });
+            socket.on('numberCalled', data => {
+                if (data.stake !== currentStake) return;
+                const num = data.number;
+                currentCallEl.innerText = formatCall(num);
+                const fullCalled = data.calledNumbers || [];
+                const historyCalled = fullCalled.slice(0, -1);
+                calledListEl.innerText = 'Called: ' + (historyCalled.length ? historyCalled.map(n => formatCall(n))
+                    .join(', ') : '—');
+                scrollCalledHistoryToEnd();
+                speakAmharicNumberWithLetter(num);
+            });
+            socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(
+                    userCard, 'gameCard', true);
+                else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
+            socket.on('gameEnded', data => {
+                if (data.stake !== currentStake) return;
+                if (data.winningNumber) currentCallEl.innerText = formatCall(data.winningNumber);
+                showWinnerOverlay(data);
+                currentGameId = null;
+                markedNumbers = [];
+                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            });
+            socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
+            socket.on('depositStatus', data => alert(data.status === 'approved' ?
+                `✅ Deposit +${data.amount} ETB approved!` : '❌ Deposit rejected.'));
+            socket.on('withdrawStatus', data => alert(data.status === 'approved' ?
+                `✅ Withdrawal -${data.amount} ETB processed.` : '❌ Withdrawal rejected.'));
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        //  Deposit accounts (Admin & method selection)
+        // ──────────────────────────────────────────────────────────────
+        let depositAdmins = [];
+
+        async function loadDepositAccounts() {
+            try {
+                const res = await fetch('/api/deposit-accounts');
+                const data = await res.json();
+                if (data.success) { depositAdmins = data.admins || [];
+                    populateAdminDropdown(depositAdmins); } else { depositAdmins = []; }
+            } catch (_) { depositAdmins = []; }
+        }
+
+        function populateAdminDropdown(admins) {
+            const select = document.getElementById('depositAdminSelect');
+            select.innerHTML = '<option value="">— Select Admin —</option>';
+            admins.forEach(admin => {
+                const hasMethod = admin.telebirr || admin.cbebirr || admin.mpesa;
+                if (hasMethod) {
+                    const opt = document.createElement('option');
+                    opt.value = admin.id;
+                    opt.textContent = admin.name || 'Admin ' + admin.id;
+                    select.appendChild(opt);
+                }
+            });
+            const methodSelect = document.getElementById('depositMethodSelect');
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            methodSelect.disabled = true;
+            document.getElementById('depositAdminDetailContainer').classList.add('hidden');
+            document.getElementById('continueDepositBtn').disabled = true;
+            selectedAdminId = null;
+            selectedDepositType = null;
+        }
+
+        document.getElementById('depositAdminSelect').addEventListener('change', function() {
+            const adminId = this.value;
+            const methodSelect = document.getElementById('depositMethodSelect');
+            const detailContainer = document.getElementById('depositAdminDetailContainer');
+            const continueBtn = document.getElementById('continueDepositBtn');
+            if (!adminId) {
+                methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+                methodSelect.disabled = true;
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                selectedDepositType = null;
+                return;
+            }
+            const admin = depositAdmins.find(a => a.id == adminId);
+            if (!admin) {
+                methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+                methodSelect.disabled = true;
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                return;
+            }
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            const methods = [];
+            if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr });
+            if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr });
+            if (admin.mpesa) methods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa });
+            if (methods.length === 0) {
+                methodSelect.innerHTML = '<option value="">— No methods —</option>';
+                methodSelect.disabled = true;
+                detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedAdminId = null;
+                return;
+            }
+            methodSelect.disabled = false;
+            methods.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.type;
+                opt.textContent = m.label + ' (' + m.number + ')';
+                opt.dataset.number = m.number;
+                methodSelect.appendChild(opt);
+            });
+            detailContainer.classList.add('hidden');
+            continueBtn.disabled = true;
+            selectedAdminId = admin.id;
+            selectedDepositType = null;
         });
-        detectRapidWins(`stake_${stake}`, w.telegramId, null);
-      }
-    }
 
-    for (const w of finalBotWinners) {
-      const bal = botBalances.get(w.telegramId) || 0;
-      botBalances.set(w.telegramId, bal + prizeEachBot);
-      console.log(`🏆 Bot ${w.telegramId} won ${prizeEachBot} (balance now ${botBalances.get(w.telegramId)})`);
-    }
-
-    const ipCounts = {};
-    game.winners.forEach(w => {
-      const player = game.players.find(p => p.telegramId === w.telegramId);
-      const ip = player ? player.ip : null;
-      if (ip) ipCounts[ip] = (ipCounts[ip] || 0) + 1;
-    });
-    Object.entries(ipCounts).forEach(([ip, count]) => {
-      if (count >= 3) {
-        Audit.suspicious(`stake_${stake}`, 'system', ip, {
-          detectionSource: 'multiple_winners_same_ip',
-          reason: `${count} winners from IP ${ip}`,
-          evidence: { winners: game.winners.map(w => w.telegramId) }
+        document.getElementById('depositMethodSelect').addEventListener('change', function() {
+            const method = this.value;
+            const adminId = document.getElementById('depositAdminSelect').value;
+            const detailContainer = document.getElementById('depositAdminDetailContainer');
+            const continueBtn = document.getElementById('continueDepositBtn');
+            if (!method || !adminId) { detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedDepositType = null; return; }
+            const admin = depositAdmins.find(a => a.id == adminId);
+            if (!admin) { detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedDepositType = null; return; }
+            let number = '';
+            if (method === 'telebirr') number = admin.telebirr;
+            else if (method === 'cbebirr') number = admin.cbebirr;
+            else if (method === 'mpesa') number = admin.mpesa;
+            if (!number) { detailContainer.classList.add('hidden');
+                continueBtn.disabled = true;
+                selectedDepositType = null; return; }
+            document.getElementById('adminDetailName').textContent = admin.name || 'Admin';
+            document.getElementById('adminDetailNumber').textContent = number;
+            document.getElementById('adminDetailMethod').textContent = method.toUpperCase();
+            detailContainer.classList.remove('hidden');
+            continueBtn.disabled = false;
+            selectedDepositType = method;
         });
-      }
-    });
 
-    const winnerNames = game.winners.map(w => w.username);
-    io.to(`stake_${stake}`).emit('gameEnded', {
-      stake,
-      winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
-      winners: winnerNames,
-      prizeEach: finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
-      totalPrize: game.prizePool,
-      winnerCount: game.winners.length,
-      winningNumber: game.winningNumber
-    });
-  } else {
-    io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
-  }
+        // ──────────────────────────────────────────────────────────────
+        //  Deposit / Withdraw modal controls
+        // ──────────────────────────────────────────────────────────────
+        function openDepositTypeModal() {
+            document.getElementById('depositTypeModal').classList.add('active');
+            const adminSelect = document.getElementById('depositAdminSelect');
+            adminSelect.value = '';
+            const methodSelect = document.getElementById('depositMethodSelect');
+            methodSelect.innerHTML = '<option value="">— Select Method —</option>';
+            methodSelect.disabled = true;
+            document.getElementById('depositAdminDetailContainer').classList.add('hidden');
+            document.getElementById('continueDepositBtn').disabled = true;
+            selectedAdminId = null;
+            selectedDepositType = null;
+            loadDepositAccounts();
+            unlockSpeech();
+        }
 
-  game.winners = [];
-  clearTimeout(game.bingoGraceTimeout);
-  game.bingoGraceTimeout = null;
-  setTimeout(() => resetGame(stake), 5000);
-  notifyAdminClients();
-}
+        function closeDepositTypeModal() { document.getElementById('depositTypeModal').classList.remove('active'); }
 
-// ---------- Bot Admin Endpoints ----------
-app.get('/admin/bots-status', (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const botData = BOT_IDS.map(id => {
-    const balance = botBalances.get(id) || 0;
-    const lastWin = botLastWinGame.get(id) || 0;
-    const game = getGame(20);
-    const player = game.players.find(p => p.telegramId === id);
-    return {
-      id,
-      username: player ? player.username : 'not in game',
-      balance,
-      lastWinGame: lastWin,
-      inGame: !!player,
-      cardNumber: player ? player.cardNumber : null
-    };
-  });
-  res.json({ success: true, bots: botData, currentGame: gameCounter });
-});
+        function proceedToDepositDetails() {
+            if (!selectedAdminId || !selectedDepositType) { alert('Please select an admin and a payment method.'); return; }
+            const admin = depositAdmins.find(a => a.id === selectedAdminId);
+            if (!admin) { alert('Admin not found.'); return; }
+            let number = '';
+            if (selectedDepositType === 'telebirr') number = admin.telebirr;
+            else if (selectedDepositType === 'cbebirr') number = admin.cbebirr;
+            else if (selectedDepositType === 'mpesa') number = admin.mpesa;
+            if (!number) { alert('No account number for this method.'); return; }
+            const title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
+            const copyDiv = document.getElementById('depositAccountNumber');
+            if (copyDiv) copyDiv.innerHTML = `📋 ${number}`;
+            copyDiv.setAttribute('onclick', `copyToClipboard('${number}')`);
+            document.getElementById('depositAccountName').textContent = admin.name || 'DOT BINGO OFFICIAL';
+            document.getElementById('depositAdminInfo').textContent = `Admin: ${admin.name || 'DOT BINGO OFFICIAL'}`;
+            document.getElementById('depositPlayerPhone').value = '';
+            document.getElementById('depositAmount').value = '';
+            document.getElementById('depositRef').value = '';
+            document.getElementById('depositPhoto').value = '';
+            document.getElementById('depositTypeModal').classList.remove('active');
+            document.getElementById('depositDetailsModal').classList.add('active');
+            unlockSpeech();
+        }
 
-app.post('/admin/bot-reset-balance', async (req, res) => {
-  const { secret, botId, newBalance } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
-  const bal = Number(newBalance);
-  if (isNaN(bal) || bal < 0) return res.status(400).json({ error: 'Balance must be non-negative' });
-  botBalances.set(botId, bal);
-  Audit.adminAction('BOT_BALANCE_RESET', 'admin', req.ip, { botId, newBalance: bal });
-  res.json({ success: true, newBalance: bal });
-});
+        let isSubmittingDeposit = false;
 
-app.post('/admin/bot-force-win', async (req, res) => {
-  const { secret, botId } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
-  const game = getGame(20);
-  if (!game || game.status !== 'running') {
-    return res.status(400).json({ error: 'Game is not running' });
-  }
-  const player = game.players.find(p => p.telegramId === botId);
-  if (!player) return res.status(400).json({ error: 'Bot is not in the current game' });
-  if (game.winners.find(w => w.telegramId === botId)) {
-    return res.status(400).json({ error: 'Bot already won this game' });
-  }
-  if (game.winningNumber === null) {
-    game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
-  }
-  game.winners.push({
-    telegramId: botId,
-    username: player.username,
-    isBot: true,
-    isForced: true
-  });
-  botLastWinGame.set(botId, gameCounter);
-  Audit.adminAction('BOT_FORCED_WIN', 'admin', req.ip, { botId, game: gameCounter });
-  clearTimeout(game.bingoGraceTimeout);
-  game.bingoGraceTimeout = null;
-  endGameWithWinners(20);
-  res.json({ success: true, message: `Bot ${botId} forced to win. Game ending.` });
-});
+        async function submitDepositRequest() {
+            if (isSubmittingDeposit) return;
+            if (!selectedAdminId) { alert('Please select a deposit account first'); return; }
+            const phone = document.getElementById('depositPlayerPhone').value.trim();
+            const amount = document.getElementById('depositAmount').value.trim();
+            const ref = document.getElementById('depositRef').value.trim();
+            const photoInput = document.getElementById('depositPhoto');
+            const photoFile = photoInput.files[0];
+            if (!phone.match(/^(09|07)\d{8}$/)) { alert(
+                    'Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'); return; }
+            if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit is 10 ETB'); return; }
+            if (!photoFile) { alert('Please upload a photo proof of your payment.'); return; }
+            isSubmittingDeposit = true;
+            const submitBtn = document.getElementById('submitDepositBtn');
+            const originalText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = '⏳ Sending...';
+            const formData = new FormData();
+            formData.append('phone', phone);
+            formData.append('amount', Number(amount));
+            formData.append('payment_type', selectedDepositType);
+            formData.append('transaction_reference', ref || '');
+            formData.append('admin_id', selectedAdminId);
+            formData.append('photo', photoFile);
+            try {
+                const response = await fetch('/api/request-deposit', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (result.success) {
+                    alert(
+                        `✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n👤 Admin: ${result.adminName || 'Processing'}\n📱 Account: ${result.adminNumber || 'N/A'}\n\n⏳ Please wait for admin approval.`
+                        );
+                    document.getElementById('depositDetailsModal').classList.remove('active');
+                } else {
+                    alert('❌ Error: ' + (result.error || 'Submission failed'));
+                }
+            } catch (_) { alert('⚠️ Network error. Please try again.'); } finally {
+                isSubmittingDeposit = false;
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+                unlockSpeech();
+            }
+        }
 
-app.get('/admin/bot-history', (req, res) => {
-  const { secret, from, to } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  let history = botGameHistory;
-  if (from) {
-    const fromDate = new Date(from);
-    fromDate.setHours(0, 0, 0, 0);
-    history = history.filter(entry => new Date(entry.date) >= fromDate);
-  }
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
-    history = history.filter(entry => new Date(entry.date) <= toDate);
-  }
-  res.json({ success: true, history, from: from || null, to: to || null });
-});
+        function openWithdrawTypeModal() {
+            document.getElementById('withdrawTypeModal').classList.add('active');
+            unlockSpeech();
+        }
 
-app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
-app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
+        function closeWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.remove('active'); }
 
-// ---------- Player deposit endpoints ----------
-app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
-  const userId = req.session?.userId;
-  if (!userId) return res.status(401).json({ error: 'Not logged in' });
+        function openWithdrawDetailsModal(type) {
+            selectedWithdrawType = type;
+            const title = type === 'telebirr' ? 'Telebirr' : type === 'cbebirr' ? 'CBE Birr' : 'M-Pesa';
+            const hint = type === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
+            document.getElementById('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`;
+            document.getElementById('withdrawReceiver').placeholder = hint;
+            document.getElementById('withdrawReceiver').value = '';
+            document.getElementById('withdrawAmount').value = '';
+            document.getElementById('withdrawName').value = '';
+            document.getElementById('withdrawDetailsModal').classList.add('active');
+            document.getElementById('withdrawTypeModal').classList.remove('active');
+            unlockSpeech();
+        }
 
-  const { phone, amount, payment_type, transaction_reference, admin_id } = req.body;
-  const amt = Number(amount);
-  const photoFile = req.file;
+        let isSubmittingWithdraw = false;
 
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
-  if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
-  if (!photoFile) return res.status(400).json({ error: 'Photo proof is required' });
+        async function submitWithdrawRequest() {
+            if (isSubmittingWithdraw) return;
+            const receiver = document.getElementById('withdrawReceiver').value.trim();
+            const amount = document.getElementById('withdrawAmount').value.trim();
+            const name = document.getElementById('withdrawName').value.trim();
+            if (!name) { alert('Full name required'); return; }
+            if (!amount || isNaN(amount) || Number(amount) < 20) { alert('Minimum withdrawal is 20 ETB'); return; }
+            if (!receiver.match(/^(09|07)\d{8}$/)) { alert(
+                    `Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`
+                    ); return; }
+            isSubmittingWithdraw = true;
+            const submitBtn = document.getElementById('submitWithdrawBtn');
+            const originalText = submitBtn.innerText;
+            submitBtn.disabled = true;
+            submitBtn.innerText = '⏳ Processing...';
+            try {
+                const response = await fetch('/api/request-withdraw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: Number(amount), phone: receiver, withdrawal_type: selectedWithdrawType,
+                        name })
+                });
+                const result = await response.json();
+                if (result.success) { alert('✅ Withdrawal request submitted!');
+                    document.getElementById('withdrawDetailsModal').classList.remove('active'); } else { alert('❌ Error: ' +
+                        (result.error || 'Submission failed')); }
+            } catch (_) { alert('⚠️ Network error.'); } finally {
+                isSubmittingWithdraw = false;
+                submitBtn.disabled = false;
+                submitBtn.innerText = originalText;
+                unlockSpeech();
+            }
+        }
 
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-      .eq('id', admin_id)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
+        // ──────────────────────────────────────────────────────────────
+        //  Event listeners
+        // ──────────────────────────────────────────────────────────────
+        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected');
+            loadStats();
+            connectToGame(10);
+            showLobby(30);
+            unlockSpeech(); });
+        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected');
+            loadStats();
+            connectToGame(20);
+            showLobby(30);
+            unlockSpeech(); });
+        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected');
+            loadStats();
+            connectToGame(30);
+            showLobby(30);
+            unlockSpeech(); });
+        document.getElementById('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom =
+                    true;
+                socket.emit('newCardNumber');
+                selectedCardNumber = null;
+                selectedNumberEl.textContent = '⚡ ...';
+                buildNumberGrid(); }
+            unlockSpeech(); });
+        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit(
+                'claimBingo');
+            unlockSpeech(); });
+        document.getElementById('muteToggleBtn')?.addEventListener('click', toggleMute);
+        document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
 
-    const methodField = `${payment_type}_number`;
-    if (!admin[methodField]) {
-      return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
-    }
-
-    const user = await loadUser(userId, null, null, null, false);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (!user.admin_id) {
-      await supabase
-        .from('users')
-        .update({ admin_id: admin.id, assigned_admin_name: admin.name })
-        .eq('telegram_id', userId);
-      if (users[userId]) {
-        users[userId].admin_id = admin.id;
-        users[userId].assigned_admin_name = admin.name;
-      }
-    }
-
-    const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `deposit-proofs/${fileName}`;
-
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets.some(b => b.name === 'deposit-photos');
-    if (!bucketExists) {
-      await supabase.storage.createBucket('deposit-photos', {
-        public: true,
-        file_size_limit: 5242880,
-        allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-      });
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from('deposit-photos')
-      .upload(filePath, photoFile.buffer, {
-        contentType: photoFile.mimetype,
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      let errorMsg = 'Failed to upload photo proof';
-      if (uploadError.message.includes('bucket not found')) {
-        errorMsg = 'Storage bucket not configured. Please contact admin.';
-      } else if (uploadError.message.includes('permission')) {
-        errorMsg = 'Permission denied. Check Supabase storage policies.';
-      } else if (uploadError.message.includes('duplicate')) {
-        errorMsg = 'File already exists. Please rename and retry.';
-      }
-      return res.status(500).json({ error: errorMsg, details: uploadError.message });
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('deposit-photos')
-      .getPublicUrl(filePath);
-
-    const photoUrl = publicUrlData?.publicUrl || null;
-
-    const { data, error } = await supabase.from('deposit_requests').insert({
-      telegram_id: userId,
-      username: user.username,
-      amount: amt,
-      status: 'pending',
-      phone: phone || null,
-      payment_type,
-      transaction_reference: transaction_reference || null,
-      proof_photo_url: photoUrl,
-      admin_id: admin.id,
-      assigned_deposit_number: admin[methodField]
-    }).select().single();
-
-    if (error) throw error;
-
-    Audit.depositInitiated(userId, req.ip, {
-      transactionId: data.id.toString(),
-      amount: amt,
-      currency: 'ETB',
-      method: payment_type,
-      adminId: admin.id,
-      adminName: admin.name,
-      adminNumber: admin[methodField],
-      transactionReference: transaction_reference,
-      photoUrl: photoUrl || 'uploaded'
-    });
-
-    res.json({
-      success: true,
-      requestId: data.id,
-      message: `Deposit request of ${amt} ETB via ${payment_type} submitted to ${admin.name}.`,
-      adminName: admin.name,
-      adminNumber: admin[methodField]
-    });
-  } catch (err) {
-    console.error('Deposit request error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Player withdrawal endpoints ----------
-app.post('/api/request-withdraw', async (req, res) => {
-  const userId = req.session?.userId;
-  if (!userId) return res.status(401).json({ error: 'Not logged in' });
-
-  const { amount, phone, withdrawal_type, name } = req.body;
-  const amt = Number(amount);
-
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(withdrawal_type)) return res.status(400).json({ error: 'Invalid withdrawal type' });
-  const receiver = (phone || '').trim();
-  if (!receiver || receiver.length < 10) return res.status(400).json({ error: 'Valid receiver phone/account required' });
-  const receiverName = (name || '').trim();
-  if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
-
-  try {
-    const user = await loadUser(userId, null, null, null, false);
-    if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
-
-    let adminId = user.admin_id;
-    let adminName = user.assigned_admin_name;
-    if (!adminId) {
-      const admins = await getAllAdmins();
-      if (admins.length > 0) { adminId = admins[0].id; adminName = admins[0].name; }
-    }
-
-    const { data, error } = await supabase.from('withdrawal_requests').insert({
-      telegram_id: userId,
-      username: user.username,
-      amount: amt,
-      status: 'pending',
-      phone_number: receiver,
-      withdrawal_type,
-      receiver_name: receiverName,
-      admin_id: adminId,
-      assigned_admin_name: adminName
-    }).select().single();
-
-    if (error) throw error;
-
-    Audit.withdrawalRequested(userId, req.ip, {
-      transactionId: data.id.toString(),
-      amount: amt,
-      currency: 'ETB',
-      method: withdrawal_type,
-      receiver,
-      name: receiverName,
-      adminId,
-      adminName
-    });
-
-    res.json({
-      success: true,
-      requestId: data.id,
-      message: `Withdrawal request of ${amt} ETB via ${withdrawal_type} to ${receiver} submitted.`
-    });
-  } catch (err) {
-    console.error('Withdrawal request error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Admin endpoints (session-based) ----------
-
-// ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
-// ============================================================
-app.get('/admin/deposits', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  let query = supabase
-    .from('deposit_requests')
-    .select('*')
-    .eq('admin_id', admin.id);
-
-  const { from, to, method, status } = req.query;
-
-  if (from) {
-    const fromDate = new Date(from);
-    fromDate.setHours(0,0,0,0);
-    query = query.gte('created_at', fromDate.toISOString());
-  }
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
-    query = query.lte('created_at', toDate.toISOString());
-  }
-  if (method && method !== 'all') {
-    query = query.eq('payment_type', method);
-  }
-  if (status && status !== 'all') {
-    query = query.eq('status', status);
-  } else {
-    query = query.eq('status', 'pending');
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const playerCount = await getAdminPlayerCount(admin.id);
-  const rawDeposits = await getAdminDeposits(admin.id);
-  const approvedToday = await getAdminDeposits(admin.id, 'approved');
-  const depositBalance = await getAdminHoldingBalance(admin.id);
-
-  res.json({
-    requests: data,
-    admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-    stats: {
-      playerCount,
-      totalDeposits: depositBalance,
-      rawDeposits: rawDeposits,
-      depositBalance,
-      pendingCount: data.filter(d => d.status === 'pending').length,
-      approvedToday
-    }
-  });
-});
-
-// ============================================================
-//  UPDATED: /admin/withdrawals with date, method, status filters
-// ============================================================
-app.get('/admin/withdrawals', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  let query = supabase
-    .from('withdrawal_requests')
-    .select('*')
-    .eq('admin_id', admin.id);
-
-  const { from, to, method, status } = req.query;
-
-  if (from) {
-    const fromDate = new Date(from);
-    fromDate.setHours(0,0,0,0);
-    query = query.gte('created_at', fromDate.toISOString());
-  }
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
-    query = query.lte('created_at', toDate.toISOString());
-  }
-  if (method && method !== 'all') {
-    query = query.eq('withdrawal_type', method);
-  }
-  if (status && status !== 'all') {
-    query = query.eq('status', status);
-  } else {
-    query = query.eq('status', 'pending');
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
-});
-
-// ---------- Other Admin Endpoints ----------
-// ---- GET admin holding balance ----
-app.get('/admin/holding-balance', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-  try {
-    const holding = await getAdminHoldingBalance(admin.id);
-    res.json({ success: true, holding });
-  } catch (err) {
-    console.error('Error fetching holding balance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---- UPDATED: /admin/process-deposit with holding limit 1500 ETB ----
-app.post('/admin/process-deposit', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { requestId, action } = req.body;
-  if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-
-  try {
-    const { data: reqData, error: fetchErr } = await supabase
-      .from('deposit_requests')
-      .select('*')
-      .eq('id', requestId)
-      .eq('admin_id', admin.id)
-      .single();
-    if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found or not assigned to you' });
-    if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
-
-    if (action === 'approve') {
-      const holding = await getAdminHoldingBalance(admin.id);
-      const newHolding = holding + reqData.amount;
-      if (newHolding > 1500) {
-        return res.status(400).json({
-          error: `Admin's total approved deposits exceeds 1500 ETB (current: ${holding.toFixed(0)} ETB). Please withdraw excess to super admin before approving more deposits.`
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const page = btn.getAttribute('data-page');
+                clearInterval(lobbyTimerInterval);
+                if (page === 'lobby') {
+                    if (currentMainPage === 'lobby') showLobby(currentTimerSeconds);
+                    else showGame();
+                } else {
+                    if (currentMainPage === 'lobby') lobbyPage.classList.add('hidden');
+                    else gamePage.classList.add('hidden');
+                    if (page === 'history') historyPage.classList.remove('hidden');
+                    else if (page === 'wallet') { walletPage.classList.remove('hidden');
+                        syncBalance(currentBalance); } else if (page === 'profile') { profilePage.classList.remove(
+                            'hidden');
+                        syncBalance(currentBalance);
+                        updateStatsUI(); }
+                }
+                unlockSpeech();
+            });
         });
-      }
 
-      const user = await loadUser(reqData.telegram_id, null, null, null, false);
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      user.balance += reqData.amount;
-      await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-      await supabase.from('deposit_requests').update({
-        status: 'approved',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
+        document.getElementById('backFromHistoryBtn')?.addEventListener('click', goBackToMain);
+        document.getElementById('backFromWalletBtn')?.addEventListener('click', goBackToMain);
+        document.getElementById('backFromProfileBtn')?.addEventListener('click', goBackToMain);
 
-      Audit.depositCompleted(reqData.telegram_id, req.ip, {
-        transactionId: requestId.toString(),
-        providerRef: reqData.id.toString(),
-        amount: reqData.amount,
-        currency: 'ETB',
-        method: reqData.payment_type || 'unknown',
-        adminId: admin.id,
-        adminName: admin.name
-      });
+        document.getElementById('depositFromWalletBtn')?.addEventListener('click', openDepositTypeModal);
+        document.getElementById('withdrawFromWalletBtn')?.addEventListener('click', openWithdrawTypeModal);
+        document.getElementById('depositBtn')?.addEventListener('click', openDepositTypeModal);
+        document.getElementById('withdrawBtn')?.addEventListener('click', openWithdrawTypeModal);
 
-      if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
-        user.first_deposit_amount = reqData.amount;
-        await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
-      }
-
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
-      if (playerSocket) {
-        playerSocket.emit('balanceUpdate', user.balance);
-        playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount });
-      }
-      res.json({ success: true, newBalance: user.balance });
-    } else {
-      await supabase.from('deposit_requests').update({
-        status: 'rejected',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
-      Audit.depositFailed(reqData.telegram_id, req.ip, {
-        transactionId: requestId.toString(),
-        amount: reqData.amount,
-        reason: 'rejected_by_admin',
-        adminId: admin.id,
-        adminName: admin.name
-      });
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
-      if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
-      res.json({ success: true });
-    }
-  } catch (err) {
-    console.error('Process deposit error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---- UPDATED: /admin/stats – includes positive adjustments in deposit totals ----
-app.get('/admin/stats', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const playerCount = await getAdminPlayerCount(admin.id);
-    
-    const { data: deposits } = await supabase
-      .from('deposit_requests')
-      .select('amount, status, created_at')
-      .eq('admin_id', admin.id);
-    
-    const rawDeposits = deposits.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayDepositsFromRequests = deposits
-      .filter(d => d.status === 'approved' && new Date(d.created_at) >= today)
-      .reduce((sum, d) => sum + Number(d.amount), 0);
-
-    const { data: adjustments, error: adjErr } = await supabase
-      .from('admin_deposit_adjustments')
-      .select('amount, created_at')
-      .eq('admin_id', admin.id)
-      .gt('amount', 0);
-
-    if (adjErr) throw adjErr;
-    const adjustmentTotal = adjustments.reduce((sum, a) => sum + Number(a.amount), 0);
-    const adjustmentToday = adjustments
-      .filter(a => new Date(a.created_at) >= today)
-      .reduce((sum, a) => sum + Number(a.amount), 0);
-
-    const totalDeposits = rawDeposits + adjustmentTotal;
-    const todayDeposits = todayDepositsFromRequests + adjustmentToday;
-
-    const { data: withdrawals } = await supabase
-      .from('withdrawal_requests')
-      .select('amount, status')
-      .eq('admin_id', admin.id);
-    
-    const totalWithdrawals = withdrawals.filter(w => w.status === 'approved').reduce((sum, w) => sum + Number(w.amount), 0);
-    const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
-    const pendingDeposits = deposits.filter(d => d.status === 'pending').length;
-
-    const depositBalance = await getAdminHoldingBalance(admin.id);
-    const { pending: pendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
-
-    res.json({
-      success: true,
-      admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-      stats: {
-        playerCount,
-        availableBalance: pendingEarnings,
-        totalEarned: totalEarned,
-        depositBalance,
-        rawDeposits,
-        totalDeposits,
-        todayDeposits,
-        totalWithdrawals,
-        pendingWithdrawals,
-        pendingDeposits
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching admin stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---- Other admin endpoints (players) unchanged ----
-app.get('/admin/players', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const players = await getAdminPlayers(admin.id);
-    const playersWithStats = await Promise.all(players.map(async (player) => {
-      const { data: deposits } = await supabase
-        .from('deposit_requests')
-        .select('amount, status, created_at, proof_photo_url')
-        .eq('telegram_id', player.telegram_id)
-        .eq('admin_id', admin.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return { ...player, recentDeposits: deposits || [] };
-    }));
-    res.json({
-      success: true,
-      admin: { id: admin.id, name: admin.name, phone: admin.phone },
-      players: playersWithStats,
-      count: playersWithStats.length
-    });
-  } catch (err) {
-    console.error('Error fetching admin players:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT 
-//  – now checks 1500 ETB holding limit for additions
-// ============================================================
-app.post('/admin/update-player-balance', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId, amount, operation } = req.body;
-  if (!telegramId) return res.status(400).json({ error: 'Telegram ID required' });
-  const amt = Number(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Amount must be a positive number' });
-  if (!['add', 'subtract'].includes(operation)) return res.status(400).json({ error: 'Operation must be "add" or "subtract"' });
-
-  try {
-    // 1. Verify the player exists and is assigned to this admin
-    const { data: user, error: userErr } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', telegramId)
-      .maybeSingle();
-    if (userErr || !user) return res.status(404).json({ error: 'Player not found' });
-    if (user.admin_id !== admin.id) {
-      return res.status(403).json({ error: 'This player is not assigned to you' });
-    }
-
-    // 2. Enforce 1500 ETB holding limit for additions
-    if (operation === 'add') {
-      const currentHolding = await getAdminHoldingBalance(admin.id);
-      if (currentHolding + amt > 1500) {
-        return res.status(400).json({
-          error: `Cannot add ${amt} ETB. Admin holding balance would exceed 1500 ETB (current: ${currentHolding.toFixed(0)} ETB). Please withdraw excess to super admin.`
+        document.getElementById('closeDepositTypeBtn')?.addEventListener('click', closeDepositTypeModal);
+        document.getElementById('backDepositBtn')?.addEventListener('click', () => {
+            document.getElementById('depositDetailsModal').classList.remove('active');
+            openDepositTypeModal();
         });
-      }
-    }
+        document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
+        document.getElementById('continueDepositBtn')?.addEventListener('click', proceedToDepositDetails);
 
-    let oldBalance = Number(user.balance);
-    let newBalance = oldBalance;
-    if (operation === 'add') {
-      newBalance += amt;
-    } else {
-      if (oldBalance < amt) return res.status(400).json({ error: 'Insufficient player balance' });
-      newBalance -= amt;
-    }
+        document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn =>
+            btn.addEventListener('click', () => openWithdrawDetailsModal(btn.dataset.type)));
+        document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click', () =>
+            document.getElementById('withdrawTypeModal').classList.remove('active'));
+        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => {
+            document.getElementById('withdrawDetailsModal').classList.remove('active');
+            openWithdrawTypeModal();
+        });
+        document.getElementById('submitWithdrawBtn')?.addEventListener('click', submitWithdrawRequest);
 
-    // 3. Update the balance in the database
-    const { error: updateErr } = await supabase
-      .from('users')
-      .update({ balance: newBalance })
-      .eq('telegram_id', telegramId);
-    if (updateErr) throw updateErr;
+        const rulesModal = document.getElementById('rulesModal');
+        const closeRules = document.getElementById('closeRulesBtn');
+        document.getElementById('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
+        document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
+        closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
-    // 4. Record the adjustment in admin_deposit_adjustments
-    const adjustmentAmount = operation === 'add' ? amt : -amt;
-    const { error: adjErr } = await supabase
-      .from('admin_deposit_adjustments')
-      .insert({
-        admin_id: admin.id,
-        amount: adjustmentAmount,
-        type: 'manual_balance_adjustment',
-        description: `Manual ${operation} of ${amt} ETB for player ${telegramId}`,
-        created_by: admin.id,
-        created_at: new Date().toISOString()
-      });
-    if (adjErr) console.error('Failed to record adjustment:', adjErr.message);
+        // ──────────────────────────────────────────────────────────────
+        //  Init
+        // ──────────────────────────────────────────────────────────────
+        buildNumberGrid();
+        loadStats();
+        updateMuteButton();
+        window.speechSynthesis.getVoices();
 
-    // 5. Update in‑memory cache
-    if (users[telegramId]) {
-      users[telegramId].balance = newBalance;
-    } else {
-      await loadUser(telegramId, user.username, user.telegram_handle, null, true);
-    }
+        stakePage.classList.remove('hidden');
 
-    // 6. Audit log
-    await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
-      targetUserId: telegramId,
-      operation,
-      amount: amt,
-      oldBalance,
-      newBalance
-    });
-
-    // 7. Notify the player via WebSocket if connected
-    const playerSocket = await getSocketByUserId(telegramId);
-    if (playerSocket) {
-      playerSocket.emit('balanceUpdate', newBalance);
-    }
-
-    res.json({ success: true, newBalance, message: `Balance ${operation}ed by ${amt} ETB` });
-  } catch (err) {
-    console.error('Error updating player balance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-
-app.post('/admin/process-withdrawal', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { requestId, action } = req.body;
-  if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-
-  try {
-    const { data: reqData, error: fetchErr } = await supabase
-      .from('withdrawal_requests')
-      .select('*')
-      .eq('id', requestId)
-      .eq('admin_id', admin.id)
-      .single();
-    if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found or not assigned to you' });
-    if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
-    if (action === 'approve') {
-      const user = await loadUser(reqData.telegram_id, null, null, null, false);
-      if (!user || user.balance < reqData.amount) return res.status(400).json({ error: 'Insufficient balance now' });
-      user.balance -= reqData.amount;
-      await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-      await supabase.from('withdrawal_requests').update({
-        status: 'approved',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
-      Audit.withdrawalCompleted(reqData.telegram_id, req.ip, {
-        transactionId: requestId.toString(),
-        amount: reqData.amount,
-        currency: 'ETB',
-        method: reqData.withdrawal_type || 'N/A',
-        receiver: reqData.phone_number,
-        adminId: admin.id,
-        adminName: admin.name
-      });
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
-      if (playerSocket) {
-        playerSocket.emit('balanceUpdate', user.balance);
-        playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number });
-      }
-      res.json({ success: true, newBalance: user.balance });
-    } else {
-      await supabase.from('withdrawal_requests').update({
-        status: 'rejected',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
-      Audit.withdrawalRejected(reqData.telegram_id, req.ip, {
-        transactionId: requestId.toString(),
-        amount: reqData.amount,
-        reason: 'rejected_by_admin',
-        adminId: admin.id,
-        adminName: admin.name
-      });
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
-      if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
-      res.json({ success: true });
-    }
-  } catch (err) {
-    console.error('Process withdrawal error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Daily Commission Calculation ----------
-const DAILY_COMMISSION_HOUR = 0;
-const DAILY_COMMISSION_MINUTE = 0;
-
-async function calculateDailyCommissions() {
-  console.log('⏰ Running daily commission calculation...');
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-  try {
-    const { data: admins, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name')
-      .eq('is_active', true);
-    if (adminErr) throw adminErr;
-
-    for (const admin of admins) {
-      const { data: contributions, error: contribErr } = await supabase
-        .from('game_admin_contributions')
-        .select('house_profit_share, total_entry_fees, created_at')
-        .eq('admin_id', admin.id)
-        .gte('created_at', yesterday.toISOString())
-        .lt('created_at', today.toISOString());
-      if (contribErr) throw contribErr;
-
-      if (contributions && contributions.length > 0) {
-        const totalCommission = contributions.reduce((sum, c) => sum + Number(c.house_profit_share), 0);
-        const totalEntryFees = contributions.reduce((sum, c) => sum + Number(c.total_entry_fees || 0), 0);
-        const totalHouseProfit = contributions.reduce((sum, c) => sum + Number(c.house_profit_share || 0), 0);
-
-        if (totalCommission > 0) {
-          const { data: existing } = await supabase
-            .from('admin_daily_commissions')
-            .select('id')
-            .eq('admin_id', admin.id)
-            .eq('date', yesterdayStr)
-            .maybeSingle();
-
-          if (existing) {
-            await supabase
-              .from('admin_daily_commissions')
-              .update({
-                total_entry_fees: totalEntryFees,
-                total_house_profit: totalHouseProfit,
-                commission_amount: totalCommission
-              })
-              .eq('id', existing.id);
-          } else {
-            await supabase
-              .from('admin_daily_commissions')
-              .insert({
-                admin_id: admin.id,
-                date: yesterdayStr,
-                total_entry_fees: totalEntryFees,
-                total_house_profit: totalHouseProfit,
-                commission_amount: totalCommission,
-                status: 'pending'
-              });
-            console.log(`✅ Admin ${admin.name} earned ${totalCommission.toFixed(2)} ETB commission for ${yesterdayStr}`);
-          }
+        // Auto-reconnect from saved stake
+        const savedStake = localStorage.getItem('dot_bingo_stake');
+        if (savedStake) {
+            const stake = parseInt(savedStake);
+            if ([10, 20, 30].includes(stake)) {
+                setTimeout(() => {
+                    if (!socket) connectToGame(stake);
+                    else socket.emit('joinLobby', { stake });
+                }, 500);
+            }
         }
-      }
-    }
-    console.log('✅ Daily commission calculation complete!');
-  } catch (err) {
-    console.error('❌ Daily commission calculation error:', err.message);
-  }
-}
+    </script>
 
-function scheduleDailyCommission() {
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setHours(DAILY_COMMISSION_HOUR, DAILY_COMMISSION_MINUTE, 0, 0);
-  if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
-  const msUntilNextRun = nextRun - now;
-  console.log(`⏰ Next daily commission calculation at: ${nextRun.toLocaleString()}`);
-  setTimeout(() => {
-    calculateDailyCommissions();
-    setInterval(calculateDailyCommissions, 24 * 60 * 60 * 1000);
-  }, msUntilNextRun);
-}
-scheduleDailyCommission();
-
-// ---------- Admin Earnings (Daily Commissions) ----------
-app.get('/admin/daily-commissions', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const { data: dailyCommissions, error } = await supabase
-      .from('admin_daily_commissions')
-      .select('*')
-      .eq('admin_id', admin.id)
-      .order('date', { ascending: false })
-      .limit(30);
-    if (error) throw error;
-
-    const { data: pendingEarnings, error: pendingErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('commission_amount')
-      .eq('admin_id', admin.id)
-      .eq('status', 'pending');
-    if (pendingErr) throw pendingErr;
-    const totalPending = pendingEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
-
-    const { data: paidEarnings, error: paidErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('commission_amount')
-      .eq('admin_id', admin.id)
-      .eq('status', 'paid');
-    if (paidErr) throw paidErr;
-    const totalPaid = paidEarnings.reduce((sum, d) => sum + Number(d.commission_amount), 0);
-
-    res.json({
-      success: true,
-      daily: dailyCommissions,
-      stats: {
-        totalEarned: totalPaid,
-        totalPending: totalPending,
-        totalPaid: totalPaid,
-        totalAvailable: totalPending
-      },
-      admin: {
-        id: admin.id,
-        name: admin.name,
-        commission_rate: admin.commission_rate
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching daily commissions:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- LIVE COMMISSION – Real-time from game_admin_contributions ----------
-app.get('/admin/live-commission', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const { data: contributions, error: contribErr } = await supabase
-      .from('game_admin_contributions')
-      .select('house_profit_share, total_entry_fees, created_at, game_round_id')
-      .eq('admin_id', admin.id);
-
-    if (contribErr) throw contribErr;
-
-    const { data: paidCommissions, error: paidErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('commission_amount, status, date')
-      .eq('admin_id', admin.id);
-
-    if (paidErr) throw paidErr;
-
-    const paidDates = new Set();
-    if (paidCommissions) {
-      paidCommissions.forEach(c => {
-        if (c.status === 'paid') {
-          const dateStr = c.date;
-          paidDates.add(dateStr);
-        }
-      });
-    }
-
-    const dailyTotals = {};
-    let totalPending = 0;
-    let totalPaid = 0;
-
-    if (contributions) {
-      for (const contrib of contributions) {
-        const date = new Date(contrib.created_at);
-        const dateStr = date.toISOString().split('T')[0];
-        const share = Number(contrib.house_profit_share) || 0;
-        const fees = Number(contrib.total_entry_fees) || 0;
-
-        if (!dailyTotals[dateStr]) {
-          dailyTotals[dateStr] = {
-            date: dateStr,
-            totalCommission: 0,
-            totalEntryFees: 0,
-            isPaid: paidDates.has(dateStr)
-          };
-        }
-        dailyTotals[dateStr].totalCommission += share;
-        dailyTotals[dateStr].totalEntryFees += fees;
-      }
-    }
-
-    const rounds = [];
-    for (const [dateStr, data] of Object.entries(dailyTotals)) {
-      rounds.push({
-        date: dateStr,
-        total_entry_fees: data.totalEntryFees,
-        commission_amount: data.totalCommission,
-        status: data.isPaid ? 'paid' : 'pending'
-      });
-
-      if (data.isPaid) {
-        totalPaid += data.totalCommission;
-      } else {
-        totalPending += data.totalCommission;
-      }
-    }
-
-    rounds.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    let totalEarned = 0;
-    if (paidCommissions) {
-      paidCommissions.forEach(c => {
-        if (c.status === 'paid') {
-          totalEarned += Number(c.commission_amount) || 0;
-        }
-      });
-    }
-
-    res.json({
-      success: true,
-      admin: {
-        id: admin.id,
-        name: admin.name,
-        commission_rate: admin.commission_rate
-      },
-      stats: {
-        pending: totalPending,
-        paid: totalPaid,
-        totalEarned: totalEarned,
-        totalPending: totalPending,
-        totalAvailable: totalPending
-      },
-      rounds: rounds
-    });
-
-  } catch (err) {
-    console.error('Error fetching live commission:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Admin Request Withdrawal ----------
-app.post('/admin/request-withdrawal', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { amount, phone, withdrawal_type, receiver_name } = req.body;
-  const amt = Number(amount);
-  if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!phone || !receiver_name) return res.status(400).json({ error: 'Phone and receiver name required' });
-
-  try {
-    const { data: contributions, error: contribErr } = await supabase
-      .from('game_admin_contributions')
-      .select('house_profit_share, created_at')
-      .eq('admin_id', admin.id);
-
-    if (contribErr) throw contribErr;
-
-    const { data: paidCommissions, error: paidErr } = await supabase
-      .from('admin_daily_commissions')
-      .select('date')
-      .eq('admin_id', admin.id)
-      .eq('status', 'paid');
-
-    if (paidErr) throw paidErr;
-
-    const paidDates = new Set();
-    if (paidCommissions) {
-      paidCommissions.forEach(c => paidDates.add(c.date));
-    }
-
-    let totalPending = 0;
-    if (contributions) {
-      for (const contrib of contributions) {
-        const date = new Date(contrib.created_at);
-        const dateStr = date.toISOString().split('T')[0];
-        if (!paidDates.has(dateStr)) {
-          totalPending += Number(contrib.house_profit_share) || 0;
-        }
-      }
-    }
-
-    if (totalPending < amt) return res.status(400).json({ error: `Insufficient pending earnings. Available: ${totalPending.toFixed(0)} ETB` });
-
-    const { data, error } = await supabase
-      .from('admin_withdrawal_requests')
-      .insert({
-        admin_id: admin.id,
-        amount: amt,
-        phone,
-        withdrawal_type,
-        receiver_name,
-        status: 'pending'
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    res.json({ success: true, request: data });
-  } catch (err) {
-    console.error('Admin withdrawal request error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Super Admin: Process Admin Withdrawal (legacy) ----------
-app.post('/admin/process-admin-withdrawal', async (req, res) => {
-  const { secret, requestId, action } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
-  try {
-    const { data: reqData, error: fetchErr } = await supabase
-      .from('admin_withdrawal_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single();
-    if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
-    if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
-
-    if (action === 'approve') {
-      await supabase
-        .from('admin_withdrawal_requests')
-        .update({ status: 'approved', processed_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-      await supabase
-        .from('admin_daily_commissions')
-        .update({ status: 'paid', paid_at: new Date().toISOString() })
-        .eq('admin_id', reqData.admin_id)
-        .eq('status', 'pending');
-
-      res.json({ success: true });
-    } else {
-      await supabase
-        .from('admin_withdrawal_requests')
-        .update({ status: 'rejected', processed_at: new Date().toISOString() })
-        .eq('id', requestId);
-      res.json({ success: true });
-    }
-  } catch (err) {
-    console.error('Process admin withdrawal error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-//  SUPER ADMIN ENDPOINTS – with secret support and filters
-// ============================================================
-
-// Helper: accept secret OR session
-async function authSuperAdmin(req, res) {
-  const secret = req.query.secret || req.body.secret;
-  const validSecret = process.env.ADMIN_SECRET || '01207';
-
-  if (secret && secret === validSecret) {
-    return { success: true, adminId: null, via: 'secret' };
-  }
-
-  if (req.session.adminId) {
-    const isSuper = await isSuperAdmin(req.session.adminId);
-    if (isSuper) {
-      return { success: true, adminId: req.session.adminId, via: 'session' };
-    }
-  }
-
-  return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
-}
-
-// ---------- GET all admins (includes adjusted deposit balance) ----------
-app.get('/super-admin/admins', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  try {
-    const { data: admins, error } = await supabase
-      .from('admins')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-
-    const adminsWithStats = await Promise.all(admins.map(async (admin) => {
-      const playerCount = await getAdminPlayerCount(admin.id);
-      const rawDeposits = await getAdminDeposits(admin.id);
-      const { data: pendingDeposits } = await supabase
-        .from('deposit_requests')
-        .select('count')
-        .eq('admin_id', admin.id)
-        .eq('status', 'pending');
-      
-      const { data: withdrawals } = await supabase
-        .from('withdrawal_requests')
-        .select('amount, status')
-        .eq('admin_id', admin.id);
-      
-      const totalWithdrawals = withdrawals
-        .filter(w => w.status === 'approved')
-        .reduce((sum, w) => sum + Number(w.amount), 0);
-      const pendingWithdrawals = withdrawals
-        .filter(w => w.status === 'pending').length;
-      
-      const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(admin.id);
-      
-      const holdingBalance = await getAdminHoldingBalance(admin.id);
-      
-      return {
-        ...admin,
-        stats: {
-          playerCount,
-          totalDeposits: holdingBalance,
-          rawDeposits: rawDeposits,
-          holdingBalance,
-          pendingDeposits: pendingDeposits?.[0]?.count || 0,
-          totalWithdrawals,
-          pendingWithdrawals,
-          totalPendingEarnings,
-          totalEarned
-        }
-      };
-    }));
-    
-    res.json({ success: true, admins: adminsWithStats });
-  } catch (err) {
-    console.error('Error fetching admins:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- GET admin detail (includes adjustments) ----------
-app.get('/super-admin/admin/:adminId', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  try {
-    const { adminId } = req.params;
-    const { data: admin, error } = await supabase
-      .from('admins')
-      .select('*')
-      .eq('id', adminId)
-      .maybeSingle();
-    if (error || !admin) return res.status(404).json({ error: 'Admin not found' });
-    
-    const players = await getAdminPlayers(adminId);
-    const { data: deposits } = await supabase
-      .from('deposit_requests')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    const { data: withdrawals } = await supabase
-      .from('withdrawal_requests')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    const { data: earnings } = await supabase
-      .from('admin_daily_commissions')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('date', { ascending: false })
-      .limit(30);
-    const { data: adminWithdrawals } = await supabase
-      .from('admin_withdrawal_requests')
-      .select('*')
-      .eq('admin_id', adminId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
-    
-    const { pending: totalPendingEarnings, earned: totalEarned } = await getAdminEarnings(adminId);
-    const holdingBalance = await getAdminHoldingBalance(adminId);
-    
-    const { data: adjustments, error: adjErr } = await supabase
-      .from('admin_deposit_adjustments')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('created_at', { ascending: false });
-    if (adjErr) throw adjErr;
-    
-    res.json({
-      success: true,
-      admin,
-      stats: {
-        players: players.length,
-        deposits,
-        withdrawals,
-        earnings,
-        adminWithdrawals,
-        totalPendingEarnings,
-        totalEarned,
-        holdingBalance,
-        adjustments: adjustments || []
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching admin details:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Toggle admin ----------
-app.post('/super-admin/toggle-admin', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId, isActive } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-
-  try {
-    if (auth.via === 'session' && parseInt(adminId) === req.session.adminId) {
-      return res.status(400).json({ error: 'Cannot change your own status' });
-    }
-    const { error } = await supabase
-      .from('admins')
-      .update({ is_active: isActive })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_TOGGLE_ADMIN', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId,
-      newStatus: isActive
-    });
-
-    res.json({ success: true, message: `Admin ${isActive ? 'activated' : 'deactivated'}` });
-  } catch (err) {
-    console.error('Error toggling admin:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Update commission ----------
-app.post('/super-admin/update-commission', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId, commissionRate } = req.body;
-  if (!adminId || commissionRate === undefined) return res.status(400).json({ error: 'Admin ID and commission rate required' });
-  if (commissionRate < 0 || commissionRate > 1) return res.status(400).json({ error: 'Commission rate must be between 0 and 1' });
-
-  try {
-    const { error } = await supabase
-      .from('admins')
-      .update({ commission_rate: commissionRate })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_UPDATE_COMMISSION', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId,
-      newCommissionRate: commissionRate
-    });
-
-    res.json({ success: true, message: 'Commission rate updated' });
-  } catch (err) {
-    console.error('Error updating commission:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- NEW: Super admin toggle deposit acceptance ----------
-app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId, acceptDeposits } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-  if (acceptDeposits === undefined) return res.status(400).json({ error: 'acceptDeposits boolean required' });
-
-  try {
-    const { error } = await supabase
-      .from('admins')
-      .update({ accept_deposits: acceptDeposits })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_TOGGLE_DEPOSIT_ACCEPTANCE', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId,
-      acceptDeposits
-    });
-
-    res.json({ success: true, message: `Deposit acceptance ${acceptDeposits ? 'enabled' : 'disabled'}` });
-  } catch (err) {
-    console.error('Error toggling deposit acceptance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- NEW: Super admin set fallback admin ----------
-app.post('/super-admin/set-fallback-admin', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-
-  try {
-    // Reset all admins' is_fallback to false, then set the chosen one
-    await supabase
-      .from('admins')
-      .update({ is_fallback: false });
-
-    const { error } = await supabase
-      .from('admins')
-      .update({ is_fallback: true })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_SET_FALLBACK', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId
-    });
-
-    res.json({ success: true, message: `Admin ${adminId} set as fallback` });
-  } catch (err) {
-    console.error('Error setting fallback admin:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Super admin adjust deposit balance ----------
-app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId, amount, description = '' } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-  if (amount === undefined || isNaN(Number(amount)) || amount === 0) {
-    return res.status(400).json({ error: 'Valid non-zero amount required (negative to deduct)' });
-  }
-
-  const amt = Number(amount);
-
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id')
-      .eq('id', adminId)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) return res.status(404).json({ error: 'Admin not found' });
-
-    const { data: newAdj, error: insertErr } = await supabase
-      .from('admin_deposit_adjustments')
-      .insert({
-        admin_id: adminId,
-        amount: amt,
-        type: 'super_admin_manual',
-        description: description || (amt < 0 ? 'Super admin deduction' : 'Super admin addition'),
-        created_by: auth.adminId || null,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    if (insertErr) throw insertErr;
-
-    const newBalance = await getAdminHoldingBalance(adminId);
-
-    Audit.adminAction('SUPER_ADMIN_ADJUST_DEPOSIT', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId,
-      amount: amt,
-      newBalance,
-      description: newAdj.description
-    });
-
-    res.json({ success: true, message: 'Deposit balance adjusted', adjustment: newAdj, newBalance });
-  } catch (err) {
-    console.error('Error adjusting deposit balance:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- GET admin withdrawal requests (with filters) ----------
-app.get('/super-admin/admin-withdrawals', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  try {
-    const { status = 'pending', limit = 50, from, to, adminId } = req.query;
-
-    let query = supabase
-      .from('admin_withdrawal_requests')
-      .select('*, admins(name, phone)')
-      .order('created_at', { ascending: false })
-      .limit(Math.min(parseInt(limit), 100));
-
-    if (status !== 'all') query = query.eq('status', status);
-    if (adminId && adminId !== 'all') query = query.eq('admin_id', adminId);
-    if (from) {
-      const fromDate = new Date(from);
-      fromDate.setHours(0,0,0,0);
-      query = query.gte('created_at', fromDate.toISOString());
-    }
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23,59,59,999);
-      query = query.lte('created_at', toDate.toISOString());
-    }
-
-    const { data: requests, error } = await query;
-    if (error) throw error;
-    res.json({ success: true, requests });
-  } catch (err) {
-    console.error('Error fetching admin withdrawals:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Process admin withdrawal (FIXED) ----------
-app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { requestId, action } = req.body;
-  if (!requestId || !['approve', 'reject'].includes(action)) return res.status(400).json({ error: 'Request ID and valid action required' });
-
-  try {
-    const { data: reqData, error: fetchErr } = await supabase
-      .from('admin_withdrawal_requests')
-      .select('*')
-      .eq('id', requestId)
-      .single();
-    if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found' });
-    if (reqData.status !== 'pending') return res.status(400).json({ error: 'Request already processed' });
-
-    if (action === 'approve') {
-      await markContributionsAsPaid(reqData.admin_id, reqData.amount);
-
-      await supabase
-        .from('admin_withdrawal_requests')
-        .update({ status: 'approved', processed_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-      Audit.adminAction('SUPER_ADMIN_APPROVE_WITHDRAWAL', auth.adminId || 'secret', req.ip, {
-        targetAdminId: reqData.admin_id,
-        amount: reqData.amount,
-        requestId
-      });
-
-      res.json({ success: true, message: 'Withdrawal approved' });
-    } else {
-      await supabase
-        .from('admin_withdrawal_requests')
-        .update({ status: 'rejected', processed_at: new Date().toISOString() })
-        .eq('id', requestId);
-
-      Audit.adminAction('SUPER_ADMIN_REJECT_WITHDRAWAL', auth.adminId || 'secret', req.ip, {
-        targetAdminId: reqData.admin_id,
-        amount: reqData.amount,
-        requestId
-      });
-
-      res.json({ success: true, message: 'Withdrawal rejected' });
-    }
-  } catch (err) {
-    console.error('Error processing admin withdrawal:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- GET platform stats (with filters) ----------
-app.get('/super-admin/platform-stats', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  try {
-    const { from, to, adminId } = req.query;
-    let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
-    let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
-    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    let roundsQuery = supabase.from('game_rounds').select('house_profit');
-    let paidEarningsQuery = supabase.from('admin_daily_commissions').select('commission_amount').eq('status', 'paid');
-    let pendingWithdrawalsQuery = supabase.from('admin_withdrawal_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-
-    if (from) {
-      const fromDate = new Date(from);
-      fromDate.setHours(0,0,0,0);
-      depositQuery = depositQuery.gte('created_at', fromDate.toISOString());
-      withdrawalQuery = withdrawalQuery.gte('created_at', fromDate.toISOString());
-      roundsQuery = roundsQuery.gte('created_at', fromDate.toISOString());
-      paidEarningsQuery = paidEarningsQuery.gte('paid_at', fromDate.toISOString());
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.gte('created_at', fromDate.toISOString());
-    }
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23,59,59,999);
-      depositQuery = depositQuery.lte('created_at', toDate.toISOString());
-      withdrawalQuery = withdrawalQuery.lte('created_at', toDate.toISOString());
-      roundsQuery = roundsQuery.lte('created_at', toDate.toISOString());
-      paidEarningsQuery = paidEarningsQuery.lte('paid_at', toDate.toISOString());
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.lte('created_at', toDate.toISOString());
-    }
-
-    if (adminId && adminId !== 'all') {
-      depositQuery = depositQuery.eq('admin_id', adminId);
-      withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
-      paidEarningsQuery = paidEarningsQuery.eq('admin_id', adminId);
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.eq('admin_id', adminId);
-    }
-
-    let pendingEarningsQuery = supabase
-      .from('game_admin_contributions')
-      .select('house_profit_share, created_at');
-    if (from) pendingEarningsQuery = pendingEarningsQuery.gte('created_at', new Date(from).toISOString());
-    if (to) pendingEarningsQuery = pendingEarningsQuery.lte('created_at', new Date(to).toISOString());
-    if (adminId && adminId !== 'all') pendingEarningsQuery = pendingEarningsQuery.eq('admin_id', adminId);
-
-    const [totalUsers, totalAdmins, deposits, withdrawals, rounds, paidEarnings, pendingWithdrawals, pendingEarnings] = await Promise.all([
-      userQuery,
-      adminQuery,
-      depositQuery,
-      withdrawalQuery,
-      roundsQuery,
-      paidEarningsQuery,
-      pendingWithdrawalsQuery,
-      pendingEarningsQuery
-    ]);
-
-    const totalDeposits = deposits.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
-    const totalWithdrawals = withdrawals.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
-    const totalHouseProfit = rounds.data?.reduce((sum, r) => sum + Number(r.house_profit), 0) || 0;
-    const totalAdminEarnings = paidEarnings.data?.reduce((sum, e) => sum + Number(e.commission_amount), 0) || 0;
-
-    let totalPendingEarnings = 0;
-    if (pendingEarnings.data) {
-      let paidDatesQuery = supabase
-        .from('admin_daily_commissions')
-        .select('date')
-        .eq('status', 'paid');
-      if (adminId && adminId !== 'all') paidDatesQuery = paidDatesQuery.eq('admin_id', adminId);
-      if (from) paidDatesQuery = paidDatesQuery.gte('paid_at', new Date(from).toISOString());
-      if (to) paidDatesQuery = paidDatesQuery.lte('paid_at', new Date(to).toISOString());
-      const { data: paidDatesData } = await paidDatesQuery;
-      const paidDates = new Set(paidDatesData?.map(d => d.date) || []);
-
-      for (const contrib of pendingEarnings.data) {
-        const dateStr = new Date(contrib.created_at).toISOString().split('T')[0];
-        if (!paidDates.has(dateStr)) {
-          totalPendingEarnings += Number(contrib.house_profit_share) || 0;
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      stats: {
-        totalUsers: totalUsers.count || 0,
-        totalAdmins: totalAdmins.count || 0,
-        totalDeposits,
-        totalWithdrawals,
-        totalHouseProfit,
-        totalAdminEarnings,
-        totalPendingEarnings,
-        pendingWithdrawals: pendingWithdrawals.count || 0
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching platform stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ============================================================
-//  UPDATED: IMPORT PLAYERS – accepts username/handle as well as numeric ID
-// ============================================================
-app.post('/admin/import-players', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
-  }
-
-  const { telegramIds, overwrite = false } = req.body;
-
-  if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
-    return res.status(400).json({ success: false, error: 'At least one Telegram ID or username required' });
-  }
-
-  try {
-    const results = [];
-    let successCount = 0;
-
-    for (const rawId of telegramIds) {
-      const identifier = String(rawId).trim();
-      if (!identifier) {
-        results.push({ telegramId: identifier, success: false, error: 'Empty identifier' });
-        continue;
-      }
-
-      let telegramId = null;
-      // Check if it's a numeric ID
-      if (/^\d+$/.test(identifier)) {
-        telegramId = identifier;
-      } else {
-        // Try to find by telegram_handle or username (case-insensitive)
-        const searchTerm = identifier.startsWith('@') ? identifier.slice(1) : identifier;
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('telegram_id')
-          .or(`telegram_handle.ilike.${searchTerm},username.ilike.${searchTerm}`)
-          .maybeSingle();
-        if (error) {
-          results.push({ telegramId: identifier, success: false, error: error.message });
-          continue;
-        }
-        if (!user) {
-          results.push({ telegramId: identifier, success: false, error: 'User not found by username/handle' });
-          continue;
-        }
-        telegramId = user.telegram_id;
-      }
-
-      // Proceed with assignment/creation using the resolved telegramId
-      try {
-        let { data: existingUser, error: findErr } = await supabase
-          .from('users')
-          .select('telegram_id, admin_id')
-          .eq('telegram_id', telegramId)
-          .maybeSingle();
-
-        if (findErr) {
-          results.push({ telegramId, success: false, error: findErr.message });
-          continue;
-        }
-
-        if (!overwrite && existingUser && existingUser.admin_id !== null) {
-          results.push({ telegramId, success: false, error: 'Already assigned to another admin (skipped)' });
-          continue;
-        }
-
-        if (!existingUser) {
-          const newUser = {
-            telegram_id: telegramId,
-            username: `Player_${telegramId.slice(-4)}`,
-            balance: 10,
-            referred_by: null,
-            first_deposit_amount: 0,
-            admin_id: admin.id,
-            assigned_admin_name: admin.name,
-            telegram_handle: null
-          };
-          const { error: insertErr } = await supabase.from('users').insert(newUser);
-          if (insertErr) {
-            results.push({ telegramId, success: false, error: insertErr.message });
-            continue;
-          }
-          users[telegramId] = {
-            id: telegramId,
-            username: newUser.username,
-            balance: newUser.balance,
-            telegram_handle: null,
-            referred_by: null,
-            first_deposit_amount: 0,
-            admin_id: newUser.admin_id,
-            assigned_admin_name: newUser.assigned_admin_name
-          };
-          results.push({ telegramId, success: true, created: true });
-          successCount++;
-        } else {
-          const { error: updateErr } = await supabase
-            .from('users')
-            .update({
-              admin_id: admin.id,
-              assigned_admin_name: admin.name
-            })
-            .eq('telegram_id', telegramId);
-          if (updateErr) {
-            results.push({ telegramId, success: false, error: updateErr.message });
-            continue;
-          }
-          if (users[telegramId]) {
-            users[telegramId].admin_id = admin.id;
-            users[telegramId].assigned_admin_name = admin.name;
-          }
-          results.push({ telegramId, success: true, updated: true });
-          successCount++;
-        }
-      } catch (err) {
-        results.push({ telegramId, success: false, error: err.message });
-      }
-    }
-
-    Audit.adminAction('IMPORT_PLAYERS', req.session.adminId, req.ip, {
-      count: telegramIds.length,
-      successCount,
-      overwrite
-    });
-
-    res.json({
-      success: true,
-      message: `Imported ${successCount} player(s)`,
-      results
-    });
-
-  } catch (err) {
-    console.error('Import players error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Statistics ----------
-app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'stats.html')));
-
-app.get('/admin/stats-summary', async (req, res) => {
-  const { secret, from, to } = req.query;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    let roundsQuery = supabase.from('game_rounds').select('house_profit');
-    if (from) {
-      const fromDate = new Date(from);
-      fromDate.setHours(0, 0, 0, 0);
-      depositQuery = depositQuery.gte('created_at', fromDate.toISOString());
-      withdrawalQuery = withdrawalQuery.gte('created_at', fromDate.toISOString());
-      roundsQuery = roundsQuery.gte('created_at', fromDate.toISOString());
-    }
-    if (to) {
-      const toDate = new Date(to);
-      toDate.setHours(23, 59, 59, 999);
-      depositQuery = depositQuery.lte('created_at', toDate.toISOString());
-      withdrawalQuery = withdrawalQuery.lte('created_at', toDate.toISOString());
-      roundsQuery = roundsQuery.lte('created_at', toDate.toISOString());
-    }
-    const { data: deposits, error: depErr } = await depositQuery;
-    if (depErr) throw depErr;
-    const totalDeposits = deposits.reduce((sum, d) => sum + Number(d.amount), 0);
-    const { data: withdrawals, error: wdErr } = await withdrawalQuery;
-    if (wdErr) throw wdErr;
-    const totalWithdrawals = withdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
-    const { data: rounds, error: rdErr } = await roundsQuery;
-    if (rdErr) throw rdErr;
-    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
-    res.json({
-      success: true,
-      totalDeposits,
-      totalWithdrawals,
-      totalHouseProfit
-    });
-  } catch (err) {
-    console.error('Stats error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Referral endpoints ----------
-app.get('/api/invite-stats', async (req, res) => {
-  const { secret } = req.query;
-  if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const { data, error } = await supabase
-      .from('invite_stats')
-      .select('*')
-      .order('invite_code', { ascending: true });
-    if (error) throw error;
-    const stats = {};
-    data.forEach(row => { stats[row.invite_code] = row.count; });
-    res.json(stats);
-  } catch (err) {
-    console.error('Error fetching invite stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/invite-details', async (req, res) => {
-  const { secret } = req.query;
-  if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const { data: referredUsers, error } = await supabase
-      .from('users')
-      .select('username, referred_by, first_deposit_amount')
-      .not('referred_by', 'is', null)
-      .gt('first_deposit_amount', 0);
-    if (error) throw error;
-    const grouped = {};
-    for (const user of referredUsers) {
-      const code = user.referred_by;
-      if (!grouped[code]) grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
-      const bonus = user.first_deposit_amount * 0.1;
-      grouped[code].players.push({
-        username: user.username || 'Anonymous',
-        deposit: user.first_deposit_amount,
-        bonus: bonus
-      });
-      grouped[code].totalBonus += bonus;
-      grouped[code].totalDeposits += user.first_deposit_amount;
-    }
-    const { data: allCodes } = await supabase.from('invite_stats').select('invite_code');
-    const allCodeSet = new Set(allCodes.map(c => c.invite_code));
-    for (const code of allCodeSet) {
-      if (!grouped[code]) grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
-    }
-    res.json({ success: true, data: grouped });
-  } catch (err) {
-    console.error('Error fetching invite details:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- Audit endpoints ----------
-app.get('/admin/audit', async (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-  const { roomId, userId, eventType, from, to, limit = 200 } = req.query;
-  try {
-    let query = supabase.from('audit_logs').select('*', { count: 'exact' });
-    if (roomId) query = query.eq('room_id', roomId);
-    if (userId) query = query.eq('user_id', userId);
-    if (eventType) query = query.eq('event_type', eventType);
-    if (from) query = query.gte('timestamp', from);
-    if (to) query = query.lte('timestamp', to);
-    query = query.order('timestamp', { ascending: false }).limit(Math.min(parseInt(limit), 1000));
-    const { data, error, count } = await query;
-    if (error) throw error;
-    res.json({ success: true, logs: data, count });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.get('/admin/audit-summary', async (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-  try {
-    const { data: deposits, error: depErr } = await supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-    if (depErr) throw depErr;
-    const { data: withdrawals, error: wdErr } = await supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    if (wdErr) throw wdErr;
-    const { data: rounds, error: rdErr } = await supabase.from('game_rounds').select('house_profit');
-    if (rdErr) throw rdErr;
-    const totalDeposits = deposits.reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalWithdrawals = withdrawals.reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalHouseProfit = rounds.reduce((sum, r) => sum + Number(r.house_profit), 0);
-    res.json({ success: true, totalDeposits, totalWithdrawals, totalHouseProfit });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ---------- NEW: Admin link stats endpoint (optional) ----------
-app.get('/admin/link-stats', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const { data: opens, error } = await supabase
-      .from('admin_link_opens')
-      .select('*')
-      .eq('admin_id', admin.id)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    if (error) throw error;
-
-    const totalOpens = opens.length;
-    const uniqueUsers = new Set(opens.map(o => o.user_id).filter(Boolean)).size;
-
-    res.json({
-      success: true,
-      stats: { totalOpens, uniqueUsers },
-      recentOpens: opens
-    });
-  } catch (err) {
-    console.error('Error fetching link stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Socket.IO (main namespace) ----------
-io.use((socket, next) => {
-  if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
-  socket.userId = socket.request.session.userId;
-  socket.username = users[socket.userId]?.username || 'Player';
-  next();
-});
-
-io.on('connection', async (socket) => {
-  let currentStake = null;
-  socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-  for (const stake of [10, 20, 30]) {
-    const game = getGame(stake);
-    socket.emit('playersCount', { stake, count: game.players.length });
-  }
-  socket.on('joinLobby', ({ stake }) => {
-    if (![10, 20, 30].includes(stake)) return;
-    currentStake = stake;
-    socket.join(`stake_${stake}`);
-    const game = getGame(stake);
-    socket.emit('playersCount', { stake, count: game.players.length });
-    if (game.status === 'lobby') {
-      const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
-      socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
-    } else if (game.status === 'running') {
-      socket.emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
-      const player = game.players.find(p => p.telegramId === socket.userId);
-      if (player) {
-        socket.emit('yourCard', player.card);
-        socket.emit('markedNumbers', player.markedNumbers);
-        socket.emit('calledNumbers', game.calledNumbers);
-      }
-    }
-  });
-  socket.on('selectCardNumber', (cardNumber) => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'lobby') return;
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < game.entryFee) {
-      socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`);
-      return;
-    }
-    const num = Number(cardNumber);
-    if (!Number.isInteger(num) || num < 1 || num > 100) return;
-    if (game.takenCardNumbers.has(num)) { socket.emit('cardSelectionFailed', 'This number is already taken.'); return; }
-    const existing = game.players.find(p => p.telegramId === socket.userId);
-    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
-    game.takenCardNumbers.add(num);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip: ip };
-    game.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
-    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
-    broadcastPlayerCount(currentStake);
-    socket.emit('yourCard', player.card);
-    notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
-  });
-  socket.on('newCardNumber', () => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'lobby') return;
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < game.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`); return; }
-    const freeNumbers = [];
-    for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) freeNumbers.push(i);
-    if (freeNumbers.length === 0) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
-    const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
-    const existing = game.players.find(p => p.telegramId === socket.userId);
-    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
-    game.takenCardNumbers.add(randomNum);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip: ip };
-    game.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
-    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
-    broadcastPlayerCount(currentStake);
-    socket.emit('yourCard', player.card);
-    notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
-  });
-  socket.on('markNumber', (number) => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'running') return;
-    const player = game.players.find(p => p.telegramId === socket.userId);
-    if (!player) return;
-    const num = Number(number);
-    if (number !== 'FREE' && (!Number.isInteger(num) || num < 1 || num > 75)) return;
-    const flat = player.card.flat();
-    if (!flat.includes(number)) return;
-    if (!game.calledNumbers.includes(num) && number !== 'FREE') return;
-    if (player.markedNumbers.includes(number)) return;
-    player.markedNumbers.push(number);
-    socket.emit('markedNumbers', player.markedNumbers);
-  });
-  socket.on('claimBingo', () => {
-    if (!currentStake) return;
-    handleBingoClaim(socket.userId, currentStake);
-  });
-  socket.on('getBalance', async () => {
-    const u = await loadUser(socket.userId, socket.username, null, null, true);
-    socket.emit('balanceUpdate', u.balance);
-  });
-});
-
-// ---------- Admin namespace ----------
-const adminNamespace = io.of('/admin');
-adminNamespace.use((socket, next) => {
-  const secret = socket.handshake.query.secret;
-  if (secret === process.env.ADMIN_SECRET) return next();
-  next(new Error('Unauthorized admin access'));
-});
-
-adminNamespace.on('connection', (socket) => {
-  console.log('Admin connected to live view');
-  socket.emit('admin:playersList', {
-    players: getAllPlayersList(),
-    gameStatus: {
-      10: games[10].status,
-      20: games[20].status,
-      30: games[30].status
-    }
-  });
-  socket.on('admin:requestPlayers', () => {
-    socket.emit('admin:playersList', {
-      players: getAllPlayersList(),
-      gameStatus: {
-        10: games[10].status,
-        20: games[20].status,
-        30: games[30].status
-      }
-    });
-  });
-  socket.on('admin:getAllRegisteredPlayers', async () => {
-    try {
-      const { data: allUsers, error } = await supabase
-        .from('users')
-        .select('telegram_id, username, balance, telegram_handle, referred_by, first_deposit_amount, admin_id, assigned_admin_name');
-      if (error) throw error;
-      const usersList = (allUsers || []).map(u => ({
-        telegramId: u.telegram_id,
-        username: u.username,
-        balance: u.balance,
-        telegram_handle: u.telegram_handle,
-        referred_by: u.referred_by,
-        first_deposit_amount: u.first_deposit_amount || 0,
-        admin_id: u.admin_id,
-        assigned_admin_name: u.assigned_admin_name
-      }));
-      socket.emit('admin:allRegisteredPlayers', { users: usersList });
-    } catch (err) {
-      console.error('Failed to fetch all registered users:', err);
-      socket.emit('admin:allRegisteredPlayers', { users: [] });
-    }
-  });
-});
-
-setInterval(() => {
-  notifyAdminClients();
-}, 2000);
-
-// ---------- Error handler ----------
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.message);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-});
-
-// ---------- Start all three stakes ----------
-resetGame(10);
-resetGame(20);
-resetGame(30);
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
+</body>
+</html>
