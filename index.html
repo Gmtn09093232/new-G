@@ -826,9 +826,9 @@
             font-size: 3rem;
             margin-bottom: 12px;
         }
-        /* hide method preview in admin list */
+        /* remove preview class */
         .admin-methods-preview {
-            display: none !important;
+            display: none;
         }
     </style>
 </head>
@@ -1247,14 +1247,17 @@
         // ========== SAFE DISPLAY NUMBER ==========
         function getSafeDisplayNumber(number) {
             if (!number) return '📞 Contact admin for number';
-            // Remove any non-digit characters
             const digits = number.replace(/\D/g, '');
-            // Check if it's a valid Ethiopian phone number (09 or 07 + 8 digits)
             if (digits.length === 10 && (digits.startsWith('09') || digits.startsWith('07'))) {
-                return number; // keep as-is if valid
+                return number;
             }
-            // Otherwise, return a safe placeholder
             return '📞 Contact admin for number';
+        }
+
+        function isValidPhoneNumber(number) {
+            if (!number) return false;
+            const digits = number.replace(/\D/g, '');
+            return digits.length === 10 && (digits.startsWith('09') || digits.startsWith('07'));
         }
 
         // ========== DEPOSIT ACCOUNTS ==========
@@ -1288,7 +1291,6 @@
                 return;
             }
 
-            // Only show admin name (and number) – no method preview
             container.innerHTML = validAdmins.map((admin, idx) => {
                 return `<div class="admin-list-item" data-admin-id="${admin.id}">
                             <div class="admin-number">${idx + 1}</div>
@@ -1297,7 +1299,6 @@
                         </div>`;
             }).join('');
 
-            // Attach click events
             container.querySelectorAll('.admin-list-item').forEach(el => {
                 el.addEventListener('click', () => {
                     const id = parseInt(el.dataset.adminId);
@@ -1345,13 +1346,11 @@
                     const method = el.dataset.method;
                     const number = el.dataset.number;
                     selectedDepositType = method;
-                    // Close method list, open deposit details
                     document.getElementById('depositMethodListModal').classList.remove('active');
                     openDepositDetails(selectedAdminObj, method, number);
                 });
             });
 
-            // Show the method list modal
             document.getElementById('depositMethodListModal').classList.add('active');
             document.getElementById('depositAdminListModal').classList.remove('active');
         }
@@ -1384,9 +1383,7 @@
             const copyDiv = document.getElementById('depositAccountNumber');
             if (copyDiv) {
                 copyDiv.innerHTML = `📋 ${displayNumber}`;
-                // Only enable copy if it's a valid phone number
-                const digits = number.replace(/\D/g, '');
-                if (digits.length === 10 && (digits.startsWith('09') || digits.startsWith('07'))) {
+                if (isValidPhoneNumber(number)) {
                     copyDiv.onclick = function() { copyToClipboard(number); };
                 } else {
                     copyDiv.onclick = function() { alert('No valid account number available. Please contact admin.'); };
