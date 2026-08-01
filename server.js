@@ -518,7 +518,7 @@ app.get('/admin/live-players', (req, res) => {
 const users = {};
 
 // ---------- loadUser ----------
-async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+ async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
@@ -531,7 +531,33 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       .eq('telegram_id', id)
       .maybeSingle();
     if (error) throw error;
+
     if (data) {
+      // ─── NEW: If user has no admin and we have an invite code, assign the admin ───
+      let needUpdate = false;
+      if (!data.admin_id && inviteCode) {
+        const { data: adminData, error: adminErr } = await supabase
+          .from('admins')
+          .select('id, name')
+          .eq('invite_code', inviteCode)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!adminErr && adminData) {
+          data.admin_id = adminData.id;
+          data.assigned_admin_name = adminData.name;
+          needUpdate = true;
+          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
+        }
+      }
+      if (needUpdate) {
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({ admin_id: data.admin_id, assigned_admin_name: data.assigned_admin_name })
+          .eq('telegram_id', id);
+        if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
+      }
+      // ─── End of new block ───
+
       users[id] = {
         id,
         username: data.username,
@@ -545,6 +571,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
+      // ─── User does not exist – create new (unchanged) ───
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
@@ -620,7 +647,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     throw err;
   }
 }
-
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
