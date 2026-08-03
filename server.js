@@ -516,10 +516,10 @@ app.get('/admin/live-players', (req, res) => {
 
 // ---------- User cache ----------
 const users = {};
-async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
-  const id = String(telegramId);
-  console.log(`🔍 loadUser called for ${id}, inviteCode: ${inviteCode}, adminId: ${adminId}`);
 
+// ---------- loadUser ----------
+ async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+  const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
     return users[id];
@@ -533,25 +533,20 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     if (error) throw error;
 
     if (data) {
-      // Existing user – check if we need to assign admin
+      // ─── NEW: If user has no admin and we have an invite code, assign the admin ───
       let needUpdate = false;
       if (!data.admin_id && inviteCode) {
-        console.log(`🔎 Looking up admin with invite code: ${inviteCode}`);
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
           .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (adminErr) {
-          console.error('❌ Admin lookup error:', adminErr.message);
-        } else if (adminData) {
+        if (!adminErr && adminData) {
           data.admin_id = adminData.id;
           data.assigned_admin_name = adminData.name;
           needUpdate = true;
-          console.log(`🔗 User ${id} assigned to admin ${adminData.name} (ID: ${adminData.id}) via invite code on login`);
-        } else {
-          console.log(`⚠️ No active admin found with invite code: ${inviteCode}`);
+          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
         }
       }
       if (needUpdate) {
@@ -559,38 +554,50 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .from('users')
           .update({ admin_id: data.admin_id, assigned_admin_name: data.assigned_admin_name })
           .eq('telegram_id', id);
-        if (updateErr) {
-          console.error('❌ Failed to update admin_id:', updateErr.message);
-        } else {
-          console.log(`✅ Updated admin_id for user ${id} to ${data.admin_id}`);
-        }
+        if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
       }
-      // ... (rest of caching)
+      // ─── End of new block ───
+
+      users[id] = {
+        id,
+        username: data.username,
+        balance: Number(data.balance),
+        telegram_handle: data.telegram_handle,
+        referred_by: data.referred_by,
+        first_deposit_amount: data.first_deposit_amount || 0,
+        admin_id: data.admin_id,
+        assigned_admin_name: data.assigned_admin_name
+      };
+      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
+      return users[id];
     } else {
-      // New user – assign admin if inviteCode provided
-      console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode}`);
+      // ─── User does not exist – create new (unchanged) ───
+      console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
+      
       let finalAdminId = adminId || null;
       let adminName = null;
       
       if (!finalAdminId && inviteCode) {
-        console.log(`🔎 Looking up admin for new user with invite code: ${inviteCode}`);
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
           .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (adminErr) {
-          console.error('❌ Admin lookup error for new user:', adminErr.message);
-        } else if (adminData) {
+        if (!adminErr && adminData) {
           finalAdminId = adminData.id;
           adminName = adminData.name;
-          console.log(`🔗 New user ${id} assigned to admin ${adminName} (ID: ${finalAdminId})`);
-        } else {
-          console.log(`⚠️ No active admin found with invite code: ${inviteCode}`);
+          console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
         }
+      } else if (adminId) {
+        const { data: adminData, error: adminErr } = await supabase
+          .from('admins')
+          .select('name')
+          .eq('id', adminId)
+          .maybeSingle();
+        if (!adminErr && adminData) adminName = adminData.name;
       }
-      // Insert new user with finalAdminId and adminName
+      
       const newUser = {
         telegram_id: id,
         username: username || 'Player',
@@ -601,16 +608,45 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         admin_id: finalAdminId,
         assigned_admin_name: adminName
       };
+      
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
-      // ... (invite stats update)
+      
+      if (inviteCode) {
+        const { data: inviteData, error: fetchError } = await supabase
+          .from('invite_stats')
+          .select('count')
+          .eq('invite_code', inviteCode)
+          .maybeSingle();
+        if (!fetchError && inviteData) {
+          await supabase
+            .from('invite_stats')
+            .update({ count: (inviteData.count || 0) + 1 })
+            .eq('invite_code', inviteCode);
+        } else if (!fetchError) {
+          await supabase
+            .from('invite_stats')
+            .insert({ invite_code: inviteCode, count: 1 });
+        }
+      }
+      
+      users[id] = {
+        id,
+        username: newUser.username,
+        balance: 10,
+        telegram_handle: newUser.telegram_handle,
+        referred_by: newUser.referred_by,
+        first_deposit_amount: 0,
+        admin_id: newUser.admin_id,
+        assigned_admin_name: newUser.assigned_admin_name
+      };
+      return users[id];
     }
   } catch (err) {
     console.error(`❌ loadUser error for ${id}:`, err.message);
     throw err;
   }
 }
-
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
