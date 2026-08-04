@@ -7,7 +7,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* same styles, no changes */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -95,22 +94,21 @@
             margin-top: 8px;
         }
         .error-msg {
+            color: #dc2626;
             background: #fee2e2;
-            color: #991b1b;
-            border-radius: 20px;
             padding: 12px 16px;
-            margin: 16px 0;
+            border-radius: 28px;
             font-size: 0.9rem;
+            margin: 16px 0;
         }
         .retry-btn {
-            background: #f97316;
-            color: white;
+            background: #e2e8f0;
             border: none;
-            padding: 10px 24px;
+            padding: 8px 24px;
             border-radius: 40px;
             font-weight: 600;
             cursor: pointer;
-            margin-top: 12px;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -120,17 +118,12 @@
         <h1>Welcome to <span style="color:#ea580c;">DOT BINGO</span></h1>
         <p class="sub">You’re now under an admin’s team!</p>
 
+        <!-- Loading state -->
         <div id="loadingState" class="loading">
             <span>⏳ Loading your details…</span>
         </div>
 
-        <div id="errorState" class="hidden">
-            <div class="error-msg" id="errorMessage">Something went wrong.</div>
-            <button class="retry-btn" id="retryBtn">🔄 Retry</button>
-            <br>
-            <button class="btn-secondary" id="goToGameBtnError">🎮 Go to Game</button>
-        </div>
-
+        <!-- Info state (hidden initially) -->
         <div id="infoState" class="hidden">
             <div class="info-box">
                 <div class="row">
@@ -146,11 +139,18 @@
                     <span class="value admin" id="adminName">—</span>
                 </div>
             </div>
-
             <button class="btn-primary" id="goToGameBtn">🎮 Go to Game</button>
             <br>
             <button class="btn-secondary" id="depositBtn">💰 Deposit</button>
             <div class="badge">✅ Auto‑assigned via invite link</div>
+        </div>
+
+        <!-- Error state -->
+        <div id="errorState" class="hidden">
+            <div class="error-msg" id="errorMessage">❌ Failed to load your details.</div>
+            <button class="retry-btn" id="retryBtn">🔄 Retry</button>
+            <br>
+            <button class="btn-secondary" id="errorGoHomeBtn" style="margin-top:12px;">🏠 Go to Home</button>
         </div>
 
         <div class="telegram-links">
@@ -165,15 +165,18 @@
         tg.ready();
         tg.expand();
 
+        // DOM elements
         const loadingEl = document.getElementById('loadingState');
-        const errorEl = document.getElementById('errorState');
-        const errorMsgEl = document.getElementById('errorMessage');
         const infoEl = document.getElementById('infoState');
+        const errorEl = document.getElementById('errorState');
+        const errorMsg = document.getElementById('errorMessage');
+        const retryBtn = document.getElementById('retryBtn');
+        const errorGoHomeBtn = document.getElementById('errorGoHomeBtn');
         const playerNameEl = document.getElementById('playerName');
         const playerBalanceEl = document.getElementById('playerBalance');
         const adminNameEl = document.getElementById('adminName');
 
-        // ===== Helper: fetch from /api/me =====
+        // Helper: fetch from /api/me
         async function fetchMe() {
             const response = await fetch('/api/me', {
                 method: 'GET',
@@ -181,16 +184,16 @@
                 credentials: 'include'
             });
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP ${response.status}`);
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${response.status}`);
             }
             return await response.json();
         }
 
-        // ===== Helper: authenticate via initData =====
+        // Helper: authenticate
         async function authenticate() {
             if (!tg.initData) {
-                throw new Error('No Telegram initData available. Please open from the bot.');
+                throw new Error('No initData – please open this page from the Telegram app.');
             }
             const response = await fetch('/api/telegram-miniapp-auth', {
                 method: 'POST',
@@ -199,83 +202,89 @@
                 body: JSON.stringify({ initData: tg.initData })
             });
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `HTTP ${response.status}`);
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || 'Authentication failed');
             }
             return await response.json();
         }
 
-        // ===== Show error state =====
-        function showError(message) {
-            loadingEl.classList.add('hidden');
-            errorEl.classList.remove('hidden');
-            errorMsgEl.textContent = message || 'Failed to load. Please refresh.';
-        }
-
-        // ===== Main init =====
-        async function init() {
+        // Main load function
+        async function loadUserData() {
             try {
-                let userData = null;
-
-                // First try to get from session
+                // First try to get session
+                let userData;
                 try {
                     userData = await fetchMe();
                 } catch (err) {
-                    // If 401, try to authenticate
+                    // If not logged in, authenticate first
                     if (err.message.includes('Not logged in') || err.message.includes('401')) {
                         console.log('No session, authenticating...');
-                        try {
-                            await authenticate();
-                            // Retry fetching user data
-                            userData = await fetchMe();
-                        } catch (authErr) {
-                            console.error('Auth failed:', authErr);
-                            // If auth fails, redirect to main page to login
-                            window.location.href = '/';
-                            return;
-                        }
+                        await authenticate();
+                        // Retry fetch
+                        userData = await fetchMe();
                     } else {
                         throw err;
                     }
                 }
-
-                // Success – display info
-                loadingEl.classList.add('hidden');
-                infoEl.classList.remove('hidden');
-
-                playerNameEl.textContent = userData.username || 'Player';
-                playerBalanceEl.textContent = userData.balance + ' ETB';
-                const adminName = userData.assigned_admin_name || 'Not assigned yet';
-                adminNameEl.textContent = adminName || '—';
-
-                if (!adminName || adminName === 'Not assigned yet') {
-                    adminNameEl.textContent = '⚠️ No admin assigned. Please deposit to pick one.';
-                }
+                return userData;
             } catch (err) {
-                console.error('Error initializing welcome page:', err);
-                showError('Failed to load. Please refresh.');
+                console.error('Error loading user data:', err);
+                throw err;
             }
         }
 
-        // ===== Buttons =====
+        // Show info
+        function showInfo(userData) {
+            loadingEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            infoEl.classList.remove('hidden');
+
+            playerNameEl.textContent = userData.username || 'Player';
+            playerBalanceEl.textContent = userData.balance + ' ETB';
+            const admin = userData.assigned_admin_name || 'Not assigned yet';
+            adminNameEl.textContent = admin;
+
+            if (!admin || admin === 'Not assigned yet') {
+                adminNameEl.textContent = '⚠️ No admin assigned. Please deposit to pick one.';
+            }
+        }
+
+        // Show error
+        function showError(message) {
+            loadingEl.classList.add('hidden');
+            infoEl.classList.add('hidden');
+            errorEl.classList.remove('hidden');
+            errorMsg.textContent = '❌ ' + message;
+        }
+
+        // Init
+        async function init() {
+            // Check if we are in Telegram context
+            if (!tg.initData) {
+                showError('Please open this page from the Telegram app.');
+                return;
+            }
+            try {
+                const userData = await loadUserData();
+                showInfo(userData);
+            } catch (err) {
+                showError(err.message || 'Failed to load. Please try again.');
+            }
+        }
+
+        // Event listeners
+        retryBtn.addEventListener('click', init);
         document.getElementById('goToGameBtn').addEventListener('click', () => {
-            window.location.href = '/';
-        });
-        document.getElementById('goToGameBtnError').addEventListener('click', () => {
             window.location.href = '/';
         });
         document.getElementById('depositBtn').addEventListener('click', () => {
             window.location.href = '/?action=deposit';
         });
-        document.getElementById('retryBtn').addEventListener('click', () => {
-            // Reset UI and retry
-            errorEl.classList.add('hidden');
-            loadingEl.classList.remove('hidden');
-            loadingEl.textContent = '⏳ Retrying…';
-            init();
+        errorGoHomeBtn.addEventListener('click', () => {
+            window.location.href = '/';
         });
 
-        // ===== Start =====
+        // Start
         init();
     </script>
 </body>
