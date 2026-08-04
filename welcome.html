@@ -7,7 +7,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* same styles as before */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -146,46 +145,73 @@
         const playerBalanceEl = document.getElementById('playerBalance');
         const adminNameEl = document.getElementById('adminName');
 
-        // ===== Fetch user data using the session-based endpoint =====
-        async function fetchUserData() {
+        // ===== Helper: fetch from /api/me =====
+        async function fetchMe() {
+            const response = await fetch('/api/me', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include' // ensure cookies are sent
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || 'Failed to fetch user data');
+            }
+            return await response.json();
+        }
+
+        // ===== Helper: authenticate via initData =====
+        async function authenticate() {
+            const response = await fetch('/api/telegram-miniapp-auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ initData: tg.initData })
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || 'Authentication failed');
+            }
+            return await response.json();
+        }
+
+        // ===== Main init =====
+        async function init() {
             try {
-                const response = await fetch('/api/me', {
-                    method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                if (data.success) {
-                    return data;
-                } else {
-                    throw new Error(data.error || 'Failed to fetch user data');
+                // Try to get user info from session
+                let userData = null;
+                try {
+                    userData = await fetchMe();
+                } catch (err) {
+                    // If 401 (not logged in), try to authenticate first
+                    if (err.message.includes('Not logged in') || err.message.includes('401')) {
+                        console.log('No session, authenticating...');
+                        await authenticate(); // this sets the session
+                        // Retry fetching user data
+                        userData = await fetchMe();
+                    } else {
+                        throw err; // rethrow other errors
+                    }
+                }
+
+                // Success – display info
+                loadingEl.classList.add('hidden');
+                infoEl.classList.remove('hidden');
+
+                playerNameEl.textContent = userData.username || 'Player';
+                playerBalanceEl.textContent = userData.balance + ' ETB';
+                const adminName = userData.assigned_admin_name || 'Not assigned yet';
+                adminNameEl.textContent = adminName || '—';
+
+                if (!adminName || adminName === 'Not assigned yet') {
+                    adminNameEl.textContent = '⚠️ No admin assigned. Please deposit to pick one.';
                 }
             } catch (err) {
-                console.error('Error fetching user data:', err);
-                return null;
-            }
-        }
-
-        async function init() {
-            const userData = await fetchUserData();
-            if (!userData) {
+                console.error('Error initializing welcome page:', err);
                 loadingEl.textContent = '❌ Failed to load. Please refresh.';
-                return;
-            }
-
-            loadingEl.classList.add('hidden');
-            infoEl.classList.remove('hidden');
-
-            playerNameEl.textContent = userData.username || 'Player';
-            playerBalanceEl.textContent = userData.balance + ' ETB';
-
-            const adminName = userData.assigned_admin_name || 'Not assigned yet';
-            adminNameEl.textContent = adminName || '—';
-
-            if (!adminName) {
-                adminNameEl.textContent = '⚠️ No admin assigned. Please deposit to pick one.';
             }
         }
 
+        // ===== Buttons =====
         document.getElementById('goToGameBtn').addEventListener('click', () => {
             window.location.href = '/';
         });
@@ -194,6 +220,7 @@
             window.location.href = '/?action=deposit';
         });
 
+        // ===== Start =====
         init();
     </script>
 </body>
