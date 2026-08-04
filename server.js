@@ -507,7 +507,7 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/welcome', (req, res) => { res.sendFile(path.join(__dirname, 'welcome.html')));
+app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
