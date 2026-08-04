@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0">
+    <title>Welcome to DOT BINGO</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f5f3f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .welcome-card {
+            max-width: 420px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 48px;
+            padding: 36px 28px 32px;
+            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15);
+            border: 1px solid rgba(0,0,0,0.04);
+            text-align: center;
+        }
+        .welcome-card .icon {
+            font-size: 4.5rem;
+            margin-bottom: 6px;
+        }
+        .welcome-card h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        .welcome-card .sub {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+        .info-box {
+            background: #f8fafc;
+            border-radius: 28px;
+            padding: 20px;
+            margin: 16px 0 24px;
+            border-left: 4px solid #f97316;
+            text-align: left;
+        }
+        .info-box .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9edf2;
+        }
+        .info-box .row:last-child { border-bottom: none; }
+        .info-box .label {
+            color: #64748b;
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+        .info-box .value {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.95rem;
+        }
+        .info-box .value.admin {
+            color: #f97316;
+        }
+        .btn-primary {
+            display: inline-block;
+            background: #f97316;
+            color: white;
+            font-weight: 700;
+            padding: 14px 40px;
+            border-radius: 60px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s ease;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            text-decoration: none;
+        }
+        .btn-primary:active { transform: scale(0.96); }
+        .btn-secondary {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #1e293b;
+            padding: 10px 24px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            font-size: 0.9rem;
+        }
+        .loading {
+            color: #94a3b8;
+            font-size: 1rem;
+            padding: 30px 0;
+        }
+        .hidden { display: none; }
+        .telegram-links {
+            margin-top: 24px;
+            font-size: 0.7rem;
+            color: #94a3b8;
+        }
+        .telegram-links a {
+            color: #f97316;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .badge {
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 0.7rem;
+            padding: 2px 14px;
+            border-radius: 30px;
+            display: inline-block;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-card" id="welcomeCard">
+        <div class="icon">🎯</div>
+        <h1>Welcome to <span style="color:#ea580c;">DOT BINGO</span></h1>
+        <p class="sub">You’re now under an admin’s team!</p>
+
+        <!-- Loading state -->
+        <div id="loadingState" class="loading">
+            <span>⏳ Loading your details…</span>
+        </div>
+
+        <!-- Info state (hidden initially) -->
+        <div id="infoState" class="hidden">
+            <div class="info-box">
+                <div class="row">
+                    <span class="label">👤 Your Name</span>
+                    <span class="value" id="playerName">—</span>
+                </div>
+                <div class="row">
+                    <span class="label">💰 Your Balance</span>
+                    <span class="value" id="playerBalance">—</span>
+                </div>
+                <div class="row">
+                    <span class="label">👑 Your Admin</span>
+                    <span class="value admin" id="adminName">—</span>
+                </div>
+            </div>
+
+            <button class="btn-primary" id="goToGameBtn">🎮 Go to Game</button>
+            <br>
+            <button class="btn-secondary" id="depositBtn">💰 Deposit</button>
+            <div class="badge">✅ Auto‑assigned via invite link</div>
+        </div>
+
+        <div class="telegram-links">
+            📢 Join our community:<br>
+            <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> |
+            <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a>
+        </div>
+    </div>
+
+    <script>
+        // ===== Telegram WebApp =====
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const loadingEl = document.getElementById('loadingState');
+        const infoEl = document.getElementById('infoState');
+        const playerNameEl = document.getElementById('playerName');
+        const playerBalanceEl = document.getElementById('playerBalance');
+        const adminNameEl = document.getElementById('adminName');
+
+        // ===== Fetch user data from the backend =====
+        async function fetchUserData() {
+            try {
+                // Call your auth endpoint to get user info (session-based)
+                const response = await fetch('/api/telegram-miniapp-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: tg.initData })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    return data;
+                } else {
+                    throw new Error(data.error || 'Auth failed');
+                }
+            } catch (err) {
+                console.error('Error fetching user data:', err);
+                alert('Could not load your details. Please try again.');
+                return null;
+            }
+        }
+
+        // ===== Display the info =====
+        async function init() {
+            const userData = await fetchUserData();
+            if (!userData) {
+                loadingEl.textContent = '❌ Failed to load. Please refresh.';
+                return;
+            }
+
+            // Hide loading, show info
+            loadingEl.classList.add('hidden');
+            infoEl.classList.remove('hidden');
+
+            // Fill in the details
+            playerNameEl.textContent = userData.username || 'Player';
+            playerBalanceEl.textContent = userData.balance + ' ETB';
+
+            // Get admin name from the session or from separate call
+            const adminName = userData.assigned_admin_name || 'Not assigned yet';
+            adminNameEl.textContent = adminName || '—';
+
+            // If no admin assigned, show a message
+            if (!adminName) {
+                adminNameEl.textContent = '⚠️ No admin assigned. Please deposit to pick one.';
+            }
+        }
+
+        // ===== Buttons =====
+        document.getElementById('goToGameBtn').addEventListener('click', () => {
+            // Redirect to main game page (index.html)
+            window.location.href = '/';
+        });
+
+        document.getElementById('depositBtn').addEventListener('click', () => {
+            // Open deposit modal – we can redirect to the main page with a parameter
+            window.location.href = '/?action=deposit';
+        });
+
+        // ===== Start =====
+        init();
+    </script>
+</body>
+</html>
