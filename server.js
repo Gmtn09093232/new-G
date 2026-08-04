@@ -496,6 +496,26 @@ app.get('/api/deposit-accounts', async (req, res) => {
 });
 
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
+
+// ---------- NEW: Get current user info (session-based) ----------
+app.get('/api/me', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+  try {
+    const user = await loadUser(req.session.userId, null, null, null, false);
+    res.json({
+      success: true,
+      username: user.username,
+      balance: user.balance,
+      assigned_admin_name: user.assigned_admin_name
+    });
+  } catch (err) {
+    console.error('Error in /api/me:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -507,10 +527,7 @@ app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-
-app.get('/welcome', (req, res) => {
-  res.sendFile(path.join(__dirname, 'welcome.html'));
-});
+app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -522,7 +539,7 @@ app.get('/admin/live-players', (req, res) => {
 const users = {};
 
 // ---------- loadUser ----------
- async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
@@ -651,6 +668,7 @@ const users = {};
     throw err;
   }
 }
+
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
