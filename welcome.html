@@ -118,12 +118,10 @@
         <h1>Welcome to <span style="color:#ea580c;">DOT BINGO</span></h1>
         <p class="sub">You’re now under an admin’s team!</p>
 
-        <!-- Loading state -->
         <div id="loadingState" class="loading">
             <span>⏳ Loading your details…</span>
         </div>
 
-        <!-- Info state (hidden initially) -->
         <div id="infoState" class="hidden">
             <div class="info-box">
                 <div class="row">
@@ -145,7 +143,6 @@
             <div class="badge">✅ Auto‑assigned via invite link</div>
         </div>
 
-        <!-- Error state -->
         <div id="errorState" class="hidden">
             <div class="error-msg" id="errorMessage">❌ Failed to load your details.</div>
             <button class="retry-btn" id="retryBtn">🔄 Retry</button>
@@ -165,7 +162,6 @@
         tg.ready();
         tg.expand();
 
-        // DOM elements
         const loadingEl = document.getElementById('loadingState');
         const infoEl = document.getElementById('infoState');
         const errorEl = document.getElementById('errorState');
@@ -176,51 +172,50 @@
         const playerBalanceEl = document.getElementById('playerBalance');
         const adminNameEl = document.getElementById('adminName');
 
-        // Helper: fetch from /api/me
+        // ----- Helper: fetch from /api/me -----
         async function fetchMe() {
-            const response = await fetch('/api/me', {
+            const res = await fetch('/api/me', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include'
             });
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || `HTTP ${response.status}`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `HTTP ${res.status}`);
             }
-            return await response.json();
+            return res.json();
         }
 
-        // Helper: authenticate
+        // ----- Helper: authenticate via initData -----
         async function authenticate() {
             if (!tg.initData) {
                 throw new Error('No initData – please open this page from the Telegram app.');
             }
-            const response = await fetch('/api/telegram-miniapp-auth', {
+            const res = await fetch('/api/telegram-miniapp-auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ initData: tg.initData })
             });
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error || 'Authentication failed');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Authentication failed');
             }
-            return await response.json();
+            return res.json();
         }
 
-        // Main load function
+        // ----- Main loader -----
         async function loadUserData() {
             try {
-                // First try to get session
+                // Try to get existing session first
                 let userData;
                 try {
                     userData = await fetchMe();
                 } catch (err) {
-                    // If not logged in, authenticate first
+                    // If 401 (not logged in), try to authenticate
                     if (err.message.includes('Not logged in') || err.message.includes('401')) {
                         console.log('No session, authenticating...');
                         await authenticate();
-                        // Retry fetch
                         userData = await fetchMe();
                     } else {
                         throw err;
@@ -233,7 +228,7 @@
             }
         }
 
-        // Show info
+        // ----- UI helpers -----
         function showInfo(userData) {
             loadingEl.classList.add('hidden');
             errorEl.classList.add('hidden');
@@ -249,7 +244,6 @@
             }
         }
 
-        // Show error
         function showError(message) {
             loadingEl.classList.add('hidden');
             infoEl.classList.add('hidden');
@@ -257,22 +251,29 @@
             errorMsg.textContent = '❌ ' + message;
         }
 
-        // Init
+        // ----- Init -----
         async function init() {
-            // Check if we are in Telegram context
+            // 1. Check if we're inside Telegram
             if (!tg.initData) {
                 showError('Please open this page from the Telegram app.');
                 return;
             }
+
+            // 2. Try to load
             try {
                 const userData = await loadUserData();
                 showInfo(userData);
             } catch (err) {
-                showError(err.message || 'Failed to load. Please try again.');
+                let msg = err.message || 'Failed to load. Please try again.';
+                // Special case for invalid initData
+                if (msg.includes('Invalid initData') || msg.includes('Authentication failed')) {
+                    msg = 'Your session may have expired. Please go back to the main app and try again.';
+                }
+                showError(msg);
             }
         }
 
-        // Event listeners
+        // ----- Event listeners -----
         retryBtn.addEventListener('click', init);
         document.getElementById('goToGameBtn').addEventListener('click', () => {
             window.location.href = '/';
@@ -284,7 +285,7 @@
             window.location.href = '/';
         });
 
-        // Start
+        // ----- Start -----
         init();
     </script>
 </body>
