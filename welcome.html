@@ -7,6 +7,7 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* same styles, no changes */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -93,6 +94,24 @@
             font-weight: 600;
             margin-top: 8px;
         }
+        .error-msg {
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 20px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            font-size: 0.9rem;
+        }
+        .retry-btn {
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
@@ -103,6 +122,13 @@
 
         <div id="loadingState" class="loading">
             <span>⏳ Loading your details…</span>
+        </div>
+
+        <div id="errorState" class="hidden">
+            <div class="error-msg" id="errorMessage">Something went wrong.</div>
+            <button class="retry-btn" id="retryBtn">🔄 Retry</button>
+            <br>
+            <button class="btn-secondary" id="goToGameBtnError">🎮 Go to Game</button>
         </div>
 
         <div id="infoState" class="hidden">
@@ -140,6 +166,8 @@
         tg.expand();
 
         const loadingEl = document.getElementById('loadingState');
+        const errorEl = document.getElementById('errorState');
+        const errorMsgEl = document.getElementById('errorMessage');
         const infoEl = document.getElementById('infoState');
         const playerNameEl = document.getElementById('playerName');
         const playerBalanceEl = document.getElementById('playerBalance');
@@ -150,17 +178,20 @@
             const response = await fetch('/api/me', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include' // ensure cookies are sent
+                credentials: 'include'
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error || 'Failed to fetch user data');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${response.status}`);
             }
             return await response.json();
         }
 
         // ===== Helper: authenticate via initData =====
         async function authenticate() {
+            if (!tg.initData) {
+                throw new Error('No Telegram initData available. Please open from the bot.');
+            }
             const response = await fetch('/api/telegram-miniapp-auth', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -168,28 +199,43 @@
                 body: JSON.stringify({ initData: tg.initData })
             });
             if (!response.ok) {
-                const error = await response.json().catch(() => ({}));
-                throw new Error(error.error || 'Authentication failed');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP ${response.status}`);
             }
             return await response.json();
+        }
+
+        // ===== Show error state =====
+        function showError(message) {
+            loadingEl.classList.add('hidden');
+            errorEl.classList.remove('hidden');
+            errorMsgEl.textContent = message || 'Failed to load. Please refresh.';
         }
 
         // ===== Main init =====
         async function init() {
             try {
-                // Try to get user info from session
                 let userData = null;
+
+                // First try to get from session
                 try {
                     userData = await fetchMe();
                 } catch (err) {
-                    // If 401 (not logged in), try to authenticate first
+                    // If 401, try to authenticate
                     if (err.message.includes('Not logged in') || err.message.includes('401')) {
                         console.log('No session, authenticating...');
-                        await authenticate(); // this sets the session
-                        // Retry fetching user data
-                        userData = await fetchMe();
+                        try {
+                            await authenticate();
+                            // Retry fetching user data
+                            userData = await fetchMe();
+                        } catch (authErr) {
+                            console.error('Auth failed:', authErr);
+                            // If auth fails, redirect to main page to login
+                            window.location.href = '/';
+                            return;
+                        }
                     } else {
-                        throw err; // rethrow other errors
+                        throw err;
                     }
                 }
 
@@ -207,7 +253,7 @@
                 }
             } catch (err) {
                 console.error('Error initializing welcome page:', err);
-                loadingEl.textContent = '❌ Failed to load. Please refresh.';
+                showError('Failed to load. Please refresh.');
             }
         }
 
@@ -215,9 +261,18 @@
         document.getElementById('goToGameBtn').addEventListener('click', () => {
             window.location.href = '/';
         });
-
+        document.getElementById('goToGameBtnError').addEventListener('click', () => {
+            window.location.href = '/';
+        });
         document.getElementById('depositBtn').addEventListener('click', () => {
             window.location.href = '/?action=deposit';
+        });
+        document.getElementById('retryBtn').addEventListener('click', () => {
+            // Reset UI and retry
+            errorEl.classList.add('hidden');
+            loadingEl.classList.remove('hidden');
+            loadingEl.textContent = '⏳ Retrying…';
+            init();
         });
 
         // ===== Start =====
