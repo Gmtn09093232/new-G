@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0">
     <title>✨ DOT BINGO ·ዶት ቢንጎ ✨</title>
-    <script src="https://telegram.org/js/telegram-web-app.js">
-    </script>
-    <script src="/socket.io/socket.io.js">
-    </script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ---------- RESET & BASE ---------- */
         * {
             margin: 0;
             padding: 0;
@@ -20,7 +19,7 @@
         body {
             min-height: 100vh;
             background: #f5f3f0;
-            background-image: radial-gradient(circle at 20% 30%, rgba(0, 0, 0, 0.02) 2%, transparent 2.5%);
+            background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%);
             background-size: 40px 40px;
             font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
             padding: 12px;
@@ -32,16 +31,14 @@
             max-width: 600px;
             width: 100%;
             margin: 0 auto;
-            background: rgba(255, 255, 248, 0.96);
+            background: rgba(255,255,248,0.96);
             border-radius: 48px;
             padding: 20px 18px 24px;
-            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.05);
             backdrop-filter: blur(2px);
         }
-        .hidden {
-            display: none !important;
-        }
+        .hidden { display: none !important; }
         .lang-toggle {
             position: fixed;
             top: 16px;
@@ -55,299 +52,255 @@
             cursor: pointer;
             z-index: 1000;
             font-size: 0.8rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         @media (max-width: 550px) {
-            .lang-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 12px;
-                font-size: 0.7rem;
-            }
+            .lang-toggle { top: 8px; left: 8px; padding: 6px 12px; font-size: 0.7rem; }
         }
-        .card-container {
-            margin: 20px 0 16px;
+
+        /* ---------- COMMON COMPONENTS (unchanged) ---------- */
+        .card-container { margin: 20px 0 16px; display: flex; justify-content: center; background: #fef7ef; border-radius: 40px; padding: 14px 8px; box-shadow: 0 8px 18px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8); overflow-x: auto; min-height: 200px; }
+        .card-container table { border-collapse: separate; border-spacing: 10px; margin: 0 auto; }
+        .card-container thead tr th { font-family: 'Inter', monospace; font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #ea580c, #f97316); -webkit-background-clip: text; background-clip: text; color: transparent; padding: 8px 0; text-align: center; width: 58px; }
+        .card-container td { width: 58px; height: 58px; background: white; border-radius: 24px; text-align: center; vertical-align: middle; font-weight: 700; font-size: 1.2rem; font-family: 'Inter', monospace; color: #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.03), inset 0 1px 0 rgba(255,255,255,0.6); border: 1px solid #fed7aa; transition: all 0.2s cubic-bezier(0.2,0.9,0.4,1.1); cursor: pointer; }
+        .card-container td.free { background: #fff3e6; color: #ea580c; font-size: 1.5rem; border-color: #fdba74; }
+        .card-container td.marked { background: linear-gradient(135deg, #f97316, #ea580c); color: white; box-shadow: 0 0 0 2px #ffedd5, inset 0 1px 2px rgba(0,0,0,0.1); border-color: #fbbf24; transform: scale(0.94); }
+
+        .balance-top, .game-top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; background: #ffffffdd; backdrop-filter: blur(4px); padding: 6px 12px; border-radius: 60px; margin-bottom: 16px; border: 1px solid #fed7aa; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        .game-top-bar div:first-child { font-size: 0.8rem; font-weight: 600; background: #fef3c7; padding: 4px 8px; border-radius: 40px; }
+        .players-badge { background: #f97316; padding: 6px 18px; border-radius: 40px; color: white; font-weight: 600; font-size: 0.75rem; box-shadow: 0 2px 8px rgba(249,115,22,0.2); }
+        .timer-badge { font-size: 1.3rem; font-weight: 700; font-family: monospace; color: #ea580c; background: #fef3c7; padding: 4px 18px; border-radius: 50px; letter-spacing: 1px; border: 1px solid #fde68a; }
+
+        .grid-100 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; margin: 20px 0; background: #fef9f0; padding: 14px; border-radius: 40px; box-shadow: inset 0 0 0 1px #fff6e5, 0 4px 12px rgba(0,0,0,0.02); }
+        .grid-cell { background: white; border-radius: 20px; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: #334155; border: 1px solid #fed7aa; cursor: pointer; transition: 0.1s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .grid-cell.taken { background: #19b105; color: white; border-color: #2ecc71; cursor: not-allowed; }
+        .grid-cell.own-card { background: #e74c3c; color: white; border-color: #f39c12; box-shadow: 0 0 0 2px #fef3c7; cursor: not-allowed; }
+        .grid-cell.selected { background: #e74c3c; color: white; box-shadow: 0 0 0 2px #fef3c7; border-color: #f39c12; transform: scale(0.96); }
+
+        button { min-height: 44px; font-family: 'Inter', sans-serif; font-weight: 600; transition: all 0.1s ease; cursor: pointer; }
+        button:active { transform: scale(0.96); }
+        button:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+
+        /* ---------- GAME PAGE NEW LAYOUT (RIGHT-ALIGNED) ---------- */
+        #gamePage {
             display: flex;
-            justify-content: center;
-            background: #fef7ef;
-            border-radius: 40px;
-            padding: 14px 8px;
-            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            overflow-x: auto;
-            min-height: 200px;
+            flex-direction: column;
+            gap: 8px;
+            padding: 8px;
         }
-        .card-container table {
-            border-collapse: separate;
-            border-spacing: 10px;
-            margin: 0 auto;
-        }
-        .card-container thead tr th {
-            font-family: 'Inter', monospace;
-            font-size: 1.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #ea580c, #f97316);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            text-shadow: none;
-            padding: 8px 0;
-            text-align: center;
-            width: 58px;
-        }
-        .card-container td {
-            width: 58px;
-            height: 58px;
-            background: white;
-            border-radius: 24px;
-            text-align: center;
-            vertical-align: middle;
-            font-weight: 700;
-            font-size: 1.2rem;
-            font-family: 'Inter', monospace;
-            color: #1e293b;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-            border: 1px solid #fed7aa;
-            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-            cursor: pointer;
-        }
-        .card-container td.free {
-            background: #fff3e6;
-            color: #ea580c;
-            font-size: 1.5rem;
-            border-color: #fdba74;
-        }
-        .card-container td.marked {
-            background: linear-gradient(135deg, #f97316, #ea580c);
+        .game-red-banner {
+            background: #dc2626;
             color: white;
-            box-shadow: 0 0 0 2px #ffedd5, inset 0 1px 2px rgba(0, 0, 0, 0.1);
-            border-color: #fbbf24;
-            transform: scale(0.94);
-        }
-        .last-call-area {
-            background: #1e1e24;
-            border-radius: 60px;
-            padding: 14px 18px;
-            margin: 12px 0 18px;
-            text-align: center;
-            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 12px 25px -10px rgba(0, 0, 0, 0.2);
-            border: 1px solid #2d2d35;
-        }
-        .last-call-label {
-            font-size: 0.7rem;
-            letter-spacing: 3px;
-            font-weight: 600;
-            color: #facc15;
-            text-transform: uppercase;
-            background: #0a0a0c;
-            display: inline-block;
-            padding: 5px 18px;
-            border-radius: 40px;
-        }
-        .last-call-number {
-            font-size: 2.7rem;
-            font-weight: 800;
-            font-family: 'Inter', monospace;
-            color: #fef08a;
-            text-shadow: 0 0 6px #f97316;
-            letter-spacing: 5px;
-            margin: 8px 0 5px;
-            background: #0a0a0c;
-            border-radius: 60px;
-            padding: 6px;
-        }
-        .called-history {
-            background: #0a0a0c;
-            border-radius: 48px;
-            font-size: 0.7rem;
-            color: #fcd34d;
-            font-weight: 500;
-            overflow-x: auto;
-            white-space: nowrap;
-            font-family: monospace;
-            text-align: center;
-            margin-top: 8px;
-            border: 1px solid #2d2d35;
-            padding: 8px 14px;
-            scroll-behavior: smooth;
-        }
-        .balance-top,
-        .game-top-bar {
+            padding: 8px 12px;
+            border-radius: 16px;
             display: flex;
-            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            gap: 8px;
-            background: #ffffffdd;
-            backdrop-filter: blur(4px);
-            padding: 6px 12px;
-            border-radius: 60px;
-            margin-bottom: 16px;
-            border: 1px solid #fed7aa;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            flex-wrap: wrap;
+            width: 100%;
         }
-        .game-top-bar div:first-child {
-            font-size: 0.8rem;
+        .banner-left {
+            display: flex;
+            gap: 20px;
             font-weight: 600;
-            background: #fef3c7;
-            padding: 4px 8px;
-            border-radius: 40px;
+            font-size: 0.95rem;
         }
-        .players-badge {
-            background: #f97316;
-            padding: 6px 18px;
-            border-radius: 40px;
-            color: white;
-            font-weight: 600;
-            font-size: 0.75rem;
-            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.2);
-        }
-        .timer-badge {
-            font-size: 1.3rem;
-            font-weight: 700;
-            font-family: monospace;
-            color: #ea580c;
-            background: #fef3c7;
-            padding: 4px 18px;
-            border-radius: 50px;
-            letter-spacing: 1px;
-            border: 1px solid #fde68a;
-        }
-        .grid-100 {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 8px;
-            margin: 20px 0;
-            background: #fef9f0;
-            padding: 14px;
-            border-radius: 40px;
-            box-shadow: inset 0 0 0 1px #fff6e5, 0 4px 12px rgba(0, 0, 0, 0.02);
-        }
-        .grid-cell {
-            background: white;
-            border-radius: 20px;
-            aspect-ratio: 1 / 1;
+        .banner-item {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.75rem;
-            color: #334155;
-            border: 1px solid #fed7aa;
-            cursor: pointer;
-            transition: 0.1s ease;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+            gap: 4px;
         }
-        .grid-cell.taken {
-            background: #19b105;
-            color: white;
-            border-color: #2ecc71;
-            cursor: not-allowed;
-        }
-        .grid-cell.own-card {
-            background: #e74c3c;
-            color: white;
-            border-color: #f39c12;
-            box-shadow: 0 0 0 2px #fef3c7;
-            cursor: not-allowed;
-        }
-        .grid-cell.selected {
-            background: #e74c3c;
-            color: white;
-            box-shadow: 0 0 0 2px #fef3c7;
-            border-color: #f39c12;
-            transform: scale(0.96);
-        }
-        button {
-            min-height: 44px;
-            font-family: 'Inter', sans-serif;
-            font-weight: 600;
-            transition: all 0.1s ease;
-            cursor: pointer;
-        }
-        button:active {
-            transform: scale(0.96);
-        }
-        button:disabled {
-            opacity: 0.6;
-            transform: none;
-            cursor: not-allowed;
-        }
-        #bingoBtn {
-            display: block;
-            width: 90%;
-            max-width: 340px;
-            margin: 24px auto 20px;
-            background: linear-gradient(105deg, #f97316, #ea580c);
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 800;
-            padding: 14px 12px;
-            border-radius: 80px;
-            border: none;
-            box-shadow: 0 10px 0 #9a3412, 0 0 20px rgba(249, 115, 22, 0.4);
-            letter-spacing: 2px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-            transition: 0.08s linear;
-        }
-        #bingoBtn:active {
-            transform: translateY(5px);
-            box-shadow: 0 5px 0 #9a3412;
-        }
-        .tab-bar {
+        .banner-right {
             display: flex;
-            background: #ffffffcc;
-            backdrop-filter: blur(8px);
-            border-radius: 100px;
-            margin-top: 20px;
-            padding: 6px 8px;
             gap: 8px;
-            border: 1px solid #fed7aa;
         }
-        .tab-btn {
-            flex: 1;
-            background: transparent;
+        .banner-icon-btn {
+            background: rgba(255,255,255,0.2);
             border: none;
-            padding: 10px 0;
-            border-radius: 80px;
-            font-weight: 600;
-            font-size: 0.8rem;
-            color: #7c2d12;
+            color: white;
+            border-radius: 40px;
+            padding: 4px 10px;
+            font-size: 1rem;
             cursor: pointer;
+        }
+        .banner-icon-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Right column wrapper – pushes content to the right */
+        .game-right-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            width: 100%;
+        }
+        .game-right-column > * {
+            width: 92%;
+            max-width: 92%;
+            margin-left: auto;
+        }
+
+        /* Yellow BINGO Board */
+        .game-yellow-board {
+            background: #fef08a;
+            border-radius: 16px;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .game-yellow-board .board-header {
+            font-weight: 800;
+            text-align: center;
+            background: #facc15;
+            padding: 4px 0;
+            border-radius: 8px;
+            font-size: 1.2rem;
+        }
+        .game-yellow-board .board-cell {
+            text-align: center;
+            background: #fffde7;
+            border-radius: 6px;
+            padding: 4px 0;
+            font-size: 0.8rem;
+            font-weight: 600;
             transition: 0.1s;
         }
-        .tab-btn.active {
+        .game-yellow-board .board-cell.marked {
+            background: #d1d5db;
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* Blue Last 3 Calls */
+        .game-blue-last-calls {
+            background: #3b82f6;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 40px;
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            align-items: center;
+        }
+        .game-blue-last-calls span:not(:first-child) {
+            background: #1e3a8a;
+            padding: 2px 14px;
+            border-radius: 30px;
+        }
+
+        /* Green Player Card */
+        .game-green-card {
+            background: #22c55e;
+            border-radius: 16px;
+            padding: 8px;
+            display: flex;
+            justify-content: center;
+        }
+        .game-green-card table {
+            border-spacing: 6px;
+        }
+        .game-green-card td {
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 700;
+            border: 2px solid #15803d;
+        }
+        .game-green-card td.free {
+            background: #bbf7d0;
+            color: #15803d;
+        }
+        .game-green-card td.marked {
             background: #f97316;
             color: white;
-            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+            border-color: #ea580c;
         }
-        .prize-pool {
-            background: #fef3c7;
-            border-radius: 40px;
-            text-align: center;
-            padding: 6px 12px;
-            margin: 6px 0 12px;
-            border: 1px solid #fed7aa;
-        }
-        .prize-pool span {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #b45309;
-            letter-spacing: 0.5px;
-        }
-        .prize-pool div {
+        .game-green-card th {
+            color: #14532d;
             font-size: 1.2rem;
-            font-weight: 800;
-            color: #ea580c;
-            line-height: 1.3;
         }
-        .winner-modal,
-        .modal {
+
+        /* White Claim Button */
+        .game-white-button {
+            background: white;
+            color: #dc2626;
+            border: 3px solid #dc2626;
+            border-radius: 60px;
+            padding: 14px 0;
+            font-weight: 800;
+            font-size: 1.4rem;
+            width: 92%;
+            margin: 4px auto 4px auto;
+            box-shadow: 0 4px 0 #b91c1c;
+            transition: 0.05s linear;
+            cursor: pointer;
+        }
+        .game-white-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 #b91c1c;
+        }
+
+        /* Dark White Bottom Tabs */
+        .game-tab-bar {
+            background: #f3f4f6;
+            border-radius: 40px;
+            padding: 4px 6px;
+            margin-top: 4px;
+            width: 100%;
+        }
+        .game-tab-bar .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 0;
+            border-radius: 30px;
+            font-weight: 600;
+            color: #4b5563;
+            flex: 1;
+        }
+        .game-tab-bar .tab-btn.active {
+            background: #9ca3af;
+            color: white;
+        }
+
+        @media (max-width: 550px) {
+            .game-yellow-board .board-cell {
+                font-size: 0.65rem;
+                padding: 2px 0;
+            }
+            .game-green-card td {
+                width: 38px;
+                height: 38px;
+                font-size: 0.9rem;
+            }
+            .banner-left {
+                font-size: 0.8rem;
+                gap: 10px;
+            }
+            .game-right-column > * {
+                width: 100%;
+                max-width: 100%;
+            }
+            .game-white-button {
+                width: 100%;
+            }
+        }
+
+        /* ---------- MODALS (unchanged) ---------- */
+        .winner-modal, .modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(16px);
             display: flex;
             align-items: center;
@@ -357,485 +310,103 @@
             opacity: 0;
             transition: visibility 0.2s, opacity 0.2s;
         }
-        .winner-modal.active,
-        .modal.active {
+        .winner-modal.active, .modal.active {
             visibility: visible;
             opacity: 1;
         }
-        .winner-card,
-        .modal-content {
-            background: rgba(255, 255, 245, 0.98);
+        .winner-card, .modal-content {
+            background: rgba(255,255,245,0.98);
             backdrop-filter: blur(12px);
             border-radius: 64px;
             padding: 28px 24px;
             text-align: center;
             width: 88%;
             max-width: 340px;
-            box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.8);
-            border: 2px solid rgba(249, 115, 22, 0.5);
-            animation: winnerPop 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+            box-shadow: 0 30px 50px -20px rgba(0,0,0,0.4), inset 0 1px 2px rgba(255,255,255,0.8);
+            border: 2px solid rgba(249,115,22,0.5);
+            animation: winnerPop 0.35s cubic-bezier(0.34,1.2,0.64,1);
         }
         @keyframes winnerPop {
-            0% {
-                transform: scale(0.85);
-                opacity: 0;
-            }
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
+            0% { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
         }
-        .winner-trophy {
-            font-size: 4rem;
-            filter: drop-shadow(0 8px 12px rgba(249, 115, 22, 0.4));
-            margin-bottom: 8px;
-            animation: floatTrophy 1.2s infinite alternate;
-        }
+        .winner-trophy { font-size: 4rem; filter: drop-shadow(0 8px 12px rgba(249,115,22,0.4)); margin-bottom: 8px; animation: floatTrophy 1.2s infinite alternate; }
         @keyframes floatTrophy {
-            0% {
-                transform: translateY(0px);
-            }
-            100% {
-                transform: translateY(-8px);
-            }
+            0% { transform: translateY(0px); }
+            100% { transform: translateY(-8px); }
         }
-        .winner-title {
-            font-size: 2rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, #f97316, #ea580c);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 12px;
-        }
-        .winners-avatars {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin: 16px 0;
-            max-height: 140px;
-            overflow-y: auto;
-            padding: 8px;
-            background: rgba(255, 237, 213, 0.4);
-            border-radius: 48px;
-        }
-        .winner-badge {
-            background: #f97316;
-            color: white;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .winner-badge::before {
-            content: "👑";
-        }
-        .prize-amount {
-            background: linear-gradient(105deg, #fef3c7, #ffedd5);
-            border-radius: 60px;
-            padding: 12px;
-            margin: 18px 0 16px;
-            border: 1px solid #fed7aa;
-        }
-        .prize-number {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #ea580c;
-        }
-        .celebrate-btn {
-            background: #f97316;
-            border: none;
-            width: 80%;
-            padding: 14px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1rem;
-            color: white;
-            margin-top: 8px;
-            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
-            transition: 0.1s;
-        }
-        .confetti {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            overflow: hidden;
-        }
-        .confetti-piece {
-            position: absolute;
-            width: 8px;
-            height: 16px;
-            background: #f97316;
-            top: -20px;
-            opacity: 0.8;
-            animation: fall 4s linear forwards;
-        }
+        .winner-title { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #f97316, #ea580c); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 12px; }
+        .winners-avatars { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 16px 0; max-height: 140px; overflow-y: auto; padding: 8px; background: rgba(255,237,213,0.4); border-radius: 48px; }
+        .winner-badge { background: #f97316; color: white; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .winner-badge::before { content: "👑"; }
+        .prize-amount { background: linear-gradient(105deg, #fef3c7, #ffedd5); border-radius: 60px; padding: 12px; margin: 18px 0 16px; border: 1px solid #fed7aa; }
+        .prize-number { font-size: 2.2rem; font-weight: 800; color: #ea580c; }
+        .celebrate-btn { background: #f97316; border: none; width: 80%; padding: 14px; border-radius: 60px; font-weight: 700; font-size: 1rem; color: white; margin-top: 8px; box-shadow: 0 4px 12px rgba(249,115,22,0.4); transition: 0.1s; }
+        .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; overflow: hidden; }
+        .confetti-piece { position: absolute; width: 8px; height: 16px; background: #f97316; top: -20px; opacity: 0.8; animation: fall 4s linear forwards; }
         @keyframes fall {
-            to {
-                transform: translateY(100vh) rotate(360deg);
-                opacity: 0;
-            }
+            to { transform: translateY(100vh) rotate(360deg); opacity: 0; }
         }
-        .mute-btn {
-            background: #334155 !important;
-            font-size: 1rem !important;
-            padding: 4px 10px !important;
-            min-width: 44px;
-        }
-        .modal-content {
-            background: #ffffff;
-            border-radius: 48px;
-            padding: 24px;
-            max-width: 92%;
-            width: 380px;
-            border: 1px solid #fed7aa;
-        }
-        .bank-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ffedd5;
-            padding-bottom: 12px;
-        }
-        .account-card {
-            background: #f8fafc;
-            border-radius: 28px;
-            padding: 14px;
-            margin: 14px 0;
-            border-left: 4px solid #f97316;
-        }
-        .copy-number {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: #f1f5f9;
-            padding: 6px 12px;
-            border-radius: 40px;
-            cursor: pointer;
-            transition: 0.1s;
-            font-weight: 600;
-            color: #1e293b;
-            margin-top: 6px;
-            width: fit-content;
-        }
-        .copy-number:active {
-            background: #e2e8f0;
-            transform: scale(0.96);
-        }
-        .input-group {
-            margin: 14px 0;
-        }
-        .input-group input,
-        .input-group textarea {
-            width: 100%;
-            padding: 12px;
-            border-radius: 60px;
-            border: 1px solid #e2e8f0;
-            background: #ffffff;
-            font-size: 0.85rem;
-            font-family: inherit;
-        }
-        .input-group input[type="file"] {
-            padding: 8px;
-            border-radius: 60px;
-            border: 1px solid #e2e8f0;
-            background: #ffffff;
-            font-size: 0.85rem;
-            font-family: inherit;
-        }
-        .input-group textarea {
-            border-radius: 24px;
-            resize: vertical;
-            min-height: 80px;
-        }
-        .transaction-summary {
-            background: #fef9e6;
-            border-radius: 28px;
-            padding: 12px;
-            font-size: 0.75rem;
-            color: #92400e;
-            margin: 12px 0;
-            text-align: center;
-        }
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 20px;
-        }
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 60px;
-            font-weight: 700;
-            border: none;
-        }
-        .btn-primary {
-            background: #f97316;
-            color: white;
-        }
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #1e293b;
-        }
-        .type-btn {
-            background: #f1f5f9;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            border-radius: 60px;
-            margin: 8px 0;
-            font-weight: 600;
-            border: 1px solid #e2e8f0;
-            width: 100%;
-            cursor: pointer;
-        }
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .back-btn {
-            background: #f1f5f9;
-            border: 1px solid #fed7aa;
-            padding: 8px 20px;
-            border-radius: 40px;
-            color: #7c2d12;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .profile-stat {
-            background: #fef9f0;
-            border-radius: 32px;
-            padding: 16px;
-            text-align: center;
-            margin: 12px 0;
-            border: 1px solid #fed7aa;
-        }
-        .stake-page-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin: 30px 0;
-            flex-wrap: wrap;
-        }
-        .stake-option {
-            background: #fef9f0;
-            border: 1px solid #fed7aa;
-            padding: 16px 24px;
-            border-radius: 60px;
-            font-size: 1.6rem;
-            font-weight: 800;
-            color: #ea580c;
-            box-shadow: 0 6px 0 #fed7aa;
-            cursor: pointer;
-            width: 150px;
-            text-align: center;
-            transition: 0.1s;
-            position: relative;
-        }
-        .stake-option:active {
-            transform: scale(0.96);
-        }
-        .player-count-badge {
-            display: block;
-            font-size: 0.7rem;
-            font-weight: normal;
-            color: #facc15;
-            margin-top: 6px;
-            background: #1e2a36;
-            padding: 2px 8px;
-            border-radius: 40px;
-        }
-        .rules-text {
-            background: #fef9f0;
-            border-radius: 32px;
-            padding: 18px;
-            margin-top: 20px;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: #1e293b;
-        }
-        .history-card {
-            background: #fef9f0;
-            border-radius: 28px;
-            padding: 14px;
-            margin-bottom: 12px;
-            border-left: 5px solid #f97316;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-        }
-        .history-card strong {
-            color: #ea580c;
-        }
+        .mute-btn { background: #334155 !important; font-size: 1rem !important; padding: 4px 10px !important; min-width: 44px; }
+        .modal-content { background: #ffffff; border-radius: 48px; padding: 24px; max-width: 92%; width: 380px; border: 1px solid #fed7aa; }
+        .bank-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; border-bottom: 2px solid #ffedd5; padding-bottom: 12px; }
+        .account-card { background: #f8fafc; border-radius: 28px; padding: 14px; margin: 14px 0; border-left: 4px solid #f97316; }
+        .copy-number { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 6px 12px; border-radius: 40px; cursor: pointer; transition: 0.1s; font-weight: 600; color: #1e293b; margin-top: 6px; width: fit-content; }
+        .copy-number:active { background: #e2e8f0; transform: scale(0.96); }
+        .input-group { margin: 14px 0; }
+        .input-group input, .input-group textarea { width: 100%; padding: 12px; border-radius: 60px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 0.85rem; font-family: inherit; }
+        .input-group input[type="file"] { padding: 8px; border-radius: 60px; border: 1px solid #e2e8f0; background: #ffffff; font-size: 0.85rem; font-family: inherit; }
+        .input-group textarea { border-radius: 24px; resize: vertical; min-height: 80px; }
+        .transaction-summary { background: #fef9e6; border-radius: 28px; padding: 12px; font-size: 0.75rem; color: #92400e; margin: 12px 0; text-align: center; }
+        .modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
+        .modal-buttons button { flex: 1; padding: 12px; border-radius: 60px; font-weight: 700; border: none; }
+        .btn-primary { background: #f97316; color: white; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .type-btn { background: #f1f5f9; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 60px; margin: 8px 0; font-weight: 600; border: 1px solid #e2e8f0; width: 100%; cursor: pointer; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .back-btn { background: #f1f5f9; border: 1px solid #fed7aa; padding: 8px 20px; border-radius: 40px; color: #7c2d12; font-weight: 600; cursor: pointer; }
+        .profile-stat { background: #fef9f0; border-radius: 32px; padding: 16px; text-align: center; margin: 12px 0; border: 1px solid #fed7aa; }
+        .stake-page-buttons { display: flex; gap: 20px; justify-content: center; margin: 30px 0; flex-wrap: wrap; }
+        .stake-option { background: #fef9f0; border: 1px solid #fed7aa; padding: 16px 24px; border-radius: 60px; font-size: 1.6rem; font-weight: 800; color: #ea580c; box-shadow: 0 6px 0 #fed7aa; cursor: pointer; width: 150px; text-align: center; transition: 0.1s; position: relative; }
+        .stake-option:active { transform: scale(0.96); }
+        .player-count-badge { display: block; font-size: 0.7rem; font-weight: normal; color: #facc15; margin-top: 6px; background: #1e2a36; padding: 2px 8px; border-radius: 40px; }
+        .rules-text { background: #fef9f0; border-radius: 32px; padding: 18px; margin-top: 20px; font-size: 0.85rem; line-height: 1.5; color: #1e293b; }
+        .history-card { background: #fef9f0; border-radius: 28px; padding: 14px; margin-bottom: 12px; border-left: 5px solid #f97316; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        .history-card strong { color: #ea580c; }
         @media (max-width: 550px) {
-            .card-container td {
-                width: 48px;
-                height: 48px;
-                border-radius: 18px;
-                font-size: 1rem;
-            }
-            .card-container thead tr th {
-                width: 48px;
-                font-size: 1.2rem;
-            }
-            .grid-100 {
-                gap: 5px;
-            }
-            #bingoBtn {
-                font-size: 1.3rem;
-            }
-            .stake-option {
-                width: 130px;
-                font-size: 1.2rem;
-                padding: 12px 16px;
-            }
-            .player-count-badge {
-                font-size: 0.6rem;
-            }
+            .card-container td { width: 48px; height: 48px; border-radius: 18px; font-size: 1rem; }
+            .card-container thead tr th { width: 48px; font-size: 1.2rem; }
+            .grid-100 { gap: 5px; }
+            #bingoBtn { font-size: 1.3rem; }
+            .stake-option { width: 130px; font-size: 1.2rem; padding: 12px 16px; }
+            .player-count-badge { font-size: 0.6rem; }
         }
-        .telegram-links {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.7rem;
-        }
-        .telegram-links a {
-            color: #ea580c;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .telegram-links a:hover {
-            text-decoration: underline;
-        }
-        /* Admin List & Method List */
-        .admin-list-item,
-        .method-list-item {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            background: #ffffff;
-            border-radius: 28px;
-            padding: 16px 18px;
-            margin: 10px 0;
-            border: 2px solid #f1f5f9;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
-        }
-        .admin-list-item:active,
-        .method-list-item:active {
-            transform: scale(0.97);
-            background: #fff7ed;
-            border-color: #f97316;
-        }
-        .admin-list-item .admin-number {
-            background: #f97316;
-            color: white;
-            font-weight: 800;
-            font-size: 0.9rem;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .admin-list-item .admin-name {
-            font-weight: 600;
-            font-size: 1rem;
-            color: #1e293b;
-            flex: 1;
-        }
-        .admin-list-item .admin-arrow {
-            color: #94a3b8;
-            font-size: 1.2rem;
-        }
-        .method-list-item .method-icon {
-            font-size: 1.6rem;
-            flex-shrink: 0;
-        }
-        .method-list-item .method-info {
-            flex: 1;
-            text-align: left;
-        }
-        .method-list-item .method-name {
-            font-weight: 700;
-            font-size: 1rem;
-            color: #1e293b;
-        }
-        .method-list-item .method-number {
-            font-size: 0.8rem;
-            color: #64748b;
-            font-family: monospace;
-            margin-top: 2px;
-        }
-        .method-list-item .method-select-badge {
-            background: #f97316;
-            color: white;
-            padding: 4px 14px;
-            border-radius: 40px;
-            font-size: 0.7rem;
-            font-weight: 700;
-        }
-        .deposit-step-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .deposit-step-header .step-back {
-            background: #f1f5f9;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .deposit-step-header .step-title {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #1e293b;
-            flex: 1;
-        }
-        .deposit-step-header .step-sub {
-            font-size: 0.7rem;
-            color: #94a3b8;
-        }
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #94a3b8;
-        }
-        .empty-state .empty-icon {
-            font-size: 3rem;
-            margin-bottom: 12px;
-        }
-        .admin-methods-preview {
-            display: none;
-        }
+        .telegram-links { text-align: center; margin-top: 20px; font-size: 0.7rem; }
+        .telegram-links a { color: #ea580c; text-decoration: none; font-weight: 600; }
+        .telegram-links a:hover { text-decoration: underline; }
+        .admin-list-item, .method-list-item { display: flex; align-items: center; gap: 14px; background: #ffffff; border-radius: 28px; padding: 16px 18px; margin: 10px 0; border: 2px solid #f1f5f9; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        .admin-list-item:active, .method-list-item:active { transform: scale(0.97); background: #fff7ed; border-color: #f97316; }
+        .admin-list-item .admin-number { background: #f97316; color: white; font-weight: 800; font-size: 0.9rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .admin-list-item .admin-name { font-weight: 600; font-size: 1rem; color: #1e293b; flex: 1; }
+        .admin-list-item .admin-arrow { color: #94a3b8; font-size: 1.2rem; }
+        .method-list-item .method-icon { font-size: 1.6rem; flex-shrink: 0; }
+        .method-list-item .method-info { flex: 1; text-align: left; }
+        .method-list-item .method-name { font-weight: 700; font-size: 1rem; color: #1e293b; }
+        .method-list-item .method-number { font-size: 0.8rem; color: #64748b; font-family: monospace; margin-top: 2px; }
+        .method-list-item .method-select-badge { background: #f97316; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.7rem; font-weight: 700; }
+        .deposit-step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .deposit-step-header .step-back { background: #f1f5f9; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .deposit-step-header .step-title { font-weight: 700; font-size: 1.1rem; color: #1e293b; flex: 1; }
+        .deposit-step-header .step-sub { font-size: 0.7rem; color: #94a3b8; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #94a3b8; }
+        .empty-state .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+        .admin-methods-preview { display: none; }
     </style>
 </head>
 <body>
     <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
 
-    <!-- ===== MODALS ===== -->
-
-    <!-- DEPOSIT STEP 1: Admin List -->
+    <!-- ===== MODALS (unchanged) ===== -->
     <div id="depositAdminListModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <div class="deposit-step-header">
@@ -849,8 +420,6 @@
             <button id="closeAdminListBtn" class="type-btn" style="margin-top:12px; background:#f1f5f9;" data-key="cancel">Cancel</button>
         </div>
     </div>
-
-    <!-- DEPOSIT STEP 2: Method List -->
     <div id="depositMethodListModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <div class="deposit-step-header">
@@ -864,8 +433,6 @@
             <button id="closeMethodListBtn" class="type-btn" style="margin-top:12px; background:#f1f5f9;" data-key="cancel">Cancel</button>
         </div>
     </div>
-
-    <!-- DEPOSIT DETAILS -->
     <div id="depositDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
@@ -890,19 +457,15 @@
             <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
         </div>
     </div>
-
-    <!-- WITHDRAW TYPE -->
     <div id="withdrawTypeModal" class="modal">
         <div class="modal-content">
             <div class="bank-header"><span class="bank-icon">💰</span><div><div class="bank-title" data-key="withdrawTitle">Withdraw Funds</div><div class="bank-sub" data-key="selectMethod">Select withdrawal method</div></div></div>
             <button class="type-btn" data-type="telebirr"><span>📱</span> Telebirr</button>
             <button class="type-btn" data-type="cbebirr"><span>🏦</span> CBE Birr</button>
-            <button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa </button>
+            <button class="type-btn" data-type="mpesa"><span>📲</span> M-Pesa</button>
             <button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button>
         </div>
     </div>
-
-    <!-- WITHDRAW DETAILS -->
     <div id="withdrawDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div>
@@ -913,53 +476,36 @@
             <div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div>
         </div>
     </div>
-
-    <!-- ===== RULES MODAL (UPDATED) ===== -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
-            <div class="bank-header">
-                <span class="bank-icon">📜</span>
-                <div>
-                    <div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div>
-                    <div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div>
-                </div>
-            </div>
+            <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div>
             <div class="rules-text" style="text-align:left; max-height:400px; overflow-y:auto; padding-right:8px;">
                 <h3 style="font-size:1rem; margin-top:0;" data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
                 <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
                 <p data-key="rulesWinningPatterns">✅ 1 አግድም መስመር (Row)<br>✅ 1 ቁመት መስመር (Column)<br>✅ 1 ሰያፍ መስመር (Diagonal)<br>✅ 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>💡 ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
                 <p data-key="rulesPrize">• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።<br>• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።<br>• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።</p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesDepositTitle">💰 ገንዘብ ማስገባት</h3>
                 <p data-key="rulesDeposit">1. <strong>➕ Deposit</strong> ይጫኑ።<br>2. አድሚን ይምረጡ።<br>3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።<br>4. ገንዘብ ይላኩ።<br>5. የክፍያ ማስረጃ ያስገቡ።<br>6. <strong>Deposit ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
                 <p data-key="rulesWithdraw">1. <strong>➖ Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
                 <p data-key="rulesGameRules">✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>🏆 ቢንጎ!</strong> መጫን አለብዎት።<br>✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
-
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesHelpTitle">📞 እርዳታ</h3>
                 <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a> ይቀላቀሉ።</p>
-
                 <p style="margin-top:12px; font-weight:700; text-align:center;" data-key="rulesGoodLuck">🎉 መልካም ዕድል!<br><span style="font-weight:400;">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
             </div>
             <button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button>
         </div>
     </div>
-
-    <!-- WINNER OVERLAY -->
     <div id="winnerOverlay" class="winner-modal">
         <div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div>
     </div>
 
     <!-- ===== PAGES ===== -->
 
-    <!-- STAKE PAGE -->
+    <!-- STAKE PAGE (unchanged) -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
@@ -988,7 +534,7 @@
         </div>
     </div>
 
-    <!-- LOBBY PAGE -->
+    <!-- LOBBY PAGE (unchanged) -->
     <div id="lobbyPage" class="page hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div></div>
@@ -1012,27 +558,74 @@
         <div class="telegram-links">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- HISTORY -->
-    <div id="historyPage" class="page hidden"><div class="page-header"><h2 data-key="gameHistory">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div><div><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div><div id="recentGamesList" style="margin-top:16px;"></div></div>
+    <!-- HISTORY PAGE (unchanged) -->
+    <div id="historyPage" class="page hidden">
+        <div class="page-header"><h2 data-key="gameHistory">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div>
+        <div><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div>
+        <div id="recentGamesList" style="margin-top:16px;"></div>
+    </div>
 
-    <!-- WALLET -->
-    <div id="walletPage" class="page hidden"><div class="page-header"><h2 data-key="myWallet">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="currentBalance">Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw">- Withdraw</button></div></div>
+    <!-- WALLET PAGE (unchanged) -->
+    <div id="walletPage" class="page hidden">
+        <div class="page-header"><h2 data-key="myWallet">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div>
+        <div class="profile-stat"><div data-key="currentBalance">Current Balance</div><div style="font-size:2rem;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw">- Withdraw</button></div>
+    </div>
 
-    <!-- PROFILE -->
-    <div id="profilePage" class="page hidden"><div class="page-header"><h2 data-key="myProfile">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div><div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div><div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div></div>
+    <!-- PROFILE PAGE (unchanged) -->
+    <div id="profilePage" class="page hidden">
+        <div class="page-header"><h2 data-key="myProfile">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div>
+        <div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div>
+        <div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div>
+    </div>
 
-    <!-- GAME PAGE -->
+    <!-- ===== GAME PAGE (RIGHT-ALIGNED LAYOUT) ===== -->
     <div id="gamePage" class="page hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div></div>
-            <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
+        <!-- 🔴 Red Banner (full width) -->
+        <div class="game-red-banner">
+            <div class="banner-left">
+                <span class="banner-item">👥 <span id="gamePlayersCount">0</span></span>
+                <span class="banner-item">🏆 <span id="winningBalance">0</span> ETB</span>
+                <span class="banner-item">⏱️ <span id="gameTimerDisplay">--</span></span>
+            </div>
+            <div class="banner-right">
+                <button id="depositBtnGame" class="banner-icon-btn" title="Deposit">💰</button>
+                <button id="withdrawBtnGame" class="banner-icon-btn" title="Withdraw">💳</button>
+                <button id="muteToggleBtn" class="banner-icon-btn">🔊</button>
+                <button id="rulesBtnGame" class="banner-icon-btn" title="Rules">📜</button>
+            </div>
         </div>
-        <div class="game-top-bar"><div>💰 <span id="gameBalanceDisplay">0</span> ETB</div><div><button id="depositBtnGame" style="background:#f97316; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="deposit">+Deposit</button><button id="withdrawBtnGame" style="background:#334155; border:none; border-radius:40px; padding:4px 12px; color:white;" data-key="withdraw">-Withdraw</button><button id="muteToggleBtn" class="mute-btn">🔊</button></div><button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px;" data-key="rulesBtn">📜 Rules</button></div>
-        <div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
-        <div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div>
-        <div id="gameCard" class="card-container"></div>
-        <button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button>
-        <div class="tab-bar"><button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button><button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button><button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button><button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button></div>
+
+        <!-- Right column: Yellow, Blue, Green, White all aligned to the right -->
+        <div class="game-right-column">
+            <!-- 🟡 BINGO Board (1-75) -->
+            <div class="game-yellow-board" id="bingoBoardContainer">
+                <!-- Generated by JS -->
+            </div>
+
+            <!-- 🔵 Last 3 Called Numbers -->
+            <div class="game-blue-last-calls">
+                <span>🔵 Last 3 calls:</span>
+                <span id="lastCall1">--</span>
+                <span id="lastCall2">--</span>
+                <span id="lastCall3">--</span>
+            </div>
+
+            <!-- 🟢 Player's BINGO Card -->
+            <div class="game-green-card" id="gameCardContainer">
+                <!-- Rendered by renderCard() -->
+            </div>
+
+            <!-- ⚪ Claim Button -->
+            <button id="bingoBtn" class="game-white-button">🏆 CLAIM BINGO! 🏆</button>
+        </div>
+
+        <!-- ⚫ Bottom Tabs (full width) -->
+        <div class="tab-bar game-tab-bar">
+            <button class="tab-btn" data-page="profile">👤 Profile</button>
+            <button class="tab-btn" data-page="wallet">💰 Wallet</button>
+            <button class="tab-btn active" data-page="game">🎮 Game</button>
+            <button class="tab-btn" data-page="history">📜 History</button>
+        </div>
     </div>
 
     <script>
@@ -1042,15 +635,15 @@
         const playersCountEl = document.getElementById('playersCount');
         const gamePlayersCountEl = document.getElementById('gamePlayersCount');
         const winningBalanceEl = document.getElementById('winningBalance');
-        const currentCallEl = document.getElementById('currentCall');
-        const calledListEl = document.getElementById('calledList');
+        const currentCallEl = document.getElementById('currentCall'); // not used in new layout but kept for compatibility
+        const calledListEl = document.getElementById('calledList'); // not used
         const selectedNumberEl = document.getElementById('selectedNumber');
         const numberGrid = document.getElementById('numberGrid');
-
         const stake10CountEl = document.getElementById('stake10Count');
         const stake20CountEl = document.getElementById('stake20Count');
         const stake30CountEl = document.getElementById('stake30Count');
 
+        // socket for stake counts (unchanged)
         const stakeCountSocket = io('/public');
         stakeCountSocket.on('playersCount', (data) => {
             if (data.stake === 10 && stake10CountEl) stake10CountEl.innerText = `👥 ${data.count} players`;
@@ -1173,7 +766,6 @@
                 continue: "➡ ቀጥል",
                 selectAdmin: "👤 አስተዳዳሪ ይምረጡ",
                 selectMethod: "💳 የክፍያ ዘዴ ይምረጡ",
-                // Rules
                 rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
                 rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
                 rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
@@ -1262,7 +854,6 @@
                 continue: "➡ Continue",
                 selectAdmin: "👤 Select Admin",
                 selectMethod: "💳 Select Payment Method",
-                // Rules
                 rulesHowToPlayTitle: "🎲 How to Play",
                 rulesHowToPlay: "1. Choose your stake (10, 20, or 30 Birr).\n2. Pick a BINGO card number from 1–100.\n3. When the game starts, numbers are called every few seconds.\n4. Mark the number on your card when it is called.\n5. If you complete one of the winning patterns, tap **🏆 BINGO!** immediately.",
                 rulesWinningPatternsTitle: "🏆 Winning Patterns",
@@ -1526,8 +1117,7 @@
         }
 
         // ========== WITHDRAWAL ==========
-        function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active');
-            unlockSpeech(); }
+        function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active'); unlockSpeech(); }
 
         function closeWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.remove('active'); }
 
@@ -1554,9 +1144,7 @@
             const name = document.getElementById('withdrawName').value.trim();
             if (!name) { alert("Full name required"); return; }
             if (!amount || isNaN(amount) || Number(amount) < 20) { alert('Minimum withdrawal is 20 ETB'); return; }
-            if (!receiver.match(/^(09|07)\d{8}$/)) { alert(
-                    `Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`
-                    ); return; }
+            if (!receiver.match(/^(09|07)\d{8}$/)) { alert(`Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`); return; }
 
             isSubmittingWithdraw = true;
             const submitBtn = document.getElementById('submitWithdrawBtn');
@@ -1568,8 +1156,7 @@
                 const response = await fetch('/api/request-withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: Number(amount), phone: receiver, withdrawal_type: selectedWithdrawType,
-                        name: name })
+                    body: JSON.stringify({ amount: Number(amount), phone: receiver, withdrawal_type: selectedWithdrawType, name: name })
                 });
                 const result = await response.json();
                 if (result.success) {
@@ -1587,110 +1174,92 @@
         }
 
         // ========== GAME FUNCTIONS ==========
-        function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent =
-                soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
+        function updateMuteButton() { const btn = document.getElementById('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
 
-        function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(
-                ' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(),
-                100); }
+        function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const dummy = new SpeechSynthesisUtterance(' '); dummy.volume = 0; window.speechSynthesis.speak(dummy); setTimeout(() => window.speechSynthesis.cancel(), 100); }
 
-        function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted);
-            updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance =
-                null; } unlockSpeech(); }
+        function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMuteButton(); if (soundMuted && currentUtterance) { window.speechSynthesis.cancel(); currentUtterance = null; } unlockSpeech(); }
 
-        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45) return "ኤን"; if (
-                num <= 60) return "ጂ"; return "ኦ"; }
+        function getBingoLetterAmharic(num) { if (num <= 15) return "ቢ"; if (num <= 30) return "አይ"; if (num <= 45) return "ኤን"; if (num <= 60) return "ጂ"; return "ኦ"; }
 
-        function getAmharicNumberWord(n) { const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት",
-                "ዘጠኝ"
-            ]; const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"]; if (n <= 10) { if (n === 10)
-                return "አስር"; return ones[n]; } if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]); let ten = Math.floor(n /
-                10),
-                unit = n % 10; if (unit === 0) return tens[ten]; return tens[ten] + " " + ones[unit]; }
+        function getAmharicNumberWord(n) { const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"]; const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"]; if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; } if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]); let ten = Math.floor(n / 10), unit = n % 10; if (unit === 0) return tens[ten]; return tens[ten] + " " + ones[unit]; }
 
-        function speakAmharicNumberWithLetter(number) { if (soundMuted || number < 1 || number > 75) return; if (!
-                speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; }
-            const fullText = getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number); if (window
-                .speechSynthesis) { if (currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(
-                    fullText); utterance.lang = 'am-ET'; utterance.rate = 0.85; const voices = window.speechSynthesis
-                    .getVoices(); const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am'));
-                if (amharicVoice) utterance.voice = amharicVoice; currentUtterance = utterance; window.speechSynthesis
-                    .speak(utterance); } }
+        function speakAmharicNumberWithLetter(number) { if (soundMuted || number < 1 || number > 75) return; if (!speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharicNumberWithLetter(number), 100); return; } const fullText = getBingoLetterAmharic(number) + " " + getAmharicNumberWord(number); if (window.speechSynthesis) { if (currentUtterance) window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(fullText); utterance.lang = 'am-ET'; utterance.rate = 0.85; const voices = window.speechSynthesis.getVoices(); const amharicVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am')); if (amharicVoice) utterance.voice = amharicVoice; currentUtterance = utterance; window.speechSynthesis.speak(utterance); } }
 
-        function updatePlayerCountFromServer(count) { const c = count !== undefined ? count : serverTakenNumbers.size; if (
-                playersCountEl) playersCountEl.innerText = c; if (gamePlayersCountEl) gamePlayersCountEl.innerText = c; }
+        function updatePlayerCountFromServer(count) { const c = count !== undefined ? count : serverTakenNumbers.size; if (playersCountEl) playersCountEl.innerText = c; if (gamePlayersCountEl) gamePlayersCountEl.innerText = c; }
 
-        function loadStats() { try { totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
-                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0'); totalEarned = parseInt(
-                    localStorage.getItem('dot_bingo_total_earned') || '0'); let stored = JSON.parse(localStorage.getItem(
-                    'dot_bingo_recent_games') || '[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date,
-                    result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g
-                        .totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []),
-                    winningNumber: g.winningNumber || null })); } catch (e) { recentGames = []; } updateStatsUI(); }
+        function loadStats() { try { totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0'); totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0'); totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0'); let stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]'); recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null })); } catch (e) { recentGames = []; } updateStatsUI(); }
 
-        function saveStats() { localStorage.setItem('dot_bingo_total_games', totalGames);
-            localStorage.setItem('dot_bingo_total_wins', totalWins);
-            localStorage.setItem('dot_bingo_total_earned', totalEarned);
-            localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10))); }
+        function saveStats() { localStorage.setItem('dot_bingo_total_games', totalGames); localStorage.setItem('dot_bingo_total_wins', totalWins); localStorage.setItem('dot_bingo_total_earned', totalEarned); localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10))); }
 
-        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++;
-            if (win) { totalWins++;
-                totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ?
-                    'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [],
-                winningNumber: winningNumber || null }); if (recentGames.length > 10) recentGames.pop(); saveStats();
-            updateStatsUI(); }
+        function addGameRecord(win, playerPrize, gameId, stake, winnersList, winningNumber, totalPrize) { totalGames++; if (win) { totalWins++; totalEarned += playerPrize; } recentGames.unshift({ gameId, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize, totalPrize: totalPrize || 0, winnersList: winnersList || [], winningNumber: winningNumber || null }); if (recentGames.length > 10) recentGames.pop(); saveStats(); updateStatsUI(); }
 
-        function updateStatsUI() { document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv =
-                document.getElementById('recentGamesList'); if (recentDiv) { if (recentGames.length) { recentDiv.innerHTML =
-                        recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g
-                            .winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g
-                            .winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g
-                                .winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g
-                                .winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—';
-                            const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g
-                                .result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; })
-                        .join(''); } else recentDiv.innerHTML =
-                        '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
+        function updateStatsUI() { document.getElementById('totalGamesCount').innerText = totalGames; const recentDiv = document.getElementById('recentGamesList'); if (recentDiv) { if (recentGames.length) { recentDiv.innerHTML = recentGames.map(g => { const winnerDisplay = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—'); const lastNumberDisplay = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g.winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g.winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—'; const totalPrizeDisplay = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—'); return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${winnerDisplay}</div><div><strong>🎯 Last Called (winning):</strong> ${lastNumberDisplay}</div><div><strong>💰 Total Prize:</strong> ${totalPrizeDisplay}</div><div style="font-size:0.7rem; color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`; }).join(''); } else recentDiv.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; } }
 
-        function syncBalance(v) { currentBalance = v; lobbyBalanceEl.innerText = v; if (document.getElementById(
-                'walletBalancePage')) document.getElementById('walletBalancePage').innerText = v; if (document
-                .getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText = v; if (
-                document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText =
-                v; }
+        function syncBalance(v) { currentBalance = v; lobbyBalanceEl.innerText = v; if (document.getElementById('walletBalancePage')) document.getElementById('walletBalancePage').innerText = v; if (document.getElementById('profileBalancePage')) document.getElementById('profileBalancePage').innerText = v; if (document.getElementById('gameBalanceDisplay')) document.getElementById('gameBalanceDisplay').innerText = v; }
 
-        function renderCard(card, containerId, clickable) { const cont = document.getElementById(containerId); if (!cont)
-                return; cont.innerHTML = ''; if (!card || !Array.isArray(card) || card.length === 0) { cont.innerHTML =
-                    '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>';
-                return; } const table = document.createElement('table'); table.style.borderCollapse = 'separate';
-            table.style.borderSpacing = '10px'; const thead = document.createElement('thead'); const hr = document
-                .createElement('tr'); ['B', 'I', 'N', 'G', 'O'].forEach(l => { let th = document.createElement('th');
-                th.textContent = l; hr.appendChild(th); }); thead.appendChild(hr); table.appendChild(thead); const tbody =
-                document.createElement('tbody'); for (let r = 0; r < 5; r++) { const tr = document.createElement('tr'); for (
-                    let c = 0; c < 5; c++) { const val = card[r][c]; const td = document.createElement('td'); td
-                        .textContent = val === 'FREE' ? '★' : val; if (val === 'FREE') td.classList.add('free'); if (
-                        markedNumbers.includes(val)) td.classList.add('marked'); if (clickable && val !== 'FREE') { td
-                            .style.cursor = 'pointer'; td.onclick = () => { if (isGameActive && socket) socket.emit(
-                                'markNumber', val); }; } tr.appendChild(td); } tbody.appendChild(tr); } table
-                .appendChild(tbody); cont.appendChild(table); }
+        // ---------- NEW GAME PAGE FUNCTIONS ----------
+        function renderBingoBoard(calledSet = new Set()) {
+            const container = document.getElementById('bingoBoardContainer');
+            if (!container) return;
+            const letters = ['B', 'I', 'N', 'G', 'O'];
+            const ranges = [[1,15], [16,30], [31,45], [46,60], [61,75]];
+            let html = '';
+            // Headers
+            letters.forEach(l => {
+                html += `<div class="board-header">${l}</div>`;
+            });
+            // Numbers: 15 rows
+            for (let row = 0; row < 15; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const num = ranges[col][0] + row;
+                    const isCalled = calledSet.has(num);
+                    html += `<div class="board-cell ${isCalled ? 'marked' : ''}">${num}</div>`;
+                }
+            }
+            container.innerHTML = html;
+        }
 
-        function buildNumberGrid() { if (!numberGrid) return; numberGrid.innerHTML = ''; for (let i = 1; i <= 100; i++) { const
-                cell = document.createElement('div'); cell.className = 'grid-cell'; cell.dataset.number = i; cell
-                .textContent = i; const isTaken = displayTakenNumbers.has(i); const isOwn = (selectedCardNumber === i);
-                if (isTaken && !isOwn) { cell.classList.add('taken'); cell.onclick = null; } else if (isOwn) { cell
-                    .classList.add('own-card'); cell.onclick = null; } else { cell.onclick = () => { if (!isGameActive &&
-                        socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)) { if (
-                            selectedCardNumber !== null && selectedCardNumber !== i) { serverTakenNumbers.delete(
-                                selectedCardNumber); displayTakenNumbers.delete(selectedCardNumber); }
-                        pendingSelection = i; selectedCardNumber = i; selectedNumberEl.textContent = i;
-                        buildNumberGrid(); socket.emit('selectCardNumber', i); } }; } numberGrid.appendChild(cell); } }
+        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l = 'O'; return `${l}-${n}`; }
 
-        function updateGridWithTakenNumbers(takenArray) { const newServerSet = new Set(takenArray); serverTakenNumbers =
-                newServerSet; const newDisplaySet = new Set(takenArray); if (selectedCardNumber !== null) newDisplaySet
-                .delete(selectedCardNumber); displayTakenNumbers = newDisplaySet; buildNumberGrid();
-            updatePlayerCountFromServer(serverTakenNumbers.size); }
-
-        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l =
-                'O'; return `${l}-${n}`; }
+        // override the old renderCard to use the new container (gameCardContainer) when in game
+        // we keep the original renderCard function but we'll update references
+        function renderCard(card, containerId, clickable) {
+            const cont = document.getElementById(containerId);
+            if (!cont) return;
+            cont.innerHTML = '';
+            if (!card || !Array.isArray(card) || card.length === 0) {
+                cont.innerHTML = '<div style="text-align:center; padding:20px;">🎴 Select a card number to see your Bingo card</div>';
+                return;
+            }
+            const table = document.createElement('table');
+            table.style.borderCollapse = 'separate';
+            table.style.borderSpacing = '10px';
+            const thead = document.createElement('thead');
+            const hr = document.createElement('tr');
+            ['B','I','N','G','O'].forEach(l => { let th = document.createElement('th'); th.textContent = l; hr.appendChild(th); });
+            thead.appendChild(hr);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            for (let r = 0; r < 5; r++) {
+                const tr = document.createElement('tr');
+                for (let c = 0; c < 5; c++) {
+                    const val = card[r][c];
+                    const td = document.createElement('td');
+                    td.textContent = val === 'FREE' ? '★' : val;
+                    if (val === 'FREE') td.classList.add('free');
+                    if (markedNumbers.includes(val)) td.classList.add('marked');
+                    if (clickable && val !== 'FREE') {
+                        td.style.cursor = 'pointer';
+                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); };
+                    }
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody);
+            cont.appendChild(table);
+        }
 
         function showLobby(sec) {
             currentMainPage = 'lobby';
@@ -1720,55 +1289,27 @@
             isGameActive = true;
             clearInterval(lobbyTimerInterval);
             if (socket) socket.emit('getBalance');
-            if (userCard.length) renderCard(userCard, 'gameCard', true);
+            if (userCard.length) renderCard(userCard, 'gameCardContainer', true);
+            // initialise BINGO board with empty called set
+            renderBingoBoard(new Set());
+            document.getElementById('lastCall1').textContent = '--';
+            document.getElementById('lastCall2').textContent = '--';
+            document.getElementById('lastCall3').textContent = '--';
         }
 
-        function startTimer(sec) { let left = sec; lobbyTimerEl.textContent = left + 's'; clearInterval(
-            lobbyTimerInterval); lobbyTimerInterval = setInterval(() => { left--;
-                currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval); showGame(); } else
-                    lobbyTimerEl.textContent = left + 's'; }, 1000); }
+        function startTimer(sec) { let left = sec; lobbyTimerEl.textContent = left + 's'; clearInterval(lobbyTimerInterval); lobbyTimerInterval = setInterval(() => { left--; currentTimerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimerEl.textContent = left + 's'; }, 1000); }
 
-        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds :
-                    30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
+        function goBackToMain() { if (currentMainPage === 'lobby') { showLobby(currentTimerSeconds > 0 ? currentTimerSeconds : 30); } else if (currentMainPage === 'game') { showGame(); } else { showLobby(30); } }
 
-        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false;
-            userCard = [];
-            markedNumbers = [];
-            selectedCardNumber = null;
-            serverTakenNumbers.clear();
-            displayTakenNumbers.clear();
-            currentStake = null;
-            localStorage.removeItem('dot_bingo_stake');
-            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
-            document.getElementById('lobbyPage').classList.add('hidden');
-            document.getElementById('gamePage').classList.add('hidden');
-            document.getElementById('stakePage').classList.remove('hidden');
-            if (selectedNumberEl) selectedNumberEl.textContent = '-';
-            pendingSelection = null;
-            pendingRandom = false;
-            currentGameId = null;
-            unlockSpeech(); }
+        function goToStakeSelection() { if (socket) { socket.disconnect(); socket = null; } isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null; serverTakenNumbers.clear(); displayTakenNumbers.clear(); currentStake = null; localStorage.removeItem('dot_bingo_stake'); if (lobbyTimerInterval) clearInterval(lobbyTimerInterval); document.getElementById('lobbyPage').classList.add('hidden'); document.getElementById('gamePage').classList.add('hidden'); document.getElementById('stakePage').classList.remove('hidden'); if (selectedNumberEl) selectedNumberEl.textContent = '-'; pendingSelection = null; pendingRandom = false; currentGameId = null; unlockSpeech(); }
 
-        function showWinnerOverlay(data) { if (data.noWinner) { if (currentGameId) addGameRecord(false, 0, currentGameId,
-                    currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data
-                .winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize =
-                data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length > 1 ?
-                `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML = title;
-            document.getElementById('winListContainer').innerHTML = winnersList.map(w =>
-                `<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML =
-                playerPrize + ' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active');
-            const confDiv = document.createElement('div'); confDiv.className = 'confetti'; for (let i = 0; i < 120; i++) { let
-                    p = document.createElement('div'); p.className = 'confetti-piece'; p.style.left = Math.random() * 100 +
-                    '%'; p.style.animationDuration = (Math.random() * 3 + 2) + 's'; p.style.backgroundColor =
-                    `hsl(${Math.random() * 30 + 20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(
-                confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize,
-                    currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
+        function showWinnerOverlay(data) { if (data.noWinner) { if (currentGameId) addGameRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; } const winnersList = data.winners || [data.winner].filter(Boolean); const winningNumber = data.winningNumber; const totalPrize = data.totalPrize || 0; const playerPrize = data.prizeEach || 0; const title = winnersList.length > 1 ? `${winnersList.length} WINNERS!` : '🎉 BINGO! 🎉'; document.getElementById('winTitle').innerHTML = title; document.getElementById('winListContainer').innerHTML = winnersList.map(w => `<span class="winner-badge">${w}</span>`).join(''); document.getElementById('winPrize').innerHTML = playerPrize + ' <small>ETB</small>'; document.getElementById('winnerOverlay').classList.add('active'); const confDiv = document.createElement('div'); confDiv.className = 'confetti'; for (let i = 0; i < 120; i++) { let p = document.createElement('div'); p.className = 'confetti-piece'; p.style.left = Math.random() * 100 + '%'; p.style.animationDuration = (Math.random() * 3 + 2) + 's'; p.style.backgroundColor = `hsl(${Math.random() * 30 + 20},90%,60%)`; confDiv.appendChild(p); } document.body.appendChild(confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize, currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
 
         function restoreGameSession() {
             const savedStake = localStorage.getItem('dot_bingo_stake');
             if (savedStake) {
                 const stake = parseInt(savedStake);
-                if ([10, 20, 30].includes(stake)) {
+                if ([10,20,30].includes(stake)) {
                     console.log(`🔄 Auto-joining stake ${stake} from saved session`);
                     setTimeout(() => {
                         if (!socket) { connectToGame(stake); } else { socket.emit('joinLobby', { stake }); }
@@ -1783,10 +1324,8 @@
             const initData = tg.initData;
             if (!initData) { alert('Open inside Telegram'); return; }
             let startParam = null;
-            if (initData) { const params = new URLSearchParams(initData);
-                startParam = params.get('start_param'); }
-            if (!startParam) { const urlParams = new URLSearchParams(window.location.search);
-                startParam = urlParams.get('start_param'); }
+            if (initData) { const params = new URLSearchParams(initData); startParam = params.get('start_param'); }
+            if (!startParam) { const urlParams = new URLSearchParams(window.location.search); startParam = urlParams.get('start_param'); }
             if (!startParam && tg.initDataUnsafe) { startParam = tg.initDataUnsafe.start_param; }
             console.log('✅ Final start_param:', startParam);
             try {
@@ -1812,8 +1351,7 @@
                     updatePlayerCountFromServer(state.playersCount);
                 }
             });
-            socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true);
-                else renderCard(card, 'lobbyCardPreview', false); });
+            socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCardContainer', true); else renderCard(card, 'lobbyCardPreview', false); });
             socket.on('cardTaken', data => {
                 if (data.stake !== currentStake) return;
                 const newServerSet = new Set(data.takenNumbers);
@@ -1836,12 +1374,9 @@
                     buildNumberGrid();
                 }
             });
-            socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null; if (
-                        selectedCardNumber) { selectedCardNumber = null; selectedNumberEl.textContent = '-';
-                        buildNumberGrid(); } } if (pendingRandom) pendingRandom = false; });
+            socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null; if (selectedCardNumber) { selectedCardNumber = null; selectedNumberEl.textContent = '-'; buildNumberGrid(); } } if (pendingRandom) pendingRandom = false; });
             socket.on('playersCount', (data) => {
-                const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
-                'dot_bingo_stake'));
+                const stake = currentStake !== null ? currentStake : parseInt(localStorage.getItem('dot_bingo_stake'));
                 if (data.stake === stake) { updatePlayerCountFromServer(data.count); }
                 if (stake && winningBalanceEl && !isGameActive) {
                     const prize = Math.floor(data.count * stake * 0.8);
@@ -1854,53 +1389,77 @@
                 if (data?.playersCount) updatePlayerCountFromServer(data.playersCount);
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
+                // reset last calls and board
+                renderBingoBoard(new Set());
+                document.getElementById('lastCall1').textContent = '--';
+                document.getElementById('lastCall2').textContent = '--';
+                document.getElementById('lastCall3').textContent = '--';
             });
-            socket.on('numberCalled', data => { if (data.stake !== currentStake) return; const num = data.number;
-                currentCallEl.innerText = formatCall(num); const fullCalled = data.calledNumbers || [];
-                const historyCalled = fullCalled.slice(0, -1); calledListEl.innerText = 'Called: ' + (historyCalled
-                    .length ? historyCalled.map(n => formatCall(n)).join(', ') : '—');
-                scrollCalledHistoryToEnd(); speakAmharicNumberWithLetter(num); });
-            socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(
-                    userCard, 'gameCard', true); else if (!isGameActive && userCard.length) renderCard(userCard,
-                    'lobbyCardPreview', false); });
-            socket.on('gameEnded', data => { if (data.stake !== currentStake) return; if (data.winningNumber)
-                    currentCallEl.innerText = formatCall(data.winningNumber); showWinnerOverlay(data);
+            socket.on('numberCalled', data => {
+                if (data.stake !== currentStake) return;
+                const num = data.number;
+                // update BINGO board
+                const calledSet = new Set(data.calledNumbers || []);
+                renderBingoBoard(calledSet);
+                // update last 3 calls
+                const allCalls = data.calledNumbers || [];
+                const lastThree = allCalls.slice(-3);
+                document.getElementById('lastCall1').textContent = lastThree[0] ? formatCall(lastThree[0]) : '--';
+                document.getElementById('lastCall2').textContent = lastThree[1] ? formatCall(lastThree[1]) : '--';
+                document.getElementById('lastCall3').textContent = lastThree[2] ? formatCall(lastThree[2]) : '--';
+                // speak
+                speakAmharicNumberWithLetter(num);
+            });
+            socket.on('markedNumbers', nums => {
+                markedNumbers = nums;
+                if (isGameActive && userCard.length) renderCard(userCard, 'gameCardContainer', true);
+                else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            });
+            socket.on('gameEnded', data => {
+                if (data.stake !== currentStake) return;
+                if (data.winningNumber) {
+                    // show last called in last calls
+                    const last = data.winningNumber;
+                    document.getElementById('lastCall1').textContent = formatCall(last);
+                    document.getElementById('lastCall2').textContent = '--';
+                    document.getElementById('lastCall3').textContent = '--';
+                }
+                showWinnerOverlay(data);
                 currentGameId = null;
                 markedNumbers = [];
-                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
+                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            });
             socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
-            socket.on('depositStatus', data => alert(data.status === 'approved' ?
-                `✅ Deposit +${data.amount} ETB approved!` : '❌ Deposit rejected.'));
-            socket.on('withdrawStatus', data => alert(data.status === 'approved' ?
-                `✅ Withdrawal -${data.amount} ETB processed.` : '❌ Withdrawal rejected.'));
+            socket.on('depositStatus', data => alert(data.status === 'approved' ? `✅ Deposit +${data.amount} ETB approved!` : '❌ Deposit rejected.'));
+            socket.on('withdrawStatus', data => alert(data.status === 'approved' ? `✅ Withdrawal -${data.amount} ETB processed.` : '❌ Withdrawal rejected.'));
         }
 
         // ========== EVENT LISTENERS ==========
-        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected');
-            loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
-        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected');
-            loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
-        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected');
-            loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
-        document.getElementById('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom =
-                    true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumberEl.textContent = '⚡ ...';
-                buildNumberGrid(); } unlockSpeech(); });
-        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit(
-                'claimBingo'); unlockSpeech(); });
+        document.getElementById('stake10Btn')?.addEventListener('click', () => { alert('10 ETB stake selected'); loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake20Btn')?.addEventListener('click', () => { alert('20 ETB stake selected'); loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
+        document.getElementById('stake30Btn')?.addEventListener('click', () => { alert('30 ETB stake selected'); loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
+        document.getElementById('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumberEl.textContent = '⚡ ...'; buildNumberGrid(); } unlockSpeech(); });
+        document.getElementById('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
         document.getElementById('muteToggleBtn')?.addEventListener('click', toggleMute);
         document.getElementById('backToStakeBtn')?.addEventListener('click', goToStakeSelection);
 
-        document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('click', () => { const page = btn
-                    .getAttribute('data-page'); clearInterval(lobbyTimerInterval); if (page === 'lobby') { if (
-                        currentMainPage === 'lobby') showLobby(currentTimerSeconds); else showGame(); } else { if (
-                        currentMainPage === 'lobby') document.getElementById('lobbyPage').classList.add('hidden');
-                    else document.getElementById('gamePage').classList.add('hidden'); if (page === 'history')
-                        document.getElementById('historyPage').classList.remove('hidden'); else if (page ===
-                        'wallet') { document.getElementById('walletPage').classList.remove('hidden');
-                        syncBalance(currentBalance); } else if (page === 'profile') { document.getElementById(
-                            'profilePage').classList.remove('hidden');
-                        syncBalance(currentBalance);
-                        updateStatsUI(); } } unlockSpeech(); }); });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const page = btn.getAttribute('data-page');
+                clearInterval(lobbyTimerInterval);
+                if (page === 'lobby') {
+                    if (currentMainPage === 'lobby') showLobby(currentTimerSeconds);
+                    else showGame();
+                } else {
+                    if (currentMainPage === 'lobby') document.getElementById('lobbyPage').classList.add('hidden');
+                    else document.getElementById('gamePage').classList.add('hidden');
+                    if (page === 'history') document.getElementById('historyPage').classList.remove('hidden');
+                    else if (page === 'wallet') { document.getElementById('walletPage').classList.remove('hidden'); syncBalance(currentBalance); }
+                    else if (page === 'profile') { document.getElementById('profilePage').classList.remove('hidden'); syncBalance(currentBalance); updateStatsUI(); }
+                }
+                unlockSpeech();
+            });
+        });
 
         document.getElementById('backFromHistoryBtn')?.addEventListener('click', goBackToMain);
         document.getElementById('backFromWalletBtn')?.addEventListener('click', goBackToMain);
@@ -1913,39 +1472,71 @@
         document.getElementById('withdrawBtn')?.addEventListener('click', openWithdrawTypeModal);
         document.getElementById('withdrawBtnGame')?.addEventListener('click', openWithdrawTypeModal);
 
-        // Deposit admin list modal controls
         document.getElementById('closeAdminListBtn')?.addEventListener('click', closeDepositAdminList);
         document.getElementById('depositAdminListBackBtn')?.addEventListener('click', closeDepositAdminList);
-
-        // Deposit method list modal controls
         document.getElementById('closeMethodListBtn')?.addEventListener('click', closeDepositMethodList);
         document.getElementById('depositMethodListBackBtn')?.addEventListener('click', () => {
             document.getElementById('depositMethodListModal').classList.remove('active');
             document.getElementById('depositAdminListModal').classList.add('active');
         });
-
         document.getElementById('backDepositBtn')?.addEventListener('click', () => {
             document.getElementById('depositDetailsModal').classList.remove('active');
             openDepositTypeModal();
         });
         document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
 
-        document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click', () =>
-            openWithdrawDetailsModal(btn.dataset.type)));
-        document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click', () => document.getElementById(
-            'withdrawTypeModal').classList.remove('active'));
-        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => { document.getElementById(
-                'withdrawDetailsModal').classList.remove('active');
-            openWithdrawTypeModal(); });
+        document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => btn.addEventListener('click', () => openWithdrawDetailsModal(btn.dataset.type)));
+        document.getElementById('closeWithdrawTypeBtn')?.addEventListener('click', () => document.getElementById('withdrawTypeModal').classList.remove('active'));
+        document.getElementById('backWithdrawBtn')?.addEventListener('click', () => { document.getElementById('withdrawDetailsModal').classList.remove('active'); openWithdrawTypeModal(); });
         document.getElementById('submitWithdrawBtn')?.addEventListener('click', submitWithdrawRequest);
 
-        const rulesModal = document.getElementById('rulesModal'),
-            closeRules = document.getElementById('closeRulesBtn');
+        const rulesModal = document.getElementById('rulesModal'), closeRules = document.getElementById('closeRulesBtn');
         document.getElementById('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
         document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
         // ========== INIT ==========
+        function buildNumberGrid() {
+            if (!numberGrid) return;
+            numberGrid.innerHTML = '';
+            for (let i = 1; i <= 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.number = i;
+                cell.textContent = i;
+                const isTaken = displayTakenNumbers.has(i);
+                const isOwn = (selectedCardNumber === i);
+                if (isTaken && !isOwn) { cell.classList.add('taken'); cell.onclick = null; }
+                else if (isOwn) { cell.classList.add('own-card'); cell.onclick = null; }
+                else {
+                    cell.onclick = () => {
+                        if (!isGameActive && socket && !displayTakenNumbers.has(i) && !serverTakenNumbers.has(i)) {
+                            if (selectedCardNumber !== null && selectedCardNumber !== i) {
+                                serverTakenNumbers.delete(selectedCardNumber);
+                                displayTakenNumbers.delete(selectedCardNumber);
+                            }
+                            pendingSelection = i;
+                            selectedCardNumber = i;
+                            selectedNumberEl.textContent = i;
+                            buildNumberGrid();
+                            socket.emit('selectCardNumber', i);
+                        }
+                    };
+                }
+                numberGrid.appendChild(cell);
+            }
+        }
+
+        function updateGridWithTakenNumbers(takenArray) {
+            const newServerSet = new Set(takenArray);
+            serverTakenNumbers = newServerSet;
+            const newDisplaySet = new Set(takenArray);
+            if (selectedCardNumber !== null) newDisplaySet.delete(selectedCardNumber);
+            displayTakenNumbers = newDisplaySet;
+            buildNumberGrid();
+            updatePlayerCountFromServer(serverTakenNumbers.size);
+        }
+
         buildNumberGrid();
         loadStats();
         updateMuteButton();
