@@ -669,23 +669,24 @@ function verifyTelegram(initData) {
 
 // ---------- Telegram auth (with link open logging) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
-  const { initData } = req.body;
+  const { initData, startParam } = req.body;   // <-- FIXED: read startParam from body
   if (!initData || !verifyTelegram(initData)) {
     return res.status(403).json({ success: false, error: 'Invalid initData' });
   }
   try {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
-    const startParam = params.get('start_param');
+    // Use startParam from body; fallback to params.get('start_param') for compatibility
+    const inviteCode = startParam || params.get('start_param');
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
     const handle = userData.username || null;
 
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
-    await logAdminLinkOpen(startParam, id, ip, userAgent);
+    await logAdminLinkOpen(inviteCode, id, ip, userAgent);
 
-    const user = await loadUser(id, displayName, handle, startParam, false);
+    const user = await loadUser(id, displayName, handle, inviteCode, false);
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
