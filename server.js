@@ -519,7 +519,7 @@ app.get('/admin/live-players', (req, res) => {
 const users = {};
 
 // ---------- loadUser ----------
- async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
@@ -534,7 +534,6 @@ const users = {};
     if (error) throw error;
 
     if (data) {
-      // ─── NEW: If user has no admin and we have an invite code, assign the admin ───
       let needUpdate = false;
       if (!data.admin_id && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
@@ -543,11 +542,17 @@ const users = {};
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (!adminErr && adminData) {
+
+        if (adminErr) {
+          console.error(`❌ Error looking up admin for invite code ${inviteCode}:`, adminErr.message);
+        } else if (adminData) {
           data.admin_id = adminData.id;
           data.assigned_admin_name = adminData.name;
           needUpdate = true;
           console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
+        } else {
+          // ⚠️ NEW: Log when invite code is provided but no active admin found
+          console.warn(`⚠️ Invite code "${inviteCode}" provided for user ${id}, but no active admin found with that code.`);
         }
       }
       if (needUpdate) {
@@ -557,7 +562,6 @@ const users = {};
           .eq('telegram_id', id);
         if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
       }
-      // ─── End of new block ───
 
       users[id] = {
         id,
@@ -572,7 +576,7 @@ const users = {};
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
-      // ─── User does not exist – create new (unchanged) ───
+      // ─── User does not exist – create new ───
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
@@ -585,10 +589,14 @@ const users = {};
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (!adminErr && adminData) {
+        if (adminErr) {
+          console.error(`❌ Error looking up admin for invite code ${inviteCode}:`, adminErr.message);
+        } else if (adminData) {
           finalAdminId = adminData.id;
           adminName = adminData.name;
           console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
+        } else {
+          console.warn(`⚠️ Invite code "${inviteCode}" provided for new user ${id}, but no active admin found.`);
         }
       } else if (adminId) {
         const { data: adminData, error: adminErr } = await supabase
