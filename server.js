@@ -686,7 +686,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     await logAdminLinkOpen(inviteCode, id, ip, userAgent);
 
-    const user = await loadUser(id, displayName, handle, inviteCode, false);
+    const user = await loadUser(id, displayName, handle, inviteCode, inviteCode ? true : false);
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
