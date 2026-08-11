@@ -551,7 +551,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           needUpdate = true;
           console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
         } else {
-          // ⚠️ NEW: Log when invite code is provided but no active admin found
           console.warn(`⚠️ Invite code "${inviteCode}" provided for user ${id}, but no active admin found with that code.`);
         }
       }
@@ -656,6 +655,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     throw err;
   }
 }
+
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
@@ -677,14 +677,13 @@ function verifyTelegram(initData) {
 
 // ---------- Telegram auth (with link open logging) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
-  const { initData, startParam } = req.body;   // <-- FIXED: read startParam from body
+  const { initData, startParam } = req.body;
   if (!initData || !verifyTelegram(initData)) {
     return res.status(403).json({ success: false, error: 'Invalid initData' });
   }
   try {
     const params = new URLSearchParams(initData);
     const userData = JSON.parse(params.get('user'));
-    // Use startParam from body; fallback to params.get('start_param') for compatibility
     const inviteCode = startParam || params.get('start_param');
     const id = String(userData.id);
     const displayName = userData.first_name || userData.username || 'Player';
@@ -793,6 +792,34 @@ app.post('/admin/register', async (req, res) => {
     res.json({ success: true, message: 'Registration successful!', admin: { id: newAdmin.id, name: newAdmin.name, phone: newAdmin.phone, deposit_number: newAdmin.deposit_number } });
   } catch (err) {
     console.error('Registration error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- NEW: Simple Admin Login (using admin ID and name, no phone/pin) ----------
+app.post('/admin/login-simple', async (req, res) => {
+  const { adminId, name } = req.body;
+  if (!adminId || !name) {
+    return res.status(400).json({ success: false, error: 'Admin ID and name required' });
+  }
+  try {
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('id', adminId)
+      .eq('name', name)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error || !admin) {
+      return res.status(401).json({ success: false, error: 'Invalid admin ID or name' });
+    }
+    req.session.adminId = admin.id;
+    req.session.adminName = admin.name;
+    req.session.adminPhone = admin.phone;
+    req.session.adminSecret = admin.secret_key;
+    res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
+  } catch (err) {
+    console.error('Simple admin login error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
