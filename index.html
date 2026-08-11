@@ -146,12 +146,12 @@
         <div id="autoLoginStatus" class="auto-login-info">⏳ Checking invite...</div>
         <form id="loginForm">
             <div class="input-group">
-                <label>👤 Admin Name</label>
-                <input type="text" id="loginName" placeholder="Auto‑filled from Telegram" disabled>
+                <label>🆔 Telegram ID</label>
+                <input type="text" id="loginTelegramId" placeholder="Auto‑filled" disabled>
             </div>
             <div class="input-group">
-                <label>🆔 Admin ID</label>
-                <input type="number" id="loginAdminId" placeholder="Enter your admin ID" required>
+                <label>🔗 Admin Link (Invite Code)</label>
+                <input type="text" id="loginInviteCode" placeholder="Enter your invite code" required>
             </div>
             <button type="submit" class="login-btn" id="loginBtn">Login</button>
             <div id="loginError" class="login-error"></div>
@@ -178,6 +178,7 @@
                 <button id="closeAdminListBtn" class="type-btn" style="margin-top:12px; background:#f1f5f9;" data-key="cancel">Cancel</button>
             </div>
         </div>
+
         <!-- DEPOSIT STEP 2: Method List -->
         <div id="depositMethodListModal" class="modal">
             <div class="modal-content" style="max-width:400px;">
@@ -192,6 +193,7 @@
                 <button id="closeMethodListBtn" class="type-btn" style="margin-top:12px; background:#f1f5f9;" data-key="cancel">Cancel</button>
             </div>
         </div>
+
         <!-- DEPOSIT DETAILS -->
         <div id="depositDetailsModal" class="modal">
             <div class="modal-content">
@@ -217,6 +219,7 @@
                 <div class="modal-buttons"><button id="submitDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
             </div>
         </div>
+
         <!-- WITHDRAW TYPE -->
         <div id="withdrawTypeModal" class="modal">
             <div class="modal-content">
@@ -227,6 +230,7 @@
                 <button id="closeWithdrawTypeBtn" class="type-btn" data-key="cancel">Cancel</button>
             </div>
         </div>
+
         <!-- WITHDRAW DETAILS -->
         <div id="withdrawDetailsModal" class="modal">
             <div class="modal-content">
@@ -238,6 +242,7 @@
                 <div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div>
             </div>
         </div>
+
         <!-- RULES MODAL -->
         <div id="rulesModal" class="modal">
             <div class="modal-content">
@@ -262,6 +267,7 @@
                 <button id="closeRulesBtn" class="btn-primary" data-key="gotIt">ገባኝ</button>
             </div>
         </div>
+
         <!-- WINNER OVERLAY -->
         <div id="winnerOverlay" class="winner-modal">
             <div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div>
@@ -454,7 +460,6 @@
                 continue: "➡ ቀጥል",
                 selectAdmin: "👤 አስተዳዳሪ ይምረጡ",
                 selectMethod: "💳 የክፍያ ዘዴ ይምረጡ",
-                // Rules (full text)
                 rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
                 rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
                 rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
@@ -1227,8 +1232,8 @@
         const loginPage = document.getElementById('loginPage');
         const gameApp = document.getElementById('gameApp');
         const loginForm = document.getElementById('loginForm');
-        const loginName = document.getElementById('loginName');
-        const loginAdminId = document.getElementById('loginAdminId');
+        const loginTelegramId = document.getElementById('loginTelegramId');
+        const loginInviteCode = document.getElementById('loginInviteCode');
         const loginBtn = document.getElementById('loginBtn');
         const loginError = document.getElementById('loginError');
         const autoLoginStatus = document.getElementById('autoLoginStatus');
@@ -1236,9 +1241,27 @@
         function showLoginError(msg) { loginError.textContent = msg; loginError.style.display = 'block'; }
         function hideLoginError() { loginError.style.display = 'none'; }
 
-        // Auto‑fill username from Telegram
+        // Auto‑fill Telegram ID from WebApp
         if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            loginName.value = tg.initDataUnsafe.user.username || '';
+            loginTelegramId.value = tg.initDataUnsafe.user.id || '';
+        }
+
+        // Auto‑fill invite code from URL if present
+        let startParam = null;
+        const initData = tg.initData;
+        if (initData) {
+            const params = new URLSearchParams(initData);
+            startParam = params.get('start_param');
+        }
+        if (!startParam) {
+            const urlParams = new URLSearchParams(window.location.search);
+            startParam = urlParams.get('tgWebAppStartParam') || urlParams.get('start_param');
+        }
+        if (!startParam && tg.initDataUnsafe) {
+            startParam = tg.initDataUnsafe.start_param;
+        }
+        if (startParam) {
+            loginInviteCode.value = startParam;
         }
 
         async function checkSessionAndShowGame() {
@@ -1264,29 +1287,16 @@
         }
 
         async function processInvite() {
-            const initData = tg.initData;
-            if (!initData) return false;
-            let startParam = null;
-            if (initData) {
-                const params = new URLSearchParams(initData);
-                startParam = params.get('start_param');
-            }
-            if (!startParam) {
-                const urlParams = new URLSearchParams(window.location.search);
-                startParam = urlParams.get('tgWebAppStartParam') || urlParams.get('start_param');
-            }
-            if (!startParam && tg.initDataUnsafe) {
-                startParam = tg.initDataUnsafe.start_param;
-            }
-            if (!startParam) return false;
-            autoLoginStatus.textContent = `🔗 Invite code detected: ${startParam}. Logging in...`;
+            const inviteCode = loginInviteCode.value.trim();
+            if (!inviteCode) return false;
+            autoLoginStatus.textContent = `🔗 Invite code detected: ${inviteCode}. Logging in...`;
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<span class="loader"></span> Processing...';
             try {
                 const res = await fetch('/api/telegram-miniapp-auth', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData, startParam })
+                    body: JSON.stringify({ initData: tg.initData, startParam: inviteCode })
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -1300,14 +1310,12 @@
                     autoLoginStatus.textContent = '❌ Invite login failed: ' + (data.error || 'Unknown error');
                     loginBtn.disabled = false;
                     loginBtn.innerHTML = 'Login';
-                    loginForm.classList.remove('hidden');
                     return false;
                 }
             } catch (e) {
                 autoLoginStatus.textContent = '⚠️ Network error. Please try manually.';
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = 'Login';
-                loginForm.classList.remove('hidden');
                 return false;
             }
         }
@@ -1315,22 +1323,21 @@
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideLoginError();
-            const adminId = loginAdminId.value.trim();
-            const name = loginName.value.trim();
-            if (!adminId || !name) { showLoginError('Both Admin ID and Name are required.'); return; }
+            const inviteCode = loginInviteCode.value.trim();
+            if (!inviteCode) { showLoginError('Admin Link (invite code) is required.'); return; }
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<span class="loader"></span> Logging in...';
             try {
-                const res = await fetch('/admin/login-simple', {
+                const res = await fetch('/admin/login-by-invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId: parseInt(adminId), name })
+                    body: JSON.stringify({ inviteCode })
                 });
                 const data = await res.json();
                 if (data.success) {
                     showGameApp();
                 } else {
-                    showLoginError(data.error || 'Invalid admin ID or name.');
+                    showLoginError(data.error || 'Invalid invite code.');
                     loginBtn.disabled = false;
                     loginBtn.innerHTML = 'Login';
                 }
@@ -1348,8 +1355,8 @@
             const inviteSuccess = await processInvite();
             if (inviteSuccess) return;
             loginForm.classList.remove('hidden');
-            autoLoginStatus.textContent = '👤 Enter your credentials to continue.';
-            loginAdminId.focus();
+            autoLoginStatus.textContent = '👤 Enter your Admin Link to continue.';
+            loginInviteCode.focus();
         })();
 
         // ========== GAME EVENT LISTENERS ==========
@@ -1417,9 +1424,9 @@
         document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
-        // Optional: admin login button (if you want to open login again)
+        // Optional: admin login button (if you want to re‑login)
         document.getElementById('adminSimpleLoginBtn')?.addEventListener('click', () => {
-            // could re-show login if needed, but here we just redirect to root
+            // Could show login again or just reload
             window.location.href = '/';
         });
 
