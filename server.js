@@ -498,7 +498,8 @@ app.get('/api/deposit-accounts', async (req, res) => {
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
+app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
 app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
@@ -796,7 +797,7 @@ app.post('/admin/register', async (req, res) => {
   }
 });
 
-// ---------- NEW: Simple Admin Login (using admin ID and name, no phone/pin) ----------
+// ---------- Simple Admin Login (using admin ID and name, no phone/pin) ----------
 app.post('/admin/login-simple', async (req, res) => {
   const { adminId, name } = req.body;
   if (!adminId || !name) {
