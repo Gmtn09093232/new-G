@@ -10,6 +10,7 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        /* ===== YOUR EXISTING STYLES (unchanged) ===== */
         * {
             margin: 0;
             padding: 0;
@@ -716,7 +717,6 @@
         .telegram-links a:hover {
             text-decoration: underline;
         }
-        /* Admin List & Method List */
         .admin-list-item,
         .method-list-item {
             display: flex;
@@ -828,6 +828,38 @@
         .admin-methods-preview {
             display: none;
         }
+
+        /* NEW: Admin status badge */
+        .admin-status-badge {
+            text-align: center;
+            margin: 8px 0;
+            font-size: 0.9rem;
+            background: #fef3c7;
+            padding: 4px 12px;
+            border-radius: 40px;
+            display: inline-block;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .admin-status-badge .label {
+            font-weight: 600;
+            color: #7c2d12;
+        }
+        .admin-status-badge .name {
+            font-weight: 700;
+        }
+        .admin-status-badge .name.assigned {
+            color: #16a34a;
+        }
+        .admin-status-badge .name.unassigned {
+            color: #dc2626;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
@@ -914,7 +946,7 @@
         </div>
     </div>
 
-    <!-- ===== RULES MODAL (UPDATED) ===== -->
+    <!-- ===== RULES MODAL ===== -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
@@ -957,14 +989,45 @@
         <div class="winner-card"><div class="winner-trophy">🏆✨</div><div class="winner-title" id="winTitle">BINGO!</div><div class="winner-sub" data-key="congrats">Congratulations</div><div class="winners-avatars" id="winListContainer"></div><div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div><button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button></div>
     </div>
 
+    <!-- ===== NEW: SIMPLE ADMIN LOGIN MODAL ===== -->
+    <div id="adminSimpleLoginModal" class="modal">
+        <div class="modal-content" style="max-width:320px;">
+            <h3 style="text-align:center; margin-bottom:16px;">🔐 Admin Login</h3>
+            <div class="input-group">
+                <label>Admin ID</label>
+                <input type="number" id="adminLoginId" placeholder="Enter your admin ID" required>
+            </div>
+            <div class="input-group">
+                <label>Admin Name</label>
+                <input type="text" id="adminLoginName" placeholder="Auto‑filled from Telegram" required>
+                <div style="font-size:0.7rem; color:#94a3b8; margin-top:4px;">Auto‑filled from Telegram username</div>
+            </div>
+            <div class="modal-buttons">
+                <button id="adminSimpleLoginSubmit" class="btn-primary">Login</button>
+                <button id="adminSimpleLoginCancel" class="btn-secondary">Cancel</button>
+            </div>
+            <div id="adminSimpleLoginError" style="color:#dc2626; margin-top:10px; display:none; text-align:center;"></div>
+        </div>
+    </div>
+
     <!-- ===== PAGES ===== -->
 
     <!-- STAKE PAGE -->
     <div id="stakePage" class="page">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
-            <div class="players-badge">DOT BINGO</div>
+            <div class="header-actions">
+                <button id="adminSimpleLoginBtn" style="background:#1e293b; color:white; border:none; border-radius:40px; padding:6px 16px; font-size:0.8rem;">🔐 Admin</button>
+                <div class="players-badge">DOT BINGO</div>
+            </div>
         </div>
+
+        <!-- NEW: Admin Status Badge -->
+        <div class="admin-status-badge">
+            <span class="label">👤 Admin:</span>
+            <span id="assignedAdminName" class="name unassigned">—</span>
+        </div>
+
         <h3 style="text-align:center; margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
         <div class="stake-page-buttons">
             <div style="text-align:center;">
@@ -1173,7 +1236,6 @@
                 continue: "➡ ቀጥል",
                 selectAdmin: "👤 አስተዳዳሪ ይምረጡ",
                 selectMethod: "💳 የክፍያ ዘዴ ይምረጡ",
-                // Rules
                 rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
                 rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
                 rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
@@ -1262,7 +1324,6 @@
                 continue: "➡ Continue",
                 selectAdmin: "👤 Select Admin",
                 selectMethod: "💳 Select Payment Method",
-                // Rules
                 rulesHowToPlayTitle: "🎲 How to Play",
                 rulesHowToPlay: "1. Choose your stake (10, 20, or 30 Birr).\n2. Pick a BINGO card number from 1–100.\n3. When the game starts, numbers are called every few seconds.\n4. Mark the number on your card when it is called.\n5. If you complete one of the winning patterns, tap **🏆 BINGO!** immediately.",
                 rulesWinningPatternsTitle: "🏆 Winning Patterns",
@@ -1764,7 +1825,32 @@
                 confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize,
                     currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
 
-        // ========== NEW: Authenticate on page load ==========
+        function restoreGameSession() {
+            const savedStake = localStorage.getItem('dot_bingo_stake');
+            if (savedStake) {
+                const stake = parseInt(savedStake);
+                if ([10, 20, 30].includes(stake)) {
+                    console.log(`🔄 Auto-joining stake ${stake} from saved session`);
+                    setTimeout(() => {
+                        if (!socket) { connectToGame(stake); } else { socket.emit('joinLobby', { stake }); }
+                    }, 500);
+                }
+            }
+        }
+
+        // ========== NEW: ADMIN STATUS BADGE ==========
+        function updateAdminBadge(adminName) {
+            const el = document.getElementById('assignedAdminName');
+            if (adminName) {
+                el.textContent = adminName;
+                el.className = 'name assigned';
+            } else {
+                el.textContent = 'Not assigned (deposit to assign)';
+                el.className = 'name unassigned';
+            }
+        }
+
+        // ========== NEW: AUTHENTICATE ON PAGE LOAD ==========
         async function authenticateUser() {
             const initData = tg.initData;
             if (!initData) return;
@@ -1796,6 +1882,9 @@
                     syncBalance(data.balance || 0);
                     if (data.assigned_admin_name) {
                         console.log(`✅ Assigned to admin: ${data.assigned_admin_name}`);
+                        updateAdminBadge(data.assigned_admin_name);
+                    } else {
+                        updateAdminBadge(null);
                     }
                 } else {
                     console.warn('Auth failed:', data.error);
@@ -1805,16 +1894,46 @@
             }
         }
 
-        function restoreGameSession() {
-            const savedStake = localStorage.getItem('dot_bingo_stake');
-            if (savedStake) {
-                const stake = parseInt(savedStake);
-                if ([10, 20, 30].includes(stake)) {
-                    console.log(`🔄 Auto-joining stake ${stake} from saved session`);
-                    setTimeout(() => {
-                        if (!socket) { connectToGame(stake); } else { socket.emit('joinLobby', { stake }); }
-                    }, 500);
+        // ========== NEW: SIMPLE ADMIN LOGIN ==========
+        function openSimpleAdminLogin() {
+            document.getElementById('adminSimpleLoginModal').classList.add('active');
+            document.getElementById('adminSimpleLoginError').style.display = 'none';
+            // Auto-fill username from Telegram
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const username = tg.initDataUnsafe.user.username || '';
+                document.getElementById('adminLoginName').value = username;
+            }
+        }
+
+        function closeSimpleAdminLogin() {
+            document.getElementById('adminSimpleLoginModal').classList.remove('active');
+        }
+
+        async function simpleAdminLogin() {
+            const adminId = document.getElementById('adminLoginId').value.trim();
+            const name = document.getElementById('adminLoginName').value.trim();
+            if (!adminId || !name) {
+                document.getElementById('adminSimpleLoginError').textContent = 'Admin ID and name required';
+                document.getElementById('adminSimpleLoginError').style.display = 'block';
+                return;
+            }
+            try {
+                const res = await fetch('/admin/login-simple', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId: parseInt(adminId), name })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // Redirect to admin dashboard
+                    window.location.href = '/admin-dashboard';
+                } else {
+                    document.getElementById('adminSimpleLoginError').textContent = data.error || 'Login failed';
+                    document.getElementById('adminSimpleLoginError').style.display = 'block';
                 }
+            } catch (e) {
+                document.getElementById('adminSimpleLoginError').textContent = 'Network error. Please try again.';
+                document.getElementById('adminSimpleLoginError').style.display = 'block';
             }
         }
 
@@ -1968,6 +2087,11 @@
         document.getElementById('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
         document.getElementById('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
+
+        // NEW: Simple admin login event listeners
+        document.getElementById('adminSimpleLoginBtn').addEventListener('click', openSimpleAdminLogin);
+        document.getElementById('adminSimpleLoginSubmit').addEventListener('click', simpleAdminLogin);
+        document.getElementById('adminSimpleLoginCancel').addEventListener('click', closeSimpleAdminLogin);
 
         // ========== INIT ==========
         buildNumberGrid();
