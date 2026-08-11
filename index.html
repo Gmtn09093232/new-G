@@ -1764,6 +1764,47 @@
                 confDiv); setTimeout(() => confDiv.remove(), 4000); if (currentGameId) addGameRecord(true, playerPrize,
                     currentGameId, currentStake, winnersList, winningNumber, totalPrize); unlockSpeech(); }
 
+        // ========== NEW: Authenticate on page load ==========
+        async function authenticateUser() {
+            const initData = tg.initData;
+            if (!initData) return;
+
+            let startParam = null;
+            if (initData) {
+                const params = new URLSearchParams(initData);
+                startParam = params.get('start_param');
+            }
+            if (!startParam) {
+                const urlParams = new URLSearchParams(window.location.search);
+                startParam = urlParams.get('tgWebAppStartParam') || urlParams.get('start_param');
+            }
+            if (!startParam && tg.initDataUnsafe) {
+                startParam = tg.initDataUnsafe.start_param;
+            }
+
+            console.log('📤 Authenticating with startParam:', startParam);
+
+            try {
+                const res = await fetch('/api/telegram-miniapp-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData, startParam })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('profileUsername').innerText = data.username || 'Player';
+                    syncBalance(data.balance || 0);
+                    if (data.assigned_admin_name) {
+                        console.log(`✅ Assigned to admin: ${data.assigned_admin_name}`);
+                    }
+                } else {
+                    console.warn('Auth failed:', data.error);
+                }
+            } catch (e) {
+                console.error('Auth error:', e);
+            }
+        }
+
         function restoreGameSession() {
             const savedStake = localStorage.getItem('dot_bingo_stake');
             if (savedStake) {
@@ -1777,34 +1818,11 @@
             }
         }
 
+        // ========== connectToGame (UPDATED: removed auth fetch) ==========
         async function connectToGame(stake) {
             currentStake = stake;
             localStorage.setItem('dot_bingo_stake', stake);
-            const initData = tg.initData;
-            if (!initData) { alert('Open inside Telegram'); return; }
-            let startParam = null;
-            if (initData) { const params = new URLSearchParams(initData);
-                startParam = params.get('start_param'); }
-           if (!startParam) {
-    const urlParams = new URLSearchParams(window.location.search);
-    startParam = urlParams.get('tgWebAppStartParam');   // ✅ correct
-}
-            if (!startParam && tg.initDataUnsafe) { startParam = tg.initDataUnsafe.start_param; }
-            console.log('✅ Final start_param:', startParam);
-            try {
-                // ========== FIX: send startParam in the body ==========
-                const res = await fetch('/api/telegram-miniapp-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        initData,
-                        startParam   // <-- NOW SENT EXPLICITLY
-                    })
-                });
-                const data = await res.json();
-                if (!data.success) { alert('Auth failed'); return; }
-                document.getElementById('profileUsername').innerText = data.username || 'Player';
-            } catch (e) { alert('Network error'); return; }
+            // No auth call here – already done on page load
             if (socket) socket.disconnect();
             socket = io();
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
@@ -1958,6 +1976,10 @@
         window.speechSynthesis.getVoices();
 
         document.getElementById('stakePage').classList.remove('hidden');
+
+        // ✅ Authenticate immediately
+        authenticateUser();
+
         restoreGameSession();
     </script>
 </body>
