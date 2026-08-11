@@ -3,6 +3,7 @@
 //             & Manual Balance Adjustments Affecting Deposit Stats
 //             & 1500 ETB Limit for Manual Additions
 //             & Import Players by Username/Handle
+//             & Login by Invite Code
 // ================================================================
 
 require('dotenv').config();
@@ -498,7 +499,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
@@ -576,7 +576,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
-      // ─── User does not exist – create new ───
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
@@ -821,6 +820,33 @@ app.post('/admin/login-simple', async (req, res) => {
     res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
   } catch (err) {
     console.error('Simple admin login error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- NEW: Login by Invite Code (Admin Link) ----------
+app.post('/admin/login-by-invite', async (req, res) => {
+  const { inviteCode } = req.body;
+  if (!inviteCode) {
+    return res.status(400).json({ success: false, error: 'Invite code required' });
+  }
+  try {
+    const { data: admin, error } = await supabase
+      .from('admins')
+      .select('*')
+      .eq('invite_code', inviteCode)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (error || !admin) {
+      return res.status(401).json({ success: false, error: 'Invalid or inactive invite code' });
+    }
+    req.session.adminId = admin.id;
+    req.session.adminName = admin.name;
+    req.session.adminPhone = admin.phone;
+    req.session.adminSecret = admin.secret_key;
+    res.json({ success: true, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
+  } catch (err) {
+    console.error('Login by invite error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -1937,7 +1963,6 @@ app.post('/api/request-withdraw', async (req, res) => {
 });
 
 // ---------- Admin endpoints (session-based) ----------
-
 // ============================================================
 //  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
 // ============================================================
