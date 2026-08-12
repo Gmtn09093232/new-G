@@ -8,7 +8,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        /* ===== ALL STYLES (unchanged) ===== */
+        /* ===== GAME STYLES ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { min-height: 100vh; background: #f5f3f0; background-image: radial-gradient(circle at 20% 30%, rgba(0,0,0,0.02) 2%, transparent 2.5%); background-size: 40px 40px; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: rgba(255,255,248,0.96); border-radius: 48px; padding: 20px 18px 24px; box-shadow: 0 20px 35px -12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.9); border: 1px solid rgba(0,0,0,0.05); backdrop-filter: blur(2px); }
@@ -345,7 +345,7 @@
 
     <script>
         // ============================================
-        //  COMPLETE JAVASCRIPT – FIXED INVITE HANDLING
+        //  COMPLETE JAVASCRIPT
         // ============================================
 
         // ----- DOM refs -----
@@ -410,21 +410,133 @@
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
         // ========== LANGUAGE ==========
-        // (Full langData from previous version – identical, so we keep it)
-        // ... (omitted for brevity, but you must include the full langData object)
+        let currentLang = 'am';
+        const langToggleBtn = document.getElementById('langToggleBtn');
 
-        // We'll include a minimal language object for demonstration – you should replace with your full one.
         const langData = {
-            am: { 
-                // Placeholder – use your full amharic object
+            am: {
+                depositTitle: "ተቀማጭ", chooseMethod: "የክፍያ ዘዴ ይምረጡ", cancel: "ይቅር",
+                sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
+                recipientLabel: "📞 ተቀባይ አካውንት (ለመቅዳት ይንኩ)",
+                accountName: "የአካውንት ስም",
+                yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
+                amountLabel: "💰 መጠን (ETB)",
+                depositHint: "💡 ክፍያ ከላኩ በኋላ ግልጽ የሆነ የክፍያ ማረጋገጫ ፎቶ ያስገቡ። አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+                requestDeposit: "✔ ተቀማጭ ጠይቅ", back: "← ተመለስ",
+                withdrawTitle: "ገንዘብ አውጣ", selectMethod: "የማውጫ ዘዴ ይምረጡ",
+                yourDetails: "የአካውንትዎ ዝርዝሮች",
+                fullName: "👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)",
+                accountNumber: "📞 አካውንት / ስልክ ቁጥር",
+                amountWithdraw: "💰 መጠን (ETB) - ዝቅተኛ 20 ETB",
+                withdrawHint: "⏱️ ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።",
+                requestWithdrawal: "✔ ገንዘብ ማውጣት ጠይቅ",
+                rulesTitle: "የቢንጎ ሕጎች", rulesSub: "75-ኳስ ክላሲክ",
+                entryFeeLabel: "💰 የመግቢያ ክፍያ፦", entryFeeValue: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabel: "🏆 የሽልማት ገንዘብ፦", prizeValue: "80% (1 ተጫዋች ከሆነ 100%)",
+                winLabel: "🎯 ማሸነፍ፦", winValue: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabel: "⏱️ የይገባኛል ጥያቄ፦", claimValue: "ወዲያው “CLAIM BINGO!”",
+                gotIt: "ገባኝ", congrats: "እንኳን ደስ ያለዎት!", winningPrize: "🎁 የሽልማት ገንዘብ",
+                amazing: "🎉 ደስ ያለኝ! 🎉", chooseStake: "የመግቢያ ክፍያ ይምረጡ",
+                bal: "ቀሪ ሂሳብ", deposit: "+ተቀማጭ", withdraw: "-ማውጣት", stakeBtn: "↺ ውርርድ",
+                pickCard: "🎴 የካርድ መለያ ይምረጡ:", selected: "የተመረጠው:", randomCard: "✨ በዘፈቀደ ካርድ",
+                yourCardPreview: "🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
+                gameTab: "🎮 ጨዋታ", historyTab: "📜 ታሪክ", walletTab: "💰 ቦርሳ", profileTab: "👤 መገለጫ",
+                rulesBtn: "📜 የጨዋታ ሕጎች",
+                gameHistory: "📜 የጨዋታ ታሪክ", totalGamesLabel: "ጠቅላላ ጨዋታዎች:",
+                myWallet: "💰 ቦርሳዬ", currentBalance: "አሁን ያለው ቀሪ ሂሳብ",
+                myProfile: "👤 መገለጫዬ", usernameLabel: "የተጠቃሚ ስም", balanceLabel: "💰 ቀሪ ሂሳብ",
+                prizePoolLabel: "🏆 የሽልማት ገንዘብ", lastCall: "🎲 የመጨረሻ ጥሪ",
+                calledPrefix: "የተጠሩ:", claimBingo: "🏆 ቢንጎ ጠይቅ! 🏆",
+                entryFeeLabelShort: "💰 የመግቢያ ክፍያ፦",
+                entryFeeValues: "10/20/30 ብር (እንደ ምርጫዎ)",
+                prizeLabelShort: "🏆 የሽልማት ገንዘብ፦",
+                prizeValueShort: "80% (1 ተጫዋች ከሆነ 100%)",
+                winLabelShort: "🎯 ማሸነፍ፦",
+                winValueShort: "ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+                claimLabelShort: "⏱️ የይገባኛል ጥያቄ፦",
+                claimValueShort: "ወዲያው “CLAIM BINGO!”",
+                refLabel: "📝 የግብይት ማጣቀሻ (አማራጭ)",
+                proofLabel: "📷 የፎቶ ማስረጃ ያስገቡ (አስፈላጊ)",
+                continue: "➡ ቀጥል",
                 selectAdmin: "👤 አስተዳዳሪ ይምረጡ",
-                cancel: "ይቅር",
-                // ... all other keys
+                selectMethod: "💳 የክፍያ ዘዴ ይምረጡ",
+                rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
+                rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
+                rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
+                rulesWinningPatterns: "✅ 1 አግድም መስመር (Row)\n✅ 1 ቁመት መስመር (Column)\n✅ 1 ሰያፍ መስመር (Diagonal)\n✅ 4ቱ ማዕዘኖች (4 Corners)\n\n**💡 ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
+                rulesPrizeTitle: "🏆 የሽልማት ህግ",
+                rulesPrize: "• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።\n• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።\n• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።",
+                rulesDepositTitle: "💰 ገንዘብ ማስገባት",
+                rulesDeposit: "1. **➕ Deposit** ይጫኑ።\n2. አድሚን ይምረጡ።\n3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።\n4. ገንዘብ ይላኩ።\n5. የክፍያ ማስረጃ ያስገቡ።\n6. **Deposit ይጠይቁ**።\n7. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።\n\n**ዝቅተኛ መጠን፦ 10 ብር**",
+                rulesWithdrawTitle: "💸 ገንዘብ ማውጣት",
+                rulesWithdraw: "1. **➖ Withdraw** ይጫኑ።\n2. የመቀበያ ዘዴ ይምረጡ።\n3. ሙሉ ስምዎን ያስገቡ።\n4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።\n5. የሚያወጡትን መጠን ያስገቡ።\n6. **Withdrawal ይጠይቁ**።\n7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።\n\n**ዝቅተኛ መጠን፦ 20 ብር**",
+                rulesGameRulesTitle: "⚖️ የጨዋታ ህጎች",
+                rulesGameRules: "✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።\n✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።\n✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት **🏆 ቢንጎ!** መጫን አለብዎት።\n✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።\n❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።\n❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።",
+                rulesHelpTitle: "📞 እርዳታ",
+                rulesHelp: "ጥያቄ ካለዎት የ @Dotbingogame ወይም @dotbingo ይቀላቀሉ።",
+                rulesGoodLuck: "🎉 መልካም ዕድል!\nDOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!"
             },
             en: {
+                depositTitle: "Deposit", chooseMethod: "Choose payment method", cancel: "Cancel",
+                sendPayment: "Send payment to the number below",
+                recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)",
+                accountName: "ACCOUNT NAME",
+                yourPhone: "📞 Your Phone Number (for verification)",
+                amountLabel: "💰 Amount (ETB)",
+                depositHint: "💡 After sending payment, upload a clear photo of your payment confirmation. Admin will verify your deposit using your phone number.",
+                requestDeposit: "✔ Request Deposit", back: "← Back",
+                withdrawTitle: "Withdraw Funds", selectMethod: "Select withdrawal method",
+                yourDetails: "Your account details",
+                fullName: "👤 Full Name (as per bank/mobile money)",
+                accountNumber: "📞 Account / Phone Number",
+                amountWithdraw: "💰 Amount (ETB) - Min 20 ETB",
+                withdrawHint: "⏱️ Withdrawals processed within moment.",
+                requestWithdrawal: "✔ Request Withdrawal",
+                rulesTitle: "Bingo Rules", rulesSub: "75-ball Classic",
+                entryFeeLabel: "💰 Entry Fee:", entryFeeValue: "10/20/30 Birr (as per your choice)",
+                prizeLabel: "🏆 Prize Money:", prizeValue: "80% (100% if 1 player)",
+                winLabel: "🎯 Winning:", winValue: "Row, Column, Diagonal or 4 Corners",
+                claimLabel: "⏱️ Claim:", claimValue: "Immediately 'CLAIM BINGO!'",
+                gotIt: "Got it", congrats: "Congratulations!", winningPrize: "🎁 WINNING PRIZE",
+                amazing: "🎉 Amazing! 🎉", chooseStake: "Choose Your Stake",
+                bal: "BAL", deposit: "+Deposit", withdraw: "-Withdraw", stakeBtn: "↺ Stake",
+                pickCard: "🎴 Pick card ID:", selected: "Selected:", randomCard: "✨ Random Card",
+                yourCardPreview: "🎴 Your Bingo Card Preview",
+                gameTab: "🎮 Game", historyTab: "📜 History", walletTab: "💰 Wallet", profileTab: "👤 Profile",
+                rulesBtn: "📜 Game Rules",
+                gameHistory: "📜 Game History", totalGamesLabel: "Total Games:",
+                myWallet: "💰 My Wallet", currentBalance: "Current Balance",
+                myProfile: "👤 My Profile", usernameLabel: "Username", balanceLabel: "💰 Balance",
+                prizePoolLabel: "🏆 PRIZE POOL", lastCall: "🎲 LAST CALL",
+                calledPrefix: "Called:", claimBingo: "🏆 CLAIM BINGO! 🏆",
+                entryFeeLabelShort: "💰 Entry Fee:",
+                entryFeeValues: "10/20/30 Birr (as per your choice)",
+                prizeLabelShort: "🏆 Prize Money:",
+                prizeValueShort: "80% (100% if 1 player)",
+                winLabelShort: "🎯 Winning:",
+                winValueShort: "Row, Column, Diagonal or 4 Corners",
+                claimLabelShort: "⏱️ Claim:",
+                claimValueShort: "Immediately 'CLAIM BINGO!'",
+                refLabel: "📝 Transaction Reference (optional)",
+                proofLabel: "📷 Upload Photo Proof (required)",
+                continue: "➡ Continue",
                 selectAdmin: "👤 Select Admin",
-                cancel: "Cancel",
-                // ... all other keys
+                selectMethod: "💳 Select Payment Method",
+                rulesHowToPlayTitle: "🎲 How to Play",
+                rulesHowToPlay: "1. Choose your stake (10, 20, or 30 Birr).\n2. Pick a BINGO card number from 1–100.\n3. When the game starts, numbers are called every few seconds.\n4. Mark the number on your card when it is called.\n5. If you complete one of the winning patterns, tap **🏆 BINGO!** immediately.",
+                rulesWinningPatternsTitle: "🏆 Winning Patterns",
+                rulesWinningPatterns: "✅ 1 Row\n✅ 1 Column\n✅ 1 Diagonal\n✅ 4 Corners\n\n**💡 Note:** The centre FREE space counts as automatically marked.",
+                rulesPrizeTitle: "🏆 Prize Rules",
+                rulesPrize: "• If 2 or more players, 80% of the total entry fees goes to the winner(s).\n• If only 1 player, you get 100% of your entry fee back if you call BINGO.\n• If multiple winners, the prize is shared equally.",
+                rulesDepositTitle: "💰 Deposit",
+                rulesDeposit: "1. Tap **➕ Deposit**.\n2. Select an admin.\n3. Choose Telebirr, CBE Birr, or M-Pesa.\n4. Send payment.\n5. Upload payment proof.\n6. Tap **Request Deposit**.\n7. Your balance updates after admin approval.\n\n**Minimum amount:** 10 Birr",
+                rulesWithdrawTitle: "💸 Withdraw",
+                rulesWithdraw: "1. Tap **➖ Withdraw**.\n2. Choose a withdrawal method.\n3. Enter your full name.\n4. Enter your phone/account number.\n5. Enter the amount to withdraw.\n6. Tap **Request Withdrawal**.\n7. Funds are sent after admin approval.\n\n**Minimum amount:** 20 Birr",
+                rulesGameRulesTitle: "⚖️ Game Rules",
+                rulesGameRules: "✅ All numbers are drawn fairly by the server.\n✅ You cannot change your card after the game starts.\n✅ You must tap **🏆 BINGO!** before the next number is called.\n✅ The server validates your BINGO claim.\n❌ Invalid claims are rejected.\n❌ Cheating, multi‑accounting, or exploiting bugs is prohibited.",
+                rulesHelpTitle: "📞 Help",
+                rulesHelp: "Join @Dotbingogame or @dotbingo for support.",
+                rulesGoodLuck: "🎉 Good luck!\nPlay DOT BINGO, win, and have fun!"
             }
         };
 
@@ -447,10 +559,10 @@
             applyLanguage();
             localStorage.setItem('dot_bingo_lang', currentLang);
         }
-        const langToggleBtn = document.getElementById('langToggleBtn');
         langToggleBtn.addEventListener('click', toggleLanguage);
         let savedLang = localStorage.getItem('dot_bingo_lang');
-        let currentLang = (savedLang === 'am' || savedLang === 'en') ? savedLang : 'am';
+        if (savedLang === 'am' || savedLang === 'en') currentLang = savedLang;
+        else currentLang = 'am';
         applyLanguage();
 
         // ========== SAFE DISPLAY NUMBER ==========
@@ -1075,58 +1187,26 @@
             }
         }
 
-        // ========== ROBUST INVITE EXTRACTION ==========
-        function extractStartParam() {
-            let startParam = null;
-
-            // 1. From WebApp object (most reliable if bot sent start_param)
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe) {
-                startParam = window.Telegram.WebApp.initDataUnsafe.start_param;
-                console.log('🔍 From WebApp.initDataUnsafe.start_param:', startParam);
-            }
-
-            // 2. From URL search params (tgWebAppStartParam is added by Telegram)
-            if (!startParam) {
-                const urlParams = new URLSearchParams(window.location.search);
-                startParam = urlParams.get('tgWebAppStartParam');
-                console.log('🔍 From URL tgWebAppStartParam:', startParam);
-                if (!startParam) {
-                    startParam = urlParams.get('start_param');
-                    console.log('🔍 From URL start_param:', startParam);
-                }
-                if (!startParam) {
-                    startParam = urlParams.get('start');
-                    console.log('🔍 From URL start:', startParam);
-                }
-                // Additional fallback: 'invite' (custom)
-                if (!startParam) {
-                    startParam = urlParams.get('invite');
-                    console.log('🔍 From URL invite:', startParam);
-                }
-            }
-
-            // 3. From initData (rare)
-            if (!startParam && tg.initData) {
-                const params = new URLSearchParams(tg.initData);
-                startParam = params.get('start_param');
-                console.log('🔍 From initData start_param:', startParam);
-            }
-
-            console.log('✅ Final startParam:', startParam);
-            return startParam;
-        }
-
-        // ========== AUTHENTICATE USER ==========
+        // ========== AUTHENTICATE USER (for game) ==========
         async function authenticateUser() {
             const initData = tg.initData;
-            if (!initData) {
-                console.warn('No initData – not in Telegram?');
-                return;
+            if (!initData) return;
+            let startParam = null;
+            if (initData) {
+                const params = new URLSearchParams(initData);
+                startParam = params.get('start_param');
             }
-
-            const startParam = extractStartParam();
-            console.log('📤 Sending startParam to backend:', startParam);
-
+            if (!startParam) {
+    const urlParams = new URLSearchParams(window.location.search);
+    startParam = urlParams.get('invite') || 
+                 urlParams.get('tgWebAppStartParam') || 
+                 urlParams.get('start_param') || 
+                 urlParams.get('start');
+}
+            if (!startParam && tg.initDataUnsafe) {
+                startParam = tg.initDataUnsafe.start_param;
+            }
+            console.log('📤 Authenticating with startParam:', startParam);
             try {
                 const res = await fetch('/api/telegram-miniapp-auth', {
                     method: 'POST',
@@ -1134,7 +1214,6 @@
                     body: JSON.stringify({ initData, startParam })
                 });
                 const data = await res.json();
-                console.log('📥 Auth response:', data);
                 if (data.success) {
                     document.getElementById('profileUsername').innerText = data.username || 'Player';
                     syncBalance(data.balance || 0);
@@ -1142,7 +1221,6 @@
                         console.log(`✅ Assigned to admin: ${data.assigned_admin_name}`);
                         updateAdminBadge(data.assigned_admin_name);
                     } else {
-                        console.warn('❌ No admin assigned – user may already have one or invite invalid.');
                         updateAdminBadge(null);
                     }
                 } else {
@@ -1171,14 +1249,27 @@
             loginTelegramId.value = tg.initDataUnsafe.user.id || '';
         }
 
-        // Auto‑fill invite code
-        const inviteCodeFromUrl = extractStartParam();
-        if (inviteCodeFromUrl) {
-            loginInviteCode.value = inviteCodeFromUrl;
-            console.log('✅ Auto‑filled invite code:', inviteCodeFromUrl);
+        // Auto‑fill invite code from URL if present
+        let startParam = null;
+        const initData = tg.initData;
+        if (initData) {
+            const params = new URLSearchParams(initData);
+            startParam = params.get('start_param');
+        }
+       if (!startParam) {
+    const urlParams = new URLSearchParams(window.location.search);
+    startParam = urlParams.get('invite') || 
+                 urlParams.get('tgWebAppStartParam') || 
+                 urlParams.get('start_param') || 
+                 urlParams.get('start');
+}
+        if (!startParam && tg.initDataUnsafe) {
+            startParam = tg.initDataUnsafe.start_param;
+        }
+        if (startParam) {
+            loginInviteCode.value = startParam;
         }
 
-        // Check session and show game if already logged in
         async function checkSessionAndShowGame() {
             try {
                 const res = await fetch('/admin/session', { credentials: 'include' });
@@ -1193,7 +1284,6 @@
         function showGameApp() {
             loginPage.classList.add('hidden');
             gameApp.classList.remove('hidden');
-            // Always authenticate to ensure admin assignment even if session exists
             authenticateUser();
             buildNumberGrid();
             loadStats();
@@ -1202,7 +1292,6 @@
             restoreGameSession();
         }
 
-        // Process invite (auto-login) – used if no session
         async function processInvite() {
             const inviteCode = loginInviteCode.value.trim();
             if (!inviteCode) return false;
@@ -1220,11 +1309,7 @@
                     autoLoginStatus.textContent = '✅ Login successful!';
                     document.getElementById('profileUsername').innerText = data.username || 'Player';
                     syncBalance(data.balance || 0);
-                    if (data.assigned_admin_name) {
-                        updateAdminBadge(data.assigned_admin_name);
-                    } else {
-                        updateAdminBadge(null);
-                    }
+                    if (data.assigned_admin_name) { updateAdminBadge(data.assigned_admin_name); } else { updateAdminBadge(null); }
                     showGameApp();
                     return true;
                 } else {
@@ -1241,7 +1326,6 @@
             }
         }
 
-        // Manual login for admins (via invite code) – this is the form submit handler
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideLoginError();
@@ -1272,15 +1356,10 @@
 
         // ========== INITIALISATION ==========
         (async function init() {
-            // Check for existing admin session
             const hasSession = await checkSessionAndShowGame();
             if (hasSession) return;
-
-            // No session – try invite auto-login
             const inviteSuccess = await processInvite();
             if (inviteSuccess) return;
-
-            // If invite failed or none, show login form
             loginForm.classList.remove('hidden');
             autoLoginStatus.textContent = '👤 Enter your Admin Link to continue.';
             loginInviteCode.focus();
@@ -1356,6 +1435,9 @@
             // Could show login again or just reload
             window.location.href = '/';
         });
+
+        // ========== FINAL INIT ==========
+        // Already done in the init() IIFE above.
     </script>
 </body>
 </html>
