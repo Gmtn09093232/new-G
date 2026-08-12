@@ -2133,11 +2133,6 @@ app.post('/admin/process-deposit', async (req, res) => {
         adminName: admin.name
       });
 
-      if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
-        user.first_deposit_amount = reqData.amount;
-        await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
-      }
-
       const playerSocket = await getSocketByUserId(reqData.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', user.balance);
