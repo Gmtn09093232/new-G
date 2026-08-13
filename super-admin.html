@@ -1,1041 +1,1772 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Super Admin</title>
-  <style>
-    /* ---------- RESET & BASE ---------- */
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      background: #f0f2f5;
-      min-height: 100vh;
-      padding-bottom: 80px;
-      font-size: 16px;
-    }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Super Admin · Dashboard</title>
+    <style>
+        /* ─── RESET ─── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    /* ---------- HEADER ---------- */
-    .header {
-      background: linear-gradient(135deg, #dc2626 0%, #7c3aed 100%);
-      color: white;
-      padding: 12px 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .header-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .header-left h1 { font-size: 18px; font-weight: 700; }
-    .header-left .subtitle { font-size: 11px; opacity: 0.85; margin-top: 1px; }
-    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .header-right .admin-info { font-size: 11px; opacity: 0.9; }
-    .header-right .admin-info span { background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 20px; font-size: 10px; white-space: nowrap; }
-    .logout-btn {
-      background: #ef4444; color: white; border: none; padding: 6px 14px; border-radius: 40px;
-      cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s;
-      min-height: 44px; min-width: 60px; flex-shrink: 0;
-      touch-action: manipulation;
-    }
-    .logout-btn:active { transform: scale(0.94); background: #dc2626; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f4f6fb;
+            min-height: 100vh;
+            padding-bottom: 80px;
+            font-size: 16px;
+            color: #0b1120;
+            -webkit-font-smoothing: antialiased;
+        }
 
-    /* ---------- CONTAINER ---------- */
-    .container { max-width: 1200px; margin: 0 auto; padding: 12px 12px 20px; }
+        /* ─── SCROLLBAR ─── */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 20px;
+        }
 
-    /* ---------- FILTER BAR ---------- */
-    .filter-bar {
-      display: flex; flex-direction: column; gap: 12px;
-      background: white; padding: 14px 16px; border-radius: 12px;
-      margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .filter-bar .row {
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    }
-    .filter-bar label {
-      font-size: 14px; font-weight: 500; color: #334155;
-      display: flex; align-items: center; gap: 6px; flex: 1 1 140px;
-    }
-    .filter-bar label input,
-    .filter-bar label select {
-      padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px;
-      font-size: 14px; background: white; width: 100%;
-      min-height: 48px;
-    }
-    .filter-bar .btn-group {
-      display: flex; gap: 10px; flex-wrap: wrap;
-    }
-    .filter-bar .btn {
-      padding: 10px 20px; border-radius: 8px; border: none;
-      font-weight: 600; font-size: 14px; cursor: pointer;
-      touch-action: manipulation;
-      min-height: 48px;
-      flex: 1 1 100px;
-    }
-    .btn-primary { background: #7c3aed; color: white; }
-    .btn-primary:active { background: #6d28d9; }
-    .btn-outline { background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed; }
-    .btn-outline:active { background: #7c3aed; color: white; }
+        /* ─── HEADER ─── */
+        .header {
+            background: linear-gradient(145deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%);
+            color: #fff;
+            padding: 16px 20px;
+            box-shadow: 0 8px 32px rgba(79, 70, 229, 0.30);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(2px);
+        }
+        .header-content {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-left .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+        }
+        .header-left h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+        .header-left .subtitle {
+            font-size: 11px;
+            opacity: 0.80;
+            font-weight: 400;
+            margin-top: 2px;
+            letter-spacing: 0.2px;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-right .admin-badge {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(4px);
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.2px;
+        }
+        .header-right .admin-badge span {
+            opacity: 0.75;
+        }
+        .refresh-btn-header {
+            background: rgba(255, 255, 255, 0.13);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+            backdrop-filter: blur(4px);
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        .refresh-btn-header:active {
+            transform: scale(0.94);
+            background: rgba(255, 255, 255, 0.25);
+        }
+        .refresh-btn-header .label {
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+        @media (max-width: 480px) {
+            .refresh-btn-header .label {
+                display: none;
+            }
+            .header-left h1 {
+                font-size: 17px;
+            }
+            .header-left .logo-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 16px;
+            }
+            .header-right .admin-badge {
+                font-size: 10px;
+                padding: 4px 12px;
+            }
+        }
 
-    /* ---------- STATS GRID ---------- */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .stat-card {
-      background: white; padding: 14px 10px; border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      text-align: center;
-      min-height: 80px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .stat-card .label { font-size: 10px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-    .stat-card .value { font-size: 20px; font-weight: 700; margin-top: 2px; line-height: 1.2; }
-    .stat-card .value.green { color: #10b981; }
-    .stat-card .value.blue { color: #3b82f6; }
-    .stat-card .value.orange { color: #f59e0b; }
-    .stat-card .value.red { color: #ef4444; }
-    .stat-card .value.purple { color: #8b5cf6; }
+        /* ─── CONTAINER ─── */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 16px 16px 20px;
+        }
 
-    /* ---------- TABS ---------- */
-    .tabs {
-      display: flex; gap: 4px; margin-bottom: 14px;
-      background: white; padding: 4px 6px; border-radius: 12px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      flex-wrap: nowrap;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      padding: 10px 16px; border: none; background: transparent;
-      border-radius: 8px; cursor: pointer;
-      font-weight: 600; font-size: 14px; color: #666;
-      transition: 0.15s; white-space: nowrap; flex-shrink: 0;
-      min-height: 48px; display: flex; align-items: center; gap: 6px;
-      touch-action: manipulation;
-    }
-    .tab-btn:active { transform: scale(0.94); }
-    .tab-btn.active { background: #7c3aed; color: white; box-shadow: 0 2px 8px rgba(124,58,237,0.3); }
-    .tab-btn .badge {
-      display: inline-block; background: #ef4444; color: white;
-      font-size: 11px; padding: 0 8px; border-radius: 12px;
-      min-width: 20px; text-align: center; line-height: 18px;
-    }
-    .tab-btn.active .badge { background: rgba(255,255,255,0.3); color: white; }
+        /* ─── FILTER BAR ─── */
+        .filter-bar {
+            background: #fff;
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(226, 232, 240, 0.50);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .filter-bar .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        .filter-bar .filter-group {
+            flex: 1 1 160px;
+            min-width: 140px;
+        }
+        .filter-bar .filter-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 4px;
+        }
+        .filter-bar .filter-group input,
+        .filter-bar .filter-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #fafcff;
+            transition: 0.2s;
+            min-height: 44px;
+            color: #0b1120;
+            font-weight: 500;
+            outline: none;
+        }
+        .filter-bar .filter-group input:focus,
+        .filter-bar .filter-group select:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
+            background: #fff;
+        }
+        .filter-bar .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            padding: 10px 22px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            touch-action: manipulation;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: 0.2s;
+            letter-spacing: 0.2px;
+        }
+        .btn:active {
+            transform: scale(0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(145deg, #7c3aed, #6d28d9);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25);
+        }
+        .btn-primary:active {
+            box-shadow: 0 1px 6px rgba(124, 58, 237, 0.15);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1.5px solid #e2e8f0;
+            color: #475569;
+        }
+        .btn-outline:active {
+            background: #f1f5f9;
+        }
+        .btn-success {
+            background: #10b981;
+            color: #fff;
+        }
+        .btn-success:active {
+            background: #059669;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        .btn-danger:active {
+            background: #dc2626;
+        }
+        .btn-warning {
+            background: #f59e0b;
+            color: #fff;
+        }
+        .btn-warning:active {
+            background: #d97706;
+        }
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 13px;
+            min-height: 36px;
+            border-radius: 8px;
+        }
+        .btn-ghost {
+            background: transparent;
+            color: #7c3aed;
+            border: 1.5px solid #7c3aed;
+        }
+        .btn-ghost:active {
+            background: #7c3aed;
+            color: #fff;
+        }
 
-    /* ---------- TAB CONTENT ---------- */
-    .tab-content {
-      background: white; border-radius: 12px; padding: 14px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-height: 280px;
-    }
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; animation: fadeIn 0.25s ease; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .tab-pane h2 { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 12px; }
+        /* ─── STATS GRID ─── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 18px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(226, 232, 240, 0.40);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            transition: 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .stat-card:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            border-color: #e2e8f0;
+        }
+        .stat-card .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .stat-card .stat-icon.blue {
+            background: #eff6ff;
+            color: #3b82f6;
+        }
+        .stat-card .stat-icon.green {
+            background: #ecfdf5;
+            color: #10b981;
+        }
+        .stat-card .stat-icon.orange {
+            background: #fffbeb;
+            color: #f59e0b;
+        }
+        .stat-card .stat-icon.purple {
+            background: #f5f3ff;
+            color: #8b5cf6;
+        }
+        .stat-card .stat-icon.red {
+            background: #fef2f2;
+            color: #ef4444;
+        }
+        .stat-card .stat-icon.indigo {
+            background: #eef2ff;
+            color: #6366f1;
+        }
+        .stat-card .stat-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .stat-card .stat-info .label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .stat-card .stat-info .value {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0b1120;
+            line-height: 1.3;
+            margin-top: 1px;
+            letter-spacing: -0.3px;
+        }
+        .stat-card .stat-info .value .currency {
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-left: 2px;
+        }
 
-    /* ---------- TABLES ---------- */
-    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
-    table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; }
-    table th {
-      background: #f8fafc; text-align: left; padding: 12px 10px;
-      font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0;
-      font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px;
-      white-space: nowrap;
-    }
-    table td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: 14px; }
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            .stat-card {
+                padding: 14px 12px;
+            }
+            .stat-card .stat-info .value {
+                font-size: 18px;
+            }
+            .stat-card .stat-icon {
+                width: 38px;
+                height: 38px;
+                font-size: 16px;
+            }
+        }
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .stat-card {
+                padding: 12px 10px;
+                gap: 10px;
+            }
+            .stat-card .stat-info .value {
+                font-size: 16px;
+            }
+            .stat-card .stat-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 14px;
+            }
+            .stat-card .stat-info .label {
+                font-size: 9px;
+            }
+        }
+        @media (min-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(6, 1fr);
+            }
+        }
 
-    /* ---------- BADGES ---------- */
-    .status-badge {
-      display: inline-block; padding: 4px 12px; border-radius: 20px;
-      font-size: 12px; font-weight: 500; white-space: nowrap;
-    }
-    .status-badge.pending { background: #fef3c7; color: #92400e; }
-    .status-badge.approved { background: #d1fae5; color: #065f46; }
-    .status-badge.rejected { background: #fee2e2; color: #991b1b; }
-    .status-badge.active { background: #d1fae5; color: #065f46; }
-    .status-badge.inactive { background: #fee2e2; color: #991b1b; }
+        /* ─── TABS ─── */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background: #fff;
+            padding: 4px;
+            border-radius: 14px;
+            border: 1px solid rgba(226, 232, 240, 0.40);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            flex-wrap: nowrap;
+        }
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+        .tab-btn {
+            padding: 10px 18px;
+            border: none;
+            background: transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: #64748b;
+            transition: 0.2s;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            touch-action: manipulation;
+        }
+        .tab-btn:active {
+            transform: scale(0.95);
+        }
+        .tab-btn.active {
+            background: linear-gradient(145deg, #7c3aed, #6d28d9);
+            color: #fff;
+            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25);
+        }
+        .tab-btn .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ef4444;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 0 8px;
+            border-radius: 20px;
+            min-width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+        }
+        .tab-btn.active .badge {
+            background: rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }
 
-    /* ---------- BUTTONS ---------- */
-    .btn {
-      padding: 8px 14px; border: none; border-radius: 8px;
-      font-size: 14px; font-weight: 600; cursor: pointer;
-      transition: 0.15s; min-height: 44px;
-      min-width: 48px; display: inline-flex; align-items: center;
-      justify-content: center; gap: 6px; touch-action: manipulation;
-    }
-    .btn:active { transform: scale(0.94); }
-    .btn-sm { padding: 6px 12px; font-size: 13px; min-height: 36px; min-width: 40px; }
-    .btn-success { background: #10b981; color: white; }
-    .btn-success:active { background: #059669; }
-    .btn-danger { background: #ef4444; color: white; }
-    .btn-danger:active { background: #dc2626; }
-    .btn-primary { background: #7c3aed; color: white; }
-    .btn-primary:active { background: #6d28d9; }
-    .btn-warning { background: #f59e0b; color: white; }
-    .btn-warning:active { background: #d97706; }
-    .btn-outline { background: transparent; border: 1.5px solid #7c3aed; color: #7c3aed; }
-    .btn-outline:active { background: #7c3aed; color: white; }
-    .action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+        /* ─── TAB CONTENT ─── */
+        .tab-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(226, 232, 240, 0.40);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            min-height: 280px;
+        }
+        .tab-pane {
+            display: none;
+            animation: fadeSlide 0.30s ease;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        @keyframes fadeSlide {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .tab-pane h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0b1120;
+            margin-bottom: 16px;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tab-pane h2 .sub {
+            font-size: 13px;
+            font-weight: 400;
+            color: #94a3b8;
+        }
 
-    /* ---------- ADMIN CARD ---------- */
-    .admin-card {
-      background: #f8fafc; border-radius: 12px; padding: 16px;
-      margin-bottom: 12px; border: 1px solid #e2e8f0; transition: 0.15s;
-    }
-    .admin-card:active { transform: scale(0.99); }
-    .admin-card .admin-header {
-      display: flex; justify-content: space-between; align-items: center;
-      flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
-    }
-    .admin-card .admin-name { font-weight: 600; font-size: 16px; color: #1e293b; }
-    .admin-card .admin-phone { font-size: 14px; color: #64748b; }
-    .admin-card .admin-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px; margin: 8px 0; font-size: 14px;
-    }
-    .admin-card .admin-stats div {
-      background: white; padding: 8px 10px; border-radius: 8px;
-      text-align: center; border: 1px solid #e2e8f0;
-    }
-    .admin-card .admin-stats strong { display: block; font-size: 18px; color: #1e293b; }
-    .admin-card .admin-actions {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
-    }
-    .admin-card .admin-actions .btn { flex: 1 1 80px; justify-content: center; }
+        /* ─── TABLES ─── */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
+            padding: 0 4px;
+            border-radius: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 600px;
+        }
+        table th {
+            background: #f8fafc;
+            text-align: left;
+            padding: 12px 14px;
+            font-weight: 600;
+            color: #475569;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+        }
+        table td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+            font-size: 14px;
+            color: #1e293b;
+        }
+        table tbody tr:hover {
+            background: #fafcff;
+        }
+        table tbody tr:last-child td {
+            border-bottom: none;
+        }
 
-    /* ============================================================ */
-    /*                MODAL – ATTRACTIVE REDESIGN                    */
-    /* ============================================================ */
-    .admin-detail-modal .modal-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
-      z-index: 2000; display: none; align-items: center; justify-content: center;
-      padding: 16px;
-    }
-    .admin-detail-modal .modal-overlay.active { display: flex; }
-    .admin-detail-modal .modal-content {
-      background: white; border-radius: 24px; padding: 24px;
-      max-width: 720px; width: 100%; max-height: 90vh; overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .modal-content .modal-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9;
-    }
-    .modal-content .modal-header h2 { font-size: 22px; font-weight: 700; color: #1e293b; }
-    .modal-content .modal-close {
-      background: none; border: none; font-size: 28px; cursor: pointer;
-      padding: 4px 8px; color: #94a3b8; transition: 0.15s;
-    }
-    .modal-content .modal-close:active { transform: scale(0.9); }
+        /* ─── BADGES ─── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 12px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            gap: 4px;
+            letter-spacing: 0.2px;
+        }
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .status-badge.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .status-badge.completed {
+            background: #dbeafe;
+            color: #1e40af;
+        }
 
-    /* Admin info row */
-    .admin-info-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
-      background: #f8fafc; padding: 14px 16px; border-radius: 12px;
-      margin-bottom: 16px;
-    }
-    .admin-info-grid .item { display: flex; justify-content: space-between; font-size: 14px; }
-    .admin-info-grid .item .label { color: #64748b; font-weight: 500; }
-    .admin-info-grid .item .value { font-weight: 600; color: #1e293b; }
+        /* ─── ADMIN CARDS ─── */
+        .admin-card {
+            background: #fafcff;
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin-bottom: 14px;
+            border: 1px solid #eef2f6;
+            transition: 0.2s;
+        }
+        .admin-card:hover {
+            border-color: #dbe4f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+        }
+        .admin-card .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .admin-card .admin-name {
+            font-weight: 700;
+            font-size: 16px;
+            color: #0b1120;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .admin-card .admin-name .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #7c3aed, #a855f7);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .admin-card .admin-phone {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .admin-card .admin-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 13px;
+            color: #64748b;
+            margin: 6px 0 10px;
+        }
+        .admin-card .admin-meta span {
+            background: #f1f5f9;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .admin-card .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 10px 0 12px;
+        }
+        .admin-card .admin-stats .stat-item {
+            background: #fff;
+            padding: 8px 10px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #eef2f6;
+        }
+        .admin-card .admin-stats .stat-item strong {
+            display: block;
+            font-size: 16px;
+            font-weight: 700;
+            color: #0b1120;
+        }
+        .admin-card .admin-stats .stat-item .slabel {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-weight: 600;
+        }
+        .admin-card .admin-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .admin-card .admin-actions .btn {
+            flex: 0 1 auto;
+            min-width: 60px;
+        }
 
-    /* Section cards */
-    .section-card {
-      background: #f8fafc; border-radius: 12px; padding: 14px 16px;
-      margin-bottom: 14px; border-left: 4px solid #7c3aed;
-    }
-    .section-card .section-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 8px;
-    }
-    .section-card .section-header h4 {
-      font-size: 15px; font-weight: 600; color: #1e293b;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .section-card .section-header .total {
-      font-size: 14px; font-weight: 700; color: #7c3aed;
-      background: white; padding: 2px 12px; border-radius: 20px;
-    }
-    .section-card .section-body {
-      font-size: 13px; max-height: 180px; overflow-y: auto;
-    }
-    .section-card .section-body .row-item {
-      display: flex; justify-content: space-between; padding: 6px 0;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .section-card .section-body .row-item:last-child { border-bottom: none; }
-    .section-card .section-body .row-item .left { color: #334155; }
-    .section-card .section-body .row-item .right { font-weight: 500; color: #0f172a; }
+        @media (max-width: 768px) {
+            .admin-card .admin-stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .admin-card {
+                padding: 14px 16px;
+            }
+        }
+        @media (max-width: 480px) {
+            .admin-card .admin-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .admin-card .admin-stats .stat-item strong {
+                font-size: 14px;
+            }
+            .admin-card .admin-actions .btn {
+                font-size: 12px;
+                padding: 6px 12px;
+                min-height: 36px;
+            }
+        }
 
-    /* Different border colors for different sections */
-    .section-card.deposits { border-left-color: #10b981; }
-    .section-card.withdrawals { border-left-color: #f59e0b; }
-    .section-card.admin-withdrawals { border-left-color: #ef4444; }
-    .section-card.earnings { border-left-color: #8b5cf6; }
-    .section-card.adjustments { border-left-color: #3b82f6; }
+        /* ─── LOADING / EMPTY ─── */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            gap: 12px;
+        }
+        .loading-state .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #7c3aed;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            color: #94a3b8;
+            gap: 8px;
+        }
+        .empty-state .icon {
+            font-size: 42px;
+            opacity: 0.5;
+        }
 
-    /* Action buttons */
-    .modal-actions {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
-      padding-top: 16px; border-top: 2px solid #f1f5f9;
-    }
-    .modal-actions .btn { flex: 1; min-width: 80px; justify-content: center; }
+        /* ─── MODAL ─── */
+        .admin-detail-modal .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .admin-detail-modal .modal-overlay.active {
+            display: flex;
+        }
+        .admin-detail-modal .modal-content {
+            background: #fff;
+            border-radius: 24px;
+            padding: 28px;
+            max-width: 740px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+            animation: modalIn 0.25s ease;
+        }
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.96) translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        .modal-content .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 2px solid #f1f5f9;
+        }
+        .modal-content .modal-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0b1120;
+            letter-spacing: -0.3px;
+        }
+        .modal-content .modal-close {
+            background: #f1f5f9;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            color: #64748b;
+            transition: 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content .modal-close:active {
+            transform: scale(0.90);
+            background: #e2e8f0;
+        }
 
-    /* ---------- RESPONSIVE ---------- */
-    @media (max-width: 640px) {
-      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-      .stat-card { padding: 12px 8px; min-height: 70px; }
-      .stat-card .value { font-size: 18px; }
-      .stat-card .label { font-size: 9px; }
+        .admin-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 20px;
+            background: #f8fafc;
+            padding: 16px 18px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            border: 1px solid #eef2f6;
+        }
+        .admin-info-grid .item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            padding: 4px 0;
+        }
+        .admin-info-grid .item .label {
+            color: #64748b;
+            font-weight: 500;
+        }
+        .admin-info-grid .item .value {
+            font-weight: 600;
+            color: #0b1120;
+        }
 
-      .filter-bar .row { flex-direction: column; align-items: stretch; }
-      .filter-bar label { flex: 1 1 auto; }
-      .filter-bar .btn { flex: 1 1 auto; }
+        .section-card {
+            background: #fafcff;
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 14px;
+            border-left: 4px solid #7c3aed;
+            border: 1px solid #eef2f6;
+            border-left-width: 4px;
+        }
+        .section-card.deposits {
+            border-left-color: #10b981;
+        }
+        .section-card.withdrawals {
+            border-left-color: #f59e0b;
+        }
+        .section-card.admin-withdrawals {
+            border-left-color: #ef4444;
+        }
+        .section-card.earnings {
+            border-left-color: #8b5cf6;
+        }
+        .section-card.adjustments {
+            border-left-color: #3b82f6;
+        }
+        .section-card .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .section-card .section-header h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0b1120;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-card .section-header .total {
+            font-size: 13px;
+            font-weight: 700;
+            color: #7c3aed;
+            background: #f1f5f9;
+            padding: 2px 14px;
+            border-radius: 40px;
+        }
+        .section-card .section-body {
+            font-size: 13px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+        .section-card .section-body .row-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f1f5f9;
+            gap: 12px;
+        }
+        .section-card .section-body .row-item:last-child {
+            border-bottom: none;
+        }
+        .section-card .section-body .row-item .left {
+            color: #475569;
+            font-size: 13px;
+        }
+        .section-card .section-body .row-item .right {
+            font-weight: 500;
+            color: #0b1120;
+            text-align: right;
+            flex-shrink: 0;
+        }
 
-      .tab-btn { font-size: 13px; padding: 8px 12px; min-height: 40px; }
-      .tab-content { padding: 12px; }
-      table { font-size: 13px; min-width: 500px; }
-      table th, table td { padding: 10px 8px; }
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 2px solid #f1f5f9;
+        }
+        .modal-actions .btn {
+            flex: 1;
+            min-width: 70px;
+            justify-content: center;
+        }
 
-      .admin-card .admin-stats { grid-template-columns: repeat(2, 1fr); }
-      .admin-card .admin-actions .btn { flex: 1 1 60px; font-size: 12px; padding: 6px 10px; min-height: 36px; }
+        @media (max-width: 640px) {
+            .admin-detail-modal .modal-content {
+                padding: 18px;
+                border-radius: 18px;
+            }
+            .admin-info-grid {
+                grid-template-columns: 1fr;
+                gap: 2px;
+                padding: 12px 14px;
+            }
+            .admin-info-grid .item {
+                font-size: 13px;
+            }
+            .section-card .section-body {
+                max-height: 120px;
+            }
+            .modal-actions .btn {
+                flex: 1 1 100%;
+            }
+            .modal-content .modal-header h2 {
+                font-size: 18px;
+            }
+        }
 
-      .refresh-btn { width: 50px; height: 50px; font-size: 18px; bottom: 16px; right: 16px; }
-      .toast { font-size: 14px; padding: 12px 18px; bottom: 16px; max-width: 96%; }
+        /* ─── TOAST ─── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #0b1120;
+            color: #fff;
+            padding: 14px 24px;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.20);
+            z-index: 3000;
+            opacity: 0;
+            transition: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+            pointer-events: none;
+            max-width: 92%;
+            text-align: center;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast.success {
+            background: #065f46;
+        }
+        .toast.error {
+            background: #991b1b;
+        }
+        .toast.info {
+            background: #1e3a5f;
+        }
 
-      .modal-content { padding: 16px; border-radius: 20px; }
-      .admin-info-grid { grid-template-columns: 1fr; gap: 4px; }
-      .section-card .section-body { max-height: 140px; }
-      .modal-actions .btn { flex: 1 1 100%; }
-    }
+        /* ─── RESPONSIVE TWEAKS ─── */
+        @media (max-width: 640px) {
+            .filter-bar .row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .filter-bar .filter-group {
+                flex: 1 1 auto;
+                min-width: unset;
+            }
+            .filter-bar .btn-group {
+                flex-wrap: wrap;
+            }
+            .filter-bar .btn-group .btn {
+                flex: 1 1 auto;
+            }
+            .tab-btn {
+                font-size: 13px;
+                padding: 8px 14px;
+                min-height: 38px;
+            }
+            .tab-content {
+                padding: 14px;
+            }
+            table {
+                font-size: 13px;
+                min-width: 460px;
+            }
+            table th,
+            table td {
+                padding: 10px 10px;
+            }
+            .header {
+                padding: 12px 16px;
+            }
+            .container {
+                padding: 12px 12px 16px;
+            }
+        }
 
-    @media (max-width: 480px) {
-      .stats-grid { grid-template-columns: 1fr 1fr; }
-      .stat-card .value { font-size: 16px; }
-      .header-left h1 { font-size: 16px; }
-      .header-right .admin-info span { font-size: 9px; padding: 2px 8px; }
-      .logout-btn { min-height: 38px; font-size: 11px; padding: 4px 10px; }
-      .admin-card .admin-stats { grid-template-columns: 1fr 1fr; }
-    }
-
-    @media (min-width: 768px) {
-      .filter-bar { flex-direction: row; flex-wrap: wrap; align-items: center; }
-      .filter-bar .row { flex: 1; }
-      .stats-grid { grid-template-columns: repeat(3, 1fr); }
-      .stat-card { padding: 18px 20px; min-height: 100px; }
-      .stat-card .value { font-size: 28px; }
-      .admin-card .admin-stats { grid-template-columns: repeat(5, 1fr); }
-    }
-  </style>
+        @media (min-width: 768px) {
+            .filter-bar {
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            .filter-bar .row {
+                flex: 1;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <header class="header">
-    <div class="header-content">
-      <div class="header-left">
-        <h1>👑 Super Admin</h1>
-        <div class="subtitle">Manage all admins & platform</div>
-      </div>
-      <div class="header-right">
-        <div class="admin-info" id="adminInfo">
-          <span>🔑 Secret Access</span>
-        </div>
-        <button class="logout-btn" onclick="refreshAll()">🔄</button>
-      </div>
-    </div>
-  </header>
-
-  <div class="container">
-
-    <!-- Filter Bar -->
-    <div class="filter-bar" id="filterBar">
-      <div class="row">
-        <label>From: <input type="date" id="filterFrom" /></label>
-        <label>To: <input type="date" id="filterTo" /></label>
-        <label>Admin:
-          <select id="filterAdmin"><option value="all">All Admins</option></select>
-        </label>
-      </div>
-      <div class="btn-group">
-        <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
-        <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
-      </div>
-    </div>
-
-    <!-- Stats Grid -->
-    <div class="stats-grid" id="statsGrid">
-      <div class="stat-card"><div class="label">👥 Users</div><div class="value blue" id="statUsers">-</div></div>
-      <div class="stat-card"><div class="label">👤 Admins</div><div class="value green" id="statAdmins">-</div></div>
-      <div class="stat-card"><div class="label">💰 Deposits</div><div class="value green" id="statDeposits">-</div></div>
-      <div class="stat-card"><div class="label">🏦 Withdrawals</div><div class="value orange" id="statWithdrawals">-</div></div>
-      <div class="stat-card"><div class="label">🏠 House Profit</div><div class="value purple" id="statHouseProfit">-</div></div>
-      <div class="stat-card"><div class="label">⏳ Pending Admin With.</div><div class="value red" id="statPendingWithdrawals">-</div></div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs" id="tabContainer">
-      <button class="tab-btn active" data-tab="admins" onclick="switchTab('admins')">👤 Admins <span class="badge" id="adminBadge">0</span></button>
-      <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">💳 Withdrawals <span class="badge" id="withdrawalBadge">0</span></button>
-      <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">📊 Platform</button>
-    </div>
-
-    <!-- Tab Content -->
-    <div class="tab-content">
-
-      <!-- ADMINS -->
-      <div class="tab-pane active" id="tab-admins">
-        <h2>👤 All Admins</h2>
-        <div id="adminsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading admins...</p></div></div>
-      </div>
-
-      <!-- WITHDRAWALS -->
-      <div class="tab-pane" id="tab-withdrawals">
-        <h2>💳 Admin Withdrawal Requests</h2>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('pending')">⏳ Pending</button>
-          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('approved')">✅ Approved</button>
-          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('rejected')">❌ Rejected</button>
-          <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('all')">📋 All</button>
-        </div>
-        <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading withdrawals...</p></div></div>
-      </div>
-
-      <!-- PLATFORM -->
-      <div class="tab-pane" id="tab-platform">
-        <h2>📊 Platform Overview</h2>
-        <div id="platformContent"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;font-size:14px;">Loading platform data...</p></div></div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Refresh Button -->
-  <button class="refresh-btn" onclick="refreshAll()" title="Refresh">🔄</button>
-
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-
-  <!-- Admin Detail Modal -->
-  <div class="admin-detail-modal" id="adminDetailModal">
-    <div class="modal-overlay" id="modalOverlay">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 id="modalTitle">Admin Details</h2>
-          <button class="modal-close" onclick="closeModal()">✕</button>
-        </div>
-        <div id="modalBody"><div class="loading"><div class="spinner"></div><p style="margin-top:8px;">Loading...</p></div></div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ============================================================
-    //  SUPER ADMIN – Secret‑based with date & admin filters
-    // ============================================================
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const SECRET = urlParams.get('secret') || '';
-
-    if (!SECRET) {
-      document.body.innerHTML = `
-        <div class="denied">
-          <div class="lock">🔑</div>
-          <h1>Secret Required</h1>
-          <p>Please add <code>?secret=YOUR_SECRET</code> to the URL.</p>
-          <p style="font-size:14px;color:#94a3b8;margin-top:4px;">Default secret is <code>01207</code>.</p>
-        </div>
-      `;
-      throw new Error('No secret provided');
-    }
-
-    function apiUrl(path, extraParams = {}) {
-      const params = new URLSearchParams({ secret: SECRET, ...extraParams });
-      for (const [key, value] of params) {
-        if (value === '' || value === 'all' || value === null) params.delete(key);
-      }
-      const query = params.toString();
-      return query ? `${path}?${query}` : path;
-    }
-
-    let currentTab = 'admins';
-    let currentWithdrawFilter = 'pending';
-    let refreshInterval = null;
-    let isRefreshing = false;
-    let filterFrom = '';
-    let filterTo = '';
-    let filterAdmin = 'all';
-
-    function showToast(message, type = 'info') {
-      const toast = document.getElementById('toast');
-      toast.textContent = message;
-      toast.className = `toast ${type}`;
-      void toast.offsetWidth;
-      toast.classList.add('show');
-      clearTimeout(toast._timeout);
-      toast._timeout = setTimeout(() => toast.classList.remove('show'), 3500);
-    }
-
-    function switchTab(tab) {
-      currentTab = tab;
-      document.querySelectorAll('.tab-btn').forEach(btn =>
-        btn.classList.toggle('active', btn.dataset.tab === tab)
-      );
-      document.querySelectorAll('.tab-pane').forEach(pane =>
-        pane.classList.toggle('active', pane.id === `tab-${tab}`)
-      );
-      if (tab === 'admins') loadAdmins();
-      else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
-      else if (tab === 'platform') loadPlatformStats();
-
-      const container = document.getElementById('tabContainer');
-      const activeBtn = container.querySelector('.tab-btn.active');
-      if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
-
-    async function loadPlatformStats() {
-      const container = document.getElementById('platformContent');
-      try {
-        const params = {};
-        if (filterFrom) params.from = filterFrom;
-        if (filterTo) params.to = filterTo;
-        if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
-
-        const url = apiUrl('/super-admin/platform-stats', params);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to load platform stats');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-
-        document.getElementById('statUsers').textContent = data.stats.totalUsers;
-        document.getElementById('statAdmins').textContent = data.stats.totalAdmins;
-        document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`;
-        document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
-        document.getElementById('statHouseProfit').textContent = `${data.stats.totalHouseProfit.toFixed(0)} ETB`;
-        document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
-
-        container.innerHTML = `
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">👥 Total Users</div>
-              <div style="font-size:24px;font-weight:700;color:#1e293b;">${data.stats.totalUsers}</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">👤 Active Admins</div>
-              <div style="font-size:24px;font-weight:700;color:#1e293b;">${data.stats.totalAdmins}</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">💰 Total Deposits</div>
-              <div style="font-size:24px;font-weight:700;color:#10b981;">${data.stats.totalDeposits.toFixed(0)} ETB</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">🏦 Total Withdrawals</div>
-              <div style="font-size:24px;font-weight:700;color:#f59e0b;">${data.stats.totalWithdrawals.toFixed(0)} ETB</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">🏠 House Profit</div>
-              <div style="font-size:24px;font-weight:700;color:#8b5cf6;">${data.stats.totalHouseProfit.toFixed(0)} ETB</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">💰 Admin Earnings Paid</div>
-              <div style="font-size:24px;font-weight:700;color:#3b82f6;">${data.stats.totalAdminEarnings.toFixed(0)} ETB</div>
-            </div>
-            <div style="background:#f8fafc;padding:14px;border-radius:10px;text-align:center;">
-              <div style="font-size:12px;color:#94a3b8;">⏳ Pending Admin With.</div>
-              <div style="font-size:24px;font-weight:700;color:#ef4444;">${data.stats.pendingWithdrawals}</div>
-            </div>
-          </div>
-        `;
-      } catch (err) {
-        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
-      }
-    }
-
-    // ---------- Reduce Deposit Balance ----------
-    async function reduceDepositBalance(adminId, currentBalance) {
-      const amountStr = prompt(`Enter amount to deduct from deposit balance (current balance: ${currentBalance.toFixed(0)} ETB):`, '');
-      if (amountStr === null) return;
-      const amount = parseFloat(amountStr);
-      if (isNaN(amount) || amount <= 0) {
-        showToast('❌ Please enter a valid positive amount.', 'error');
-        return;
-      }
-      if (amount > currentBalance) {
-        showToast(`❌ Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
-        return;
-      }
-      if (!confirm(`Are you sure you want to deduct ${amount.toFixed(0)} ETB from ${adminId}?`)) return;
-      try {
-        const url = apiUrl('/super-admin/adjust-deposit-balance');
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminId,
-            amount: -amount,
-            description: `Super admin deduction of ${amount.toFixed(0)} ETB`
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`✅ Balance reduced by ${amount.toFixed(0)} ETB. New balance: ${data.newBalance.toFixed(0)} ETB`, 'success');
-          refreshAll();
-        } else {
-          throw new Error(data.error || 'Failed to reduce balance');
-        }
-      } catch (err) {
-        showToast('❌ ' + err.message, 'error');
-      }
-    }
-
-    async function loadAdmins() {
-      const container = document.getElementById('adminsList');
-      try {
-        const url = apiUrl('/super-admin/admins');
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to load admins');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-
-        document.getElementById('adminBadge').textContent = data.admins.length;
-        populateAdminDropdown(data.admins);
-
-        if (data.admins.length === 0) {
-          container.innerHTML = `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
-          return;
-        }
-
-        container.innerHTML = data.admins.map(admin => {
-          const rawDeposits = admin.stats.totalDeposits || 0;
-          const balance = admin.stats.holdingBalance || 0; // adjusted
-          return `
-          <div class="admin-card">
-            <div class="admin-header">
-              <div>
-                <div class="admin-name">${escapeHtml(admin.name)}</div>
-                <div class="admin-phone">📱 ${admin.phone}</div>
-                <div style="font-size:12px;color:#94a3b8;margin-top:2px;">
-                  Code: <strong>${admin.invite_code || 'N/A'}</strong>
-                  ${admin.is_super_admin ? ' 👑 Super Admin' : ''}
+    <!-- ─── HEADER ─── -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo-icon">👑</div>
+                <div>
+                    <h1>Super Admin</h1>
+                    <div class="subtitle">Platform oversight &amp; admin management</div>
                 </div>
-              </div>
-              <div>
-                <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
-              </div>
             </div>
-            <div class="admin-stats">
-              <div><strong>${admin.stats.playerCount}</strong> Players</div>
-              <div><strong>${rawDeposits.toFixed(0)} ETB</strong> Deposits</div>
-              <div><strong>${balance.toFixed(0)} ETB</strong> Balance</div>
-              <div><strong>${admin.stats.totalEarned.toFixed(0)} ETB</strong> Earned</div>
-              <div><strong>${admin.stats.totalPendingEarnings.toFixed(0)} ETB</strong> Pending</div>
+            <div class="header-right">
+                <div class="admin-badge">
+                    🔑 <span>Secret Access</span>
+                </div>
+                <button class="refresh-btn-header" onclick="refreshAll()">
+                    <span>🔄</span>
+                    <span class="label">Refresh</span>
+                </button>
             </div>
-            <div style="font-size:13px;color:#94a3b8;margin:4px 0;">
-              Commission: <strong>${(admin.commission_rate * 100)}%</strong> | 
-              Pending Withdrawals: <strong>${admin.stats.pendingWithdrawals}</strong>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- ─── FILTER BAR ─── -->
+        <div class="filter-bar" id="filterBar">
+            <div class="row">
+                <div class="filter-group">
+                    <label>From</label>
+                    <input type="date" id="filterFrom" />
+                </div>
+                <div class="filter-group">
+                    <label>To</label>
+                    <input type="date" id="filterTo" />
+                </div>
+                <div class="filter-group">
+                    <label>Admin</label>
+                    <select id="filterAdmin"><option value="all">All Admins</option></select>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
+                    <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+                </div>
             </div>
-            <div class="admin-actions">
-              <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})">📋 View</button>
-              <button class="btn btn-warning btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})">📊 Rate</button>
-              <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
-                ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
-              </button>
-              <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">💰 Reduce</button>
+        </div>
+
+        <!-- ─── STATS ─── -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon blue">👥</div>
+                <div class="stat-info"><div class="label">Users</div><div class="value" id="statUsers">-</div></div>
             </div>
-          </div>
-        `}).join('');
-
-      } catch (err) {
-        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
-      }
-    }
-
-    function populateAdminDropdown(admins) {
-      const select = document.getElementById('filterAdmin');
-      if (select.options.length > 1) return;
-      select.innerHTML = '<option value="all">All Admins</option>';
-      admins.forEach(admin => {
-        const opt = document.createElement('option');
-        opt.value = admin.id;
-        opt.textContent = admin.name;
-        select.appendChild(opt);
-      });
-    }
-
-    // ============================================================
-    //  UPDATED loadAdminDetail – now with totals and attractive cards
-    // ============================================================
-    async function loadAdminDetail(adminId) {
-      const body = document.getElementById('modalBody');
-      try {
-        const url = apiUrl(`/super-admin/admin/${adminId}`);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to load admin details');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
-
-        const a = data.admin;
-        const stats = data.stats;
-        document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
-
-        // Helper: format date
-        const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
-
-        // Compute totals
-        const totalDeposits = stats.deposits ? stats.deposits.reduce((s, d) => s + Number(d.amount), 0) : 0;
-        const totalWithdrawals = stats.withdrawals ? stats.withdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
-        const totalAdminWithdrawals = stats.adminWithdrawals ? stats.adminWithdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
-        const totalEarnings = stats.earnings ? stats.earnings.reduce((s, e) => s + Number(e.commission_amount), 0) : 0;
-
-        // Build sections
-        const depositsHtml = stats.deposits && stats.deposits.length > 0
-          ? stats.deposits.slice(0,10).map(d => `
-              <div class="row-item">
-                <span class="left">${escapeHtml(d.username)}</span>
-                <span class="right"><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span>
-              </div>
-            `).join('')
-          : '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No deposits</div>';
-
-        const withdrawalsHtml = stats.withdrawals && stats.withdrawals.length > 0
-          ? stats.withdrawals.slice(0,10).map(w => `
-              <div class="row-item">
-                <span class="left">${escapeHtml(w.username)} → ${escapeHtml(w.phone_number)}</span>
-                <span class="right"><strong>${w.amount} ETB</strong> <span class="status-badge ${w.status}">${w.status}</span></span>
-              </div>
-            `).join('')
-          : '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No withdrawals</div>';
-
-        const adminWithdrawalsHtml = stats.adminWithdrawals && stats.adminWithdrawals.length > 0
-          ? stats.adminWithdrawals.map(w => `
-              <div class="row-item">
-                <span class="left">${w.amount} ETB - ${w.withdrawal_type}</span>
-                <span class="right"><span class="status-badge ${w.status}">${w.status}</span></span>
-              </div>
-            `).join('')
-          : '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No pending withdrawals</div>';
-
-        const earningsHtml = stats.earnings && stats.earnings.length > 0
-          ? stats.earnings.slice(0,10).map(e => `
-              <div class="row-item">
-                <span class="left">${fmt(e.date)}</span>
-                <span class="right"><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span>
-              </div>
-            `).join('')
-          : '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No earnings</div>';
-
-        const adjustmentsHtml = stats.adjustments && stats.adjustments.length > 0
-          ? stats.adjustments.map(adj => `
-              <div class="row-item">
-                <span class="left">${fmt(adj.created_at)} - ${escapeHtml(adj.description || 'N/A')}</span>
-                <span class="right"><strong>${adj.amount > 0 ? '+' : ''}${adj.amount.toFixed(0)} ETB</strong></span>
-              </div>
-            `).join('')
-          : '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No adjustments</div>';
-
-        body.innerHTML = `
-          <!-- Admin info -->
-          <div class="admin-info-grid">
-            <div class="item"><span class="label">📱 Phone</span><span class="value">${a.phone}</span></div>
-            <div class="item"><span class="label">🔑 Invite Code</span><span class="value">${a.invite_code || 'N/A'}</span></div>
-            <div class="item"><span class="label">📊 Status</span><span class="value"><span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></span></div>
-            <div class="item"><span class="label">📈 Commission</span><span class="value">${(a.commission_rate * 100)}%</span></div>
-            <div class="item"><span class="label">👑 Super Admin</span><span class="value">${a.is_super_admin ? '✅ Yes' : '❌ No'}</span></div>
-            <div class="item"><span class="label">👥 Players</span><span class="value">${stats.players}</span></div>
-            <div class="item"><span class="label">💰 Deposits (raw)</span><span class="value">${(stats.totalDeposits || 0).toFixed(0)} ETB</span></div>
-            <div class="item"><span class="label">💰 Balance (adjusted)</span><span class="value"><strong>${(stats.holdingBalance || 0).toFixed(0)} ETB</strong></span></div>
-          </div>
-
-          <!-- Deposits -->
-          <div class="section-card deposits">
-            <div class="section-header">
-              <h4>📋 Recent Deposits</h4>
-              <span class="total">Total: ${totalDeposits.toFixed(0)} ETB</span>
+            <div class="stat-card">
+                <div class="stat-icon green">👤</div>
+                <div class="stat-info"><div class="label">Admins</div><div class="value" id="statAdmins">-</div></div>
             </div>
-            <div class="section-body">${depositsHtml}</div>
-          </div>
-
-          <!-- Withdrawals -->
-          <div class="section-card withdrawals">
-            <div class="section-header">
-              <h4>🏦 Recent Withdrawals</h4>
-              <span class="total">Total: ${totalWithdrawals.toFixed(0)} ETB</span>
+            <div class="stat-card">
+                <div class="stat-icon green">💰</div>
+                <div class="stat-info"><div class="label">Deposits</div><div class="value" id="statDeposits">-</div></div>
             </div>
-            <div class="section-body">${withdrawalsHtml}</div>
-          </div>
-
-          <!-- Admin Withdrawals -->
-          <div class="section-card admin-withdrawals">
-            <div class="section-header">
-              <h4>💳 Admin Withdrawal Requests</h4>
-              <span class="total">Total: ${totalAdminWithdrawals.toFixed(0)} ETB</span>
+            <div class="stat-card">
+                <div class="stat-icon orange">🏦</div>
+                <div class="stat-info"><div class="label">Withdrawals</div><div class="value" id="statWithdrawals">-</div></div>
             </div>
-            <div class="section-body">${adminWithdrawalsHtml}</div>
-          </div>
-
-          <!-- Earnings -->
-          <div class="section-card earnings">
-            <div class="section-header">
-              <h4>💰 Earnings History</h4>
-              <span class="total">Total: ${totalEarnings.toFixed(0)} ETB</span>
+            <div class="stat-card">
+                <div class="stat-icon purple">🏠</div>
+                <div class="stat-info"><div class="label">House Profit</div><div class="value" id="statHouseProfit">-</div></div>
             </div>
-            <div class="section-body">${earningsHtml}</div>
-          </div>
-
-          <!-- Adjustments -->
-          <div class="section-card adjustments">
-            <div class="section-header">
-              <h4>📊 Adjustment History</h4>
-              <span class="total">${stats.adjustments ? stats.adjustments.reduce((s, a) => s + Number(a.amount), 0).toFixed(0) : '0'} ETB</span>
+            <div class="stat-card">
+                <div class="stat-icon red">⏳</div>
+                <div class="stat-info"><div class="label">Pending Admin With.</div><div class="value" id="statPendingWithdrawals">-</div></div>
             </div>
-            <div class="section-body">${adjustmentsHtml}</div>
-          </div>
+        </div>
 
-          <!-- Actions -->
-          <div class="modal-actions">
-            <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">🔴 Deactivate</button>
-            <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">🟢 Activate</button>
-            <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">📊 Set Commission</button>
-            <button class="btn btn-outline" onclick="closeModal()">Close</button>
-          </div>
-        `;
+        <!-- ─── TABS ─── -->
+        <div class="tabs" id="tabContainer">
+            <button class="tab-btn active" data-tab="admins" onclick="switchTab('admins')">
+                👤 Admins <span class="badge" id="adminBadge">0</span>
+            </button>
+            <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">
+                💳 Withdrawals <span class="badge" id="withdrawalBadge">0</span>
+            </button>
+            <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
+                📊 Platform
+            </button>
+        </div>
 
-      } catch (err) {
-        body.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
-      }
-    }
+        <!-- ─── TAB CONTENT ─── -->
+        <div class="tab-content">
 
-    async function loadAdminWithdrawals(status = 'pending') {
-      currentWithdrawFilter = status;
-      const container = document.getElementById('withdrawalsList');
-      try {
-        const params = { status, limit: 100 };
-        if (filterFrom) params.from = filterFrom;
-        if (filterTo) params.to = filterTo;
-        if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+            <!-- ADMINS -->
+            <div class="tab-pane active" id="tab-admins">
+                <h2>👤 All Admins <span class="sub">— manage and monitor</span></h2>
+                <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
+            </div>
 
-        const url = apiUrl('/super-admin/admin-withdrawals', params);
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to load withdrawals');
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error);
+            <!-- WITHDRAWALS -->
+            <div class="tab-pane" id="tab-withdrawals">
+                <h2>💳 Admin Withdrawals <span class="sub">— requests from admins</span></h2>
+                <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('pending')">⏳ Pending</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('approved')">✅ Approved</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('rejected')">❌ Rejected</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('all')">📋 All</button>
+                </div>
+                <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
+            </div>
 
-        document.getElementById('withdrawalBadge').textContent = 
-          status === 'pending' ? data.requests.filter(r => r.status === 'pending').length : 0;
+            <!-- PLATFORM -->
+            <div class="tab-pane" id="tab-platform">
+                <h2>📊 Platform Overview <span class="sub">— key metrics</span></h2>
+                <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+            </div>
 
-        if (data.requests.length === 0) {
-          container.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
-          return;
+        </div>
+    </div>
+
+    <!-- ─── TOAST ─── -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ─── MODAL ─── -->
+    <div class="admin-detail-modal" id="adminDetailModal">
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Admin Details</h2>
+                    <button class="modal-close" onclick="closeModal()">✕</button>
+                </div>
+                <div id="modalBody"><div class="loading-state"><div class="spinner"></div><span>Loading…</span></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  SUPER ADMIN – Full functionality (preserved & enhanced)
+        // ============================================================
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const SECRET = urlParams.get('secret') || '';
+
+        if (!SECRET) {
+            document.body.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;background:#f4f6fb;font-family:system-ui;">
+                    <div style="font-size:64px;margin-bottom:16px;">🔑</div>
+                    <h1 style="font-size:24px;color:#0b1120;">Secret Required</h1>
+                    <p style="color:#64748b;max-width:380px;margin:8px auto;">Please add <code style="background:#e2e8f0;padding:2px 10px;border-radius:6px;">?secret=YOUR_SECRET</code> to the URL.</p>
+                    <p style="font-size:13px;color:#94a3b8;margin-top:4px;">Default secret is <code style="background:#e2e8f0;padding:2px 10px;border-radius:6px;">01207</code>.</p>
+                </div>
+            `;
+            throw new Error('No secret provided');
         }
 
-        const showActions = status === 'pending';
+        // ─── HELPERS ───
+        function apiUrl(path, extraParams = {}) {
+            const params = new URLSearchParams({ secret: SECRET, ...extraParams });
+            for (const [key, value] of Object.entries(params)) {
+                if (value === '' || value === 'all' || value === null || value === undefined) params.delete(key);
+            }
+            const query = params.toString();
+            return query ? `${path}?${query}` : path;
+        }
 
-        container.innerHTML = `
-          <div class="table-wrapper">
-            <table>
-              <thead><tr><th>Admin</th><th>Amount</th><th>Phone</th><th>Method</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead>
-              <tbody>${data.requests.map(req => `
-                <tr>
-                  <td><strong>${escapeHtml(req.admins?.name || 'Unknown')}</strong><br><small>${req.admins?.phone || ''}</small></td>
-                  <td><strong>${req.amount} ETB</strong></td>
-                  <td>${req.phone}</td>
-                  <td>${req.withdrawal_type}</td>
-                  <td><span class="status-badge ${req.status}">${req.status}</span></td>
-                  <td>${formatDate(req.created_at)}</td>
-                  ${showActions ? `
-                    <td>
-                      <div class="action-buttons">
-                        <button class="btn btn-success btn-sm" onclick="processAdminWithdrawal(${req.id},'approve')">✅</button>
-                        <button class="btn btn-danger btn-sm" onclick="processAdminWithdrawal(${req.id},'reject')">❌</button>
-                      </div>
-                    </td>
-                  ` : ''}
-                </tr>
-              `).join('')}</tbody>
-            </table>
-          </div>
-        `;
-      } catch (err) {
-        container.innerHTML = `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
-      }
-    }
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-    async function processAdminWithdrawal(requestId, action) {
-      if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
-      try {
-        const url = apiUrl('/super-admin/process-admin-withdrawal');
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId, action })
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const d = new Date(dateString);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch { return dateString; }
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        let currentTab = 'admins';
+        let currentWithdrawFilter = 'pending';
+        let refreshInterval = null;
+        let isRefreshing = false;
+        let filterFrom = '';
+        let filterTo = '';
+        let filterAdmin = 'all';
+
+        // ─── TOAST ───
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        // ─── TAB SWITCH ───
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(btn =>
+                btn.classList.toggle('active', btn.dataset.tab === tab)
+            );
+            document.querySelectorAll('.tab-pane').forEach(pane =>
+                pane.classList.toggle('active', pane.id === `tab-${tab}`)
+            );
+            if (tab === 'admins') loadAdmins();
+            else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
+            else if (tab === 'platform') loadPlatformStats();
+
+            const container = document.getElementById('tabContainer');
+            const activeBtn = container.querySelector('.tab-btn.active');
+            if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+
+        // ─── PLATFORM STATS ───
+        async function loadPlatformStats() {
+            const container = document.getElementById('platformContent');
+            try {
+                const params = {};
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/platform-stats', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load platform stats');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('statUsers').textContent = data.stats.totalUsers;
+                document.getElementById('statAdmins').textContent = data.stats.totalAdmins;
+                document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`;
+                document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
+                document.getElementById('statHouseProfit').textContent = `${data.stats.totalHouseProfit.toFixed(0)} ETB`;
+                document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
+
+                container.innerHTML = `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">👥 Total Users</div>
+                            <div style="font-size:24px;font-weight:700;color:#0b1120;">${data.stats.totalUsers}</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">👤 Active Admins</div>
+                            <div style="font-size:24px;font-weight:700;color:#0b1120;">${data.stats.totalAdmins}</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">💰 Total Deposits</div>
+                            <div style="font-size:24px;font-weight:700;color:#10b981;">${data.stats.totalDeposits.toFixed(0)} ETB</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">🏦 Total Withdrawals</div>
+                            <div style="font-size:24px;font-weight:700;color:#f59e0b;">${data.stats.totalWithdrawals.toFixed(0)} ETB</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">🏠 House Profit</div>
+                            <div style="font-size:24px;font-weight:700;color:#8b5cf6;">${data.stats.totalHouseProfit.toFixed(0)} ETB</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">💰 Admin Earnings Paid</div>
+                            <div style="font-size:24px;font-weight:700;color:#6366f1;">${data.stats.totalAdminEarnings.toFixed(0)} ETB</div>
+                        </div>
+                        <div style="background:#f8fafc;padding:16px;border-radius:12px;text-align:center;border:1px solid #eef2f6;">
+                            <div style="font-size:12px;color:#94a3b8;font-weight:500;">⏳ Pending Admin With.</div>
+                            <div style="font-size:24px;font-weight:700;color:#ef4444;">${data.stats.pendingWithdrawals}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── REDUCE DEPOSIT BALANCE ───
+        async function reduceDepositBalance(adminId, currentBalance) {
+            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
+            if (amountStr === null) return;
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                showToast('❌ Please enter a valid positive amount.', 'error');
+                return;
+            }
+            if (amount > currentBalance) {
+                showToast(`❌ Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
+                return;
+            }
+            if (!confirm(`Deduct ${amount.toFixed(0)} ETB from admin ${adminId}?`)) return;
+            try {
+                const url = apiUrl('/super-admin/adjust-deposit-balance');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, amount: -amount, description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`, 'success');
+                    refreshAll();
+                } else {
+                    throw new Error(data.error || 'Failed');
+                }
+            } catch (err) {
+                showToast('❌ ' + err.message, 'error');
+            }
+        }
+
+        // ─── LOAD ADMINS ───
+        async function loadAdmins() {
+            const container = document.getElementById('adminsList');
+            try {
+                const url = apiUrl('/super-admin/admins');
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admins');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('adminBadge').textContent = data.admins.length;
+                populateAdminDropdown(data.admins);
+
+                if (data.admins.length === 0) {
+                    container.innerHTML =
+                    `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
+                    return;
+                }
+
+                container.innerHTML = data.admins.map(admin => {
+                    const rawDeposits = admin.stats.totalDeposits || 0;
+                    const balance = admin.stats.holdingBalance || 0;
+                    const initials = getInitials(admin.name);
+                    return `
+                    <div class="admin-card">
+                        <div class="admin-header">
+                            <div>
+                                <div class="admin-name">
+                                    <span class="avatar">${initials}</span>
+                                    ${escapeHtml(admin.name)}
+                                    ${admin.is_super_admin ? ' 👑' : ''}
+                                </div>
+                                <div class="admin-phone">📱 ${escapeHtml(admin.phone)}</div>
+                                <div class="admin-meta">
+                                    <span>🔑 ${admin.invite_code || 'N/A'}</span>
+                                    <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
+                                    <span>📊 ${(admin.commission_rate * 100)}% commission</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="admin-stats">
+                            <div class="stat-item"><strong>${admin.stats.playerCount}</strong><span class="slabel">Players</span></div>
+                            <div class="stat-item"><strong>${rawDeposits.toFixed(0)}</strong><span class="slabel">Deposits</span></div>
+                            <div class="stat-item"><strong>${balance.toFixed(0)}</strong><span class="slabel">Balance</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalEarned.toFixed(0)}</strong><span class="slabel">Earned</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalPendingEarnings.toFixed(0)}</strong><span class="slabel">Pending</span></div>
+                        </div>
+                        <div class="admin-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})">📋 View</button>
+                            <button class="btn btn-warning btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})">📊 Rate</button>
+                            <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
+                                ${admin.is_active ? '🔴 Deactivate' : '🟢 Activate'}
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">💰 Reduce</button>
+                        </div>
+                    </div>
+                `}).join('');
+
+            } catch (err) {
+                container.innerHTML =
+                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        function populateAdminDropdown(admins) {
+            const select = document.getElementById('filterAdmin');
+            if (select.options.length > 1) return;
+            select.innerHTML = '<option value="all">All Admins</option>';
+            admins.forEach(admin => {
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name;
+                select.appendChild(opt);
+            });
+        }
+
+        // ─── LOAD ADMIN DETAIL (modal) ───
+        async function loadAdminDetail(adminId) {
+            const body = document.getElementById('modalBody');
+            try {
+                const url = apiUrl(`/super-admin/admin/${adminId}`);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admin details');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                const a = data.admin;
+                const stats = data.stats;
+                document.getElementById('modalTitle').textContent = `👤 ${a.name}`;
+
+                const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric',
+                    year: 'numeric' }) : 'N/A';
+
+                const totalDeposits = stats.deposits ? stats.deposits.reduce((s, d) => s + Number(d.amount), 0) : 0;
+                const totalWithdrawals = stats.withdrawals ? stats.withdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
+                const totalAdminWithdrawals = stats.adminWithdrawals ? stats.adminWithdrawals.reduce((s, w) => s + Number(w
+                    .amount), 0) : 0;
+                const totalEarnings = stats.earnings ? stats.earnings.reduce((s, e) => s + Number(e.commission_amount), 0) :
+                0;
+
+                const depositsHtml = stats.deposits && stats.deposits.length > 0 ?
+                    stats.deposits.slice(0, 10).map(d =>
+                        `<div class="row-item"><span class="left">${escapeHtml(d.username)}</span><span class="right"><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span></div>`
+                    ).join('') :
+                    '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No deposits</div>';
+
+                const withdrawalsHtml = stats.withdrawals && stats.withdrawals.length > 0 ?
+                    stats.withdrawals.slice(0, 10).map(w =>
+                        `<div class="row-item"><span class="left">${escapeHtml(w.username)} → ${escapeHtml(w.phone_number)}</span><span class="right"><strong>${w.amount} ETB</strong> <span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No withdrawals</div>';
+
+                const adminWithdrawalsHtml = stats.adminWithdrawals && stats.adminWithdrawals.length > 0 ?
+                    stats.adminWithdrawals.map(w =>
+                        `<div class="row-item"><span class="left">${w.amount} ETB — ${w.withdrawal_type}</span><span class="right"><span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No pending withdrawals</div>';
+
+                const earningsHtml = stats.earnings && stats.earnings.length > 0 ?
+                    stats.earnings.slice(0, 10).map(e =>
+                        `<div class="row-item"><span class="left">${fmt(e.date)}</span><span class="right"><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span></div>`
+                    ).join('') :
+                    '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No earnings</div>';
+
+                const adjustmentsHtml = stats.adjustments && stats.adjustments.length > 0 ?
+                    stats.adjustments.map(adj =>
+                        `<div class="row-item"><span class="left">${fmt(adj.created_at)} — ${escapeHtml(adj.description || 'N/A')}</span><span class="right"><strong>${adj.amount > 0 ? '+' : ''}${adj.amount.toFixed(0)} ETB</strong></span></div>`
+                    ).join('') :
+                    '<div style="color:#94a3b8;font-size:13px;padding:6px 0;">No adjustments</div>';
+
+                body.innerHTML = `
+                    <div class="admin-info-grid">
+                        <div class="item"><span class="label">📱 Phone</span><span class="value">${a.phone}</span></div>
+                        <div class="item"><span class="label">🔑 Invite Code</span><span class="value">${a.invite_code || 'N/A'}</span></div>
+                        <div class="item"><span class="label">📊 Status</span><span class="value"><span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></span></div>
+                        <div class="item"><span class="label">📈 Commission</span><span class="value">${(a.commission_rate * 100)}%</span></div>
+                        <div class="item"><span class="label">👑 Super Admin</span><span class="value">${a.is_super_admin ? '✅ Yes' : '❌ No'}</span></div>
+                        <div class="item"><span class="label">👥 Players</span><span class="value">${stats.players}</span></div>
+                        <div class="item"><span class="label">💰 Deposits (raw)</span><span class="value">${(stats.totalDeposits || 0).toFixed(0)} ETB</span></div>
+                        <div class="item"><span class="label">💰 Balance (adjusted)</span><span class="value"><strong>${(stats.holdingBalance || 0).toFixed(0)} ETB</strong></span></div>
+                    </div>
+
+                    <div class="section-card deposits">
+                        <div class="section-header"><h4>📋 Recent Deposits</h4><span class="total">Total: ${totalDeposits.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${depositsHtml}</div>
+                    </div>
+
+                    <div class="section-card withdrawals">
+                        <div class="section-header"><h4>🏦 Recent Withdrawals</h4><span class="total">Total: ${totalWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${withdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card admin-withdrawals">
+                        <div class="section-header"><h4>💳 Admin Withdrawal Requests</h4><span class="total">Total: ${totalAdminWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${adminWithdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card earnings">
+                        <div class="section-header"><h4>💰 Earnings History</h4><span class="total">Total: ${totalEarnings.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${earningsHtml}</div>
+                    </div>
+
+                    <div class="section-card adjustments">
+                        <div class="section-header"><h4>📊 Adjustment History</h4><span class="total">${stats.adjustments ? stats.adjustments.reduce((s, a) => s + Number(a.amount), 0).toFixed(0) : '0'} ETB</span></div>
+                        <div class="section-body">${adjustmentsHtml}</div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">🔴 Deactivate</button>
+                        <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">🟢 Activate</button>
+                        <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">📊 Set Commission</button>
+                        <button class="btn btn-outline" onclick="closeModal()">Close</button>
+                    </div>
+                `;
+
+            } catch (err) {
+                body.innerHTML =
+                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── LOAD ADMIN WITHDRAWALS ───
+        async function loadAdminWithdrawals(status = 'pending') {
+            currentWithdrawFilter = status;
+            const container = document.getElementById('withdrawalsList');
+            try {
+                const params = { status, limit: 100 };
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/admin-withdrawals', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load withdrawals');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('withdrawalBadge').textContent =
+                    status === 'pending' ? data.requests.filter(r => r.status === 'pending').length : 0;
+
+                if (data.requests.length === 0) {
+                    container.innerHTML =
+                    `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
+                    return;
+                }
+
+                const showActions = status === 'pending';
+
+                container.innerHTML = `
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Admin</th><th>Amount</th><th>Phone</th><th>Method</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead>
+                            <tbody>${data.requests.map(req => `
+                                <tr>
+                                    <td><strong>${escapeHtml(req.admins?.name || 'Unknown')}</strong><br><small style="color:#94a3b8;">${req.admins?.phone || ''}</small></td>
+                                    <td><strong>${req.amount} ETB</strong></td>
+                                    <td>${req.phone}</td>
+                                    <td>${req.withdrawal_type}</td>
+                                    <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                                    <td>${formatDate(req.created_at)}</td>
+                                    ${showActions ? `
+                                        <td>
+                                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                                <button class="btn btn-success btn-sm" onclick="processAdminWithdrawal(${req.id},'approve')">✅</button>
+                                                <button class="btn btn-danger btn-sm" onclick="processAdminWithdrawal(${req.id},'reject')">❌</button>
+                                            </div>
+                                        </td>
+                                    ` : ''}
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── PROCESS ADMIN WITHDRAWAL ───
+        async function processAdminWithdrawal(requestId, action) {
+            if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
+            try {
+                const url = apiUrl('/super-admin/process-admin-withdrawal');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requestId, action })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Withdrawal ${action}ed!`, 'success');
+                    loadAdminWithdrawals(currentWithdrawFilter);
+                    loadPlatformStats();
+                } else {
+                    throw new Error(data.error || 'Failed to process');
+                }
+            } catch (err) {
+                showToast('❌ ' + err.message, 'error');
+            }
+        }
+
+        // ─── TOGGLE ADMIN ───
+        async function toggleAdmin(adminId, isActive) {
+            const action = isActive ? 'activate' : 'deactivate';
+            if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+            try {
+                const url = apiUrl('/super-admin/toggle-admin');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, isActive })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Admin ${action}d!`, 'success');
+                    loadAdmins();
+                    loadPlatformStats();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to toggle admin');
+                }
+            } catch (err) {
+                showToast('❌ ' + err.message, 'error');
+            }
+        }
+
+        // ─── EDIT COMMISSION ───
+        function editCommission(adminId, currentRate) {
+            const newRate = prompt(`Enter new commission rate (0.01 – 1.00):\nCurrent: ${(currentRate * 100)}%`, currentRate);
+            if (newRate === null) return;
+            const rate = parseFloat(newRate);
+            if (isNaN(rate) || rate < 0 || rate > 1) {
+                showToast('❌ Invalid rate. Must be between 0 and 1', 'error');
+                return;
+            }
+            updateCommission(adminId, rate);
+        }
+
+        async function updateCommission(adminId, commissionRate) {
+            try {
+                const url = apiUrl('/super-admin/update-commission');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, commissionRate })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Commission updated to ${(commissionRate * 100)}%`, 'success');
+                    loadAdmins();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to update commission');
+                }
+            } catch (err) {
+                showToast('❌ ' + err.message, 'error');
+            }
+        }
+
+        // ─── MODAL ───
+        function openModal(adminId) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            loadAdminDetail(adminId);
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
         });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`✅ Withdrawal ${action}ed!`, 'success');
-          loadAdminWithdrawals(currentWithdrawFilter);
-          loadPlatformStats();
-        } else {
-          throw new Error(data.error || 'Failed to process');
-        }
-      } catch (err) {
-        showToast('❌ ' + err.message, 'error');
-      }
-    }
-
-    async function toggleAdmin(adminId, isActive) {
-      const action = isActive ? 'activate' : 'deactivate';
-      if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
-      try {
-        const url = apiUrl('/super-admin/toggle-admin');
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminId, isActive })
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
         });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`✅ Admin ${action}d!`, 'success');
-          loadAdmins();
-          loadPlatformStats();
-          closeModal();
-        } else {
-          throw new Error(data.error || 'Failed to toggle admin');
+
+        // ─── FILTERS ───
+        function applyFilters() {
+            filterFrom = document.getElementById('filterFrom').value;
+            filterTo = document.getElementById('filterTo').value;
+            filterAdmin = document.getElementById('filterAdmin').value;
+            refreshAll();
         }
-      } catch (err) {
-        showToast('❌ ' + err.message, 'error');
-      }
-    }
 
-    function editCommission(adminId, currentRate) {
-      const newRate = prompt(`Enter new commission rate (0.01 to 1.00):\nCurrent: ${(currentRate * 100)}%`, currentRate);
-      if (newRate === null) return;
-      const rate = parseFloat(newRate);
-      if (isNaN(rate) || rate < 0 || rate > 1) {
-        showToast('❌ Invalid rate. Must be between 0 and 1', 'error');
-        return;
-      }
-      updateCommission(adminId, rate);
-    }
+        function resetFilters() {
+            document.getElementById('filterFrom').value = '';
+            document.getElementById('filterTo').value = '';
+            document.getElementById('filterAdmin').value = 'all';
+            filterFrom = '';
+            filterTo = '';
+            filterAdmin = 'all';
+            refreshAll();
+        }
 
-    async function updateCommission(adminId, commissionRate) {
-      try {
-        const url = apiUrl('/super-admin/update-commission');
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminId, commissionRate })
+        // ─── REFRESH ───
+        async function refreshAll() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            try {
+                if (currentTab === 'admins') await loadAdmins();
+                else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
+                else if (currentTab === 'platform') await loadPlatformStats();
+                showToast('🔄 Refreshed', 'info');
+            } catch (err) {
+                console.error('Refresh error:', err);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
+        // ─── AUTO REFRESH ───
+        function startAutoRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(() => {
+                if (!document.hidden) refreshAll();
+            }, 30000);
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (refreshInterval) { clearInterval(refreshInterval);
+                    refreshInterval = null; }
+            } else {
+                startAutoRefresh();
+                refreshAll();
+            }
         });
-        const data = await res.json();
-        if (data.success) {
-          showToast(`✅ Commission updated to ${(commissionRate * 100)}%`, 'success');
-          loadAdmins();
-          closeModal();
-        } else {
-          throw new Error(data.error || 'Failed to update commission');
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault();
+                refreshAll(); }
+        });
+
+        // ─── INIT ───
+        async function init() {
+            await loadAdmins();
+            await loadPlatformStats();
+            await loadAdminWithdrawals('pending');
+            startAutoRefresh();
         }
-      } catch (err) {
-        showToast('❌ ' + err.message, 'error');
-      }
-    }
 
-    function openModal(adminId) {
-      document.getElementById('modalOverlay').classList.add('active');
-      loadAdminDetail(adminId);
-    }
-    function closeModal() {
-      document.getElementById('modalOverlay').classList.remove('active');
-    }
-    document.getElementById('modalOverlay').addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) closeModal();
-    });
-
-    function applyFilters() {
-      filterFrom = document.getElementById('filterFrom').value;
-      filterTo = document.getElementById('filterTo').value;
-      filterAdmin = document.getElementById('filterAdmin').value;
-      refreshAll();
-    }
-
-    function resetFilters() {
-      document.getElementById('filterFrom').value = '';
-      document.getElementById('filterTo').value = '';
-      document.getElementById('filterAdmin').value = 'all';
-      filterFrom = '';
-      filterTo = '';
-      filterAdmin = 'all';
-      refreshAll();
-    }
-
-    async function refreshAll() {
-      if (isRefreshing) return;
-      isRefreshing = true;
-      try {
-        if (currentTab === 'admins') await loadAdmins();
-        else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
-        else if (currentTab === 'platform') await loadPlatformStats();
-        showToast('🔄 Refreshed', 'info');
-      } catch (err) {
-        console.error('Refresh error:', err);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    function escapeHtml(text) {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-    function formatDate(dateString) {
-      if (!dateString) return 'N/A';
-      try {
-        const d = new Date(dateString);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      } catch { return dateString; }
-    }
-
-    function startAutoRefresh() {
-      if (refreshInterval) clearInterval(refreshInterval);
-      refreshInterval = setInterval(() => {
-        if (!document.hidden) refreshAll();
-      }, 30000);
-    }
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
-      } else {
-        startAutoRefresh();
-        refreshAll();
-      }
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
-    });
-
-    async function init() {
-      await loadAdmins();
-      await loadPlatformStats();
-      await loadAdminWithdrawals('pending');
-      startAutoRefresh();
-    }
-
-    document.addEventListener('touchstart', function() {}, { passive: true });
-    init();
-  </script>
+        document.addEventListener('touchstart', function() {}, { passive: true });
+        init();
+    </script>
 </body>
 </html>
