@@ -134,6 +134,10 @@
         .admin-status-badge .name.unassigned { color: #dc2626; }
         .header-actions { display: flex; align-items: center; gap: 8px; }
         #gameApp { max-width: 600px; width: 100%; margin: 0 auto; }
+
+        /* ===== LANGUAGE TOGGLE ===== */
+        .lang-toggle { position: fixed; top: 16px; left: 16px; background: #f97316; color: white; border: none; border-radius: 40px; padding: 8px 16px; font-weight: bold; cursor: pointer; z-index: 1000; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        @media (max-width: 550px) { .lang-toggle { top: 8px; left: 8px; padding: 6px 12px; font-size: 0.7rem; } }
     </style>
 </head>
 <body>
@@ -345,7 +349,7 @@
 
     <script>
         // ============================================
-        //  COMPLETE JAVASCRIPT
+        //  COMPLETE JAVASCRIPT – FIXED INVITE FLOW
         // ============================================
 
         // ----- DOM refs -----
@@ -1187,26 +1191,48 @@
             }
         }
 
-        // ========== AUTHENTICATE USER (for game) ==========
+        // ========== ROBUST INVITE EXTRACTION ==========
+        function extractStartParam() {
+            let startParam = null;
+
+            // 1. From WebApp object (best)
+            if (tg.initDataUnsafe) {
+                startParam = tg.initDataUnsafe.start_param;
+                console.log('🔍 from WebApp.initDataUnsafe.start_param:', startParam);
+            }
+
+            // 2. From URL search params
+            if (!startParam) {
+                const urlParams = new URLSearchParams(window.location.search);
+                startParam = urlParams.get('tgWebAppStartParam') ||
+                             urlParams.get('start_param') ||
+                             urlParams.get('start') ||
+                             urlParams.get('invite');
+                console.log('🔍 from URL params:', startParam);
+            }
+
+            // 3. From initData (rare)
+            if (!startParam && tg.initData) {
+                const params = new URLSearchParams(tg.initData);
+                startParam = params.get('start_param');
+                console.log('🔍 from initData.start_param:', startParam);
+            }
+
+            console.log('✅ Final invite code:', startParam);
+            return startParam;
+        }
+
+        // ========== AUTHENTICATE (sends invite) ==========
         async function authenticateUser() {
             const initData = tg.initData;
-            if (!initData) return;
-            let startParam = null;
-            if (initData) {
-                const params = new URLSearchParams(initData);
-                startParam = params.get('start_param');
+            if (!initData) {
+                console.warn('No initData – not in Telegram?');
+                return false;
             }
-            if (!startParam) {
-    const urlParams = new URLSearchParams(window.location.search);
-    startParam = urlParams.get('invite') || 
-                 urlParams.get('tgWebAppStartParam') || 
-                 urlParams.get('start_param') || 
-                 urlParams.get('start');
-}
-            if (!startParam && tg.initDataUnsafe) {
-                startParam = tg.initDataUnsafe.start_param;
-            }
-            console.log('📤 Authenticating with startParam:', startParam);
+
+            const startParam = extractStartParam();
+            console.log('📤 Sending startParam:', startParam);
+
             try {
                 const res = await fetch('/api/telegram-miniapp-auth', {
                     method: 'POST',
@@ -1214,21 +1240,47 @@
                     body: JSON.stringify({ initData, startParam })
                 });
                 const data = await res.json();
+                console.log('📥 Auth response:', data);
                 if (data.success) {
-                    document.getElementById('profileUsername').innerText = data.username || 'Player';
-                    syncBalance(data.balance || 0);
+                    // Update UI
                     if (data.assigned_admin_name) {
-                        console.log(`✅ Assigned to admin: ${data.assigned_admin_name}`);
+                        console.log('✅ Admin assigned:', data.assigned_admin_name);
                         updateAdminBadge(data.assigned_admin_name);
                     } else {
-                        updateAdminBadge(null);
+                        console.warn('⚠️ No admin assigned – invite may be invalid or user already has admin.');
                     }
+                    // Store user data (balance etc.)
+                    syncBalance(data.balance || 0);
+                    document.getElementById('profileUsername').innerText = data.username || 'Player';
+                    return true;
                 } else {
-                    console.warn('Auth failed:', data.error);
+                    console.warn('❌ Auth failed:', data.error);
+                    return false;
                 }
             } catch (e) {
-                console.error('Auth error:', e);
+                console.error('❌ Auth error:', e);
+                return false;
             }
+        }
+
+        // ========== CHECK SESSION ==========
+        async function checkSession() {
+            try {
+                const res = await fetch('/admin/session', { credentials: 'include' });
+                return res.ok;
+            } catch { return false; }
+        }
+
+        // ========== SHOW GAME ==========
+        function showGameApp() {
+            loginPage.classList.add('hidden');
+            gameApp.classList.remove('hidden');
+            // Initialise game components
+            buildNumberGrid();
+            loadStats();
+            updateMuteButton();
+            window.speechSynthesis.getVoices();
+            restoreGameSession();
         }
 
         // ========== LOGIN PAGE LOGIC ==========
@@ -1250,82 +1302,13 @@
         }
 
         // Auto‑fill invite code from URL if present
-        let startParam = null;
-        const initData = tg.initData;
-        if (initData) {
-            const params = new URLSearchParams(initData);
-            startParam = params.get('start_param');
-        }
-       if (!startParam) {
-    const urlParams = new URLSearchParams(window.location.search);
-    startParam = urlParams.get('invite') || 
-                 urlParams.get('tgWebAppStartParam') || 
-                 urlParams.get('start_param') || 
-                 urlParams.get('start');
-}
-        if (!startParam && tg.initDataUnsafe) {
-            startParam = tg.initDataUnsafe.start_param;
-        }
-        if (startParam) {
-            loginInviteCode.value = startParam;
+        const inviteCodeFromUrl = extractStartParam();
+        if (inviteCodeFromUrl) {
+            loginInviteCode.value = inviteCodeFromUrl;
+            autoLoginStatus.textContent = `🔗 Invite code detected: ${inviteCodeFromUrl}`;
         }
 
-        async function checkSessionAndShowGame() {
-            try {
-                const res = await fetch('/admin/session', { credentials: 'include' });
-                if (res.ok) {
-                    showGameApp();
-                    return true;
-                }
-            } catch (e) {}
-            return false;
-        }
-
-        function showGameApp() {
-            loginPage.classList.add('hidden');
-            gameApp.classList.remove('hidden');
-            authenticateUser();
-            buildNumberGrid();
-            loadStats();
-            updateMuteButton();
-            window.speechSynthesis.getVoices();
-            restoreGameSession();
-        }
-
-        async function processInvite() {
-            const inviteCode = loginInviteCode.value.trim();
-            if (!inviteCode) return false;
-            autoLoginStatus.textContent = `🔗 Invite code detected: ${inviteCode}. Logging in...`;
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="loader"></span> Processing...';
-            try {
-                const res = await fetch('/api/telegram-miniapp-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ initData: tg.initData, startParam: inviteCode })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    autoLoginStatus.textContent = '✅ Login successful!';
-                    document.getElementById('profileUsername').innerText = data.username || 'Player';
-                    syncBalance(data.balance || 0);
-                    if (data.assigned_admin_name) { updateAdminBadge(data.assigned_admin_name); } else { updateAdminBadge(null); }
-                    showGameApp();
-                    return true;
-                } else {
-                    autoLoginStatus.textContent = '❌ Invite login failed: ' + (data.error || 'Unknown error');
-                    loginBtn.disabled = false;
-                    loginBtn.innerHTML = 'Login';
-                    return false;
-                }
-            } catch (e) {
-                autoLoginStatus.textContent = '⚠️ Network error. Please try manually.';
-                loginBtn.disabled = false;
-                loginBtn.innerHTML = 'Login';
-                return false;
-            }
-        }
-
+        // Manual login (fallback)
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             hideLoginError();
@@ -1341,6 +1324,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
+                    // Admin logged in – show game
                     showGameApp();
                 } else {
                     showLoginError(data.error || 'Invalid invite code.');
@@ -1356,10 +1340,29 @@
 
         // ========== INITIALISATION ==========
         (async function init() {
-            const hasSession = await checkSessionAndShowGame();
-            if (hasSession) return;
-            const inviteSuccess = await processInvite();
-            if (inviteSuccess) return;
+            // 1. Auto-fill Telegram ID
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                loginTelegramId.value = tg.initDataUnsafe.user.id || '';
+            }
+
+            // 2. Auto-fill invite code (if found)
+            const code = extractStartParam();
+            if (code) {
+                loginInviteCode.value = code;
+                autoLoginStatus.textContent = `🔗 Invite code detected: ${code}`;
+            }
+
+            // 3. Try to authenticate (this will assign the admin if possible)
+            const authSuccess = await authenticateUser();
+
+            // 4. If auth succeeded and user is logged in (session exists), show game
+            const hasSession = await checkSession();
+            if (hasSession && authSuccess) {
+                showGameApp();
+                return;
+            }
+
+            // 5. If not, show login form and let user try manually
             loginForm.classList.remove('hidden');
             autoLoginStatus.textContent = '👤 Enter your Admin Link to continue.';
             loginInviteCode.focus();
@@ -1432,12 +1435,8 @@
 
         // Optional: admin login button (if you want to re‑login)
         document.getElementById('adminSimpleLoginBtn')?.addEventListener('click', () => {
-            // Could show login again or just reload
             window.location.href = '/';
         });
-
-        // ========== FINAL INIT ==========
-        // Already done in the init() IIFE above.
     </script>
 </body>
 </html>
