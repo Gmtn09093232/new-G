@@ -1645,6 +1645,13 @@
 
         // ========== OPEN PAYMENT CONFIRMATION PAGE ==========
         function openPaymentConfirmation(phone, amount) {
+            // Ensure we have a selected method number
+            if (!selectedMethodNumber) {
+                alert('Please select an admin and payment method first.');
+                openDepositTypeModal();
+                return;
+            }
+
             // Set the amount display
             const formattedAmount = Number(amount).toFixed(2);
             document.getElementById('paymentAmountDisplay').textContent = formattedAmount + ' ETB';
@@ -1679,9 +1686,13 @@
         }
 
         function closePaymentConfirmation() {
+            // Close the payment modal and reopen the deposit details modal
             document.getElementById('depositPaymentModal').classList.remove('active');
-            // Go back to the simple deposit page
+            // Ensure the deposit details modal is clean
             document.getElementById('depositDetailsModal').classList.add('active');
+            // Re-enable the request button if it was disabled
+            const btn = document.getElementById('requestDepositBtn');
+            if (btn) btn.disabled = false;
         }
 
         // ========== HANDLE "REQUEST DEPOSIT" CLICK ==========
@@ -1714,7 +1725,6 @@
             document.getElementById('paymentInvoiceNumber').value = '';
             document.getElementById('depositPaymentModal').classList.remove('active');
             document.getElementById('depositDetailsModal').classList.remove('active');
-            // Also close the admin/method modals just in case
             document.getElementById('depositAdminListModal').classList.remove('active');
             document.getElementById('depositMethodListModal').classList.remove('active');
         }
@@ -1754,9 +1764,7 @@
                 const result = await response.json();
                 if (result.success) {
                     alert(`✅ Deposit request submitted!\n\n💰 Amount: ${pendingDepositAmount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
-                    // Reset the deposit state so the user can make another deposit
                     resetDepositState();
-                    // Close the payment modal (already done by reset, but ensure)
                     document.getElementById('depositPaymentModal').classList.remove('active');
                 } else {
                     alert('❌ Error: ' + (result.error || 'Submission failed'));
