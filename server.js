@@ -3,6 +3,7 @@
 //             & Manual Balance Adjustments Affecting Deposit Stats
 //             & 1500 ETB Limit for Manual Additions
 //             & Import Players by Username/Handle
+//             & DUPLICATE TRANSACTION NUMBER CHECK
 // ================================================================
 
 require('dotenv').config();
@@ -1733,6 +1734,24 @@ const handleDepositRequest = async (req, res) => {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
+  // --- DUPLICATE TRANSACTION NUMBER CHECK ---
+  if (transaction_reference) {
+    const trimmedRef = transaction_reference.trim();
+    const { data: existing, error: dupErr } = await supabase
+      .from('deposit_requests')
+      .select('id')
+      .eq('transaction_reference', trimmedRef)
+      .maybeSingle();
+    if (dupErr) {
+      console.error('Error checking duplicate transaction reference:', dupErr);
+      return res.status(500).json({ error: 'Error validating transaction number' });
+    }
+    if (existing) {
+      return res.status(400).json({ error: 'This transaction number has already been used.' });
+    }
+  }
+  // -----------------------------------------
+
   try {
     const { data: admin, error: adminErr } = await supabase
       .from('admins')
@@ -1813,7 +1832,7 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: transaction_reference || null,
+      transaction_reference: transaction_reference ? transaction_reference.trim() : null,
       proof_photo_url: photoUrl,
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
