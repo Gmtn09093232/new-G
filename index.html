@@ -1256,6 +1256,8 @@
         let selectedAdminObj = null;
         let selectedMethodNumber = null;
         let pendingDepositAmount = 0;
+        let savedPhone = '';
+        let savedAmount = '';
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
         // ========== LANGUAGE ==========
@@ -1631,11 +1633,12 @@
             selectedDepositType = method;
             selectedMethodNumber = number;
 
-            // Clear fields
-            document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmountSimple').value = '';
+            // Restore saved values if they exist
+            const phoneInput = document.getElementById('depositPlayerPhone');
+            const amountInput = document.getElementById('depositAmountSimple');
+            if (savedPhone) phoneInput.value = savedPhone;
+            if (savedAmount) amountInput.value = savedAmount;
 
-            // Show the modal
             document.getElementById('depositDetailsModal').classList.add('active');
             unlockSpeech();
         }
@@ -1646,12 +1649,14 @@
 
         // ========== OPEN PAYMENT CONFIRMATION PAGE ==========
         function openPaymentConfirmation(phone, amount) {
-            // Set the amount display
+            // Save the values so they can be restored if the user goes back
+            savedPhone = phone;
+            savedAmount = amount;
+
             const formattedAmount = Number(amount).toFixed(2);
             document.getElementById('paymentAmountDisplay').textContent = formattedAmount + ' ETB';
             document.getElementById('paymentStepAmountLabel').textContent = formattedAmount;
 
-            // Set the step 1 label with the amount
             const step1Label = document.getElementById('paymentStep1Label');
             const key = 'sendToNumber';
             const template = currentLang === 'am' ? langData.am[key] : langData.en[key];
@@ -1659,21 +1664,15 @@
                 step1Label.innerHTML = template.replace('{amount}', formattedAmount);
             }
 
-            // Set the recipient number
             const displayNumber = getSafeDisplayNumber(selectedMethodNumber);
             document.getElementById('paymentRecipientNumber').textContent = `📞 ${displayNumber}`;
 
-            // Set the method title
             let title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
             document.getElementById('paymentMethodTitle').textContent = title + ' P2P';
 
-            // Clear invoice field
             document.getElementById('paymentInvoiceNumber').value = '';
-
-            // Store phone for later
             pendingDepositAmount = Number(amount);
 
-            // Close the simple deposit modal and open the payment modal
             document.getElementById('depositDetailsModal').classList.remove('active');
             document.getElementById('depositPaymentModal').classList.add('active');
             unlockSpeech();
@@ -1681,8 +1680,13 @@
 
         function closePaymentConfirmation() {
             document.getElementById('depositPaymentModal').classList.remove('active');
-            // Go back to the simple deposit page
+            // Re-open the deposit details modal, preserving the saved phone and amount
             document.getElementById('depositDetailsModal').classList.add('active');
+            // Restore the input values from saved state
+            const phoneInput = document.getElementById('depositPlayerPhone');
+            const amountInput = document.getElementById('depositAmountSimple');
+            if (savedPhone) phoneInput.value = savedPhone;
+            if (savedAmount) amountInput.value = savedAmount;
         }
 
         // ========== RESET DEPOSIT STATE ==========
@@ -1692,19 +1696,18 @@
             selectedDepositType = null;
             selectedMethodNumber = null;
             pendingDepositAmount = 0;
+            savedPhone = '';
+            savedAmount = '';
             document.getElementById('depositPlayerPhone').value = '';
             document.getElementById('depositAmountSimple').value = '';
             document.getElementById('paymentInvoiceNumber').value = '';
             document.getElementById('depositPaymentModal').classList.remove('active');
             document.getElementById('depositDetailsModal').classList.remove('active');
-            // Also close the admin/method modals just in case
             document.getElementById('depositAdminListModal').classList.remove('active');
             document.getElementById('depositMethodListModal').classList.remove('active');
         }
 
-        // ========== HANDLE "REQUEST DEPOSIT" CLICK - Using Event Delegation ==========
-        // We attach a single listener to the document that checks if the target is the requestDepositBtn.
-        // This ensures it works even if the button is recreated or the listener is lost.
+        // ========== HANDLE "REQUEST DEPOSIT" CLICK - Event Delegation ==========
         document.addEventListener('click', function(e) {
             const target = e.target.closest('#requestDepositBtn');
             if (target) {
@@ -1720,8 +1723,15 @@
                     return;
                 }
 
-                // Open the payment confirmation page
                 openPaymentConfirmation(phone, amount);
+            }
+        });
+
+        // ========== HANDLE "BACK" ON PAYMENT MODAL - Event Delegation ==========
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('#backPaymentBtn');
+            if (target) {
+                closePaymentConfirmation();
             }
         });
 
@@ -1760,9 +1770,7 @@
                 const result = await response.json();
                 if (result.success) {
                     alert(`✅ Deposit request submitted!\n\n💰 Amount: ${pendingDepositAmount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
-                    // Reset the deposit state so the user can make another deposit
                     resetDepositState();
-                    // Close the payment modal (already done by reset, but ensure)
                     document.getElementById('depositPaymentModal').classList.remove('active');
                 } else {
                     alert('❌ Error: ' + (result.error || 'Submission failed'));
@@ -2181,9 +2189,6 @@
             document.getElementById('depositDetailsModal').classList.remove('active');
             openDepositTypeModal();
         });
-
-        // Payment modal back button - goes back to simple deposit page
-        document.getElementById('backPaymentBtn')?.addEventListener('click', closePaymentConfirmation);
 
         // Copy recipient number on payment page
         document.getElementById('paymentCopyBtn')?.addEventListener('click', function() {
