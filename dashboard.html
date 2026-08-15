@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Admin Dashboard</title>
     <style>
         /* ---------- RESET & BASE ---------- */
@@ -474,7 +474,7 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 700px;
+            min-width: 650px;
         }
         table th {
             background: #f8fafc;
@@ -2107,7 +2107,7 @@
             }
         }
 
-        // ---------- LOAD DEPOSITS (removed Proof and Scan, added transaction reference display) ----------
+        // ---------- LOAD DEPOSITS (extract only transaction number) ----------
         async function loadDeposits() {
             const container = document.getElementById('depositsList');
             const filters = getDepositFilters();
@@ -2130,11 +2130,31 @@
                 <table>
                   <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Receipt</th><th>Date & Time</th><th>Actions</th></tr></thead>
                   <tbody>${data.requests.map(req => {
-                    const receiptLink = req.transaction_reference 
-                      ? `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(req.transaction_reference)}`
+                    // Extract only the transaction number from the full text
+                    let txnRef = null;
+                    let fullText = req.transaction_reference || '';
+                    // Try to extract the transaction number from the full text
+                    const txnMatch = fullText.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
+                    if (txnMatch && txnMatch[1]) {
+                        txnRef = txnMatch[1];
+                    } else {
+                        // If no pattern match, try to find any alphanumeric sequence of 8+ chars
+                        const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
+                        if (fallbackMatch && fallbackMatch[1]) {
+                            txnRef = fallbackMatch[1];
+                        } else {
+                            // If nothing found, use the original (but clean it)
+                            const clean = fullText.replace(/\s+/g, ' ').trim();
+                            if (clean.length > 0 && clean.length < 30) {
+                                txnRef = clean;
+                            }
+                        }
+                    }
+                    
+                    const receiptLink = txnRef 
+                      ? `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`
                       : null;
                     const formattedDate = new Date(req.created_at).toLocaleString();
-                    const txnRef = req.transaction_reference || '';
                     return `
                     <tr>
                       <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
