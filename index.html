@@ -1702,6 +1702,23 @@
             openPaymentConfirmation(phone, amount);
         });
 
+        // ========== RESET DEPOSIT STATE ==========
+        function resetDepositState() {
+            selectedAdminId = null;
+            selectedAdminObj = null;
+            selectedDepositType = null;
+            selectedMethodNumber = null;
+            pendingDepositAmount = 0;
+            document.getElementById('depositPlayerPhone').value = '';
+            document.getElementById('depositAmountSimple').value = '';
+            document.getElementById('paymentInvoiceNumber').value = '';
+            document.getElementById('depositPaymentModal').classList.remove('active');
+            document.getElementById('depositDetailsModal').classList.remove('active');
+            // Also close the admin/method modals just in case
+            document.getElementById('depositAdminListModal').classList.remove('active');
+            document.getElementById('depositMethodListModal').classList.remove('active');
+        }
+
         // ========== HANDLE "CONFIRM PAYMENT" CLICK ==========
         let isSubmittingPayment = false;
 
@@ -1737,6 +1754,9 @@
                 const result = await response.json();
                 if (result.success) {
                     alert(`✅ Deposit request submitted!\n\n💰 Amount: ${pendingDepositAmount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
+                    // Reset the deposit state so the user can make another deposit
+                    resetDepositState();
+                    // Close the payment modal (already done by reset, but ensure)
                     document.getElementById('depositPaymentModal').classList.remove('active');
                 } else {
                     alert('❌ Error: ' + (result.error || 'Submission failed'));
