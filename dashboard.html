@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Admin Dashboard</title>
     <style>
         /* ---------- RESET & BASE ---------- */
@@ -1305,6 +1305,20 @@
             gap: 4px;
             flex-wrap: wrap;
         }
+        .txn-ref-wrap .cbe-detail {
+            font-family: monospace;
+            font-weight: 500;
+            font-size: 12px;
+            background: #fef3c7;
+            padding: 1px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            color: #92400e;
+        }
+        .txn-ref-wrap .cbe-detail.phone {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
     </style>
 </head>
 <body>
@@ -2107,7 +2121,7 @@
             }
         }
 
-        // ---------- LOAD DEPOSITS (extract only transaction number) ----------
+        // ---------- LOAD DEPOSITS (extract transaction number; support CBE Birr) ----------
         async function loadDeposits() {
             const container = document.getElementById('depositsList');
             const filters = getDepositFilters();
@@ -2130,46 +2144,85 @@
                 <table>
                   <thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Receipt</th><th>Date & Time</th><th>Actions</th></tr></thead>
                   <tbody>${data.requests.map(req => {
-                    // Extract only the transaction number from the full text
                     let txnRef = null;
-                    let fullText = req.transaction_reference || '';
-                    // Try to extract the transaction number from the full text
-                    const txnMatch = fullText.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
-                    if (txnMatch && txnMatch[1]) {
-                        txnRef = txnMatch[1];
-                    } else {
-                        // If no pattern match, try to find any alphanumeric sequence of 8+ chars
-                        const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
-                        if (fallbackMatch && fallbackMatch[1]) {
-                            txnRef = fallbackMatch[1];
+                    let cbePhone = null;
+                    const fullText = req.transaction_reference || '';
+                    const paymentType = req.payment_type || '';
+
+                    // Helper to extract TID and PH for CBE
+                    function extractCbeData(text) {
+                        let tid = null;
+                        let ph = null;
+                        // Look for TID=... or TID ...
+                        const tidMatch = text.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
+                        if (tidMatch) tid = tidMatch[1];
+                        // Look for PH=... or PH ... (phone number)
+                        const phMatch = text.match(/PH[=:\s]*(251\d{9})/i) || text.match(/PH[=:\s]*(09\d{8})/i);
+                        if (phMatch) ph = phMatch[1];
+                        return { tid, ph };
+                    }
+
+                    if (paymentType === 'cbebirr') {
+                        const cbeData = extractCbeData(fullText);
+                        if (cbeData.tid) {
+                            txnRef = cbeData.tid;
+                            cbePhone = cbeData.ph;
                         } else {
-                            // If nothing found, use the original (but clean it)
-                            const clean = fullText.replace(/\s+/g, ' ').trim();
-                            if (clean.length > 0 && clean.length < 30) {
-                                txnRef = clean;
-                            }
+                            // fallback: try to find any alphanumeric sequence of 8+ chars
+                            const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
+                            if (fallbackMatch) txnRef = fallbackMatch[1];
+                        }
+                    } else {
+                        // Telebirr or other: extract transaction number
+                        const txnMatch = fullText.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
+                        if (txnMatch && txnMatch[1]) {
+                            txnRef = txnMatch[1];
+                        } else {
+                            const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
+                            if (fallbackMatch) txnRef = fallbackMatch[1];
                         }
                     }
-                    
-                    const receiptLink = txnRef 
-                      ? `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`
-                      : null;
+
+                    let receiptLink = null;
+                    if (txnRef) {
+                        if (paymentType === 'cbebirr') {
+                            // CBE receipt URL
+                            let phoneParam = cbePhone ? cbePhone : '';
+                            if (phoneParam && phoneParam.startsWith('09')) {
+                                // Convert to 251 format
+                                phoneParam = '251' + phoneParam.substring(1);
+                            }
+                            receiptLink = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(txnRef)}&PH=${encodeURIComponent(phoneParam)}`;
+                        } else {
+                            // Telebirr or other
+                            receiptLink = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
+                        }
+                    }
+
                     const formattedDate = new Date(req.created_at).toLocaleString();
+
+                    // Build receipt display
+                    let receiptDisplay = '';
+                    if (txnRef) {
+                        receiptDisplay = `
+                          <div class="txn-ref-wrap">
+                            <span class="txn-ref">${escapeHtml(txnRef)}</span>
+                            ${cbePhone ? `<span class="cbe-detail phone">📱 ${escapeHtml(cbePhone)}</span>` : ''}
+                            <button class="copy-btn-icon" onclick="copyToClipboard('${escapeHtml(txnRef)}')" title="Copy transaction number">📋</button>
+                            ${receiptLink ? `<a href="${receiptLink}" target="_blank" class="link-btn">🔍 View</a>` : ''}
+                          </div>
+                        `;
+                    } else {
+                        receiptDisplay = `<span style="color:#94a3b8;font-size:11px;">—</span>`;
+                    }
+
                     return `
                     <tr>
                       <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
                       <td><strong>${req.amount} ETB</strong></td>
-                      <td><span class="status-badge ${req.payment_type}">${req.payment_type}</span></td>
+                      <td><span class="status-badge ${paymentType}">${paymentType}</span></td>
                       <td><span class="status-badge ${req.status}">${req.status}</span></td>
-                      <td>
-                        ${txnRef ? `
-                          <div class="txn-ref-wrap">
-                            <span class="txn-ref">${escapeHtml(txnRef)}</span>
-                            <button class="copy-btn-icon" onclick="copyToClipboard('${escapeHtml(txnRef)}')" title="Copy transaction number">📋</button>
-                            ${receiptLink ? `<a href="${receiptLink}" target="_blank" class="link-btn">🔍 View</a>` : ''}
-                          </div>
-                        ` : `<span style="color:#94a3b8;font-size:11px;">—</span>`}
-                      </td>
+                      <td>${receiptDisplay}</td>
                       <td>${formattedDate}</td>
                       <td>
                         ${req.status === 'pending' ? `
