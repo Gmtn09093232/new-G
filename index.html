@@ -1638,8 +1638,6 @@
             // Show the modal
             document.getElementById('depositDetailsModal').classList.add('active');
             unlockSpeech();
-            // Re-attach the request deposit listener to ensure it works
-            attachRequestDepositListener();
         }
 
         function closeDepositDetails() {
@@ -1685,37 +1683,7 @@
             document.getElementById('depositPaymentModal').classList.remove('active');
             // Go back to the simple deposit page
             document.getElementById('depositDetailsModal').classList.add('active');
-            // Re-attach the listener for the request deposit button
-            attachRequestDepositListener();
         }
-
-        // ========== HANDLE "REQUEST DEPOSIT" CLICK ==========
-        function attachRequestDepositListener() {
-            const btn = document.getElementById('requestDepositBtn');
-            // Remove any previous listener to avoid duplicates
-            btn.removeEventListener('click', requestDepositClickHandler);
-            btn.addEventListener('click', requestDepositClickHandler);
-        }
-
-        function requestDepositClickHandler() {
-            const phone = document.getElementById('depositPlayerPhone').value.trim();
-            const amount = document.getElementById('depositAmountSimple').value.trim();
-
-            if (!phone.match(/^(09|07)\d{8}$/)) {
-                alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.');
-                return;
-            }
-            if (!amount || isNaN(amount) || Number(amount) < 10) {
-                alert('Minimum deposit is 10 ETB');
-                return;
-            }
-
-            // Open the payment confirmation page
-            openPaymentConfirmation(phone, amount);
-        }
-
-        // Attach listener initially
-        attachRequestDepositListener();
 
         // ========== RESET DEPOSIT STATE ==========
         function resetDepositState() {
@@ -1733,6 +1701,29 @@
             document.getElementById('depositAdminListModal').classList.remove('active');
             document.getElementById('depositMethodListModal').classList.remove('active');
         }
+
+        // ========== HANDLE "REQUEST DEPOSIT" CLICK - Using Event Delegation ==========
+        // We attach a single listener to the document that checks if the target is the requestDepositBtn.
+        // This ensures it works even if the button is recreated or the listener is lost.
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('#requestDepositBtn');
+            if (target) {
+                const phone = document.getElementById('depositPlayerPhone').value.trim();
+                const amount = document.getElementById('depositAmountSimple').value.trim();
+
+                if (!phone.match(/^(09|07)\d{8}$/)) {
+                    alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.');
+                    return;
+                }
+                if (!amount || isNaN(amount) || Number(amount) < 10) {
+                    alert('Minimum deposit is 10 ETB');
+                    return;
+                }
+
+                // Open the payment confirmation page
+                openPaymentConfirmation(phone, amount);
+            }
+        });
 
         // ========== HANDLE "CONFIRM PAYMENT" CLICK ==========
         let isSubmittingPayment = false;
