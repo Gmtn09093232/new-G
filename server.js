@@ -3,6 +3,7 @@
 //             & Manual Balance Adjustments Affecting Deposit Stats
 //             & 1500 ETB Limit for Manual Additions
 //             & Import Players by Username/Handle
+//             & AUTOMATIC RECEIPT VERIFICATION (Telebirr & CBE)
 // ================================================================
 
 require('dotenv').config();
@@ -413,6 +414,236 @@ async function getAdminFromSession(req) {
   }
   return data;
 }
+
+// ============================================================
+//  AUTOMATIC RECEIPT VERIFICATION
+// ============================================================
+async function fetchReceiptHtml(url) {
+  const controller = new AbortController();
+  const timeout = 15000;
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.text();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+function parseCreditedParty(html, paymentType) {
+  // Try to find a pattern like "Credited Party: Name" or "Receiver: Name"
+  // For Telebirr (transactioninfo.ethiotelecom.et) the page often contains:
+  // "Credited Party" or "Receiver Name"
+  // For CBE, similar patterns.
+  let name = null;
+  const lower = html.toLowerCase();
+  const patterns = [
+    /credited\s*party\s*[:]\s*([^\n<]+)/i,
+    /receiver\s*(?:name)?\s*[:]\s*([^\n<]+)/i,
+    /beneficiary\s*(?:name)?\s*[:]\s*([^\n<]+)/i,
+    /account\s*holder\s*[:]\s*([^\n<]+)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) {
+      name = match[1].trim();
+      break;
+    }
+  }
+  // If not found, try to find a name in a table cell following a label
+  if (!name) {
+    // Look for a table row containing "Credited Party" or "Receiver"
+    const rowRegex = /<tr[^>]*>.*?(?:credited party|receiver|beneficiary).*?<td[^>]*>(.*?)<\/td>/is;
+    const rowMatch = html.match(rowRegex);
+    if (rowMatch) {
+      name = rowMatch[1].trim();
+    }
+  }
+  // Clean up possible HTML tags
+  if (name) {
+    name = name.replace(/<[^>]*>/g, '').trim();
+    // Remove extra whitespace
+    name = name.replace(/\s+/g, ' ');
+  }
+  return name;
+}
+
+async function verifyDepositReceipt(depositRequest) {
+  const { id, payment_type, transaction_reference, admin_id } = depositRequest;
+  if (!transaction_reference) {
+    console.log(`Deposit ${id} has no transaction reference, skipping auto-verify.`);
+    return;
+  }
+
+  // Get admin details
+  const { data: admin, error: adminErr } = await supabase
+    .from('admins')
+    .select('id, name')
+    .eq('id', admin_id)
+    .maybeSingle();
+  if (adminErr || !admin) {
+    console.log(`Deposit ${id}: Admin not found, skipping auto-verify.`);
+    return;
+  }
+
+  let url = null;
+  if (payment_type === 'telebirr') {
+    // Telebirr receipt URL
+    const txn = transaction_reference.trim();
+    url = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txn)}`;
+  } else if (payment_type === 'cbebirr') {
+    // CBE Birr receipt URL – we need both TID and PH
+    // The transaction_reference may contain both, e.g., "TID=ABC123&PH=2519..."
+    // Or we can store them separately; but we'll try to extract from the text.
+    // For simplicity, we'll use the transaction_reference as the TID, and we'll try to extract PH from the same text if present.
+    // If we have a separate field for PH, we could use it; but we don't.
+    // We'll try to extract TID and PH from the transaction_reference using regex.
+    const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
+    const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) || transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
+    if (tidMatch) {
+      const tid = tidMatch[1];
+      let ph = '';
+      if (phMatch) {
+        ph = phMatch[1];
+        if (ph.startsWith('09')) ph = '251' + ph.substring(1);
+      }
+      url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
+    } else {
+      // If no TID found, use the whole reference as TID (fallback)
+      url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(transaction_reference)}`;
+    }
+  } else {
+    console.log(`Deposit ${id}: Unsupported payment type ${payment_type} for auto-verify.`);
+    return;
+  }
+
+  if (!url) {
+    console.log(`Deposit ${id}: Could not construct receipt URL.`);
+    return;
+  }
+
+  console.log(`🔍 Verifying deposit ${id} via ${url}`);
+  try {
+    const html = await fetchReceiptHtml(url);
+    const creditedName = parseCreditedParty(html, payment_type);
+    if (!creditedName) {
+      console.log(`Deposit ${id}: Could not extract credited party name from receipt.`);
+      return; // leave pending
+    }
+
+    // Normalize names
+    const adminName = admin.name.trim().toLowerCase();
+    const creditedNormalized = creditedName.trim().toLowerCase();
+
+    // Check if they match
+    let newStatus = 'pending';
+    let auditDetail = { receiptUrl: url, creditedName, adminName };
+    if (creditedNormalized === adminName) {
+      newStatus = 'approved';
+      console.log(`✅ Deposit ${id}: Credited party matches admin (${admin.name}). Auto-approved.`);
+      auditDetail.match = true;
+    } else {
+      newStatus = 'rejected';
+      console.log(`❌ Deposit ${id}: Credited party "${creditedName}" does not match admin "${admin.name}". Auto-rejected.`);
+      auditDetail.match = false;
+    }
+
+    // Update deposit status
+    const { error: updateErr } = await supabase
+      .from('deposit_requests')
+      .update({ status: newStatus, processed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (updateErr) throw updateErr;
+
+    // Audit log
+    await Audit.adminAction(
+      newStatus === 'approved' ? 'DEPOSIT_AUTO_APPROVED' : 'DEPOSIT_AUTO_REJECTED',
+      'system',
+      null,
+      {
+        depositId: id,
+        adminId: admin_id,
+        adminName: admin.name,
+        creditedName,
+        receiptUrl: url,
+        reason: newStatus === 'approved' ? 'Credited party matches admin name' : 'Credited party does not match admin name'
+      }
+    );
+
+    // If approved, add balance to user
+    if (newStatus === 'approved') {
+      // Get user
+      const { data: user, error: userErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('telegram_id', depositRequest.telegram_id)
+        .maybeSingle();
+      if (userErr || !user) {
+        console.error(`Deposit ${id}: User not found, balance not updated.`);
+        return;
+      }
+      const newBalance = Number(user.balance) + Number(depositRequest.amount);
+      await supabase
+        .from('users')
+        .update({ balance: newBalance })
+        .eq('telegram_id', depositRequest.telegram_id);
+      // Update cache if exists
+      if (users[depositRequest.telegram_id]) {
+        users[depositRequest.telegram_id].balance = newBalance;
+      }
+      // Notify user via socket
+      const playerSocket = await getSocketByUserId(depositRequest.telegram_id);
+      if (playerSocket) {
+        playerSocket.emit('balanceUpdate', newBalance);
+        playerSocket.emit('depositStatus', { status: 'approved', amount: depositRequest.amount });
+      }
+      // Update first deposit if needed
+      if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
+        await supabase
+          .from('users')
+          .update({ first_deposit_amount: depositRequest.amount })
+          .eq('telegram_id', depositRequest.telegram_id);
+      }
+      Audit.depositCompleted(depositRequest.telegram_id, null, {
+        transactionId: id.toString(),
+        amount: depositRequest.amount,
+        currency: 'ETB',
+        method: depositRequest.payment_type,
+        adminId: admin_id,
+        adminName: admin.name,
+        autoVerified: true
+      });
+    } else {
+      // Rejected – notify user
+      const playerSocket = await getSocketByUserId(depositRequest.telegram_id);
+      if (playerSocket) {
+        playerSocket.emit('depositStatus', { status: 'rejected', amount: depositRequest.amount });
+      }
+      Audit.depositFailed(depositRequest.telegram_id, null, {
+        transactionId: id.toString(),
+        amount: depositRequest.amount,
+        reason: 'auto_rejected_credited_party_mismatch',
+        adminId: admin_id,
+        adminName: admin.name,
+        autoVerified: true
+      });
+    }
+
+  } catch (err) {
+    console.error(`⚠️ Deposit ${id}: Receipt verification failed: ${err.message}`);
+    // Leave pending for manual review
+  }
+}
+
+// ============================================================
 
 // ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', async (req, res) => {
@@ -1805,6 +2036,7 @@ const handleDepositRequest = async (req, res) => {
       photoUrl = publicUrlData?.publicUrl || null;
     }
 
+    // Insert deposit request
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1831,6 +2063,15 @@ const handleDepositRequest = async (req, res) => {
       transactionReference: transaction_reference || null,
       hasPhoto: !!photoUrl
     });
+
+    // Fire-and-forget automatic receipt verification (if transaction_reference provided)
+    if (transaction_reference) {
+      // We'll call it asynchronously, but we don't want to block the response.
+      // We'll spawn a promise without await.
+      verifyDepositReceipt(data).catch(err => {
+        console.error(`Background verify error for deposit ${data.id}:`, err);
+      });
+    }
 
     res.json({
       success: true,
