@@ -486,6 +486,38 @@ function parseCreditedParty(html, paymentType) {
   return name;
 }
 
+// Helper to try both 'O' and '0' variants if a receipt fetch fails
+async function fetchReceiptWithCorrection(baseUrl, txnRef) {
+  // First try with the exact transaction reference
+  try {
+    const html = await fetchReceiptHtml(baseUrl);
+    return { html, usedVariant: txnRef };
+  } catch (err) {
+    // If it fails with 404, try replacing O with 0 and vice versa
+    if (err.message.includes('HTTP 404')) {
+      // Try replacing 'O' with '0' and '0' with 'O'
+      const variants = [];
+      const replacedO = txnRef.replace(/O/g, '0');
+      const replacedZero = txnRef.replace(/0/g, 'O');
+      // Avoid duplicates
+      if (replacedO !== txnRef) variants.push(replacedO);
+      if (replacedZero !== txnRef && replacedZero !== replacedO) variants.push(replacedZero);
+      
+      for (const variant of variants) {
+        try {
+          const correctedUrl = baseUrl.replace(txnRef, variant);
+          const html = await fetchReceiptHtml(correctedUrl);
+          return { html, usedVariant: variant };
+        } catch (innerErr) {
+          // Continue to next variant
+          continue;
+        }
+      }
+    }
+    throw err;
+  }
+}
+
 async function verifyDepositReceipt(depositRequest) {
   const { id, payment_type, transaction_reference, admin_id } = depositRequest;
   if (!transaction_reference) {
@@ -504,12 +536,11 @@ async function verifyDepositReceipt(depositRequest) {
     return;
   }
 
-  let url = null;
+  let baseUrl = null;
+  let txnRef = transaction_reference.trim();
   if (payment_type === 'telebirr') {
-    const txn = transaction_reference.trim();
-    url = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txn)}`;
+    baseUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
   } else if (payment_type === 'cbebirr') {
-    // CBE receipt – we need TID and PH
     const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
     const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) || transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
     if (tidMatch) {
@@ -519,23 +550,33 @@ async function verifyDepositReceipt(depositRequest) {
         ph = phMatch[1];
         if (ph.startsWith('09')) ph = '251' + ph.substring(1);
       }
-      url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
+      baseUrl = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
     } else {
-      url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(transaction_reference)}`;
+      baseUrl = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(transaction_reference)}`;
     }
   } else {
     console.log(`Deposit ${id}: Unsupported payment type ${payment_type} for auto-verify.`);
     return;
   }
 
-  if (!url) {
+  if (!baseUrl) {
     console.log(`Deposit ${id}: Could not construct receipt URL.`);
     return;
   }
 
-  console.log(`🔍 Verifying deposit ${id} via ${url}`);
+  console.log(`🔍 Verifying deposit ${id} via ${baseUrl}`);
   try {
-    const html = await fetchReceiptHtml(url);
+    // Attempt to fetch with correction
+    const { html, usedVariant } = await fetchReceiptWithCorrection(baseUrl, txnRef);
+    if (usedVariant !== txnRef) {
+      console.log(`Deposit ${id}: Used corrected transaction number "${usedVariant}" instead of "${txnRef}"`);
+      // Optionally update the deposit record with the corrected reference
+      await supabase
+        .from('deposit_requests')
+        .update({ transaction_reference: usedVariant })
+        .eq('id', id);
+    }
+
     const creditedName = parseCreditedParty(html, payment_type);
     console.log(`Deposit ${id}: Extracted credited name: "${creditedName}"`);
 
@@ -558,7 +599,7 @@ async function verifyDepositReceipt(depositRequest) {
     }
 
     let newStatus = 'pending';
-    let auditDetail = { receiptUrl: url, creditedName, adminName, isMatch };
+    let auditDetail = { receiptUrl: baseUrl, creditedName, adminName, isMatch };
 
     if (isMatch) {
       newStatus = 'approved';
