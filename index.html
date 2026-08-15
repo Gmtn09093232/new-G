@@ -864,23 +864,17 @@
         </div>
     </div>
 
-    <!-- DEPOSIT DETAILS (only phone + amount) -->
+    <!-- DEPOSIT DETAILS (only phone + amount, no account card) -->
     <div id="depositDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
                 <span class="bank-icon">💸</span>
                 <div>
                     <div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div>
-                    <div class="bank-sub" data-key="sendPayment">Send payment to the number below</div>
+                    <div class="bank-sub" data-key="sendPayment">Send payment to the selected admin</div>
                 </div>
             </div>
-            <div class="account-card">
-                <div class="account-label" data-key="recipientLabel">📞 RECIPIENT ACCOUNT (tap to copy)</div>
-                <div class="copy-number" id="depositAccountNumber">📋 Contact admin for number</div>
-                <div class="account-label" style="margin-top:8px;" data-key="accountName">ACCOUNT NAME</div>
-                <div class="account-number" style="font-size:1rem;" id="depositAccountName">DOT BINGO OFFICIAL</div>
-                <div style="margin-top:8px;font-size:0.75rem;color:#64748b;" id="depositAdminInfo">Admin: Loading...</div>
-            </div>
+            <!-- account-card removed -->
             <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required></div>
             <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any"></div>
             <div class="transaction-summary" data-key="depositHint">💡 After sending payment, admin will verify your deposit using your phone number.</div>
@@ -1190,7 +1184,7 @@
                 depositTitle: "Deposit",
                 chooseMethod: "Choose payment method",
                 cancel: "Cancel",
-                sendPayment: "Send payment to the number below",
+                sendPayment: "Send payment to the selected admin",
                 recipientLabel: "📞 RECIPIENT ACCOUNT (tap to copy)",
                 accountName: "ACCOUNT NAME",
                 yourPhone: "📞 Your Phone Number (for verification)",
@@ -1443,19 +1437,10 @@
             let title = method.charAt(0).toUpperCase() + method.slice(1);
             document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
 
-            const displayNumber = getSafeDisplayNumber(number);
-            const copyDiv = document.getElementById('depositAccountNumber');
-            if (copyDiv) {
-                copyDiv.innerHTML = `📋 ${displayNumber}`;
-                if (isValidPhoneNumber(number)) {
-                    copyDiv.onclick = function() { copyToClipboard(number); };
-                } else {
-                    copyDiv.onclick = function() { alert('No valid account number available. Please contact admin.'); };
-                }
-            }
-
-            document.getElementById('depositAccountName').textContent = admin.name || 'DOT BINGO OFFICIAL';
-            document.getElementById('depositAdminInfo').textContent = `Admin: ${admin.name || 'DOT BINGO OFFICIAL'}`;
+            // Account card removed, so we just set the title and store admin info
+            selectedAdminObj = admin;
+            selectedAdminId = admin.id;
+            selectedDepositType = method;
 
             document.getElementById('depositPlayerPhone').value = '';
             document.getElementById('depositAmount').value = '';
@@ -1499,7 +1484,7 @@
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(`✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n👤 Admin: ${result.adminName || 'Processing'}\n📱 Account: ${result.adminNumber || 'N/A'}\n\n⏳ Please wait for admin approval.`);
+                    alert(`✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
                     document.getElementById('depositDetailsModal').classList.remove('active');
                 } else {
                     alert('❌ Error: ' + (result.error || 'Submission failed'));
