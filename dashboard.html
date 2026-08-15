@@ -4,8 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Admin Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js">
-    </script>
     <style>
         /* ---------- RESET & BASE ---------- */
         * {
@@ -663,6 +661,24 @@
             transform: scale(0.94);
         }
 
+        .copy-btn-icon {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: 0.15s;
+            color: #64748b;
+        }
+        .copy-btn-icon:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .copy-btn-icon:active {
+            transform: scale(0.9);
+        }
+
         @media (max-width: 480px) {
             .btn {
                 min-height: 40px;
@@ -1271,6 +1287,23 @@
         }
         .close-btn:hover {
             background: #f1f5f9;
+        }
+
+        .txn-ref {
+            font-family: monospace;
+            font-weight: 600;
+            font-size: 13px;
+            background: #f1f5f9;
+            padding: 2px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .txn-ref-wrap {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
         }
     </style>
 </head>
@@ -2074,7 +2107,7 @@
             }
         }
 
-        // ---------- LOAD DEPOSITS (removed Proof and Scan columns) ----------
+        // ---------- LOAD DEPOSITS (removed Proof and Scan, added transaction reference display) ----------
         async function loadDeposits() {
             const container = document.getElementById('depositsList');
             const filters = getDepositFilters();
@@ -2101,6 +2134,7 @@
                       ? `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(req.transaction_reference)}`
                       : null;
                     const formattedDate = new Date(req.created_at).toLocaleString();
+                    const txnRef = req.transaction_reference || '';
                     return `
                     <tr>
                       <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
@@ -2108,10 +2142,13 @@
                       <td><span class="status-badge ${req.payment_type}">${req.payment_type}</span></td>
                       <td><span class="status-badge ${req.status}">${req.status}</span></td>
                       <td>
-                        ${receiptLink 
-                          ? `<a href="${receiptLink}" target="_blank" class="link-btn">🔍 View</a>` 
-                          : `<span style="color:#94a3b8;font-size:11px;">—</span>`
-                        }
+                        ${txnRef ? `
+                          <div class="txn-ref-wrap">
+                            <span class="txn-ref">${escapeHtml(txnRef)}</span>
+                            <button class="copy-btn-icon" onclick="copyToClipboard('${escapeHtml(txnRef)}')" title="Copy transaction number">📋</button>
+                            ${receiptLink ? `<a href="${receiptLink}" target="_blank" class="link-btn">🔍 View</a>` : ''}
+                          </div>
+                        ` : `<span style="color:#94a3b8;font-size:11px;">—</span>`}
                       </td>
                       <td>${formattedDate}</td>
                       <td>
@@ -2131,6 +2168,16 @@
                 container.innerHTML =
                     `<div class="empty-state"><div class="icon">❌</div><p style="color:#dc2626;">${escapeHtml(err.message)}</p></div>`;
             }
+        }
+
+        // ---------- CLIPBOARD COPY ----------
+        function copyToClipboard(text) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('📋 Copied: ' + text, 'success');
+            }).catch(() => {
+                showToast('❌ Copy failed', 'error');
+            });
         }
 
         // ---------- LOAD WITHDRAWALS ----------
