@@ -989,11 +989,11 @@
             </div>
             <div class="input-group">
                 <label data-key="yourPhone">🔒 Your Phone Number (for verification)</label>
-                <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required>
+                <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required autocomplete="off">
             </div>
             <div class="input-group">
                 <label data-key="amountLabel">🤑 Amount (ETB)</label>
-                <input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any">
+                <input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off">
             </div>
             <div class="transaction-summary" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
             <div class="modal-buttons">
@@ -1039,7 +1039,7 @@
                 <div class="step-content">
                     <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
                     <div class="invoice-input">
-                        <input type="text" id="paymentInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder">
+                        <input type="text" id="paymentInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder" autocomplete="off">
                     </div>
                 </div>
             </div>
@@ -1066,9 +1066,9 @@
     <div id="withdrawDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header"><span class="bank-icon">🏧</span><div><div class="bank-title" id="withdrawDetailsTitle">Withdraw via Telebirr</div><div class="bank-sub" data-key="yourDetails">Your account details</div></div></div>
-            <div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required></div>
-            <div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required></div>
-            <div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any"></div>
+            <div class="input-group"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label><input type="text" id="withdrawName" placeholder="Full name" required autocomplete="off"></div>
+            <div class="input-group"><label data-key="accountNumber">📞 Account / Phone Number</label><input type="text" id="withdrawReceiver" placeholder="" required autocomplete="off"></div>
+            <div class="input-group"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any" autocomplete="off"></div>
             <div class="transaction-summary" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div>
             <div class="modal-buttons"><button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button><button id="backWithdrawBtn" class="btn-secondary" data-key="back">← Back</button></div>
         </div>
@@ -1670,7 +1670,17 @@
             let title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
             document.getElementById('paymentMethodTitle').textContent = title + ' P2P';
 
-            document.getElementById('paymentInvoiceNumber').value = '';
+            // Clear invoice number field every time the payment modal opens
+            const invoiceInput = document.getElementById('paymentInvoiceNumber');
+            invoiceInput.value = '';
+            // Also force a blur to reset any autofill suggestions
+            invoiceInput.blur();
+            // Small delay to re-focus with empty field
+            setTimeout(() => {
+                invoiceInput.value = '';
+                invoiceInput.autocomplete = 'off';
+            }, 10);
+
             pendingDepositAmount = Number(amount);
 
             document.getElementById('depositDetailsModal').classList.remove('active');
