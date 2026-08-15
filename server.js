@@ -416,8 +416,9 @@ async function getAdminFromSession(req) {
 }
 
 // ============================================================
-//  AUTOMATIC RECEIPT VERIFICATION
+//  AUTOMATIC RECEIPT VERIFICATION – IMPROVED
 // ============================================================
+
 async function fetchReceiptHtml(url) {
   const controller = new AbortController();
   const timeout = 15000;
@@ -439,18 +440,18 @@ async function fetchReceiptHtml(url) {
 }
 
 function parseCreditedParty(html, paymentType) {
-  // Try to find a pattern like "Credited Party: Name" or "Receiver: Name"
-  // For Telebirr (transactioninfo.ethiotelecom.et) the page often contains:
-  // "Credited Party" or "Receiver Name"
-  // For CBE, similar patterns.
   let name = null;
-  const lower = html.toLowerCase();
+
+  // Try multiple patterns to extract the credited party / receiver name
   const patterns = [
-    /credited\s*party\s*[:]\s*([^\n<]+)/i,
-    /receiver\s*(?:name)?\s*[:]\s*([^\n<]+)/i,
-    /beneficiary\s*(?:name)?\s*[:]\s*([^\n<]+)/i,
-    /account\s*holder\s*[:]\s*([^\n<]+)/i,
+    /Credited\s*Party\s*[:]\s*([^\n<]+)/i,
+    /Receiver\s*(?:Name)?\s*[:]\s*([^\n<]+)/i,
+    /Beneficiary\s*(?:Name)?\s*[:]\s*([^\n<]+)/i,
+    /Account\s*Holder\s*[:]\s*([^\n<]+)/i,
+    /Payee\s*[:]\s*([^\n<]+)/i,
+    /To\s*[:]\s*([^\n<]+)/i,
   ];
+
   for (const pattern of patterns) {
     const match = html.match(pattern);
     if (match) {
@@ -458,21 +459,30 @@ function parseCreditedParty(html, paymentType) {
       break;
     }
   }
-  // If not found, try to find a name in a table cell following a label
+
+  // If still not found, look for a table row with a label
   if (!name) {
-    // Look for a table row containing "Credited Party" or "Receiver"
-    const rowRegex = /<tr[^>]*>.*?(?:credited party|receiver|beneficiary).*?<td[^>]*>(.*?)<\/td>/is;
+    const rowRegex = /<tr[^>]*>.*?(?:credited party|receiver|beneficiary|payee).*?<td[^>]*>(.*?)<\/td>/is;
     const rowMatch = html.match(rowRegex);
     if (rowMatch) {
       name = rowMatch[1].trim();
     }
   }
-  // Clean up possible HTML tags
+
+  // If still not found, try raw text after "To:" 
+  if (!name) {
+    const toMatch = html.match(/To\s*:\s*([^\n<]+)/i);
+    if (toMatch) {
+      name = toMatch[1].trim();
+    }
+  }
+
+  // Clean up any leftover HTML tags
   if (name) {
     name = name.replace(/<[^>]*>/g, '').trim();
-    // Remove extra whitespace
     name = name.replace(/\s+/g, ' ');
   }
+
   return name;
 }
 
@@ -496,16 +506,10 @@ async function verifyDepositReceipt(depositRequest) {
 
   let url = null;
   if (payment_type === 'telebirr') {
-    // Telebirr receipt URL
     const txn = transaction_reference.trim();
     url = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txn)}`;
   } else if (payment_type === 'cbebirr') {
-    // CBE Birr receipt URL – we need both TID and PH
-    // The transaction_reference may contain both, e.g., "TID=ABC123&PH=2519..."
-    // Or we can store them separately; but we'll try to extract from the text.
-    // For simplicity, we'll use the transaction_reference as the TID, and we'll try to extract PH from the same text if present.
-    // If we have a separate field for PH, we could use it; but we don't.
-    // We'll try to extract TID and PH from the transaction_reference using regex.
+    // CBE receipt – we need TID and PH
     const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
     const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) || transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
     if (tidMatch) {
@@ -517,7 +521,6 @@ async function verifyDepositReceipt(depositRequest) {
       }
       url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
     } else {
-      // If no TID found, use the whole reference as TID (fallback)
       url = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(transaction_reference)}`;
     }
   } else {
@@ -534,19 +537,30 @@ async function verifyDepositReceipt(depositRequest) {
   try {
     const html = await fetchReceiptHtml(url);
     const creditedName = parseCreditedParty(html, payment_type);
+    console.log(`Deposit ${id}: Extracted credited name: "${creditedName}"`);
+
     if (!creditedName) {
-      console.log(`Deposit ${id}: Could not extract credited party name from receipt.`);
-      return; // leave pending
+      console.log(`Deposit ${id}: Could not extract credited party name from receipt. Leaving pending.`);
+      return;
     }
 
-    // Normalize names
-    const adminName = admin.name.trim().toLowerCase();
-    const creditedNormalized = creditedName.trim().toLowerCase();
+    // Normalize: trim, lowercase, remove extra spaces
+    const adminName = admin.name.trim().toLowerCase().replace(/\s+/g, ' ');
+    const creditedNormalized = creditedName.trim().toLowerCase().replace(/\s+/g, ' ');
 
-    // Check if they match
-    let newStatus = 'pending';
-    let auditDetail = { receiptUrl: url, creditedName, adminName };
+    // Determine match: exact or partial (contains)
+    let isMatch = false;
     if (creditedNormalized === adminName) {
+      isMatch = true;
+    } else if (creditedNormalized.includes(adminName) || adminName.includes(creditedNormalized)) {
+      isMatch = true;
+      console.log(`Deposit ${id}: Partial match: admin name "${adminName}" is contained in credited name "${creditedNormalized}"`);
+    }
+
+    let newStatus = 'pending';
+    let auditDetail = { receiptUrl: url, creditedName, adminName, isMatch };
+
+    if (isMatch) {
       newStatus = 'approved';
       console.log(`✅ Deposit ${id}: Credited party matches admin (${admin.name}). Auto-approved.`);
       auditDetail.match = true;
@@ -568,19 +582,11 @@ async function verifyDepositReceipt(depositRequest) {
       newStatus === 'approved' ? 'DEPOSIT_AUTO_APPROVED' : 'DEPOSIT_AUTO_REJECTED',
       'system',
       null,
-      {
-        depositId: id,
-        adminId: admin_id,
-        adminName: admin.name,
-        creditedName,
-        receiptUrl: url,
-        reason: newStatus === 'approved' ? 'Credited party matches admin name' : 'Credited party does not match admin name'
-      }
+      auditDetail
     );
 
     // If approved, add balance to user
     if (newStatus === 'approved') {
-      // Get user
       const { data: user, error: userErr } = await supabase
         .from('users')
         .select('*')
@@ -595,11 +601,11 @@ async function verifyDepositReceipt(depositRequest) {
         .from('users')
         .update({ balance: newBalance })
         .eq('telegram_id', depositRequest.telegram_id);
-      // Update cache if exists
+      // Update cache
       if (users[depositRequest.telegram_id]) {
         users[depositRequest.telegram_id].balance = newBalance;
       }
-      // Notify user via socket
+      // Notify user
       const playerSocket = await getSocketByUserId(depositRequest.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', newBalance);
@@ -619,7 +625,8 @@ async function verifyDepositReceipt(depositRequest) {
         method: depositRequest.payment_type,
         adminId: admin_id,
         adminName: admin.name,
-        autoVerified: true
+        autoVerified: true,
+        matchType: isMatch ? (creditedNormalized === adminName ? 'exact' : 'partial') : 'none'
       });
     } else {
       // Rejected – notify user
@@ -633,7 +640,8 @@ async function verifyDepositReceipt(depositRequest) {
         reason: 'auto_rejected_credited_party_mismatch',
         adminId: admin_id,
         adminName: admin.name,
-        autoVerified: true
+        autoVerified: true,
+        creditedName
       });
     }
 
