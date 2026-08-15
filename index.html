@@ -925,6 +925,21 @@
             border-top: 1px solid #e2e8f0;
             padding-top: 12px;
         }
+        .step-connector {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 1.2rem;
+            margin: 4px 0;
+        }
+        .payment-method-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #475569;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -962,36 +977,56 @@
         </div>
     </div>
 
-    <!-- DEPOSIT DETAILS (matching photo layout) -->
+    <!-- DEPOSIT DETAILS (simple: phone + amount + Request Deposit) -->
     <div id="depositDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="bank-header">
+                <span class="bank-icon">💸</span>
+                <div>
+                    <div class="bank-title" id="depositDetailsTitle">Deposit via Telebirr</div>
+                    <div class="bank-sub" data-key="sendPayment">Send payment to the selected admin</div>
+                </div>
+            </div>
+            <div class="input-group">
+                <label data-key="yourPhone">🔒 Your Phone Number (for verification)</label>
+                <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required>
+            </div>
+            <div class="input-group">
+                <label data-key="amountLabel">🤑 Amount (ETB)</label>
+                <input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any">
+            </div>
+            <div class="transaction-summary" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
+            <div class="modal-buttons">
+                <button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button>
+                <button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEPOSIT PAYMENT CONFIRMATION (new Telebirr P2P style page) -->
+    <div id="depositPaymentModal" class="modal">
         <div class="modal-content" style="max-width:420px;">
             <!-- Header -->
             <div class="bank-header">
                 <span class="bank-icon">📱</span>
                 <div>
-                    <div class="bank-title" id="depositDetailsTitle">Telebirr P2P</div>
+                    <div class="bank-title" id="paymentMethodTitle">Telebirr P2P</div>
                     <div class="bank-sub">Ethiopia - ETB</div>
                 </div>
             </div>
 
-            <!-- Amount display (updates as user types) -->
-            <div class="amount-display" id="depositAmountDisplay">0.00 ETB</div>
-
-            <!-- Hidden amount input for user to enter -->
-            <div class="input-group" style="margin-bottom:8px;">
-                <label data-key="amountLabel">💰 Amount (ETB)</label>
-                <input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" required>
-            </div>
+            <!-- Amount display -->
+            <div class="amount-display" id="paymentAmountDisplay">0.00 ETB</div>
 
             <!-- Step 1: Send to this number -->
             <div class="deposit-step">
                 <div class="step-number">1️⃣ Step 1:</div>
-                <div class="step-title" id="step1Label" data-key="sendToNumber">Send <span id="stepAmountLabel">0.00</span> ETB to this Telebirr number</div>
+                <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this Telebirr number</div>
                 <div class="step-content">
                     <div style="font-size:0.75rem; color:#64748b; margin-bottom:6px;" data-key="howToPay">📞 How to pay?</div>
                     <div class="recipient-number">
-                        <span class="number" id="depositRecipientNumber">📞 0953677690</span>
-                        <button class="copy-btn" id="copyRecipientBtn" data-key="copy">Copy</button>
+                        <span class="number" id="paymentRecipientNumber">📞 0953677690</span>
+                        <button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button>
                     </div>
                     <div style="font-size:0.7rem; color:#64748b; margin-top:8px;">Open Telebirr app → Send Money to Individual → Paste the Mobile number → Make the transfer</div>
                 </div>
@@ -1004,19 +1039,13 @@
                 <div class="step-content">
                     <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
                     <div class="invoice-input">
-                        <input type="text" id="depositInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder">
+                        <input type="text" id="paymentInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder">
                     </div>
                 </div>
             </div>
 
-            <!-- User phone (for verification) -->
-            <div class="input-group" style="margin-top:12px;">
-                <label data-key="yourPhone">📞 Your Phone Number (for verification)</label>
-                <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required>
-            </div>
-
             <!-- Confirm button -->
-            <button id="submitDepositBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
+            <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
 
             <!-- Footer info -->
             <div class="deposit-footer">
@@ -1026,7 +1055,7 @@
             </div>
 
             <!-- Back button -->
-            <button id="backDepositBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
+            <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
         </div>
     </div>
 
@@ -1234,6 +1263,7 @@
         let selectedAdminId = null;
         let selectedAdminObj = null;
         let selectedMethodNumber = null;
+        let pendingDepositAmount = 0;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
         // ========== LANGUAGE ==========
@@ -1250,7 +1280,7 @@
                 accountName: "የአካውንት ስም",
                 yourPhone: "📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",
                 amountLabel: "💰 መጠን (ETB)",
-                depositHint: "💡 ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+                depositHint: "⚠️ ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
                 requestDeposit: "✔ ተቀማጭ ጠይቅ",
                 back: "← ተመለስ",
                 withdrawTitle: "ገንዘብ አውጣ",
@@ -1328,15 +1358,14 @@
                 rulesHelpTitle: "📞 እርዳታ",
                 rulesHelp: "ጥያቄ ካለዎት የ @Dotbingogame ወይም @dotbingo ይቀላቀሉ።",
                 rulesGoodLuck: "🎉 መልካም ዕድል!\nDOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!",
-                // New keys for deposit modal
+                // New keys for payment modal
                 sendToNumber: "Send {amount} ETB to this Telebirr number",
                 howToPay: "📞 How to pay?",
                 enterInvoice: "Enter your Invoice Number",
                 invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
                 invoicePlaceholder: "e.g. CKU3JPX6M3",
                 confirmPayment: "Confirm Payment →",
-                copy: "Copy",
-                amountLabel: "💰 Amount (ETB)"
+                copy: "Copy"
             },
             en: {
                 depositTitle: "Deposit",
@@ -1347,7 +1376,7 @@
                 accountName: "ACCOUNT NAME",
                 yourPhone: "📞 Your Phone Number (for verification)",
                 amountLabel: "💰 Amount (ETB)",
-                depositHint: "💡 After sending payment, admin will verify your deposit using your phone number.",
+                depositHint: "⚠️ After sending payment, admin will verify your deposit using your phone number.",
                 requestDeposit: "✔ Request Deposit",
                 back: "← Back",
                 withdrawTitle: "Withdraw Funds",
@@ -1432,8 +1461,7 @@
                 invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
                 invoicePlaceholder: "e.g. CKU3JPX6M3",
                 confirmPayment: "Confirm Payment →",
-                copy: "Copy",
-                amountLabel: "💰 Amount (ETB)"
+                copy: "Copy"
             }
         };
 
@@ -1603,11 +1631,7 @@
             }
 
             let title = method.charAt(0).toUpperCase() + method.slice(1);
-            document.getElementById('depositDetailsTitle').innerHTML = `${title} P2P`;
-
-            // Set recipient number
-            const displayNumber = getSafeDisplayNumber(number);
-            document.getElementById('depositRecipientNumber').textContent = `📞 ${displayNumber}`;
+            document.getElementById('depositDetailsTitle').innerHTML = `Deposit via ${title}`;
 
             // Store for later use
             selectedAdminObj = admin;
@@ -1617,28 +1641,7 @@
 
             // Clear fields
             document.getElementById('depositPlayerPhone').value = '';
-            document.getElementById('depositAmount').value = '';
-            document.getElementById('depositInvoiceNumber').value = '';
-
-            // Update amount display dynamically
-            const amountInput = document.getElementById('depositAmount');
-            const amountDisplay = document.getElementById('depositAmountDisplay');
-            const stepAmountLabel = document.getElementById('stepAmountLabel');
-            const step1Label = document.getElementById('step1Label');
-            amountInput.addEventListener('input', function() {
-                const val = parseFloat(this.value) || 0;
-                amountDisplay.textContent = val.toFixed(2) + ' ETB';
-                stepAmountLabel.textContent = val.toFixed(2);
-                // Update the step 1 text using data-key
-                const key = 'sendToNumber';
-                const template = currentLang === 'am' ? langData.am[key] : langData.en[key];
-                if (template) {
-                    step1Label.innerHTML = template.replace('{amount}', val.toFixed(2));
-                }
-            });
-
-            // Trigger once to set initial
-            amountInput.dispatchEvent(new Event('input'));
+            document.getElementById('depositAmountSimple').value = '';
 
             document.getElementById('depositDetailsModal').classList.add('active');
             unlockSpeech();
@@ -1648,25 +1651,84 @@
             document.getElementById('depositDetailsModal').classList.remove('active');
         }
 
-        let isSubmittingDeposit = false;
+        // ========== OPEN PAYMENT CONFIRMATION PAGE ==========
+        function openPaymentConfirmation(phone, amount) {
+            // Set the amount display
+            const formattedAmount = Number(amount).toFixed(2);
+            document.getElementById('paymentAmountDisplay').textContent = formattedAmount + ' ETB';
+            document.getElementById('paymentStepAmountLabel').textContent = formattedAmount;
 
-        async function submitDepositRequest() {
-            if (isSubmittingDeposit) return;
-            if (!selectedAdminId) { alert('Please select a deposit account first'); return; }
+            // Set the step 1 label with the amount
+            const step1Label = document.getElementById('paymentStep1Label');
+            const key = 'sendToNumber';
+            const template = currentLang === 'am' ? langData.am[key] : langData.en[key];
+            if (template) {
+                step1Label.innerHTML = template.replace('{amount}', formattedAmount);
+            }
+
+            // Set the recipient number
+            const displayNumber = getSafeDisplayNumber(selectedMethodNumber);
+            document.getElementById('paymentRecipientNumber').textContent = `📞 ${displayNumber}`;
+
+            // Set the method title
+            let title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
+            document.getElementById('paymentMethodTitle').textContent = title + ' P2P';
+
+            // Clear invoice field
+            document.getElementById('paymentInvoiceNumber').value = '';
+
+            // Store phone for later
+            pendingDepositAmount = Number(amount);
+
+            // Close the simple deposit modal and open the payment modal
+            document.getElementById('depositDetailsModal').classList.remove('active');
+            document.getElementById('depositPaymentModal').classList.add('active');
+            unlockSpeech();
+        }
+
+        function closePaymentConfirmation() {
+            document.getElementById('depositPaymentModal').classList.remove('active');
+            // Go back to the simple deposit page
+            document.getElementById('depositDetailsModal').classList.add('active');
+        }
+
+        // ========== HANDLE "REQUEST DEPOSIT" CLICK ==========
+        document.getElementById('requestDepositBtn')?.addEventListener('click', function() {
+            const phone = document.getElementById('depositPlayerPhone').value.trim();
+            const amount = document.getElementById('depositAmountSimple').value.trim();
+
+            if (!phone.match(/^(09|07)\d{8}$/)) {
+                alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.');
+                return;
+            }
+            if (!amount || isNaN(amount) || Number(amount) < 10) {
+                alert('Minimum deposit is 10 ETB');
+                return;
+            }
+
+            // Open the payment confirmation page
+            openPaymentConfirmation(phone, amount);
+        });
+
+        // ========== HANDLE "CONFIRM PAYMENT" CLICK ==========
+        let isSubmittingPayment = false;
+
+        document.getElementById('confirmPaymentBtn')?.addEventListener('click', async function() {
+            if (isSubmittingPayment) return;
 
             const phone = document.getElementById('depositPlayerPhone').value.trim();
-            const amount = document.getElementById('depositAmount').value.trim();
-            const invoice = document.getElementById('depositInvoiceNumber').value.trim();
+            const invoice = document.getElementById('paymentInvoiceNumber').value.trim();
 
-            if (!phone.match(/^(09|07)\d{8}$/)) { alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'); return; }
-            if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit is 10 ETB'); return; }
-            if (!invoice) { alert('Please paste your Invoice Number / SMS confirmation.'); return; }
+            if (!invoice) {
+                alert('Please paste your Invoice Number / SMS confirmation.');
+                return;
+            }
 
-            isSubmittingDeposit = true;
-            const submitBtn = document.getElementById('submitDepositBtn');
-            const originalText = submitBtn.innerText;
-            submitBtn.disabled = true;
-            submitBtn.innerText = '⏳ Sending...';
+            isSubmittingPayment = true;
+            const btn = document.getElementById('confirmPaymentBtn');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = '⏳ Sending...';
 
             try {
                 const response = await fetch('/api/request-deposit', {
@@ -1674,7 +1736,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         phone: phone,
-                        amount: Number(amount),
+                        amount: pendingDepositAmount,
                         payment_type: selectedDepositType,
                         admin_id: selectedAdminId,
                         transaction_reference: invoice
@@ -1682,8 +1744,8 @@
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert(`✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
-                    document.getElementById('depositDetailsModal').classList.remove('active');
+                    alert(`✅ Deposit request submitted!\n\n💰 Amount: ${pendingDepositAmount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${result.adminName || 'Processing'}\n\n⏳ Please wait for admin approval.`);
+                    document.getElementById('depositPaymentModal').classList.remove('active');
                 } else {
                     alert('❌ Error: ' + (result.error || 'Submission failed'));
                 }
@@ -1691,12 +1753,12 @@
                 alert('⚠️ Network error. Please try again.');
                 console.error('Deposit error:', err);
             } finally {
-                isSubmittingDeposit = false;
-                submitBtn.disabled = false;
-                submitBtn.innerText = originalText;
+                isSubmittingPayment = false;
+                btn.disabled = false;
+                btn.innerText = originalText;
                 unlockSpeech();
             }
-        }
+        });
 
         // ========== WITHDRAWAL ==========
         function openWithdrawTypeModal() { document.getElementById('withdrawTypeModal').classList.add('active');
@@ -2101,11 +2163,13 @@
             document.getElementById('depositDetailsModal').classList.remove('active');
             openDepositTypeModal();
         });
-        document.getElementById('submitDepositBtn')?.addEventListener('click', submitDepositRequest);
 
-        // Copy recipient number
-        document.getElementById('copyRecipientBtn')?.addEventListener('click', function() {
-            const numberEl = document.getElementById('depositRecipientNumber');
+        // Payment modal back button - goes back to simple deposit page
+        document.getElementById('backPaymentBtn')?.addEventListener('click', closePaymentConfirmation);
+
+        // Copy recipient number on payment page
+        document.getElementById('paymentCopyBtn')?.addEventListener('click', function() {
+            const numberEl = document.getElementById('paymentRecipientNumber');
             const raw = numberEl.textContent.replace('📞 ', '').trim();
             if (raw) copyToClipboard(raw);
         });
