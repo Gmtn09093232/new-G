@@ -4,6 +4,7 @@
 //             & 1500 ETB Limit for Manual Additions
 //             & Import Players by Username/Handle
 //             & DUPLICATE TRANSACTION NUMBER CHECK
+//             & SMART TRANSACTION NUMBER EXTRACTION
 // ================================================================
 
 require('dotenv').config();
@@ -413,6 +414,42 @@ async function getAdminFromSession(req) {
     return null;
   }
   return data;
+}
+
+// ============================================================
+//  TRANSACTION NUMBER EXTRACTOR
+// ============================================================
+function extractTransactionNumber(text) {
+  if (!text) return null;
+  const trimmed = text.trim();
+  // 1. Check if it's a URL containing "receipt/"
+  const urlMatch = trimmed.match(/https?:\/\/[^\s]+\/receipt\/([A-Za-z0-9]+)/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+
+  // 2. Look for "transaction number is", "transaction number:", "TID:", etc.
+  const patterns = [
+    /transaction\s+number\s+is\s+([A-Za-z0-9]+)/i,
+    /transaction\s+number\s*[:]\s*([A-Za-z0-9]+)/i,
+    /TID\s*[:=]\s*([A-Za-z0-9]+)/i,
+    /reference\s*[:=]\s*([A-Za-z0-9]+)/i,
+    /receipt\/([A-Za-z0-9]+)/i,
+    /\b([A-Za-z0-9]{8,16})\b/ // fallback: any 8-16 alphanumeric sequence
+  ];
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) return match[1].toUpperCase();
+  }
+
+  // 3. If the text itself looks like a transaction number (alphanumeric, 8+ chars)
+  if (/^[A-Za-z0-9]{8,16}$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  // 4. Try to find any alphanumeric sequence of 8-16 chars
+  const fallback = trimmed.match(/\b([A-Za-z0-9]{8,16})\b/);
+  if (fallback) return fallback[1].toUpperCase();
+
+  return null;
 }
 
 // ---------- Static endpoints ----------
@@ -1734,13 +1771,21 @@ const handleDepositRequest = async (req, res) => {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
-  // --- DUPLICATE TRANSACTION NUMBER CHECK ---
+  // --- EXTRACT TRANSACTION NUMBER ---
+  let extractedTxn = null;
   if (transaction_reference) {
-    const trimmedRef = transaction_reference.trim();
+    extractedTxn = extractTransactionNumber(transaction_reference);
+    if (!extractedTxn) {
+      return res.status(400).json({ error: 'Could not extract a valid transaction number from the provided text. Please paste the full SMS or the transaction number.' });
+    }
+  }
+
+  // --- DUPLICATE CHECK ON EXTRACTED NUMBER ---
+  if (extractedTxn) {
     const { data: existing, error: dupErr } = await supabase
       .from('deposit_requests')
       .select('id')
-      .eq('transaction_reference', trimmedRef)
+      .eq('transaction_reference', extractedTxn)
       .maybeSingle();
     if (dupErr) {
       console.error('Error checking duplicate transaction reference:', dupErr);
@@ -1750,7 +1795,6 @@ const handleDepositRequest = async (req, res) => {
       return res.status(400).json({ error: 'This transaction number has already been used.' });
     }
   }
-  // -----------------------------------------
 
   try {
     const { data: admin, error: adminErr } = await supabase
@@ -1824,7 +1868,7 @@ const handleDepositRequest = async (req, res) => {
       photoUrl = publicUrlData?.publicUrl || null;
     }
 
-    // Insert deposit request
+    // Insert deposit request with extracted transaction number
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1832,7 +1876,7 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: transaction_reference ? transaction_reference.trim() : null,
+      transaction_reference: extractedTxn, // store only the extracted number
       proof_photo_url: photoUrl,
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
@@ -1848,7 +1892,7 @@ const handleDepositRequest = async (req, res) => {
       adminId: admin.id,
       adminName: admin.name,
       adminNumber: admin[methodField],
-      transactionReference: transaction_reference || null,
+      transactionReference: extractedTxn,
       hasPhoto: !!photoUrl
     });
 
