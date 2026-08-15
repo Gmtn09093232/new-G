@@ -1715,7 +1715,8 @@ app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bo
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ---------- Player deposit endpoints ----------
-app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
+// Custom handler for deposit with optional photo and invoice number
+const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
@@ -1726,7 +1727,11 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
-  if (!photoFile) return res.status(400).json({ error: 'Photo proof is required' });
+
+  // Require either a photo or a transaction reference (invoice)
+  if (!photoFile && !transaction_reference) {
+    return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
+  }
 
   try {
     const { data: admin, error: adminErr } = await supabase
@@ -1745,6 +1750,7 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Assign admin if not set
     if (!user.admin_id) {
       await supabase
         .from('users')
@@ -1756,46 +1762,48 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       }
     }
 
-    const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `deposit-proofs/${fileName}`;
+    let photoUrl = null;
+    if (photoFile) {
+      const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `deposit-proofs/${fileName}`;
 
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const bucketExists = buckets.some(b => b.name === 'deposit-photos');
-    if (!bucketExists) {
-      await supabase.storage.createBucket('deposit-photos', {
-        public: true,
-        file_size_limit: 5242880,
-        allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-      });
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from('deposit-photos')
-      .upload(filePath, photoFile.buffer, {
-        contentType: photoFile.mimetype,
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      let errorMsg = 'Failed to upload photo proof';
-      if (uploadError.message.includes('bucket not found')) {
-        errorMsg = 'Storage bucket not configured. Please contact admin.';
-      } else if (uploadError.message.includes('permission')) {
-        errorMsg = 'Permission denied. Check Supabase storage policies.';
-      } else if (uploadError.message.includes('duplicate')) {
-        errorMsg = 'File already exists. Please rename and retry.';
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets.some(b => b.name === 'deposit-photos');
+      if (!bucketExists) {
+        await supabase.storage.createBucket('deposit-photos', {
+          public: true,
+          file_size_limit: 5242880,
+          allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+        });
       }
-      return res.status(500).json({ error: errorMsg, details: uploadError.message });
+
+      const { error: uploadError } = await supabase.storage
+        .from('deposit-photos')
+        .upload(filePath, photoFile.buffer, {
+          contentType: photoFile.mimetype,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        let errorMsg = 'Failed to upload photo proof';
+        if (uploadError.message.includes('bucket not found')) {
+          errorMsg = 'Storage bucket not configured. Please contact admin.';
+        } else if (uploadError.message.includes('permission')) {
+          errorMsg = 'Permission denied. Check Supabase storage policies.';
+        } else if (uploadError.message.includes('duplicate')) {
+          errorMsg = 'File already exists. Please rename and retry.';
+        }
+        return res.status(500).json({ error: errorMsg, details: uploadError.message });
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('deposit-photos')
+        .getPublicUrl(filePath);
+      photoUrl = publicUrlData?.publicUrl || null;
     }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('deposit-photos')
-      .getPublicUrl(filePath);
-
-    const photoUrl = publicUrlData?.publicUrl || null;
 
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
@@ -1820,8 +1828,8 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
       adminId: admin.id,
       adminName: admin.name,
       adminNumber: admin[methodField],
-      transactionReference: transaction_reference,
-      photoUrl: photoUrl || 'uploaded'
+      transactionReference: transaction_reference || null,
+      hasPhoto: !!photoUrl
     });
 
     res.json({
@@ -1835,6 +1843,30 @@ app.post('/api/request-deposit', upload.single('photo'), async (req, res) => {
     console.error('Deposit request error:', err.message);
     res.status(500).json({ error: err.message });
   }
+};
+
+// Use multer with single file, but we handle errors to make it optional
+const uploadSingle = upload.single('photo');
+app.post('/api/request-deposit', (req, res, next) => {
+  uploadSingle(req, res, function(err) {
+    if (err) {
+      // If it's a multer error related to file size or unexpected file, return error
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large (max 5MB)' });
+      }
+      if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({ error: 'Unexpected file field' });
+      }
+      // For other errors (e.g., invalid file type), we can still continue if it's not a file error?
+      // But if it's a file type error, we should reject.
+      if (err.message && err.message.includes('Only images are allowed')) {
+        return res.status(400).json({ error: err.message });
+      }
+      // Otherwise, if no file is present, multer may throw a 'LIMIT_FILE_COUNT'? Actually it won't.
+      // We'll just proceed; req.file will be undefined.
+    }
+    handleDepositRequest(req, res);
+  });
 });
 
 // ---------- Player withdrawal endpoints ----------
