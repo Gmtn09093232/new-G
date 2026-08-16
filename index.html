@@ -1007,6 +1007,22 @@
         .back-btn:active {
             background: #e2e8f0;
         }
+
+        /* ========== HOW TO PAY SPECIFIC ========== */
+        #howToPayContent ul {
+            padding-left: 20px;
+        }
+        #howToPayContent li {
+            margin-bottom: 8px;
+        }
+        #howToPayTrigger {
+            cursor: pointer;
+            text-decoration: underline;
+            color: #0f172a;
+        }
+        #howToPayTrigger:hover {
+            color: #f97316;
+        }
     </style>
 </head>
 <body>
@@ -1085,7 +1101,7 @@
                 <div class="step-number">1️⃣ Step 1:</div>
                 <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this Telebirr number</div>
                 <div class="step-content">
-                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:6px;" data-key="howToPay">📞 How to pay?</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:6px;" id="howToPayTrigger" data-key="howToPay">📞 How to pay?</div>
                     <div class="recipient-number">
                         <span class="number" id="paymentRecipientNumber">📞 0953677690</span>
                         <button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button>
@@ -1105,6 +1121,23 @@
             </div>
             <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
             <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
+        </div>
+    </div>
+
+    <!-- ===== HOW TO PAY MODAL ===== -->
+    <div id="howToPayModal" class="modal">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="bank-header">
+                <span class="bank-icon">📖</span>
+                <div>
+                    <div class="bank-title" id="howToPayTitle">How to Pay</div>
+                    <div class="bank-sub" id="howToPayMethod">Telebirr</div>
+                </div>
+            </div>
+            <div id="howToPayContent" style="font-size:0.9rem; line-height:1.6; color:#1e293b; max-height:400px; overflow-y:auto; padding-right:8px;">
+                <!-- content filled by JS -->
+            </div>
+            <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">Got it</button>
         </div>
     </div>
 
@@ -1296,7 +1329,7 @@
 
     <script>
         // ============================================================
-        //  CLEAN, FAST, SMOOTH – DOT BINGO (with fixed deposit flow)
+        //  CLEAN, FAST, SMOOTH – DOT BINGO (with fixed deposit flow & How to Pay)
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1639,68 +1672,68 @@
         // ========== FIXED DEPOSIT FLOW WITH PROPER RESET ==========
 
         function resetDepositState() {
-    // Reset all state variables
-    selectedAdminId = null;
-    selectedAdminObj = null;
-    selectedDepositType = null;
-    selectedMethodNumber = null;
-    pendingAmount = 0;
-    savedPhone = '';
-    savedAmount = '';
-    submitting = false;
-
-    // Clear input fields
-    const phoneInput = $('depositPlayerPhone');
-    const amountInput = $('depositAmountSimple');
-    const invoiceInput = $('paymentInvoiceNumber');
-    if (phoneInput) phoneInput.value = '';
-    if (amountInput) amountInput.value = '';
-    if (invoiceInput) invoiceInput.value = '';
-
-    // Close ALL deposit modals
-    const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositAdminListModal', 'depositMethodListModal'];
-    modals.forEach(id => {
-        const el = $(id);
-        if (el) el.classList.remove('active');
-    });
-
-    // Reset confirm button
-    const confirmBtn = $('confirmPaymentBtn');
-    if (confirmBtn) {
-        confirmBtn.disabled = false;
-        const key = confirmBtn.getAttribute('data-key');
-        if (key) {
-            confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key];
-        } else {
-            confirmBtn.innerText = 'Confirm Payment →';
+            // Reset all state variables
+            selectedAdminId = null;
+            selectedAdminObj = null;
+            selectedDepositType = null;
+            selectedMethodNumber = null;
+            pendingAmount = 0;
+            savedPhone = '';
+            savedAmount = '';
+            submitting = false;
+            
+            // Clear input fields
+            const phoneInput = $('depositPlayerPhone');
+            const amountInput = $('depositAmountSimple');
+            const invoiceInput = $('paymentInvoiceNumber');
+            if (phoneInput) phoneInput.value = '';
+            if (amountInput) amountInput.value = '';
+            if (invoiceInput) invoiceInput.value = '';
+            
+            // Close ALL deposit modals
+            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositAdminListModal', 'depositMethodListModal'];
+            modals.forEach(id => {
+                const el = $(id);
+                if (el) el.classList.remove('active');
+            });
+            
+            // Reset confirm button
+            const confirmBtn = $('confirmPaymentBtn');
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                const key = confirmBtn.getAttribute('data-key');
+                if (key) {
+                    confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key];
+                } else {
+                    confirmBtn.innerText = 'Confirm Payment →';
+                }
+            }
         }
-    }
-}
 
         function openDepositType() {
-    resetDepositState(); // clean slate
-    $('depositAdminListModal').classList.add('active');
-    loadAdmins();
-    unlockSpeech();
-}
+            resetDepositState(); // clean slate
+            $('depositAdminListModal').classList.add('active');
+            loadAdmins();
+            unlockSpeech();
+        }
 
-function closeAdminList() {
-    resetDepositState(); // full exit
-}
+        function closeAdminList() {
+            resetDepositState();
+        }
 
-function closeMethodList() {
-    $('depositMethodListModal').classList.remove('active');
-    $('depositAdminListModal').classList.add('active');
-}
+        function closeMethodList() {
+            $('depositMethodListModal').classList.remove('active');
+            $('depositAdminListModal').classList.add('active');
+        }
 
-function closeDepositDetails() {
-    $('depositDetailsModal').classList.remove('active');
-    if (selectedAdminObj) {
-        showMethods(selectedAdminObj);
-    } else {
-        $('depositAdminListModal').classList.add('active');
-    }
-}
+        function closeDepositDetails() {
+            $('depositDetailsModal').classList.remove('active');
+            if (selectedAdminObj) {
+                showMethods(selectedAdminObj);
+            } else {
+                $('depositAdminListModal').classList.add('active');
+            }
+        }
 
         function openDepositDetails(admin, method, number) {
             if (!admin || !method || !number) { alert('Please select a valid payment method.'); return; }
@@ -1741,6 +1774,86 @@ function closeDepositDetails() {
             if (savedAmount) $('depositAmountSimple').value = savedAmount;
         }
 
+        // ========== HOW TO PAY ==========
+
+        function openHowToPay() {
+            const method = selectedDepositType || 'telebirr';
+            const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
+            document.getElementById('howToPayMethod').textContent = methodLabel;
+
+            const content = document.getElementById('howToPayContent');
+            const instructions = getPaymentInstructions(method);
+            content.innerHTML = instructions;
+
+            // Update amount placeholder
+            const amountSpan = document.getElementById('howToPayAmount');
+            if (amountSpan) amountSpan.textContent = pendingAmount || '10';
+
+            document.getElementById('howToPayModal').classList.add('active');
+            unlockSpeech();
+        }
+
+        function closeHowToPay() {
+            document.getElementById('howToPayModal').classList.remove('active');
+        }
+
+        function getPaymentInstructions(method) {
+            const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
+            const common = `
+                <p><strong>📌 Follow these steps carefully:</strong></p>
+                <ol>
+                    <li>Open your ${methodLabel} app or mobile money service.</li>
+                    <li>Select <strong>Send Money</strong> (or <strong>Transfer</strong>).</li>
+                    <li>Enter the admin's phone number shown above.</li>
+                    <li>Enter the exact amount (<span id="howToPayAmount">${pendingAmount || '...'}</span> ETB).</li>
+                    <li>Complete the transaction and copy the <strong>Invoice Number</strong> (or the full SMS confirmation).</li>
+                    <li>Paste that Invoice Number in the field below and tap <strong>Confirm Payment</strong>.</li>
+                </ol>
+                <p style="margin-top:12px; background:#fef3c7; padding:10px; border-radius:16px;">
+                    ⚠️ <strong>Important:</strong> Use the <strong>exact</strong> phone number and amount to ensure your deposit is credited automatically.
+                </p>
+            `;
+
+            let methodSpecific = '';
+            if (method === 'telebirr') {
+                methodSpecific = `
+                    <h4 style="margin-top:16px;">📱 Telebirr Specific</h4>
+                    <ul>
+                        <li>Open Telebirr app → <strong>Send Money</strong> → <strong>To Individual</strong>.</li>
+                        <li>Paste the admin's number (starting with <strong>09</strong>).</li>
+                        <li>After payment, you'll receive an SMS with a <strong>Transaction ID</strong> – that is your Invoice Number.</li>
+                    </ul>
+                `;
+            } else if (method === 'cbebirr') {
+                methodSpecific = `
+                    <h4 style="margin-top:16px;">🏦 CBE Birr Specific</h4>
+                    <ul>
+                        <li>Open CBE Birr app → <strong>Send Money</strong>.</li>
+                        <li>Enter the admin's phone number.</li>
+                        <li>Your Invoice Number is the <strong>reference number</strong> shown after the transaction.</li>
+                    </ul>
+                `;
+            } else if (method === 'mpesa') {
+                methodSpecific = `
+                    <h4 style="margin-top:16px;">📲 M-Pesa Specific</h4>
+                    <ul>
+                        <li>Open M-Pesa → <strong>Send Money</strong>.</li>
+                        <li>Enter the admin's phone number (starting with <strong>07</strong>).</li>
+                        <li>Your Invoice Number is the <strong>transaction code</strong> (e.g., <code>CKU3JPX6M3</code>).</li>
+                    </ul>
+                `;
+            }
+
+            return `
+                <p><strong>💰 Sending via ${methodLabel}</strong></p>
+                ${common}
+                ${methodSpecific}
+                <p style="margin-top:16px; font-size:0.85rem; color:#64748b;">
+                    💡 <em>If you don't see your Invoice Number, wait a few seconds for the SMS to arrive.</em>
+                </p>
+            `;
+        }
+
         // ---------- EVENT DELEGATION ----------
         document.addEventListener('click', e => {
             const t = e.target.closest('#requestDepositBtn');
@@ -1765,55 +1878,55 @@ function closeDepositDetails() {
         });
 
         // ---------- CONFIRM PAYMENT ----------
-       $('confirmPaymentBtn')?.addEventListener('click', async function() {
-    if (submitting) return;
-    const phone = $('depositPlayerPhone').value.trim();
-    const invoice = $('paymentInvoiceNumber').value.trim();
-    if (!invoice) {
-        alert('Please paste your Invoice Number / SMS confirmation.');
-        return;
-    }
-    submitting = true;
-    const btn = this;
-    const orig = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = '⏳ Sending...';
-    try {
-        const r = await fetch('/api/request-deposit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                phone, 
-                amount: pendingAmount, 
-                payment_type: selectedDepositType,
-                admin_id: selectedAdminId, 
-                transaction_reference: invoice 
-            })
+        $('confirmPaymentBtn')?.addEventListener('click', async function() {
+            if (submitting) return;
+            const phone = $('depositPlayerPhone').value.trim();
+            const invoice = $('paymentInvoiceNumber').value.trim();
+            if (!invoice) {
+                alert('Please paste your Invoice Number / SMS confirmation.');
+                return;
+            }
+            submitting = true;
+            const btn = this;
+            const orig = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = '⏳ Sending...';
+            try {
+                const r = await fetch('/api/request-deposit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        phone, 
+                        amount: pendingAmount, 
+                        payment_type: selectedDepositType,
+                        admin_id: selectedAdminId, 
+                        transaction_reference: invoice 
+                    })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    alert(
+                        `✅ Deposit request submitted!\n\n` +
+                        `💰 Amount: ${pendingAmount} ETB\n` +
+                        `📱 Invoice: ${invoice}\n` +
+                        `👤 Admin: ${d.adminName||'Processing'}\n\n` +
+                        `⏳ Please wait for admin approval.`
+                    );
+                    resetDepositState();
+                    $('depositPaymentModal').classList.remove('active');
+                } else {
+                    alert('❌ Error: ' + (d.error || 'Submission failed'));
+                }
+            } catch (err) {
+                alert('⚠️ Network error. Please try again.');
+                console.error(err);
+            } finally {
+                submitting = false;
+                btn.disabled = false;
+                btn.innerText = orig;
+                unlockSpeech();
+            }
         });
-        const d = await r.json();
-        if (d.success) {
-            alert(
-                `✅ Deposit request submitted!\n\n` +
-                `💰 Amount: ${pendingAmount} ETB\n` +
-                `📱 Invoice: ${invoice}\n` +
-                `👤 Admin: ${d.adminName||'Processing'}\n\n` +
-                `⏳ Please wait for admin approval.`
-            );
-            resetDepositState();  // ✅ full reset on success
-            $('depositPaymentModal').classList.remove('active');
-        } else {
-            alert('❌ Error: ' + (d.error || 'Submission failed'));
-        }
-    } catch (err) {
-        alert('⚠️ Network error. Please try again.');
-        console.error(err);
-    } finally {
-        submitting = false;
-        btn.disabled = false;
-        btn.innerText = orig;
-        unlockSpeech();
-    }
-});
 
         // ---------- WITHDRAWAL ----------
         function openWithdrawType() { $('withdrawTypeModal').classList.add('active');
@@ -2063,19 +2176,6 @@ function closeDepositDetails() {
             currentGameId = null;
             unlockSpeech();
         }
-        
-        function debugModalState() {
-    console.log('===== DEPOSIT MODAL STATE =====');
-    ['depositAdminListModal', 'depositMethodListModal', 'depositDetailsModal', 'depositPaymentModal'].forEach(id => {
-        const el = $(id);
-        console.log(`${id}: ${el ? (el.classList.contains('active') ? '✅ ACTIVE' : '❌ hidden') : 'NOT FOUND'}`);
-    });
-    console.log('selectedAdminId:', selectedAdminId);
-    console.log('selectedDepositType:', selectedDepositType);
-    console.log('pendingAmount:', pendingAmount);
-    console.log('===== END =====');
-}
-
 
         function showWinner(data) {
             if (data.noWinner) { if (currentGameId) addRecord(false, 0, currentGameId, currentStake, [], null, 0);
@@ -2406,27 +2506,19 @@ function closeDepositDetails() {
         $('depositBtnGame')?.addEventListener('click', openDepositType);
         $('withdrawBtn')?.addEventListener('click', openWithdrawType);
         $('withdrawBtnGame')?.addEventListener('click', openWithdrawType);
-// Admin list
-$('closeAdminListBtn')?.addEventListener('click', closeAdminList);
-$('depositAdminListBackBtn')?.addEventListener('click', closeAdminList);
 
-// Method list
-$('closeMethodListBtn')?.addEventListener('click', closeMethodList);
-$('depositMethodListBackBtn')?.addEventListener('click', () => {
-    $('depositMethodListModal').classList.remove('active');
-    $('depositAdminListModal').classList.add('active');
-});
+        // Deposit admin list modal controls (FIXED)
+        $('closeAdminListBtn')?.addEventListener('click', closeAdminList);
+        $('depositAdminListBackBtn')?.addEventListener('click', closeAdminList);
 
-// Deposit details
-$('backDepositBtn')?.addEventListener('click', closeDepositDetails);
+        // Deposit method list modal controls (FIXED)
+        $('closeMethodListBtn')?.addEventListener('click', closeMethodList);
+        $('depositMethodListBackBtn')?.addEventListener('click', () => {
+            $('depositMethodListModal').classList.remove('active');
+            $('depositAdminListModal').classList.add('active');
+        });
 
-// Payment confirmation
-$('backPaymentBtn')?.addEventListener('click', () => {
-    $('depositPaymentModal').classList.remove('active');
-    $('depositDetailsModal').classList.add('active');
-    if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-    if (savedAmount) $('depositAmountSimple').value = savedAmount;
-});
+        $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
 
         // Copy recipient number on payment page
         $('paymentCopyBtn')?.addEventListener('click', function() {
@@ -2434,6 +2526,10 @@ $('backPaymentBtn')?.addEventListener('click', () => {
             const raw = el.textContent.replace('📞 ', '').trim();
             if (raw) copy(raw);
         });
+
+        // How to Pay trigger
+        $('howToPayTrigger')?.addEventListener('click', openHowToPay);
+        $('closeHowToPayBtn')?.addEventListener('click', closeHowToPay);
 
         // Withdraw
         document.querySelectorAll('#withdrawTypeModal .type-btn[data-type]').forEach(btn => {
