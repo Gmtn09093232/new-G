@@ -1296,7 +1296,7 @@
 
     <script>
         // ============================================================
-        //  CLEAN, FAST, SMOOTH – DOT BINGO
+        //  CLEAN, FAST, SMOOTH – DOT BINGO (with fixed deposit flow)
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1380,6 +1380,9 @@
         let pendingAmount = 0,
             savedPhone = '',
             savedAmount = '';
+        // Submit flags
+        let submitting = false;
+        let submittingW = false;
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
         // ---------- LANGUAGE ----------
@@ -1558,8 +1561,8 @@
             localStorage.setItem('dot_bingo_lang', lang);
             applyLang(); }
         langBtn.addEventListener('click', toggleLang);
-        const saved = localStorage.getItem('dot_bingo_lang');
-        if (saved === 'am' || saved === 'en') lang = saved;
+        const savedLang = localStorage.getItem('dot_bingo_lang');
+        if (savedLang === 'am' || savedLang === 'en') lang = savedLang;
         else lang = 'am';
         applyLang();
 
@@ -1633,14 +1636,71 @@
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
         }
 
-        // ---------- DEPOSIT FLOW ----------
-        function openDepositType() { $('depositAdminListModal').classList.add('active');
+        // ========== FIXED DEPOSIT FLOW WITH PROPER RESET ==========
+
+        function resetDepositState() {
+            // Reset all state variables
+            selectedAdminId = null;
+            selectedAdminObj = null;
+            selectedDepositType = null;
+            selectedMethodNumber = null;
+            pendingAmount = 0;
+            savedPhone = '';
+            savedAmount = '';
+            submitting = false;
+            
+            // Clear input fields
+            const phoneInput = $('depositPlayerPhone');
+            const amountInput = $('depositAmountSimple');
+            const invoiceInput = $('paymentInvoiceNumber');
+            if (phoneInput) phoneInput.value = '';
+            if (amountInput) amountInput.value = '';
+            if (invoiceInput) invoiceInput.value = '';
+            
+            // Close ALL deposit modals
+            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositAdminListModal', 'depositMethodListModal'];
+            modals.forEach(id => {
+                const el = $(id);
+                if (el) el.classList.remove('active');
+            });
+            
+            // Reset confirm button
+            const confirmBtn = $('confirmPaymentBtn');
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                const key = confirmBtn.getAttribute('data-key');
+                if (key) {
+                    confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key];
+                } else {
+                    confirmBtn.innerText = 'Confirm Payment →';
+                }
+            }
+        }
+
+        function openDepositType() {
+            resetDepositState(); // clean slate
+            $('depositAdminListModal').classList.add('active');
             loadAdmins();
-            unlockSpeech(); }
+            unlockSpeech();
+        }
 
-        function closeAdminList() { $('depositAdminListModal').classList.remove('active'); }
+        function closeAdminList() {
+            resetDepositState();
+        }
 
-        function closeMethodList() { $('depositMethodListModal').classList.remove('active'); }
+        function closeMethodList() {
+            $('depositMethodListModal').classList.remove('active');
+            $('depositAdminListModal').classList.add('active');
+        }
+
+        function closeDepositDetails() {
+            $('depositDetailsModal').classList.remove('active');
+            if (selectedAdminObj) {
+                showMethods(selectedAdminObj);
+            } else {
+                $('depositAdminListModal').classList.add('active');
+            }
+        }
 
         function openDepositDetails(admin, method, number) {
             if (!admin || !method || !number) { alert('Please select a valid payment method.'); return; }
@@ -1653,8 +1713,6 @@
             $('depositDetailsModal').classList.add('active');
             unlockSpeech();
         }
-
-        function closeDepositDetails() { $('depositDetailsModal').classList.remove('active'); }
 
         function openPaymentConfirm(phone, amount) {
             savedPhone = phone;
@@ -1683,32 +1741,20 @@
             if (savedAmount) $('depositAmountSimple').value = savedAmount;
         }
 
-        function resetDepositState() {
-            selectedAdminId = null;
-            selectedAdminObj = null;
-            selectedDepositType = null;
-            selectedMethodNumber = null;
-            pendingAmount = 0;
-            savedPhone = '';
-            savedAmount = '';
-            $('depositPlayerPhone').value = '';
-            $('depositAmountSimple').value = '';
-            $('paymentInvoiceNumber').value = '';
-            $('depositPaymentModal').classList.remove('active');
-            $('depositDetailsModal').classList.remove('active');
-            $('depositAdminListModal').classList.remove('active');
-            $('depositMethodListModal').classList.remove('active');
-        }
-
         // ---------- EVENT DELEGATION ----------
         document.addEventListener('click', e => {
             const t = e.target.closest('#requestDepositBtn');
             if (t) {
                 const phone = $('depositPlayerPhone').value.trim();
                 const amount = $('depositAmountSimple').value.trim();
-                if (!phone.match(/^(09|07)\d{8}$/)) { alert(
-                    'Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'); return; }
-                if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit is 10 ETB'); return; }
+                if (!phone.match(/^(09|07)\d{8}$/)) {
+                    alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.');
+                    return;
+                }
+                if (!amount || isNaN(amount) || Number(amount) < 10) {
+                    alert('Minimum deposit is 10 ETB');
+                    return;
+                }
                 openPaymentConfirm(phone, amount);
             }
         });
@@ -1719,12 +1765,14 @@
         });
 
         // ---------- CONFIRM PAYMENT ----------
-        let submitting = false;
         $('confirmPaymentBtn')?.addEventListener('click', async function() {
             if (submitting) return;
             const phone = $('depositPlayerPhone').value.trim();
             const invoice = $('paymentInvoiceNumber').value.trim();
-            if (!invoice) { alert('Please paste your Invoice Number / SMS confirmation.'); return; }
+            if (!invoice) {
+                alert('Please paste your Invoice Number / SMS confirmation.');
+                return;
+            }
             submitting = true;
             const btn = this;
             const orig = btn.innerText;
@@ -1734,22 +1782,37 @@
                 const r = await fetch('/api/request-deposit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, amount: pendingAmount, payment_type: selectedDepositType,
-                        admin_id: selectedAdminId, transaction_reference: invoice })
+                    body: JSON.stringify({ 
+                        phone, 
+                        amount: pendingAmount, 
+                        payment_type: selectedDepositType,
+                        admin_id: selectedAdminId, 
+                        transaction_reference: invoice 
+                    })
                 });
                 const d = await r.json();
                 if (d.success) {
                     alert(
-                        `✅ Deposit request submitted!\n\n💰 Amount: ${pendingAmount} ETB\n📱 Invoice: ${invoice}\n👤 Admin: ${d.adminName||'Processing'}\n\n⏳ Please wait for admin approval.`
-                        );
+                        `✅ Deposit request submitted!\n\n` +
+                        `💰 Amount: ${pendingAmount} ETB\n` +
+                        `📱 Invoice: ${invoice}\n` +
+                        `👤 Admin: ${d.adminName||'Processing'}\n\n` +
+                        `⏳ Please wait for admin approval.`
+                    );
                     resetDepositState();
                     $('depositPaymentModal').classList.remove('active');
-                } else { alert('❌ Error: ' + (d.error || 'Submission failed')); }
-            } catch (err) { alert('⚠️ Network error. Please try again.');
-                console.error(err); } finally { submitting = false;
+                } else {
+                    alert('❌ Error: ' + (d.error || 'Submission failed'));
+                }
+            } catch (err) {
+                alert('⚠️ Network error. Please try again.');
+                console.error(err);
+            } finally {
+                submitting = false;
                 btn.disabled = false;
                 btn.innerText = orig;
-                unlockSpeech(); }
+                unlockSpeech();
+            }
         });
 
         // ---------- WITHDRAWAL ----------
@@ -1772,7 +1835,6 @@
             unlockSpeech();
         }
 
-        let submittingW = false;
         async function submitWithdraw() {
             if (submittingW) return;
             const rec = $('withdrawReceiver').value.trim(),
@@ -1780,9 +1842,10 @@
                 name = $('withdrawName').value.trim();
             if (!name) { alert("Full name required"); return; }
             if (!amt || isNaN(amt) || Number(amt) < 20) { alert('Minimum withdrawal is 20 ETB'); return; }
-            if (!rec.match(/^(09|07)\d{8}$/)) { alert(
-                    `Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`
-                    ); return; }
+            if (!rec.match(/^(09|07)\d{8}$/)) {
+                alert(`Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`);
+                return;
+            }
             submittingW = true;
             const btn = $('submitWithdrawBtn');
             const orig = btn.innerText;
@@ -1979,6 +2042,7 @@
             else showLobby(30); }
 
         function goStake() {
+            resetDepositState(); // cleanup
             if (socket) { socket.disconnect();
                 socket = null; }
             isGameActive = false;
@@ -2249,7 +2313,6 @@
         }
 
         // ---------- INIT ----------
-        // ---------- INIT ----------
         function init() {
             buildGrid();
             loadStats();
@@ -2257,12 +2320,11 @@
             window.speechSynthesis.getVoices();
             $('stakePage').classList.remove('hidden');
             restoreSession();
-            // Log that we're ready
             console.log('✨ DOT BINGO ready');
         }
 
         // ============================================================
-        //  EVENT BINDINGS
+        //  EVENT BINDINGS (with fixes)
         // ============================================================
 
         // Stake buttons
@@ -2296,6 +2358,7 @@
         // Tab navigation
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                resetDepositState(); // cleanup on tab switch
                 const page = btn.dataset.page;
                 clearInterval(lobbyTimerInterval);
                 if (page === 'lobby') {
@@ -2316,9 +2379,12 @@
         });
 
         // Back buttons
-        $('backFromHistoryBtn')?.addEventListener('click', goBack);
-        $('backFromWalletBtn')?.addEventListener('click', goBack);
-        $('backFromProfileBtn')?.addEventListener('click', goBack);
+        $('backFromHistoryBtn')?.addEventListener('click', () => { resetDepositState();
+            goBack(); });
+        $('backFromWalletBtn')?.addEventListener('click', () => { resetDepositState();
+            goBack(); });
+        $('backFromProfileBtn')?.addEventListener('click', () => { resetDepositState();
+            goBack(); });
 
         // Deposit buttons
         $('depositFromWalletBtn')?.addEventListener('click', openDepositType);
@@ -2328,21 +2394,18 @@
         $('withdrawBtn')?.addEventListener('click', openWithdrawType);
         $('withdrawBtnGame')?.addEventListener('click', openWithdrawType);
 
-        // Deposit admin list modal controls
+        // Deposit admin list modal controls (FIXED)
         $('closeAdminListBtn')?.addEventListener('click', closeAdminList);
         $('depositAdminListBackBtn')?.addEventListener('click', closeAdminList);
 
-        // Deposit method list modal controls
+        // Deposit method list modal controls (FIXED)
         $('closeMethodListBtn')?.addEventListener('click', closeMethodList);
         $('depositMethodListBackBtn')?.addEventListener('click', () => {
             $('depositMethodListModal').classList.remove('active');
             $('depositAdminListModal').classList.add('active');
         });
 
-        $('backDepositBtn')?.addEventListener('click', () => {
-            $('depositDetailsModal').classList.remove('active');
-            openDepositType();
-        });
+        $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
 
         // Copy recipient number on payment page
         $('paymentCopyBtn')?.addEventListener('click', function() {
