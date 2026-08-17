@@ -5,6 +5,7 @@
 //             & Import Players by Username/Handle
 //             & DUPLICATE TRANSACTION NUMBER CHECK
 //             & SMART TRANSACTION NUMBER EXTRACTION
+//             & AUTO-VERIFY DEPOSIT BOT (NEW)
 // ================================================================
 
 require('dotenv').config();
@@ -18,6 +19,8 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');          // <-- NEW for receipt fetching
+const cheerio = require('cheerio');      // <-- NEW for HTML parsing
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -450,6 +453,100 @@ function extractTransactionNumber(text) {
   if (fallback) return fallback[1].toUpperCase();
 
   return null;
+}
+
+// ============================================================
+//  NEW: RECEIPT VERIFICATION HELPER (used by auto-verify)
+// ============================================================
+async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
+  const { transaction_reference, payment_type } = deposit;
+  let receiptUrl = '';
+
+  // Build the receipt URL based on payment type
+  if (payment_type === 'cbebirr') {
+    // CBE usually needs TID and PH (Phone). Extract them from the reference text.
+    const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
+    const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) ||
+                    transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
+    const tid = tidMatch ? tidMatch[1] : '';
+    let ph = phMatch ? phMatch[1] : '';
+    if (ph && ph.startsWith('09')) ph = '251' + ph.substring(1);
+
+    if (!tid) return { match: false, expected: expectedCbe, accountFound: null, error: 'Missing TID' };
+    receiptUrl = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
+
+  } else if (payment_type === 'telebirr') {
+    const txnMatch = transaction_reference.match(/\b([A-Z0-9]{8,15})\b/);
+    if (!txnMatch) return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: 'Missing Txn ID' };
+    receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnMatch[1])}`;
+  } else {
+    return { match: false, expected: 'N/A', accountFound: null, error: 'Unsupported method' };
+  }
+
+  try {
+    // Fetch the receipt HTML
+    const response = await axios.get(receiptUrl, { timeout: 10000 });
+    const html = response.data;
+    const $ = cheerio.load(html);
+
+    let accountFound = null;
+
+    if (payment_type === 'cbebirr') {
+      // CBE Page: Look for "Credit Account" or "Credited Account"
+      const creditText = $('td:contains("Credit Account")').next('td').text().trim() ||
+                         $('td:contains("Credited Account")').next('td').text().trim() ||
+                         $('div:contains("Credit Account")').next('div').text().trim();
+
+      // Extract the 12-digit number (251xxxxxxxxx)
+      const match = creditText.match(/(251\d{9})/);
+      if (match) accountFound = match[1];
+
+    } else if (payment_type === 'telebirr') {
+      // Telebirr Page: Look for "Credited Party Account" or similar
+      const creditText = $('td:contains("Credited Party Account")').next('td').text().trim() ||
+                         $('td:contains("Receiver Account")').next('td').text().trim() ||
+                         $('div:contains("Credited Party")').text().trim();
+
+      // Telebirr numbers are usually 12 digits (2519xxxxxxxx)
+      const match = creditText.match(/(2519\d{7})/);
+      if (match) accountFound = match[1];
+    }
+
+    // If we couldn't find the number, check the raw text as a fallback
+    if (!accountFound) {
+      const rawText = $('body').text();
+      if (payment_type === 'cbebirr') {
+        const match = rawText.match(/(251918\d{6})/); // Specifically looking for admin number pattern
+        if (match) accountFound = match[1];
+      } else {
+        const match = rawText.match(/(2519\d{7})/);
+        if (match) accountFound = match[1];
+      }
+    }
+
+    // PERFORM THE MATCHING
+    let match = false;
+    if (payment_type === 'cbebirr') {
+      // CBE: Exact match on the full number
+      match = (accountFound === expectedCbe);
+    } else if (payment_type === 'telebirr') {
+      // Telebirr: Match the last 4 digits
+      if (accountFound && accountFound.length >= 4) {
+        const foundLast4 = accountFound.slice(-4);
+        match = (foundLast4 === expectedTelebirrLast4);
+      }
+    }
+
+    return {
+      match,
+      expected: payment_type === 'cbebirr' ? expectedCbe : expectedTelebirrLast4,
+      accountFound
+    };
+
+  } catch (fetchError) {
+    console.error(`Failed to fetch receipt ${receiptUrl}:`, fetchError.message);
+    return { match: false, expected: 'N/A', accountFound: null, error: 'Network/Scraping error' };
+  }
 }
 
 // ---------- Static endpoints ----------
@@ -2383,6 +2480,190 @@ app.post('/admin/update-player-balance', async (req, res) => {
   } catch (err) {
     console.error('Error updating player balance:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================
+//  NEW: AUTO-VERIFY DEPOSIT ENDPOINTS
+// ============================================================
+
+// POST /admin/auto-verify-deposit
+app.post('/admin/auto-verify-deposit', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
+  }
+
+  const { depositId } = req.body;
+  if (!depositId) {
+    return res.status(400).json({ success: false, error: 'Deposit ID required' });
+  }
+
+  try {
+    // 1. Fetch the deposit request
+    const { data: deposit, error: fetchErr } = await supabase
+      .from('deposit_requests')
+      .select('*')
+      .eq('id', depositId)
+      .eq('admin_id', admin.id)
+      .maybeSingle();
+
+    if (fetchErr || !deposit) {
+      return res.status(404).json({ success: false, error: 'Deposit not found or not assigned to you' });
+    }
+
+    if (deposit.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'Deposit already processed' });
+    }
+
+    // 2. Get admin's account numbers
+    const expectedCbe = admin.cbebirr_number || '';
+    const expectedTelebirrLast4 = admin.telebirr_number ? admin.telebirr_number.slice(-4) : '';
+
+    // 3. Run verification
+    const result = await verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4);
+
+    // 4. If matched, auto-approve
+    if (result.match) {
+      // Check holding limit before auto-approving
+      const holding = await getAdminHoldingBalance(admin.id);
+      const newHolding = holding + deposit.amount;
+      if (newHolding > 1500) {
+        return res.status(400).json({
+          success: false,
+          error: `Auto-approval would exceed 1500 ETB holding limit (current: ${holding.toFixed(0)} ETB). Please withdraw excess before auto-approving.`
+        });
+      }
+
+      // Update deposit status
+      await supabase
+        .from('deposit_requests')
+        .update({
+          status: 'approved',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', depositId);
+
+      // Add balance to player
+      const user = await loadUser(deposit.telegram_id, null, null, null, false);
+      if (user) {
+        user.balance += deposit.amount;
+        await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', deposit.telegram_id);
+        if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
+          user.first_deposit_amount = deposit.amount;
+          await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', deposit.telegram_id);
+        }
+        const playerSocket = await getSocketByUserId(deposit.telegram_id);
+        if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
+      }
+
+      Audit.depositCompleted(deposit.telegram_id, req.ip, {
+        transactionId: depositId.toString(),
+        providerRef: depositId.toString(),
+        amount: deposit.amount,
+        currency: 'ETB',
+        method: deposit.payment_type || 'unknown',
+        adminId: admin.id,
+        adminName: admin.name,
+        autoVerified: true
+      });
+    }
+
+    // 5. Return result
+    res.json({
+      success: true,
+      result: {
+        match: result.match,
+        expected: result.expected,
+        accountFound: result.accountFound || null,
+        error: result.error || null
+      }
+    });
+
+  } catch (err) {
+    console.error('Auto-verify deposit error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /admin/auto-verify-all
+app.post('/admin/auto-verify-all', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ success: false, error: 'Session expired or deactivated' });
+  }
+
+  try {
+    // Fetch all pending deposits for this admin
+    const { data: pendingDeposits, error: fetchErr } = await supabase
+      .from('deposit_requests')
+      .select('*')
+      .eq('admin_id', admin.id)
+      .eq('status', 'pending');
+
+    if (fetchErr) throw fetchErr;
+
+    const results = [];
+    const expectedCbe = admin.cbebirr_number || '';
+    const expectedTelebirrLast4 = admin.telebirr_number ? admin.telebirr_number.slice(-4) : '';
+
+    for (const deposit of pendingDeposits) {
+      try {
+        const result = await verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4);
+        let processed = false;
+        if (result.match) {
+          // Check holding limit
+          const holding = await getAdminHoldingBalance(admin.id);
+          const newHolding = holding + deposit.amount;
+          if (newHolding <= 1500) {
+            // Auto-approve
+            await supabase
+              .from('deposit_requests')
+              .update({
+                status: 'approved',
+                processed_at: new Date().toISOString()
+              })
+              .eq('id', deposit.id);
+
+            const user = await loadUser(deposit.telegram_id, null, null, null, false);
+            if (user) {
+              user.balance += deposit.amount;
+              await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', deposit.telegram_id);
+              if (!user.first_deposit_amount || user.first_deposit_amount === 0) {
+                user.first_deposit_amount = deposit.amount;
+                await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', deposit.telegram_id);
+              }
+              const playerSocket = await getSocketByUserId(deposit.telegram_id);
+              if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
+            }
+            processed = true;
+          }
+        }
+        results.push({
+          depositId: deposit.id,
+          match: result.match,
+          processed,
+          expected: result.expected,
+          accountFound: result.accountFound || null,
+          error: result.error || null
+        });
+      } catch (err) {
+        results.push({
+          depositId: deposit.id,
+          match: false,
+          processed: false,
+          error: err.message
+        });
+      }
+    }
+
+    res.json({ success: true, results });
+
+  } catch (err) {
+    console.error('Auto-verify all error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
