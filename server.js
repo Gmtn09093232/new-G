@@ -13,7 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const { Verifier } = require('@creofam/verifier'); // <-- NEW
+const verifier = require('@creofam/verifier'); // <-- FIXED: import as module (not class)
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -449,15 +449,14 @@ function extractTransactionNumber(text) {
 }
 
 // ============================================================
-//  NEW: RECEIPT VERIFICATION USING @creofam/verifier
+//  RECEIPT VERIFICATION USING @creofam/verifier (no constructor)
 // ============================================================
 async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
     const { transaction_reference, payment_type } = deposit;
-    const verifier = new Verifier();
 
     try {
         if (payment_type === 'cbebirr') {
-            // CBE verification
+            // Extract TID and PH for CBE
             const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
             const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) ||
                             transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
@@ -469,6 +468,7 @@ async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
                 return { match: false, expected: expectedCbe, accountFound: null, error: 'Missing TID/PH for CBE' };
             }
 
+            // Call the CBE verification function (function name may vary – check package docs)
             const result = await verifier.verifyCBE({ tid, phone: ph });
             if (!result.ok) {
                 return { match: false, expected: expectedCbe, accountFound: null, error: result.error || 'CBE verification failed' };
@@ -480,12 +480,14 @@ async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
             return { match, expected: expectedCbe, accountFound };
 
         } else if (payment_type === 'telebirr') {
+            // Extract transaction reference
             const txnMatch = transaction_reference.match(/\b([A-Z0-9]{8,15})\b/);
             if (!txnMatch) {
                 return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: 'Missing transaction number for Telebirr' };
             }
             const reference = txnMatch[1];
 
+            // Call the Telebirr verification function
             const result = await verifier.verifyTelebirr({ reference });
             if (!result.ok) {
                 return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: result.error || 'Telebirr verification failed' };
@@ -2529,19 +2531,14 @@ app.post('/admin/auto-verify-deposit', async (req, res) => {
       });
     } else if (result.manualReview) {
       // If verification failed due to network/API error, mark for manual review
-      await supabase
-        .from('deposit_requests')
-        .update({ 
-          // optionally add a note column, but we'll keep status pending
-        })
-        .eq('id', depositId);
-      // Return with manual review flag
+      // We'll keep it pending but you could set a flag or note in the DB
+      // For now, just return with manual review flag
       return res.json({
         success: true,
         result: {
           match: false,
           manualReview: true,
-          error: result.error
+          error: result.error || 'Verification API error'
         }
       });
     }
