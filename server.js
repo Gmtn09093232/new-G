@@ -3427,7 +3427,7 @@ app.get('/admin/link-stats', async (req, res) => {
 // ================================================================
 //  TELEGRAM BOT (Integrated)
 // ================================================================
-const botToken = process.env.BOT_TOKEN;
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
   console.error('❌ BOT_TOKEN is not set in environment variables!');
 } else {
