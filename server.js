@@ -19,7 +19,6 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const TelegramBot = require('node-telegram-bot-api'); // 👈 Added
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -638,7 +637,7 @@ function verifyTelegram(initData) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join('\n');
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
     return calculatedHash === hash;
   } catch (err) {
@@ -3425,47 +3424,49 @@ app.get('/admin/link-stats', async (req, res) => {
 });
 
 // ================================================================
-//  TELEGRAM BOT (Integrated)
+//  TELEGRAM BOT (Integrated) – safe initialization
 // ================================================================
-const botToken = process.env.TELEGRAM_BOT_TOKEN;
+const botToken = process.env.BOT_TOKEN;
 if (!botToken) {
-  console.error('❌ BOT_TOKEN is not set in environment variables!');
+  console.warn('⚠️ BOT_TOKEN is not set – Telegram bot disabled');
 } else {
-  const bot = new TelegramBot(botToken, { polling: true });
-  console.log('🤖 Telegram bot started (polling)');
+  try {
+    const TelegramBot = require('node-telegram-bot-api');
+    const bot = new TelegramBot(botToken, { polling: true });
+    console.log('🤖 Telegram bot started (polling)');
 
-  // Handle /start commands
-  bot.onText(/\/start(.+)?/, (msg, match) => {
-    const chatId = msg.chat.id;
-    const startParam = match[1] ? match[1].trim() : '';
+    bot.onText(/\/start(.+)?/, (msg, match) => {
+      const chatId = msg.chat.id;
+      const startParam = match[1] ? match[1].trim() : '';
+      const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
 
-    // Your game URL – you can set APP_URL env or fallback
-    const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
+      const messageText = startParam
+        ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
+        : '🎯 Welcome! Click below to start playing.';
 
-    const messageText = startParam
-      ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
-      : '🎯 Welcome! Click below to start playing.';
-
-    const options = {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: '🎮 Open Game',
-              web_app: { url: webAppUrl }
-            }
+      const options = {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🎮 Open Game',
+                web_app: { url: webAppUrl }
+              }
+            ]
           ]
-        ]
-      }
-    };
+        }
+      };
 
-    bot.sendMessage(chatId, messageText, options)
-      .then(() => console.log(`✅ Sent web_app button to ${chatId} (param: ${startParam || 'none'})`))
-      .catch(err => console.error(`❌ Failed to send message to ${chatId}:`, err.message));
-  });
+      bot.sendMessage(chatId, messageText, options)
+        .then(() => console.log(`✅ Sent web_app button to ${chatId} (param: ${startParam || 'none'})`))
+        .catch(err => console.error(`❌ Failed to send message to ${chatId}:`, err.message));
+    });
 
-  // Handle errors
-  bot.on('polling_error', (err) => console.error('Polling error:', err.message));
+    bot.on('polling_error', (err) => console.error('Polling error:', err.message));
+  } catch (err) {
+    console.error('❌ Failed to initialize Telegram bot:', err.message);
+    console.warn('⚠️ The server will continue without the bot. Make sure "node-telegram-bot-api" is installed and BOT_TOKEN is set.');
+  }
 }
 
 // ---------- Socket.IO (main namespace) ----------
