@@ -610,7 +610,7 @@ const users = {};
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
-      // ─── User does not exist – create new (unchanged) ───
+      // ─── User does not exist – create new ───
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
@@ -651,23 +651,7 @@ const users = {};
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
       
-      if (inviteCode) {
-        const { data: inviteData, error: fetchError } = await supabase
-          .from('invite_stats')
-          .select('count')
-          .eq('invite_code', inviteCode)
-          .maybeSingle();
-        if (!fetchError && inviteData) {
-          await supabase
-            .from('invite_stats')
-            .update({ count: (inviteData.count || 0) + 1 })
-            .eq('invite_code', inviteCode);
-        } else if (!fetchError) {
-          await supabase
-            .from('invite_stats')
-            .insert({ invite_code: inviteCode, count: 1 });
-        }
-      }
+      // Note: invite_stats tracking has been removed per request
       
       users[id] = {
         id,
@@ -3519,59 +3503,8 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Referral endpoints ----------
-app.get('/api/invite-stats', async (req, res) => {
-  const { secret } = req.query;
-  if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const { data, error } = await supabase
-      .from('invite_stats')
-      .select('*')
-      .order('invite_code', { ascending: true });
-    if (error) throw error;
-    const stats = {};
-    data.forEach(row => { stats[row.invite_code] = row.count; });
-    res.json(stats);
-  } catch (err) {
-    console.error('Error fetching invite stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/invite-details', async (req, res) => {
-  const { secret } = req.query;
-  if (secret && secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    const { data: referredUsers, error } = await supabase
-      .from('users')
-      .select('username, referred_by, first_deposit_amount')
-      .not('referred_by', 'is', null)
-      .gt('first_deposit_amount', 0);
-    if (error) throw error;
-    const grouped = {};
-    for (const user of referredUsers) {
-      const code = user.referred_by;
-      if (!grouped[code]) grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
-      const bonus = user.first_deposit_amount * 0.1;
-      grouped[code].players.push({
-        username: user.username || 'Anonymous',
-        deposit: user.first_deposit_amount,
-        bonus: bonus
-      });
-      grouped[code].totalBonus += bonus;
-      grouped[code].totalDeposits += user.first_deposit_amount;
-    }
-    const { data: allCodes } = await supabase.from('invite_stats').select('invite_code');
-    const allCodeSet = new Set(allCodes.map(c => c.invite_code));
-    for (const code of allCodeSet) {
-      if (!grouped[code]) grouped[code] = { players: [], totalBonus: 0, totalDeposits: 0 };
-    }
-    res.json({ success: true, data: grouped });
-  } catch (err) {
-    console.error('Error fetching invite details:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+// ---------- Referral endpoints (removed invite_stats) ----------
+// (Invite stats endpoints have been removed per request)
 
 // ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
