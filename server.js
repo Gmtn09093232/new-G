@@ -471,19 +471,26 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins = [];
     if (adminId) {
-      // Only show the admin the user is assigned to
+      // If the user has an assigned admin, fetch that specific admin
       const { data: admin, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
         .eq('id', adminId)
         .eq('is_active', true)
         .maybeSingle();
-      if (!error && admin && admin.accept_deposits !== false) {
+      if (error) throw error;
+      if (admin && admin.accept_deposits !== false) {
         admins = [admin];
-      }
-      // If assigned admin doesn't accept deposits, return empty (no fallback)
+      } // else admins remains empty
+    } else {
+      // No assigned admin → show all active admins that accept deposits
+      const { data: allAdmins, error: allErr } = await supabase
+        .from('admins')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
+        .eq('is_active', true);
+      if (allErr) throw allErr;
+      admins = allAdmins.filter(a => a.accept_deposits !== false);
     }
-    // If no adminId, return empty (no list of all admins)
 
     const result = admins.map(a => ({
       id: a.id,
@@ -523,7 +530,7 @@ app.get('/admin/live-players', (req, res) => {
 const users = {};
 
 // ---------- loadUser ----------
- async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
@@ -538,7 +545,7 @@ const users = {};
     if (error) throw error;
 
     if (data) {
-      // ─── NEW: If user has no admin and we have an invite code, assign the admin ───
+      // ─── ONLY assign admin if user has no admin and inviteCode is provided ───
       let needUpdate = false;
       if (!data.admin_id && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
@@ -561,7 +568,7 @@ const users = {};
           .eq('telegram_id', id);
         if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
       }
-      // ─── End of new block ───
+      // ─── End of admin assignment block ───
 
       users[id] = {
         id,
@@ -582,6 +589,7 @@ const users = {};
       let finalAdminId = adminId || null;
       let adminName = null;
       
+      // Only assign admin if an invite code is present
       if (!finalAdminId && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
@@ -594,14 +602,8 @@ const users = {};
           adminName = adminData.name;
           console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
         }
-      } else if (adminId) {
-        const { data: adminData, error: adminErr } = await supabase
-          .from('admins')
-          .select('name')
-          .eq('id', adminId)
-          .maybeSingle();
-        if (!adminErr && adminData) adminName = adminData.name;
       }
+      // Note: we do NOT assign admin from the `adminId` parameter – only invite code matters.
       
       const newUser = {
         telegram_id: id,
@@ -616,8 +618,6 @@ const users = {};
       
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
-      
-      // Note: invite_stats tracking has been removed per request
       
       users[id] = {
         id,
@@ -636,6 +636,7 @@ const users = {};
     throw err;
   }
 }
+
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
@@ -1763,17 +1764,15 @@ const handleDepositRequest = async (req, res) => {
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Assign admin if not set
-    if (!user.admin_id) {
-      await supabase
-        .from('users')
-        .update({ admin_id: admin.id, assigned_admin_name: admin.name })
-        .eq('telegram_id', userId);
-      if (users[userId]) {
-        users[userId].admin_id = admin.id;
-        users[userId].assigned_admin_name = admin.name;
-      }
-    }
+    // ❌ REMOVED: automatic admin assignment on deposit
+    // if (!user.admin_id) {
+    //   await supabase.from('users').update({ admin_id: admin.id, assigned_admin_name: admin.name })
+    //     .eq('telegram_id', userId);
+    //   if (users[userId]) {
+    //     users[userId].admin_id = admin.id;
+    //     users[userId].assigned_admin_name = admin.name;
+    //   }
+    // }
 
     let photoUrl = null;
     if (photoFile) {
@@ -1828,7 +1827,7 @@ const handleDepositRequest = async (req, res) => {
       payment_type,
       transaction_reference: extractedTxn, // store only the extracted number
       proof_photo_url: photoUrl,
-      admin_id: admin.id,
+      admin_id: admin.id,               // still record which admin was chosen for this deposit
       assigned_deposit_number: admin[methodField]
     }).select().single();
 
@@ -3259,6 +3258,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – accepts username/handle as well as numeric ID
+//            DOES NOT ASSIGN ADMIN
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -3326,14 +3326,14 @@ app.post('/admin/import-players', async (req, res) => {
         }
 
         if (!existingUser) {
+          // Create new user WITHOUT setting admin_id
           const newUser = {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
             referred_by: null,
             first_deposit_amount: 0,
-            admin_id: admin.id,
-            assigned_admin_name: admin.name,
+            // admin_id and assigned_admin_name are NOT set
             telegram_handle: null
           };
           const { error: insertErr } = await supabase.from('users').insert(newUser);
@@ -3341,6 +3341,7 @@ app.post('/admin/import-players', async (req, res) => {
             results.push({ telegramId, success: false, error: insertErr.message });
             continue;
           }
+          // Update cache with null admin
           users[telegramId] = {
             id: telegramId,
             username: newUser.username,
@@ -3348,29 +3349,16 @@ app.post('/admin/import-players', async (req, res) => {
             telegram_handle: null,
             referred_by: null,
             first_deposit_amount: 0,
-            admin_id: newUser.admin_id,
-            assigned_admin_name: newUser.assigned_admin_name
+            admin_id: null,
+            assigned_admin_name: null
           };
           results.push({ telegramId, success: true, created: true });
           successCount++;
         } else {
-          const { error: updateErr } = await supabase
-            .from('users')
-            .update({
-              admin_id: admin.id,
-              assigned_admin_name: admin.name
-            })
-            .eq('telegram_id', telegramId);
-          if (updateErr) {
-            results.push({ telegramId, success: false, error: updateErr.message });
-            continue;
-          }
-          if (users[telegramId]) {
-            users[telegramId].admin_id = admin.id;
-            users[telegramId].assigned_admin_name = admin.name;
-          }
-          results.push({ telegramId, success: true, updated: true });
-          successCount++;
+          // Existing user – we do NOT change admin_id.
+          // Optionally, we could update other fields like username, but we'll leave as-is.
+          results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
+          // If we wanted to update the username, we could do it here, but not necessary.
         }
       } catch (err) {
         results.push({ telegramId, success: false, error: err.message });
