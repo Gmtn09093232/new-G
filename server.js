@@ -1,11 +1,5 @@
 // ================================================================
-//  server.js – Full Bingo Server with Admin Link Open Tracking
-//             & Manual Balance Adjustments Affecting Deposit Stats
-//             & 1500 ETB Limit for Manual Additions
-//             & Import Players by Username/Handle
-//             & DUPLICATE TRANSACTION NUMBER CHECK
-//             & SMART TRANSACTION NUMBER EXTRACTION
-//             & AUTO-VERIFY DEPOSIT BOT (NEW)
+//  server.js – Full Bingo Server with Auto-Verify via @creofam/verifier
 // ================================================================
 
 require('dotenv').config();
@@ -19,8 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const axios = require('axios');          // <-- NEW for receipt fetching
-const cheerio = require('cheerio');      // <-- NEW for HTML parsing
+const { Verifier } = require('@creofam/verifier'); // <-- NEW
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -456,97 +449,64 @@ function extractTransactionNumber(text) {
 }
 
 // ============================================================
-//  NEW: RECEIPT VERIFICATION HELPER (used by auto-verify)
+//  NEW: RECEIPT VERIFICATION USING @creofam/verifier
 // ============================================================
 async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
-  const { transaction_reference, payment_type } = deposit;
-  let receiptUrl = '';
+    const { transaction_reference, payment_type } = deposit;
+    const verifier = new Verifier();
 
-  // Build the receipt URL based on payment type
-  if (payment_type === 'cbebirr') {
-    // CBE usually needs TID and PH (Phone). Extract them from the reference text.
-    const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
-    const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) ||
-                    transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
-    const tid = tidMatch ? tidMatch[1] : '';
-    let ph = phMatch ? phMatch[1] : '';
-    if (ph && ph.startsWith('09')) ph = '251' + ph.substring(1);
+    try {
+        if (payment_type === 'cbebirr') {
+            // CBE verification
+            const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
+            const phMatch = transaction_reference.match(/PH[=:\s]*(251\d{9})/i) ||
+                            transaction_reference.match(/PH[=:\s]*(09\d{8})/i);
+            const tid = tidMatch ? tidMatch[1] : '';
+            let ph = phMatch ? phMatch[1] : '';
+            if (ph && ph.startsWith('09')) ph = '251' + ph.substring(1);
 
-    if (!tid) return { match: false, expected: expectedCbe, accountFound: null, error: 'Missing TID' };
-    receiptUrl = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(tid)}&PH=${encodeURIComponent(ph)}`;
+            if (!tid || !ph) {
+                return { match: false, expected: expectedCbe, accountFound: null, error: 'Missing TID/PH for CBE' };
+            }
 
-  } else if (payment_type === 'telebirr') {
-    const txnMatch = transaction_reference.match(/\b([A-Z0-9]{8,15})\b/);
-    if (!txnMatch) return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: 'Missing Txn ID' };
-    receiptUrl = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnMatch[1])}`;
-  } else {
-    return { match: false, expected: 'N/A', accountFound: null, error: 'Unsupported method' };
-  }
+            const result = await verifier.verifyCBE({ tid, phone: ph });
+            if (!result.ok) {
+                return { match: false, expected: expectedCbe, accountFound: null, error: result.error || 'CBE verification failed' };
+            }
 
-  try {
-    // Fetch the receipt HTML
-    const response = await axios.get(receiptUrl, { timeout: 10000 });
-    const html = response.data;
-    const $ = cheerio.load(html);
+            const accountFound = result.data?.creditAccount || result.data?.accountNumber || null;
+            const match = (accountFound === expectedCbe);
 
-    let accountFound = null;
+            return { match, expected: expectedCbe, accountFound };
 
-    if (payment_type === 'cbebirr') {
-      // CBE Page: Look for "Credit Account" or "Credited Account"
-      const creditText = $('td:contains("Credit Account")').next('td').text().trim() ||
-                         $('td:contains("Credited Account")').next('td').text().trim() ||
-                         $('div:contains("Credit Account")').next('div').text().trim();
+        } else if (payment_type === 'telebirr') {
+            const txnMatch = transaction_reference.match(/\b([A-Z0-9]{8,15})\b/);
+            if (!txnMatch) {
+                return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: 'Missing transaction number for Telebirr' };
+            }
+            const reference = txnMatch[1];
 
-      // Extract the 12-digit number (251xxxxxxxxx)
-      const match = creditText.match(/(251\d{9})/);
-      if (match) accountFound = match[1];
+            const result = await verifier.verifyTelebirr({ reference });
+            if (!result.ok) {
+                return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: result.error || 'Telebirr verification failed' };
+            }
 
-    } else if (payment_type === 'telebirr') {
-      // Telebirr Page: Look for "Credited Party Account" or similar
-      const creditText = $('td:contains("Credited Party Account")').next('td').text().trim() ||
-                         $('td:contains("Receiver Account")').next('td').text().trim() ||
-                         $('div:contains("Credited Party")').text().trim();
+            const accountFound = result.data?.accountNumber || result.data?.receiverAccount || null;
+            let match = false;
+            if (accountFound && accountFound.length >= 4) {
+                const foundLast4 = accountFound.slice(-4);
+                match = (foundLast4 === expectedTelebirrLast4);
+            }
 
-      // Telebirr numbers are usually 12 digits (2519xxxxxxxx)
-      const match = creditText.match(/(2519\d{7})/);
-      if (match) accountFound = match[1];
+            return { match, expected: expectedTelebirrLast4, accountFound };
+
+        } else {
+            return { match: false, expected: 'N/A', accountFound: null, error: 'Unsupported payment method' };
+        }
+    } catch (err) {
+        console.error('Verifier error:', err.message);
+        return { match: false, expected: 'N/A', accountFound: null, error: err.message, manualReview: true };
     }
-
-    // If we couldn't find the number, check the raw text as a fallback
-    if (!accountFound) {
-      const rawText = $('body').text();
-      if (payment_type === 'cbebirr') {
-        const match = rawText.match(/(251918\d{6})/); // Specifically looking for admin number pattern
-        if (match) accountFound = match[1];
-      } else {
-        const match = rawText.match(/(2519\d{7})/);
-        if (match) accountFound = match[1];
-      }
-    }
-
-    // PERFORM THE MATCHING
-    let match = false;
-    if (payment_type === 'cbebirr') {
-      // CBE: Exact match on the full number
-      match = (accountFound === expectedCbe);
-    } else if (payment_type === 'telebirr') {
-      // Telebirr: Match the last 4 digits
-      if (accountFound && accountFound.length >= 4) {
-        const foundLast4 = accountFound.slice(-4);
-        match = (foundLast4 === expectedTelebirrLast4);
-      }
-    }
-
-    return {
-      match,
-      expected: payment_type === 'cbebirr' ? expectedCbe : expectedTelebirrLast4,
-      accountFound
-    };
-
-  } catch (fetchError) {
-    console.error(`Failed to fetch receipt ${receiptUrl}:`, fetchError.message);
-    return { match: false, expected: 'N/A', accountFound: null, error: 'Network/Scraping error' };
-  }
 }
 
 // ---------- Static endpoints ----------
@@ -2484,7 +2444,7 @@ app.post('/admin/update-player-balance', async (req, res) => {
 });
 
 // ============================================================
-//  NEW: AUTO-VERIFY DEPOSIT ENDPOINTS
+//  NEW: AUTO-VERIFY DEPOSIT ENDPOINTS (using @creofam/verifier)
 // ============================================================
 
 // POST /admin/auto-verify-deposit
@@ -2521,12 +2481,11 @@ app.post('/admin/auto-verify-deposit', async (req, res) => {
     const expectedCbe = admin.cbebirr_number || '';
     const expectedTelebirrLast4 = admin.telebirr_number ? admin.telebirr_number.slice(-4) : '';
 
-    // 3. Run verification
+    // 3. Run verification using the verifier
     const result = await verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4);
 
-    // 4. If matched, auto-approve
+    // 4. If matched, auto-approve (respecting holding limit)
     if (result.match) {
-      // Check holding limit before auto-approving
       const holding = await getAdminHoldingBalance(admin.id);
       const newHolding = holding + deposit.amount;
       if (newHolding > 1500) {
@@ -2568,6 +2527,23 @@ app.post('/admin/auto-verify-deposit', async (req, res) => {
         adminName: admin.name,
         autoVerified: true
       });
+    } else if (result.manualReview) {
+      // If verification failed due to network/API error, mark for manual review
+      await supabase
+        .from('deposit_requests')
+        .update({ 
+          // optionally add a note column, but we'll keep status pending
+        })
+        .eq('id', depositId);
+      // Return with manual review flag
+      return res.json({
+        success: true,
+        result: {
+          match: false,
+          manualReview: true,
+          error: result.error
+        }
+      });
     }
 
     // 5. Return result
@@ -2577,7 +2553,8 @@ app.post('/admin/auto-verify-deposit', async (req, res) => {
         match: result.match,
         expected: result.expected,
         accountFound: result.accountFound || null,
-        error: result.error || null
+        error: result.error || null,
+        manualReview: result.manualReview || false
       }
     });
 
@@ -2614,7 +2591,6 @@ app.post('/admin/auto-verify-all', async (req, res) => {
         const result = await verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4);
         let processed = false;
         if (result.match) {
-          // Check holding limit
           const holding = await getAdminHoldingBalance(admin.id);
           const newHolding = holding + deposit.amount;
           if (newHolding <= 1500) {
@@ -2647,14 +2623,16 @@ app.post('/admin/auto-verify-all', async (req, res) => {
           processed,
           expected: result.expected,
           accountFound: result.accountFound || null,
-          error: result.error || null
+          error: result.error || null,
+          manualReview: result.manualReview || false
         });
       } catch (err) {
         results.push({
           depositId: deposit.id,
           match: false,
           processed: false,
-          error: err.message
+          error: err.message,
+          manualReview: true
         });
       }
     }
