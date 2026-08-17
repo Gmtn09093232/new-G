@@ -451,10 +451,32 @@ function extractTransactionNumber(text) {
 // ============================================================
 //  RECEIPT VERIFICATION USING @creofam/verifier (no constructor)
 // ============================================================
+// ============================================================
+//  RECEIPT VERIFICATION USING @creofam/verifier (auto‑detect)
+// ============================================================
 async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
     const { transaction_reference, payment_type } = deposit;
 
+    // Helper to call a method safely
+    function safeCall(fn, ...args) {
+        if (typeof fn === 'function') {
+            return fn(...args);
+        }
+        throw new Error(`Method not found or not a function`);
+    }
+
     try {
+        // Determine which functions are available
+        const hasVerifyTelebirr = typeof verifier.verifyTelebirr === 'function';
+        const hasVerifyTeleBirr = typeof verifier.verifyTeleBirr === 'function';
+        const hasVerifyCBE = typeof verifier.verifyCBE === 'function';
+        const hasVerifyCbe = typeof verifier.verifyCbe === 'function';
+        const hasTelebirr = typeof verifier.telebirr === 'function';
+        const hasCbe = typeof verifier.cbe === 'function';
+
+        // If the package exports a default function that returns an object
+        const verifierInstance = (typeof verifier === 'function') ? verifier() : verifier;
+
         if (payment_type === 'cbebirr') {
             // Extract TID and PH for CBE
             const tidMatch = transaction_reference.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
@@ -468,8 +490,19 @@ async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
                 return { match: false, expected: expectedCbe, accountFound: null, error: 'Missing TID/PH for CBE' };
             }
 
-            // Call the CBE verification function (function name may vary – check package docs)
-            const result = await verifier.verifyCBE({ tid, phone: ph });
+            let result;
+            if (hasVerifyCBE) {
+                result = await verifier.verifyCBE({ tid, phone: ph });
+            } else if (hasVerifyCbe) {
+                result = await verifier.verifyCbe({ tid, phone: ph });
+            } else if (hasCbe) {
+                result = await verifier.cbe({ tid, phone: ph });
+            } else if (verifierInstance && typeof verifierInstance.verifyCBE === 'function') {
+                result = await verifierInstance.verifyCBE({ tid, phone: ph });
+            } else {
+                throw new Error('No CBE verification method found in @creofam/verifier');
+            }
+
             if (!result.ok) {
                 return { match: false, expected: expectedCbe, accountFound: null, error: result.error || 'CBE verification failed' };
             }
@@ -487,8 +520,19 @@ async function verifyReceipt(deposit, expectedCbe, expectedTelebirrLast4) {
             }
             const reference = txnMatch[1];
 
-            // Call the Telebirr verification function
-            const result = await verifier.verifyTelebirr({ reference });
+            let result;
+            if (hasVerifyTelebirr) {
+                result = await verifier.verifyTelebirr({ reference });
+            } else if (hasVerifyTeleBirr) {
+                result = await verifier.verifyTeleBirr({ reference });
+            } else if (hasTelebirr) {
+                result = await verifier.telebirr({ reference });
+            } else if (verifierInstance && typeof verifierInstance.verifyTelebirr === 'function') {
+                result = await verifierInstance.verifyTelebirr({ reference });
+            } else {
+                throw new Error('No Telebirr verification method found in @creofam/verifier');
+            }
+
             if (!result.ok) {
                 return { match: false, expected: expectedTelebirrLast4, accountFound: null, error: result.error || 'Telebirr verification failed' };
             }
