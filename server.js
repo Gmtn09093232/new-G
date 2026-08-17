@@ -568,7 +568,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .eq('telegram_id', id);
         if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
       }
-      // ─── End of admin assignment block ───
 
       users[id] = {
         id,
@@ -603,7 +602,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
         }
       }
-      // Note: we do NOT assign admin from the `adminId` parameter – only invite code matters.
       
       const newUser = {
         telegram_id: id,
@@ -674,7 +672,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     await logAdminLinkOpen(startParam, id, ip, userAgent);
 
-    const user = await loadUser(id, displayName, handle, startParam, false);
+    // 🔥 Force refresh if an invite code is present, so the cache is bypassed
+    const user = await loadUser(id, displayName, handle, startParam, !!startParam);
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
@@ -1765,14 +1764,6 @@ const handleDepositRequest = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // ❌ REMOVED: automatic admin assignment on deposit
-    // if (!user.admin_id) {
-    //   await supabase.from('users').update({ admin_id: admin.id, assigned_admin_name: admin.name })
-    //     .eq('telegram_id', userId);
-    //   if (users[userId]) {
-    //     users[userId].admin_id = admin.id;
-    //     users[userId].assigned_admin_name = admin.name;
-    //   }
-    // }
 
     let photoUrl = null;
     if (photoFile) {
@@ -1825,7 +1816,7 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: extractedTxn, // store only the extracted number
+      transaction_reference: extractedTxn,
       proof_photo_url: photoUrl,
       admin_id: admin.id,               // still record which admin was chosen for this deposit
       assigned_deposit_number: admin[methodField]
@@ -1863,20 +1854,15 @@ const uploadSingle = upload.single('photo');
 app.post('/api/request-deposit', (req, res, next) => {
   uploadSingle(req, res, function(err) {
     if (err) {
-      // If it's a multer error related to file size or unexpected file, return error
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'File too large (max 5MB)' });
       }
       if (err.code === 'LIMIT_UNEXPECTED_FILE') {
         return res.status(400).json({ error: 'Unexpected file field' });
       }
-      // For other errors (e.g., invalid file type), we can still continue if it's not a file error?
-      // But if it's a file type error, we should reject.
       if (err.message && err.message.includes('Only images are allowed')) {
         return res.status(400).json({ error: err.message });
       }
-      // Otherwise, if no file is present, multer may throw a 'LIMIT_FILE_COUNT'? Actually it won't.
-      // We'll just proceed; req.file will be undefined.
     }
     handleDepositRequest(req, res);
   });
@@ -1946,9 +1932,6 @@ app.post('/api/request-withdraw', async (req, res) => {
 
 // ---------- Admin endpoints (session-based) ----------
 
-// ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
-// ============================================================
 app.get('/admin/deposits', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2006,9 +1989,6 @@ app.get('/admin/deposits', async (req, res) => {
   });
 });
 
-// ============================================================
-//  UPDATED: /admin/withdrawals with date, method, status filters
-// ============================================================
 app.get('/admin/withdrawals', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2050,7 +2030,6 @@ app.get('/admin/withdrawals', async (req, res) => {
   res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
 });
 
-// ---------- Other Admin Endpoints ----------
 // ---- GET admin holding balance ----
 app.get('/admin/holding-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -2271,7 +2250,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
   if (!['add', 'subtract'].includes(operation)) return res.status(400).json({ error: 'Operation must be "add" or "subtract"' });
 
   try {
-    // 1. Verify the player exists and is assigned to this admin
     const { data: user, error: userErr } = await supabase
       .from('users')
       .select('*')
@@ -2282,7 +2260,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
       return res.status(403).json({ error: 'This player is not assigned to you' });
     }
 
-    // 2. Enforce 1500 ETB holding limit for additions
     if (operation === 'add') {
       const currentHolding = await getAdminHoldingBalance(admin.id);
       if (currentHolding + amt > 1500) {
@@ -2301,14 +2278,12 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance -= amt;
     }
 
-    // 3. Update the balance in the database
     const { error: updateErr } = await supabase
       .from('users')
       .update({ balance: newBalance })
       .eq('telegram_id', telegramId);
     if (updateErr) throw updateErr;
 
-    // 4. Record the adjustment in admin_deposit_adjustments
     const adjustmentAmount = operation === 'add' ? amt : -amt;
     const { error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
@@ -2322,14 +2297,12 @@ app.post('/admin/update-player-balance', async (req, res) => {
       });
     if (adjErr) console.error('Failed to record adjustment:', adjErr.message);
 
-    // 5. Update in‑memory cache
     if (users[telegramId]) {
       users[telegramId].balance = newBalance;
     } else {
       await loadUser(telegramId, user.username, user.telegram_handle, null, true);
     }
 
-    // 6. Audit log
     await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
       targetUserId: telegramId,
       operation,
@@ -2338,7 +2311,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance
     });
 
-    // 7. Notify the player via WebSocket if connected
     const playerSocket = await getSocketByUserId(telegramId);
     if (playerSocket) {
       playerSocket.emit('balanceUpdate', newBalance);
@@ -2350,8 +2322,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ============================================================
 
 app.post('/admin/process-withdrawal', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -2776,7 +2746,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 //  SUPER ADMIN ENDPOINTS – with secret support and filters
 // ============================================================
 
-// Helper: accept secret OR session
 async function authSuperAdmin(req, res) {
   const secret = req.query.secret || req.body.secret;
   const validSecret = process.env.ADMIN_SECRET || '01207';
@@ -3257,8 +3226,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 });
 
 // ============================================================
-//  UPDATED: IMPORT PLAYERS – accepts username/handle as well as numeric ID
-//            DOES NOT ASSIGN ADMIN
+//  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -3285,11 +3253,9 @@ app.post('/admin/import-players', async (req, res) => {
       }
 
       let telegramId = null;
-      // Check if it's a numeric ID
       if (/^\d+$/.test(identifier)) {
         telegramId = identifier;
       } else {
-        // Try to find by telegram_handle or username (case-insensitive)
         const searchTerm = identifier.startsWith('@') ? identifier.slice(1) : identifier;
         const { data: user, error } = await supabase
           .from('users')
@@ -3307,7 +3273,6 @@ app.post('/admin/import-players', async (req, res) => {
         telegramId = user.telegram_id;
       }
 
-      // Proceed with assignment/creation using the resolved telegramId
       try {
         let { data: existingUser, error: findErr } = await supabase
           .from('users')
@@ -3326,22 +3291,21 @@ app.post('/admin/import-players', async (req, res) => {
         }
 
         if (!existingUser) {
-          // Create new user WITHOUT setting admin_id
+          // Create new user WITHOUT admin_id
           const newUser = {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
             referred_by: null,
             first_deposit_amount: 0,
-            // admin_id and assigned_admin_name are NOT set
             telegram_handle: null
+            // admin_id and assigned_admin_name are NOT set
           };
           const { error: insertErr } = await supabase.from('users').insert(newUser);
           if (insertErr) {
             results.push({ telegramId, success: false, error: insertErr.message });
             continue;
           }
-          // Update cache with null admin
           users[telegramId] = {
             id: telegramId,
             username: newUser.username,
@@ -3356,9 +3320,7 @@ app.post('/admin/import-players', async (req, res) => {
           successCount++;
         } else {
           // Existing user – we do NOT change admin_id.
-          // Optionally, we could update other fields like username, but we'll leave as-is.
           results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
-          // If we wanted to update the username, we could do it here, but not necessary.
         }
       } catch (err) {
         results.push({ telegramId, success: false, error: err.message });
@@ -3429,7 +3391,6 @@ app.get('/admin/stats-summary', async (req, res) => {
 });
 
 // ---------- Referral endpoints (removed invite_stats) ----------
-// (Invite stats endpoints have been removed per request)
 
 // ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
