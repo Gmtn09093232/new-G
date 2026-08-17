@@ -471,26 +471,19 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins = [];
     if (adminId) {
-      // If the user has an assigned admin, fetch that specific admin
+      // Only show the admin the user is assigned to
       const { data: admin, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
         .eq('id', adminId)
         .eq('is_active', true)
         .maybeSingle();
-      if (error) throw error;
-      if (admin && admin.accept_deposits !== false) {
+      if (!error && admin && admin.accept_deposits !== false) {
         admins = [admin];
-      } // else admins remains empty
-    } else {
-      // No assigned admin → show all active admins that accept deposits
-      const { data: allAdmins, error: allErr } = await supabase
-        .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
-        .eq('is_active', true);
-      if (allErr) throw allErr;
-      admins = allAdmins.filter(a => a.accept_deposits !== false);
+      }
+      // If assigned admin doesn't accept deposits, return empty (no fallback)
     }
+    // If no adminId, return empty (no list of all admins)
 
     const result = admins.map(a => ({
       id: a.id,
