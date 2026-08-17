@@ -1,5 +1,6 @@
 // ================================================================
-//  server.js – Full Bingo Server with Admin Link Open Tracking
+//  server.js – Full Bingo Server with Integrated Telegram Bot
+//             & Admin Link Open Tracking
 //             & Manual Balance Adjustments Affecting Deposit Stats
 //             & 1500 ETB Limit for Manual Additions
 //             & Import Players by Username/Handle
@@ -18,6 +19,7 @@ const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const TelegramBot = require('node-telegram-bot-api'); // 👈 Added
 
 // ---------- Supabase ----------
 console.log('Connecting to Supabase...');
@@ -422,30 +424,26 @@ async function getAdminFromSession(req) {
 function extractTransactionNumber(text) {
   if (!text) return null;
   const trimmed = text.trim();
-  // 1. Check if it's a URL containing "receipt/"
   const urlMatch = trimmed.match(/https?:\/\/[^\s]+\/receipt\/([A-Za-z0-9]+)/i);
   if (urlMatch) return urlMatch[1].toUpperCase();
 
-  // 2. Look for "transaction number is", "transaction number:", "TID:", etc.
   const patterns = [
     /transaction\s+number\s+is\s+([A-Za-z0-9]+)/i,
     /transaction\s+number\s*[:]\s*([A-Za-z0-9]+)/i,
     /TID\s*[:=]\s*([A-Za-z0-9]+)/i,
     /reference\s*[:=]\s*([A-Za-z0-9]+)/i,
     /receipt\/([A-Za-z0-9]+)/i,
-    /\b([A-Za-z0-9]{8,16})\b/ // fallback: any 8-16 alphanumeric sequence
+    /\b([A-Za-z0-9]{8,16})\b/
   ];
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
     if (match) return match[1].toUpperCase();
   }
 
-  // 3. If the text itself looks like a transaction number (alphanumeric, 8+ chars)
   if (/^[A-Za-z0-9]{8,16}$/.test(trimmed)) {
     return trimmed.toUpperCase();
   }
 
-  // 4. Try to find any alphanumeric sequence of 8-16 chars
   const fallback = trimmed.match(/\b([A-Za-z0-9]{8,16})\b/);
   if (fallback) return fallback[1].toUpperCase();
 
@@ -471,7 +469,6 @@ app.get('/api/deposit-accounts', async (req, res) => {
 
     let admins = [];
     if (adminId) {
-      // If the user has an assigned admin, fetch that specific admin
       const { data: admin, error } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
@@ -481,9 +478,8 @@ app.get('/api/deposit-accounts', async (req, res) => {
       if (error) throw error;
       if (admin && admin.accept_deposits !== false) {
         admins = [admin];
-      } // else admins remains empty
+      }
     } else {
-      // No assigned admin → show all active admins that accept deposits
       const { data: allAdmins, error: allErr } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
@@ -545,7 +541,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     if (error) throw error;
 
     if (data) {
-      // ─── ONLY assign admin if user has no admin and inviteCode is provided ───
       let needUpdate = false;
       if (!data.admin_id && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
@@ -582,13 +577,11 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
-      // ─── User does not exist – create new ───
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
       let adminName = null;
       
-      // Only assign admin if an invite code is present
       if (!finalAdminId && inviteCode) {
         const { data: adminData, error: adminErr } = await supabase
           .from('admins')
@@ -672,7 +665,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
     await logAdminLinkOpen(startParam, id, ip, userAgent);
 
-    // 🔥 Force refresh if an invite code is present, so the cache is bypassed
+    // Force refresh if startParam is present
     const user = await loadUser(id, displayName, handle, startParam, !!startParam);
     req.session.userId = id;
     req.session.save((err) => {
@@ -763,7 +756,6 @@ app.post('/admin/register', async (req, res) => {
         cbebirr_number: cbebirr_number || null,
         mpesa_number: mpesa_number || null,
         accept_deposits: true
-        // is_fallback removed
       })
       .select()
       .single();
@@ -1703,7 +1695,6 @@ app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bo
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ---------- Player deposit endpoints ----------
-// Custom handler for deposit with optional photo and invoice number
 const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1716,12 +1707,10 @@ const handleDepositRequest = async (req, res) => {
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
-  // Require either a photo or a transaction reference (invoice)
   if (!photoFile && !transaction_reference) {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
-  // --- EXTRACT TRANSACTION NUMBER ---
   let extractedTxn = null;
   if (transaction_reference) {
     extractedTxn = extractTransactionNumber(transaction_reference);
@@ -1730,7 +1719,6 @@ const handleDepositRequest = async (req, res) => {
     }
   }
 
-  // --- DUPLICATE CHECK ON EXTRACTED NUMBER ---
   if (extractedTxn) {
     const { data: existing, error: dupErr } = await supabase
       .from('deposit_requests')
@@ -1808,7 +1796,6 @@ const handleDepositRequest = async (req, res) => {
       photoUrl = publicUrlData?.publicUrl || null;
     }
 
-    // Insert deposit request with extracted transaction number
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1818,7 +1805,7 @@ const handleDepositRequest = async (req, res) => {
       payment_type,
       transaction_reference: extractedTxn,
       proof_photo_url: photoUrl,
-      admin_id: admin.id,               // still record which admin was chosen for this deposit
+      admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
     }).select().single();
 
@@ -1849,7 +1836,6 @@ const handleDepositRequest = async (req, res) => {
   }
 };
 
-// Use multer with single file, but we handle errors to make it optional
 const uploadSingle = upload.single('photo');
 app.post('/api/request-deposit', (req, res, next) => {
   uploadSingle(req, res, function(err) {
@@ -2030,7 +2016,6 @@ app.get('/admin/withdrawals', async (req, res) => {
   res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
 });
 
-// ---- GET admin holding balance ----
 app.get('/admin/holding-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2046,7 +2031,6 @@ app.get('/admin/holding-balance', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/process-deposit with holding limit 1500 ETB ----
 app.post('/admin/process-deposit', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2128,7 +2112,6 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – includes positive adjustments in deposit totals ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2200,7 +2183,6 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// ---- Other admin endpoints (players) unchanged ----
 app.get('/admin/players', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2232,10 +2214,6 @@ app.get('/admin/players', async (req, res) => {
   }
 });
 
-// ============================================================
-//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT 
-//  – now checks 1500 ETB holding limit for additions
-// ============================================================
 app.post('/admin/update-player-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2764,7 +2742,6 @@ async function authSuperAdmin(req, res) {
   return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
 }
 
-// ---------- GET all admins (includes adjusted deposit balance) ----------
 app.get('/super-admin/admins', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2823,7 +2800,6 @@ app.get('/super-admin/admins', async (req, res) => {
   }
 });
 
-// ---------- GET admin detail (includes adjustments) ----------
 app.get('/super-admin/admin/:adminId', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2894,7 +2870,6 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
   }
 });
 
-// ---------- Toggle admin ----------
 app.post('/super-admin/toggle-admin', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2924,7 +2899,6 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
-// ---------- Update commission ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2952,7 +2926,6 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin toggle deposit acceptance ----------
 app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2980,9 +2953,6 @@ app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
   }
 });
 
-// ---------- (Removed: /super-admin/set-fallback-admin) ----------
-
-// ---------- Super admin adjust deposit balance ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3034,7 +3004,6 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   }
 });
 
-// ---------- GET admin withdrawal requests (with filters) ----------
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3070,7 +3039,6 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Process admin withdrawal (FIXED) ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3122,7 +3090,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- GET platform stats (with filters) ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3291,7 +3258,6 @@ app.post('/admin/import-players', async (req, res) => {
         }
 
         if (!existingUser) {
-          // Create new user WITHOUT admin_id
           const newUser = {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
@@ -3299,7 +3265,6 @@ app.post('/admin/import-players', async (req, res) => {
             referred_by: null,
             first_deposit_amount: 0,
             telegram_handle: null
-            // admin_id and assigned_admin_name are NOT set
           };
           const { error: insertErr } = await supabase.from('users').insert(newUser);
           if (insertErr) {
@@ -3319,7 +3284,6 @@ app.post('/admin/import-players', async (req, res) => {
           results.push({ telegramId, success: true, created: true });
           successCount++;
         } else {
-          // Existing user – we do NOT change admin_id.
           results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
         }
       } catch (err) {
@@ -3390,8 +3354,6 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Referral endpoints (removed invite_stats) ----------
-
 // ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
@@ -3432,7 +3394,6 @@ app.get('/admin/audit-summary', async (req, res) => {
   }
 });
 
-// ---------- NEW: Admin link stats endpoint (optional) ----------
 app.get('/admin/link-stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -3462,6 +3423,50 @@ app.get('/admin/link-stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ================================================================
+//  TELEGRAM BOT (Integrated)
+// ================================================================
+const botToken = process.env.BOT_TOKEN;
+if (!botToken) {
+  console.error('❌ BOT_TOKEN is not set in environment variables!');
+} else {
+  const bot = new TelegramBot(botToken, { polling: true });
+  console.log('🤖 Telegram bot started (polling)');
+
+  // Handle /start commands
+  bot.onText(/\/start(.+)?/, (msg, match) => {
+    const chatId = msg.chat.id;
+    const startParam = match[1] ? match[1].trim() : '';
+
+    // Your game URL – you can set APP_URL env or fallback
+    const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
+
+    const messageText = startParam
+      ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
+      : '🎯 Welcome! Click below to start playing.';
+
+    const options = {
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: '🎮 Open Game',
+              web_app: { url: webAppUrl }
+            }
+          ]
+        ]
+      }
+    };
+
+    bot.sendMessage(chatId, messageText, options)
+      .then(() => console.log(`✅ Sent web_app button to ${chatId} (param: ${startParam || 'none'})`))
+      .catch(err => console.error(`❌ Failed to send message to ${chatId}:`, err.message));
+  });
+
+  // Handle errors
+  bot.on('polling_error', (err) => console.error('Polling error:', err.message));
+}
 
 // ---------- Socket.IO (main namespace) ----------
 io.use((socket, next) => {
