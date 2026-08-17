@@ -469,48 +469,21 @@ app.get('/api/deposit-accounts', async (req, res) => {
       }
     }
 
-    let admins;
+    let admins = [];
     if (adminId) {
+      // If the user has an assigned admin, fetch that specific admin
       const { data: admin, error } = await supabase
         .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
         .eq('id', adminId)
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw error;
-
-      if (admin) {
-        if (admin.accept_deposits !== false) {
-          admins = [admin];
-        } else {
-          const { data: fallback, error: fallbackErr } = await supabase
-            .from('admins')
-            .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-            .eq('is_fallback', true)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (fallbackErr) throw fallbackErr;
-          if (fallback) {
-            admins = [fallback];
-          } else {
-            admins = [];
-          }
-        }
-      } else {
-        const { data: fallback, error: fallbackErr } = await supabase
-          .from('admins')
-          .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-          .eq('is_fallback', true)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (fallbackErr) throw fallbackErr;
-        if (fallback) {
-          admins = [fallback];
-        } else {
-          admins = [];
-        }
-      }
+      if (admin && admin.accept_deposits !== false) {
+        admins = [admin];
+      } // else admins remains empty
     } else {
+      // No assigned admin → show all active admins that accept deposits
       const { data: allAdmins, error: allErr } = await supabase
         .from('admins')
         .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
@@ -796,8 +769,8 @@ app.post('/admin/register', async (req, res) => {
         telebirr_number: telebirr_number || null,
         cbebirr_number: cbebirr_number || null,
         mpesa_number: mpesa_number || null,
-        accept_deposits: true,
-        is_fallback: false
+        accept_deposits: true
+        // is_fallback removed
       })
       .select()
       .single();
@@ -3046,36 +3019,7 @@ app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin set fallback admin ----------
-app.post('/super-admin/set-fallback-admin', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-
-  try {
-    // Reset all admins' is_fallback to false, then set the chosen one
-    await supabase
-      .from('admins')
-      .update({ is_fallback: false });
-
-    const { error } = await supabase
-      .from('admins')
-      .update({ is_fallback: true })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_SET_FALLBACK', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId
-    });
-
-    res.json({ success: true, message: `Admin ${adminId} set as fallback` });
-  } catch (err) {
-    console.error('Error setting fallback admin:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
+// ---------- (Removed: /super-admin/set-fallback-admin) ----------
 
 // ---------- Super admin adjust deposit balance ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
