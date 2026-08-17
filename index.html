@@ -1331,7 +1331,7 @@
 
     <script>
         // ============================================================
-        //  DOT BINGO – withdrawal shows only methods, no admin names
+        //  DOT BINGO – withdrawal shows only methods, no phone number
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1417,7 +1417,6 @@
             savedAmount = '';
         let submitting = false;
         let submittingW = false;
-        // For withdrawal: we skip admin selection, directly choose method
         let withdrawMethodMap = {}; // { method: admin_id }
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
@@ -1594,7 +1593,6 @@
                 el.innerText = (lang === 'am' ? data.am[k] : data.en[k]) || el.innerText;
             });
             langBtn.textContent = lang === 'am' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
-            // dynamic titles
             if ($('depositAdminListTitle')) {
                 $('depositAdminListTitle').innerHTML = lang === 'am' ? '👤 አስተዳዳሪ ይምረጡ' : '👤 Select Admin';
             }
@@ -1638,14 +1636,13 @@
                     if (admin) {
                         selectedAdminObj = admin;
                         selectedAdminId = admin.id;
-                        // Deposit flow: show methods
                         showMethods(admin);
                     }
                 });
             });
         }
 
-        // ----- DEPOSIT method list -----
+        // ----- DEPOSIT method list (shows phone number) -----
         function showMethods(admin) {
             const c = $('methodListContainer'),
                 t = $('methodListAdminName');
@@ -1684,16 +1681,14 @@
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
         }
 
-        // ========== WITHDRAW: Show only methods (no admin) ==========
+        // ========== WITHDRAW: Show only methods (no phone number) ==========
         async function openWithdrawFlow() {
             resetDepositState();
-            // Load admins, then build unique methods map
             try {
                 const r = await fetch('/api/deposit-accounts');
                 const d = await r.json();
                 if (!d.success || !d.admins) { alert('No admins available'); return; }
                 const admins = d.admins;
-                // Build map: method -> first admin that supports it
                 const methodMap = {};
                 admins.forEach(a => {
                     if (a.telebirr && !methodMap.telebirr) methodMap.telebirr = a.id;
@@ -1704,9 +1699,7 @@
                     alert('No withdrawal methods available.');
                     return;
                 }
-                // Store mapping globally
                 withdrawMethodMap = methodMap;
-                // Show method list modal with these methods
                 showWithdrawMethods(methodMap);
             } catch (e) {
                 alert('Error loading withdrawal methods.');
@@ -1718,14 +1711,11 @@
             const c = $('methodListContainer'),
                 t = $('methodListAdminName');
             if (!c || !t) return;
-            // Change header to "Select Withdrawal Method"
             t.innerHTML = lang === 'am' ? '💸 የማውጫ ዘዴ ይምረጡ' : '💸 Select Withdrawal Method';
             $('depositMethodListStepLabel').textContent = '';
-            // Hide the back button because we don't have a previous step (no admin list)
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = 'none';
 
-            // Build method list from map
             const methodList = [];
             const icons = { telebirr: '📱', cbebirr: '🏦', mpesa: '📲' };
             const labels = { telebirr: 'Telebirr', cbebirr: 'CBE Birr', mpesa: 'M-Pesa' };
@@ -1733,14 +1723,12 @@
                 const admin = depositAdmins.find(a => a.id === adminId);
                 if (!admin) continue;
                 const number = admin[type] || '';
-                const disp = getSafeNumber(number);
                 methodList.push({
                     type,
                     label: labels[type] || type,
                     number: number,
                     icon: icons[type] || '💳',
                     adminId: adminId,
-                    displayNumber: disp
                 });
             }
             if (!methodList.length) {
@@ -1750,7 +1738,7 @@
             c.innerHTML = methodList.map(m => {
                 return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
                             <div class="method-icon">${m.icon}</div>
-                            <div class="method-info"><div class="method-name">${m.label}</div><div class="method-number">${m.displayNumber}</div></div>
+                            <div class="method-info"><div class="method-name">${m.label}</div></div>
                             <div class="method-select-badge">Select</div>
                         </div>`;
             }).join('');
@@ -1766,7 +1754,6 @@
                     selectedAdminId = adminId;
                     selectedAdminObj = admin;
                     $('depositMethodListModal').classList.remove('active');
-                    // Open withdrawal details
                     openWithdrawDetails(admin, method, number);
                 });
             });
@@ -1800,10 +1787,8 @@
                 if (key) { confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key]; } else { confirmBtn
                         .innerText = 'Confirm Payment →'; }
             }
-            // Show back button again (for deposit)
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = '';
-            // Restore admin list title
             if ($('depositAdminListTitle')) {
                 $('depositAdminListTitle').innerHTML = lang === 'am' ? '👤 አስተዳዳሪ ይምረጡ' : '👤 Select Admin';
             }
@@ -2501,7 +2486,7 @@
             window.speechSynthesis.getVoices();
             $('stakePage').classList.remove('hidden');
             restoreSession();
-            console.log('✨ DOT BINGO ready (withdrawal: methods only, no admin)');
+            console.log('✨ DOT BINGO ready (withdrawal: methods only, no phone)');
         }
 
         // ============================================================
@@ -2581,9 +2566,7 @@
 
         // Method list modal controls (deposit & withdrawal share same modal)
         $('closeMethodListBtn')?.addEventListener('click', () => {
-            // If we are in withdrawal flow and we close, just close modal
             if (Object.keys(withdrawMethodMap).length > 0 && !$('depositAdminListModal').classList.contains('active')) {
-                // Withdrawal: no admin list, just close
                 $('depositMethodListModal').classList.remove('active');
                 resetDepositState();
             } else {
@@ -2591,12 +2574,10 @@
             }
         });
         $('depositMethodListBackBtn')?.addEventListener('click', () => {
-            // If withdrawal flow, just close
             if (Object.keys(withdrawMethodMap).length > 0 && !$('depositAdminListModal').classList.contains('active')) {
                 $('depositMethodListModal').classList.remove('active');
                 resetDepositState();
             } else {
-                // Deposit: go back to admin list
                 $('depositMethodListModal').classList.remove('active');
                 $('depositAdminListModal').classList.add('active');
             }
@@ -2618,7 +2599,6 @@
         // Withdraw details
         $('backWithdrawBtn')?.addEventListener('click', () => {
             $('withdrawDetailsModal').classList.remove('active');
-            // Go back to withdrawal method list (not admin)
             openWithdrawFlow();
         });
         $('submitWithdrawBtn')?.addEventListener('click', submitWithdraw);
