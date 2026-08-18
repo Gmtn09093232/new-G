@@ -543,9 +543,9 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       let needUpdate = false;
       // If user has no admin and we have an invite code, try to assign
       if (!data.admin_id && inviteCode) {
-        // First try to find admin by invite_code in admins table
         let adminData = null;
         let adminErr = null;
+        // 1) Try admins table (direct invite_code)
         const { data: admins, error: adminsErr } = await supabase
           .from('admins')
           .select('id, name')
@@ -555,13 +555,28 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         if (!adminsErr && admins) {
           adminData = admins;
         } else {
-          // Fallback: try to find admin via invite_code_used table
-          const { data: inviteUsed, error: inviteErr } = await supabase
+          // 2) Try invite_code_used table
+          // Try column 'invite_code' first, then 'invite_code_used'
+          let inviteUsed = null;
+          let errInvite = null;
+          const { data: used1, error: err1 } = await supabase
             .from('invite_code_used')
-            .select('admin_id')
+            .select('admin_id, invite_code')
             .eq('invite_code', inviteCode)
             .maybeSingle();
-          if (!inviteErr && inviteUsed) {
+          if (!err1 && used1) {
+            inviteUsed = used1;
+          } else {
+            const { data: used2, error: err2 } = await supabase
+              .from('invite_code_used')
+              .select('admin_id, invite_code_used')
+              .eq('invite_code_used', inviteCode)
+              .maybeSingle();
+            if (!err2 && used2) {
+              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
+            }
+          }
+          if (inviteUsed) {
             const { data: adminFromUsed, error: adminUsedErr } = await supabase
               .from('admins')
               .select('id, name')
@@ -579,6 +594,8 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           data.assigned_admin_name = adminData.name;
           needUpdate = true;
           console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code ${inviteCode}`);
+        } else {
+          console.log(`❌ No admin found for invite code ${inviteCode}`);
         }
       }
 
@@ -620,8 +637,8 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       let adminName = null;
       
       if (!finalAdminId && inviteCode) {
-        // Try to find admin from admins table first
         let adminData = null;
+        // 1) admins table
         const { data: admins, error: adminsErr } = await supabase
           .from('admins')
           .select('id, name')
@@ -631,13 +648,26 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         if (!adminsErr && admins) {
           adminData = admins;
         } else {
-          // Fallback: invite_code_used
-          const { data: inviteUsed, error: inviteErr } = await supabase
+          // 2) invite_code_used
+          let inviteUsed = null;
+          const { data: used1, error: err1 } = await supabase
             .from('invite_code_used')
-            .select('admin_id')
+            .select('admin_id, invite_code')
             .eq('invite_code', inviteCode)
             .maybeSingle();
-          if (!inviteErr && inviteUsed) {
+          if (!err1 && used1) {
+            inviteUsed = used1;
+          } else {
+            const { data: used2, error: err2 } = await supabase
+              .from('invite_code_used')
+              .select('admin_id, invite_code_used')
+              .eq('invite_code_used', inviteCode)
+              .maybeSingle();
+            if (!err2 && used2) {
+              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
+            }
+          }
+          if (inviteUsed) {
             const { data: adminFromUsed, error: adminUsedErr } = await supabase
               .from('admins')
               .select('id, name')
@@ -653,6 +683,8 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           finalAdminId = adminData.id;
           adminName = adminData.name;
           console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
+        } else {
+          console.log(`❌ No admin found for invite code ${inviteCode} during user creation`);
         }
       }
       
