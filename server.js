@@ -544,7 +544,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       // If user has no admin and we have an invite code, try to assign
       if (!data.admin_id && inviteCode) {
         let adminData = null;
-        let adminErr = null;
         // 1) Try admins table (direct invite_code)
         const { data: admins, error: adminsErr } = await supabase
           .from('admins')
@@ -556,7 +555,6 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           adminData = admins;
         } else {
           // 2) Try invite_code_used table
-          // Try column 'invite_code' first, then 'invite_code_used'
           let inviteUsed = null;
           let errInvite = null;
           const { data: used1, error: err1 } = await supabase
@@ -599,9 +597,9 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         }
       }
 
-      // Also update referred_by (or invite_code_used column) with the invite code if not set
-      if (inviteCode && !data.referred_by) {
-        data.referred_by = inviteCode;
+      // Store the invite code used if not already set
+      if (inviteCode && !data.invite_code_used) {
+        data.invite_code_used = inviteCode;
         needUpdate = true;
       }
 
@@ -611,7 +609,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .update({ 
             admin_id: data.admin_id, 
             assigned_admin_name: data.assigned_admin_name,
-            referred_by: data.referred_by
+            invite_code_used: data.invite_code_used
           })
           .eq('telegram_id', id);
         if (updateErr) console.error('Failed to update user:', updateErr.message);
@@ -622,7 +620,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: data.username,
         balance: Number(data.balance),
         telegram_handle: data.telegram_handle,
-        referred_by: data.referred_by,
+        invite_code_used: data.invite_code_used,
         first_deposit_amount: data.first_deposit_amount || 0,
         admin_id: data.admin_id,
         assigned_admin_name: data.assigned_admin_name
@@ -693,7 +691,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: username || 'Player',
         telegram_handle: telegramHandle || null,
         balance: 10,
-        referred_by: inviteCode || null,
+        invite_code_used: inviteCode || null,
         first_deposit_amount: 0,
         admin_id: finalAdminId,
         assigned_admin_name: adminName
@@ -707,7 +705,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: newUser.username,
         balance: 10,
         telegram_handle: newUser.telegram_handle,
-        referred_by: newUser.referred_by,
+        invite_code_used: newUser.invite_code_used,
         first_deposit_amount: 0,
         admin_id: newUser.admin_id,
         assigned_admin_name: newUser.assigned_admin_name
@@ -730,7 +728,7 @@ function verifyTelegram(initData) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join('\n');
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
     return calculatedHash === hash;
   } catch (err) {
@@ -3354,7 +3352,7 @@ app.post('/admin/import-players', async (req, res) => {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
-            referred_by: null,
+            invite_code_used: null,
             first_deposit_amount: 0,
             telegram_handle: null
           };
@@ -3368,7 +3366,7 @@ app.post('/admin/import-players', async (req, res) => {
             username: newUser.username,
             balance: newUser.balance,
             telegram_handle: null,
-            referred_by: null,
+            invite_code_used: null,
             first_deposit_amount: 0,
             admin_id: null,
             assigned_admin_name: null
@@ -3701,14 +3699,14 @@ adminNamespace.on('connection', (socket) => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle, referred_by, first_deposit_amount, admin_id, assigned_admin_name');
+        .select('telegram_id, username, balance, telegram_handle, invite_code_used, first_deposit_amount, admin_id, assigned_admin_name');
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
         telegram_handle: u.telegram_handle,
-        referred_by: u.referred_by,
+        invite_code_used: u.invite_code_used,
         first_deposit_amount: u.first_deposit_amount || 0,
         admin_id: u.admin_id,
         assigned_admin_name: u.assigned_admin_name
