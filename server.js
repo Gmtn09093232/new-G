@@ -541,26 +541,63 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
 
     if (data) {
       let needUpdate = false;
+      // If user has no admin and we have an invite code, try to assign
       if (!data.admin_id && inviteCode) {
-        const { data: adminData, error: adminErr } = await supabase
+        // First try to find admin by invite_code in admins table
+        let adminData = null;
+        let adminErr = null;
+        const { data: admins, error: adminsErr } = await supabase
           .from('admins')
           .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (!adminErr && adminData) {
+        if (!adminsErr && admins) {
+          adminData = admins;
+        } else {
+          // Fallback: try to find admin via invite_code_used table
+          const { data: inviteUsed, error: inviteErr } = await supabase
+            .from('invite_code_used')
+            .select('admin_id')
+            .eq('invite_code', inviteCode)
+            .maybeSingle();
+          if (!inviteErr && inviteUsed) {
+            const { data: adminFromUsed, error: adminUsedErr } = await supabase
+              .from('admins')
+              .select('id, name')
+              .eq('id', inviteUsed.admin_id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (!adminUsedErr && adminFromUsed) {
+              adminData = adminFromUsed;
+            }
+          }
+        }
+
+        if (adminData) {
           data.admin_id = adminData.id;
           data.assigned_admin_name = adminData.name;
           needUpdate = true;
-          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
+          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code ${inviteCode}`);
         }
       }
+
+      // Also update referred_by (or invite_code_used column) with the invite code if not set
+      if (inviteCode && !data.referred_by) {
+        data.referred_by = inviteCode;
+        needUpdate = true;
+      }
+
       if (needUpdate) {
         const { error: updateErr } = await supabase
           .from('users')
-          .update({ admin_id: data.admin_id, assigned_admin_name: data.assigned_admin_name })
+          .update({ 
+            admin_id: data.admin_id, 
+            assigned_admin_name: data.assigned_admin_name,
+            referred_by: data.referred_by
+          })
           .eq('telegram_id', id);
-        if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
+        if (updateErr) console.error('Failed to update user:', updateErr.message);
       }
 
       users[id] = {
@@ -576,19 +613,43 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
       return users[id];
     } else {
+      // Create new user
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
       
       let finalAdminId = adminId || null;
       let adminName = null;
       
       if (!finalAdminId && inviteCode) {
-        const { data: adminData, error: adminErr } = await supabase
+        // Try to find admin from admins table first
+        let adminData = null;
+        const { data: admins, error: adminsErr } = await supabase
           .from('admins')
           .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (!adminErr && adminData) {
+        if (!adminsErr && admins) {
+          adminData = admins;
+        } else {
+          // Fallback: invite_code_used
+          const { data: inviteUsed, error: inviteErr } = await supabase
+            .from('invite_code_used')
+            .select('admin_id')
+            .eq('invite_code', inviteCode)
+            .maybeSingle();
+          if (!inviteErr && inviteUsed) {
+            const { data: adminFromUsed, error: adminUsedErr } = await supabase
+              .from('admins')
+              .select('id, name')
+              .eq('id', inviteUsed.admin_id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (!adminUsedErr && adminFromUsed) {
+              adminData = adminFromUsed;
+            }
+          }
+        }
+        if (adminData) {
           finalAdminId = adminData.id;
           adminName = adminData.name;
           console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
