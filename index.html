@@ -401,7 +401,7 @@
                 </div>
                 <div>
                     <strong data-key="assignedAdminLabel">👤 Admin:</strong>
-                    <span class="assigned-admin-display" id="userAssignedAdmin">—</span>
+                    <span class="assigned-admin-display" id="userAdminName">—</span>
                 </div>
             </div>
         </div>
@@ -469,7 +469,7 @@
         <div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div>
         <div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div>
         <div class="profile-stat"><div data-key="inviteCodeLabel">🔑 Invite Code Used</div><div><strong id="profileInviteCode">—</strong></div></div>
-        <div class="profile-stat"><div data-key="assignedAdminLabel">👤 Assigned Admin</div><div><strong id="profileAssignedAdmin">—</strong></div></div>
+        <div class="profile-stat"><div data-key="assignedAdminLabel">👤 Assigned Admin</div><div><strong id="profileAdminName">—</strong></div></div>
     </div>
 
     <!-- ===== GAME PAGE ===== -->
@@ -559,7 +559,7 @@
         let pendingAmount = 0, savedPhone = '', savedAmount = '';
         let submitting = false, submittingW = false;
         let withdrawMethodMap = {};
-        // ✅ Changed invite_code_used to invite_code
+        // ✅ Using invite_code and admin_name (not invite_code_used / assigned_admin_name)
         let userInviteData = { invite_code: null, admin_id: null, admin_name: null };
         let isAuthenticated = false;
 
@@ -602,13 +602,12 @@
                 const response = await fetch('/api/user/invite-code');
                 const data = await response.json();
                 if (data.success) {
-                    // ✅ Use invite_code instead of invite_code_used
-    
-                          userInviteData = {
-                            invite_code: data.invite_code || null,
-                            admin_id: data.admin_id || null,
-                            admin_name: data.admin_name || null
-                          };
+                    // ✅ Using invite_code and admin_name
+                    userInviteData = {
+                        invite_code: data.invite_code || null,
+                        admin_id: data.admin_id || null,
+                        admin_name: data.admin_name || null
+                    };
                     updateInviteInfoUI();
                     return data;
                 }
@@ -622,15 +621,17 @@
         function updateInviteInfoUI() {
             const container = $('inviteInfoContainer');
             if (!container) return;
-            // ✅ Use invite_code
+            // ✅ Using invite_code and admin_name
             if (userInviteData.invite_code || userInviteData.admin_name) {
                 container.classList.remove('hidden');
                 const codeEl = $('userInviteCode');
-                const adminEl = $('userAssignedAdmin');
+                const adminEl = $('userAdminName');
                 if (codeEl) codeEl.textContent = userInviteData.invite_code || '—';
                 if (adminEl) adminEl.textContent = userInviteData.admin_name || 'Not assigned';
+                
+                // Also update profile page
                 const profileCode = $('profileInviteCode');
-                const profileAdmin = $('profileAssignedAdmin');
+                const profileAdmin = $('profileAdminName');
                 if (profileCode) profileCode.textContent = userInviteData.invite_code || '—';
                 if (profileAdmin) profileAdmin.textContent = userInviteData.admin_name || 'Not assigned';
             } else {
@@ -656,7 +657,7 @@
                 const data = await response.json();
                 if (data.success) {
                     $('profileUsername').innerText = data.username || 'Player';
-                    // ✅ Use invite_code
+                    // ✅ Using invite_code and admin_name
                     userInviteData = {
                         invite_code: data.invite_code || null,
                         admin_id: data.admin_id || null,
