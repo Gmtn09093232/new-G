@@ -240,9 +240,50 @@
         .invite-info strong { color:#ea580c; }
         .invite-code-display { background:#1e293b; color:#facc15; padding:4px 12px; border-radius:40px; font-family:monospace; font-weight:700; font-size:0.85rem; display:inline-block; }
         .assigned-admin-display { background:#f97316; color:white; padding:4px 12px; border-radius:40px; font-weight:600; font-size:0.85rem; display:inline-block; }
+
+        /* ===== INVITE REQUIRED OVERLAY ===== */
+        #inviteRequiredOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 24px;
+            text-align: center;
+            color: white;
+        }
+        #inviteRequiredOverlay.hidden { display: none; }
+        #inviteRequiredOverlay .overlay-icon { font-size: 4rem; margin-bottom: 16px; }
+        #inviteRequiredOverlay h2 { font-size: 1.8rem; margin-bottom: 12px; }
+        #inviteRequiredOverlay p { font-size: 1rem; max-width: 400px; margin-bottom: 24px; opacity: 0.9; }
+        #inviteRequiredOverlay .btn-bot {
+            background: #f97316;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 60px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(249,115,22,0.4);
+            transition: transform 0.1s;
+        }
+        #inviteRequiredOverlay .btn-bot:active { transform: scale(0.96); }
     </style>
 </head>
 <body>
+    <!-- ===== INVITE REQUIRED OVERLAY ===== -->
+    <div id="inviteRequiredOverlay" class="hidden">
+        <div class="overlay-icon">🔑</div>
+        <h2>Invite Required</h2>
+        <p>Please use an invite link from an admin to access the game. Click the button below to get your invite code from the bot.</p>
+        <button class="btn-bot" id="goToBotBtn">🚀 Go to Bot</button>
+    </div>
+
     <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
 
     <!-- ============================================================ -->
@@ -674,6 +715,35 @@
             } catch(error) {
                 console.error('Auth error:', error);
                 return null;
+            }
+        }
+
+        // ============================================================
+        //  INVITE REQUIRED CHECK
+        // ============================================================
+        function checkInviteRequired() {
+            // Get start_param from URL or Telegram WebApp
+            const urlParams = new URLSearchParams(window.location.search);
+            let startParam = urlParams.get('start_param');
+            if (!startParam && tg?.initDataUnsafe) {
+                startParam = tg.initDataUnsafe.start_param;
+            }
+            if (!startParam && tg?.initData) {
+                try {
+                    const params = new URLSearchParams(tg.initData);
+                    startParam = params.get('start_param');
+                } catch(e) {}
+            }
+
+            const overlay = document.getElementById('inviteRequiredOverlay');
+            if (!startParam) {
+                // Show overlay
+                overlay.classList.remove('hidden');
+                // Disable any game interaction (overlay blocks clicks)
+                return false;
+            } else {
+                overlay.classList.add('hidden');
+                return true;
             }
         }
 
@@ -1365,6 +1435,12 @@
 
         // ========== INIT ==========
         async function init() {
+            // ✅ Force invite check
+            if (!checkInviteRequired()) {
+                // Show overlay and stop further initialization
+                return;
+            }
+
             buildGrid();
             loadStats();
             updateMute();
@@ -1468,6 +1544,16 @@
 
         // Winner overlay close
         document.querySelector('.winner-modal .celebrate-btn')?.addEventListener('click', () => { $('winnerOverlay').classList.remove('active'); });
+
+        // Go to Bot button
+        document.getElementById('goToBotBtn')?.addEventListener('click', function() {
+            const botUsername = 'bingomkmk0120_bot'; // Replace with your bot's username
+            if (tg && tg.openTelegramLink) {
+                tg.openTelegramLink(`https://t.me/${botUsername}`);
+            } else {
+                window.open(`https://t.me/${botUsername}`, '_blank');
+            }
+        });
 
         // ============================================================
         //  START
