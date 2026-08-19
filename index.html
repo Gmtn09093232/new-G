@@ -1034,6 +1034,39 @@
             font-size: 0.8rem;
             color: #64748b;
         }
+
+        /* ===== INVITE INFO DISPLAY ===== */
+        .invite-info {
+            background: #fef9f0;
+            border-radius: 28px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border: 1px solid #fed7aa;
+            font-size: 0.75rem;
+            color: #1e293b;
+        }
+        .invite-info strong {
+            color: #ea580c;
+        }
+        .invite-code-display {
+            background: #1e293b;
+            color: #facc15;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: inline-block;
+        }
+        .assigned-admin-display {
+            background: #f97316;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -1217,6 +1250,21 @@
             <h2 style="font-family:'Inter', monospace; font-weight:800; color:#ea580c;">🎲 ዶት ቢንጎ</h2>
             <div class="players-badge">DOT BINGO</div>
         </div>
+        
+        <!-- ===== INVITE INFO DISPLAY ===== -->
+        <div id="inviteInfoContainer" class="invite-info hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
+                    <span class="invite-code-display" id="userInviteCode">—</span>
+                </div>
+                <div>
+                    <strong data-key="assignedAdminLabel">👤 Admin:</strong>
+                    <span class="assigned-admin-display" id="userAssignedAdmin">—</span>
+                </div>
+            </div>
+        </div>
+        
         <h3 style="text-align:center; margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
         <div class="stake-page-buttons">
             <div style="text-align:center;"><button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="stake10Count">👥 0 players</div></div>
@@ -1296,6 +1344,8 @@
         </div>
         <div class="profile-stat"><div data-key="usernameLabel">Username</div><div><strong id="profileUsername">Player</strong></div></div>
         <div class="profile-stat"><div data-key="balanceLabel">💰 Balance</div><div id="profileBalancePage">0</div></div>
+        <div class="profile-stat"><div data-key="inviteCodeLabel">🔑 Invite Code Used</div><div><strong id="profileInviteCode">—</strong></div></div>
+        <div class="profile-stat"><div data-key="assignedAdminLabel">👤 Assigned Admin</div><div><strong id="profileAssignedAdmin">—</strong></div></div>
     </div>
 
     <!-- ===== GAME PAGE ===== -->
@@ -1331,7 +1381,7 @@
 
     <script>
         // ============================================================
-        //  DOT BINGO – withdrawal shows only methods, no phone number
+        //  DOT BINGO – Full Frontend with Invite Tracking
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1418,6 +1468,12 @@
         let submitting = false;
         let submittingW = false;
         let withdrawMethodMap = {}; // { method: admin_id }
+        let userInviteData = {
+            invite_code_used: null,
+            admin_id: null,
+            assigned_admin_name: null
+        };
+        let isAuthenticated = false;
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
@@ -1504,6 +1560,8 @@
                 amazing: "🎉 ደስ ያለኝ! 🎉",
                 sendToNumber: "Send {amount} ETB to this Telebirr number",
                 selectWithdrawMethod: "💸 Select Withdrawal Method",
+                inviteCodeLabel: "🔑 Invite Code",
+                assignedAdminLabel: "👤 Admin",
             },
             en: {
                 deposit: "+Deposit",
@@ -1584,6 +1642,8 @@
                 amazing: "🎉 Amazing! 🎉",
                 sendToNumber: "Send {amount} ETB to this Telebirr number",
                 selectWithdrawMethod: "💸 Select Withdrawal Method",
+                inviteCodeLabel: "🔑 Invite Code",
+                assignedAdminLabel: "👤 Admin",
             }
         };
 
@@ -1596,6 +1656,8 @@
             if ($('depositAdminListTitle')) {
                 $('depositAdminListTitle').innerHTML = lang === 'am' ? '👤 አስተዳዳሪ ይምረጡ' : '👤 Select Admin';
             }
+            // Update invite info labels
+            updateInviteInfoUI();
         }
 
         function toggleLang() { lang = lang === 'am' ? 'en' : 'am';
@@ -1606,6 +1668,100 @@
         if (savedLang === 'am' || savedLang === 'en') lang = savedLang;
         else lang = 'am';
         applyLang();
+
+        // ============================================================
+        //  INVITE TRACKING – Fetch and display user's invite info
+        // ============================================================
+        async function fetchUserInviteInfo() {
+            try {
+                const response = await fetch('/api/user/invite-code');
+                const data = await response.json();
+                if (data.success) {
+                    userInviteData = {
+                        invite_code_used: data.invite_code_used || null,
+                        admin_id: data.admin_id || null,
+                        assigned_admin_name: data.assigned_admin_name || null
+                    };
+                    updateInviteInfoUI();
+                    return data;
+                }
+                return null;
+            } catch (error) {
+                console.error('Error fetching invite info:', error);
+                return null;
+            }
+        }
+
+        function updateInviteInfoUI() {
+            const container = $('inviteInfoContainer');
+            if (!container) return;
+
+            if (userInviteData.invite_code_used || userInviteData.assigned_admin_name) {
+                container.classList.remove('hidden');
+                const codeEl = $('userInviteCode');
+                const adminEl = $('userAssignedAdmin');
+                
+                if (codeEl) {
+                    codeEl.textContent = userInviteData.invite_code_used || '—';
+                }
+                if (adminEl) {
+                    adminEl.textContent = userInviteData.assigned_admin_name || 'Not assigned';
+                }
+                
+                // Also update profile page
+                const profileCode = $('profileInviteCode');
+                const profileAdmin = $('profileAssignedAdmin');
+                if (profileCode) profileCode.textContent = userInviteData.invite_code_used || '—';
+                if (profileAdmin) profileAdmin.textContent = userInviteData.assigned_admin_name || 'Not assigned';
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        // ============================================================
+        //  AUTH – Enhanced to ensure invite tracking
+        // ============================================================
+        async function authenticateUser() {
+            const initData = tg.initData;
+            if (!initData) {
+                console.warn('No initData, skipping auth');
+                return null;
+            }
+
+            try {
+                const response = await fetch('/api/telegram-miniapp-auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    // Update user info
+                    $('profileUsername').innerText = data.username || 'Player';
+                    
+                    // Store invite info from auth response
+                    userInviteData = {
+                        invite_code_used: data.invite_code_used || null,
+                        admin_id: data.admin_id || null,
+                        assigned_admin_name: data.assigned_admin_name || null
+                    };
+                    updateInviteInfoUI();
+                    isAuthenticated = true;
+                    
+                    // If user has an invite code, log it
+                    if (userInviteData.invite_code_used) {
+                        console.log(`🔑 User authenticated with invite code: ${userInviteData.invite_code_used}`);
+                        console.log(`👤 Assigned to admin: ${userInviteData.assigned_admin_name || 'None'}`);
+                    }
+                    
+                    return data;
+                }
+                return null;
+            } catch (error) {
+                console.error('Auth error:', error);
+                return null;
+            }
+        }
 
         // ---------- DEPOSIT ACCOUNTS ----------
         let depositAdmins = [];
@@ -2312,6 +2468,11 @@
 
         // ========== CONNECT TO GAME ==========
         async function connectToGame(stake) {
+            // First authenticate and get invite info
+            if (!isAuthenticated) {
+                await authenticateUser();
+            }
+            
             currentStake = stake;
             localStorage.setItem('dot_bingo_stake', stake);
             const initData = tg.initData;
@@ -2322,6 +2483,7 @@
             if (!startParam) { const urlParams = new URLSearchParams(window.location.search);
                 startParam = urlParams.get('start_param'); }
             if (!startParam && tg.initDataUnsafe) { startParam = tg.initDataUnsafe.start_param; }
+            
             try {
                 const r = await fetch('/api/telegram-miniapp-auth', {
                     method: 'POST',
@@ -2331,7 +2493,22 @@
                 const d = await r.json();
                 if (!d.success) { alert('Auth failed'); return; }
                 $('profileUsername').innerText = d.username || 'Player';
+                
+                // Store invite info from auth response
+                userInviteData = {
+                    invite_code_used: d.invite_code_used || null,
+                    admin_id: d.admin_id || null,
+                    assigned_admin_name: d.assigned_admin_name || null
+                };
+                updateInviteInfoUI();
+                isAuthenticated = true;
+                
+                // If user has an invite code, log it
+                if (userInviteData.invite_code_used) {
+                    console.log(`🔑 User connected with invite code: ${userInviteData.invite_code_used}`);
+                }
             } catch (e) { alert('Network error'); return; }
+            
             if (socket) socket.disconnect();
             socket = io();
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
@@ -2479,14 +2656,21 @@
         }
 
         // ========== INIT ==========
-        function init() {
+        async function init() {
             buildGrid();
             loadStats();
             updateMute();
             window.speechSynthesis.getVoices();
             $('stakePage').classList.remove('hidden');
+            
+            // Authenticate and get invite info
+            await authenticateUser();
+            
+            // Fetch additional invite info
+            await fetchUserInviteInfo();
+            
             restoreSession();
-            console.log('✨ DOT BINGO ready (withdrawal: methods only, no phone)');
+            console.log('✨ DOT BINGO ready with invite tracking');
         }
 
         // ============================================================
@@ -2538,7 +2722,9 @@
                         syncBalance(balance); } else if (page === 'profile') { $('profilePage').classList.remove(
                             'hidden');
                         syncBalance(balance);
-                        updateStatsUI(); }
+                        updateStatsUI();
+                        // Refresh invite info on profile view
+                        fetchUserInviteInfo(); }
                 }
                 unlockSpeech();
             });
