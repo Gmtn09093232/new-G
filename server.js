@@ -3941,7 +3941,7 @@ if (!botToken) {
     const bot = new TelegramBot(botToken, { polling: true });
     console.log('🤖 Telegram bot started (polling)');
 
-    bot.onText(/\/start(.+)?/, (msg, match) => {
+    bot.onText(/\/start(.+)?/, async (msg, match) => {
       const chatId = msg.chat.id;
       const startParam = match[1] ? match[1].trim() : '';
       const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
@@ -3951,43 +3951,115 @@ if (!botToken) {
         ? `${webAppUrl}?start_param=${startParam}` 
         : webAppUrl;
 
-      // Also log the invite usage
+      // If there is a start parameter, log the invite immediately
       if (startParam) {
-        console.log(`🔗 User ${chatId} opened invite link with code: ${startParam}`);
-        
-        // Store invite link open immediately
         const userId = msg.from.id.toString();
         const username = msg.from.username || msg.from.first_name || 'Unknown';
-        
-        supabase
-          .from('admin_link_opens')
-          .insert({
-            admin_id: null,
-            invite_code: startParam,
-            user_id: userId,
-            ip_address: null,
-            user_agent: 'telegram_bot'
-          })
-          .then(() => {
-            console.log(`✅ Logged invite link open for user ${userId} with code ${startParam}`);
-            // Also update user's invite code if they exist
-            return supabase
-              .from('users')
-              .update({ invite_code_used: startParam })
-              .eq('telegram_id', userId);
-          })
-          .then(({ error }) => {
-            if (error && error.code !== 'PGRST116') {
-              console.error('Failed to update user invite code:', error.message);
-            } else if (!error) {
-              console.log(`✅ Updated user ${userId} with invite code ${startParam}`);
+        const ip = null; // Not available in bot context
+        const userAgent = 'telegram_bot';
+
+        console.log(`🔗 User ${userId} opened invite link with code: ${startParam}`);
+
+        // Look up admin by invite code
+        let adminId = null;
+        let adminName = null;
+        try {
+          const { data: admin } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('invite_code', startParam)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (admin) {
+            adminId = admin.id;
+            adminName = admin.name;
+          }
+        } catch (e) {
+          console.error('Error looking up admin:', e.message);
+        }
+
+        // 1. Insert into admin_link_opens
+        try {
+          await supabase
+            .from('admin_link_opens')
+            .insert({
+              admin_id: adminId,
+              invite_code: startParam,
+              user_id: userId,
+              ip_address: ip,
+              user_agent: userAgent
+            });
+          console.log(`✅ Logged admin_link_opens for ${userId}`);
+        } catch (e) {
+          console.error('Error inserting admin_link_opens:', e.message);
+        }
+
+        // 2. Insert/Update invite_tracking (upsert by (telegram_id, invite_code))
+        try {
+          const { data: existing } = await supabase
+            .from('invite_tracking')
+            .select('id')
+            .eq('telegram_id', userId)
+            .eq('invite_code', startParam)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase
+              .from('invite_tracking')
+              .update({
+                username: username,
+                admin_id: adminId,
+                admin_name: adminName,
+                user_agent: userAgent
+              })
+              .eq('id', existing.id);
+            console.log(`✅ Updated invite_tracking for ${userId}`);
+          } else {
+            await supabase
+              .from('invite_tracking')
+              .insert({
+                telegram_id: userId,
+                username: username,
+                invite_code: startParam,
+                admin_id: adminId,
+                admin_name: adminName,
+                ip_address: ip,
+                user_agent: userAgent
+              });
+            console.log(`✅ Inserted invite_tracking for ${userId}`);
+          }
+        } catch (e) {
+          console.error('Error with invite_tracking:', e.message);
+        }
+
+        // 3. Update users table (if user exists)
+        try {
+          const { data: user } = await supabase
+            .from('users')
+            .select('id')
+            .eq('telegram_id', userId)
+            .maybeSingle();
+
+          if (user) {
+            const updates = { invite_code_used: startParam };
+            if (adminId && !user.admin_id) {
+              updates.admin_id = adminId;
+              updates.assigned_admin_name = adminName;
             }
-          })
-          .catch(err => {
-            console.error('Error logging invite:', err.message);
-          });
+            await supabase
+              .from('users')
+              .update(updates)
+              .eq('telegram_id', userId);
+            console.log(`✅ Updated users table for ${userId} with invite ${startParam}`);
+          } else {
+            console.log(`ℹ️ User ${userId} not yet in users table, will be created on first app open.`);
+          }
+        } catch (e) {
+          console.error('Error updating users table:', e.message);
+        }
       }
 
+      // Send the message with web app button
       const messageText = startParam
         ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
         : '🎯 Welcome! Click below to start playing.';
