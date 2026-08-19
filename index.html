@@ -559,7 +559,8 @@
         let pendingAmount = 0, savedPhone = '', savedAmount = '';
         let submitting = false, submittingW = false;
         let withdrawMethodMap = {};
-        let userInviteData = { invite_code_used: null, admin_id: null, assigned_admin_name: null };
+        // ✅ Changed invite_code_used to invite_code
+        let userInviteData = { invite_code: null, admin_id: null, assigned_admin_name: null };
         let isAuthenticated = false;
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch(e) {}
@@ -601,8 +602,9 @@
                 const response = await fetch('/api/user/invite-code');
                 const data = await response.json();
                 if (data.success) {
+                    // ✅ Use invite_code instead of invite_code_used
                     userInviteData = {
-                        invite_code_used: data.invite_code_used || null,
+                        invite_code: data.invite_code || null,
                         admin_id: data.admin_id || null,
                         assigned_admin_name: data.assigned_admin_name || null
                     };
@@ -619,15 +621,16 @@
         function updateInviteInfoUI() {
             const container = $('inviteInfoContainer');
             if (!container) return;
-            if (userInviteData.invite_code_used || userInviteData.assigned_admin_name) {
+            // ✅ Use invite_code
+            if (userInviteData.invite_code || userInviteData.assigned_admin_name) {
                 container.classList.remove('hidden');
                 const codeEl = $('userInviteCode');
                 const adminEl = $('userAssignedAdmin');
-                if (codeEl) codeEl.textContent = userInviteData.invite_code_used || '—';
+                if (codeEl) codeEl.textContent = userInviteData.invite_code || '—';
                 if (adminEl) adminEl.textContent = userInviteData.assigned_admin_name || 'Not assigned';
                 const profileCode = $('profileInviteCode');
                 const profileAdmin = $('profileAssignedAdmin');
-                if (profileCode) profileCode.textContent = userInviteData.invite_code_used || '—';
+                if (profileCode) profileCode.textContent = userInviteData.invite_code || '—';
                 if (profileAdmin) profileAdmin.textContent = userInviteData.assigned_admin_name || 'Not assigned';
             } else {
                 container.classList.add('hidden');
@@ -652,15 +655,16 @@
                 const data = await response.json();
                 if (data.success) {
                     $('profileUsername').innerText = data.username || 'Player';
+                    // ✅ Use invite_code
                     userInviteData = {
-                        invite_code_used: data.invite_code_used || null,
+                        invite_code: data.invite_code || null,
                         admin_id: data.admin_id || null,
                         assigned_admin_name: data.assigned_admin_name || null
                     };
                     updateInviteInfoUI();
                     isAuthenticated = true;
-                    if (userInviteData.invite_code_used) {
-                        console.log(`🔑 User authenticated with invite code: ${userInviteData.invite_code_used}`);
+                    if (userInviteData.invite_code) {
+                        console.log(`🔑 User authenticated with invite code: ${userInviteData.invite_code}`);
                     }
                     return data;
                 }
