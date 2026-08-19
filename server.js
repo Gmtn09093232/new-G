@@ -1,12 +1,8 @@
 // ================================================================
 //  server.js – Full Bingo Server with Integrated Telegram Bot
 //             & Admin Link Open Tracking
-//             & Manual Balance Adjustments Affecting Deposit Stats
-//             & 1500 ETB Limit for Manual Additions
-//             & Import Players by Username/Handle
-//             & DUPLICATE TRANSACTION NUMBER CHECK
-//             & SMART TRANSACTION NUMBER EXTRACTION
-//             & NEW INVITE TRACKING TABLE
+//             & INVITE TRACKING TABLE
+//             & Auto-assign Admin from Invite Code
 // ================================================================
 
 require('dotenv').config();
@@ -129,93 +125,29 @@ const Audit = {
 };
 
 // ================================================================
-//  Log Admin Link Open & Store in Invite Tracking Table
+//  NEW: Log Admin Link Open with Invite Tracking Table
 // ================================================================
-async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
+async function logAdminLinkOpen(inviteCode, userId, ip, userAgent, username = null) {
   try {
     let adminId = null;
-    let username = null;
-
-    // Find the admin
+    let adminName = null;
+    
     if (inviteCode) {
+      // Find admin by invite code
       const { data: admin } = await supabase
         .from('admins')
-        .select('id')
+        .select('id, name')
         .eq('invite_code', inviteCode)
+        .eq('is_active', true)
         .maybeSingle();
-      if (admin) adminId = admin.id;
-    }
-
-    // Get user info if userId exists
-    if (userId) {
-      const { data: user } = await supabase
-        .from('users')
-        .select('username')
-        .eq('telegram_id', String(userId))
-        .maybeSingle();
-      if (user) username = user.username;
-    }
-
-    // Check if this invite tracking record already exists
-    const { data: existingRecord, error: checkError } = await supabase
-      .from('invite_tracking')
-      .select('id, open_count, is_registered')
-      .eq('telegram_id', String(userId))
-      .eq('invite_code', inviteCode)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking existing invite record:', checkError.message);
-    }
-
-    if (existingRecord) {
-      // Update existing record
-      const { error: updateError } = await supabase
-        .from('invite_tracking')
-        .update({
-          open_count: existingRecord.open_count + 1,
-          last_open_at: new Date().toISOString(),
-          user_agent: userAgent || existingRecord.user_agent,
-          ip_address: ip || existingRecord.ip_address,
-          username: username || existingRecord.username,
-          // If user now exists in users table, mark as registered
-          is_registered: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingRecord.id);
-
-      if (updateError) {
-        console.error('Error updating invite tracking:', updateError.message);
-      } else {
-        console.log(`✅ Updated invite tracking for user ${userId} with invite ${inviteCode} (${existingRecord.open_count + 1} opens)`);
-      }
-    } else {
-      // Insert new record
-      const { error: insertError } = await supabase
-        .from('invite_tracking')
-        .insert({
-          telegram_id: String(userId),
-          username: username || null,
-          invite_code: inviteCode || null,
-          admin_id: adminId,
-          first_open_at: new Date().toISOString(),
-          last_open_at: new Date().toISOString(),
-          open_count: 1,
-          is_registered: !!userId, // If userId exists, they're registered
-          user_agent: userAgent || null,
-          ip_address: ip || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-      if (insertError) {
-        console.error('Error inserting invite tracking:', insertError.message);
-      } else {
-        console.log(`✅ Created invite tracking for user ${userId} with invite ${inviteCode}`);
+      
+      if (admin) {
+        adminId = admin.id;
+        adminName = admin.name;
       }
     }
 
-    // Also log to admin_link_opens for backwards compatibility
+    // 1. Log the link open in admin_link_opens table
     const { error } = await supabase
       .from('admin_link_opens')
       .insert({
@@ -227,304 +159,126 @@ async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
       });
     if (error) console.error('Failed to log admin link open:', error.message);
 
-    // If user exists, also update the users table with invite_code_used
+    // 2. Store/Update in invite_tracking table
     if (userId && inviteCode) {
-      const { data: existingUser, error: findError } = await supabase
-        .from('users')
-        .select('invite_code_used')
-        .eq('telegram_id', String(userId))
+      const userIdStr = String(userId);
+      
+      // Check if entry exists
+      const { data: existingEntry, error: findError } = await supabase
+        .from('invite_tracking')
+        .select('id, telegram_id, invite_code')
+        .eq('telegram_id', userIdStr)
+        .eq('invite_code', inviteCode)
         .maybeSingle();
 
       if (findError) {
-        console.error('Error finding user:', findError.message);
+        console.error('Error finding invite tracking entry:', findError.message);
         return;
       }
 
-      if (existingUser && !existingUser.invite_code_used) {
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ invite_code_used: inviteCode })
-          .eq('telegram_id', String(userId));
+      if (!existingEntry) {
+        // Create new invite tracking entry
+        const { error: insertError } = await supabase
+          .from('invite_tracking')
+          .insert({
+            telegram_id: userIdStr,
+            username: username || null,
+            invite_code: inviteCode,
+            admin_id: adminId,
+            admin_name: adminName,
+            ip_address: ip,
+            user_agent: userAgent || null
+          });
         
-        if (updateError) {
-          console.error('Failed to store invite code in user table:', updateError.message);
+        if (insertError) {
+          console.error('Failed to insert invite tracking:', insertError.message);
         } else {
-          console.log(`✅ Stored invite code ${inviteCode} in users table for ${userId}`);
+          console.log(`✅ Invite tracking entry created for user ${userId} with code ${inviteCode}`);
+        }
+      } else {
+        // Update existing entry if needed
+        const updateData = {};
+        if (adminId) updateData.admin_id = adminId;
+        if (adminName) updateData.admin_name = adminName;
+        if (username) updateData.username = username;
+        if (ip) updateData.ip_address = ip;
+        if (userAgent) updateData.user_agent = userAgent;
+        
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
+            .from('invite_tracking')
+            .update(updateData)
+            .eq('id', existingEntry.id);
           
-          if (users[String(userId)]) {
-            users[String(userId)].invite_code_used = inviteCode;
+          if (updateError) {
+            console.error('Failed to update invite tracking:', updateError.message);
+          } else {
+            console.log(`✅ Invite tracking entry updated for user ${userId}`);
           }
         }
       }
-    }
 
+      // 3. Update user table with invite code, admin_id, and assigned_admin_name
+      const { data: user, error: userError } = await supabase
+        .from('users')
+        .select('id, invite_code_used, admin_id, assigned_admin_name')
+        .eq('telegram_id', userIdStr)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('Error finding user:', userError.message);
+        return;
+      }
+
+      if (user) {
+        const updateUserData = {};
+        let needsUpdate = false;
+
+        // Only update if user doesn't already have an invite code
+        if (!user.invite_code_used) {
+          updateUserData.invite_code_used = inviteCode;
+          needsUpdate = true;
+        }
+
+        // Only update admin if user doesn't already have one and we found an admin
+        if (!user.admin_id && adminId) {
+          updateUserData.admin_id = adminId;
+          updateUserData.assigned_admin_name = adminName;
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          const { error: updateUserError } = await supabase
+            .from('users')
+            .update(updateUserData)
+            .eq('telegram_id', userIdStr);
+          
+          if (updateUserError) {
+            console.error('Failed to update user with invite info:', updateUserError.message);
+          } else {
+            console.log(`✅ User ${userId} updated with admin ${adminName} (ID: ${adminId}) and invite code ${inviteCode}`);
+            
+            // Update in-memory cache
+            if (users[userIdStr]) {
+              if (updateUserData.invite_code_used) {
+                users[userIdStr].invite_code_used = updateUserData.invite_code_used;
+              }
+              if (updateUserData.admin_id) {
+                users[userIdStr].admin_id = updateUserData.admin_id;
+                users[userIdStr].assigned_admin_name = updateUserData.assigned_admin_name;
+              }
+            }
+          }
+        }
+      } else {
+        // User doesn't exist yet - will be created by loadUser
+        console.log(`User ${userId} not found, will be created by loadUser`);
+      }
+    }
   } catch (err) {
-    console.error('Error in logAdminLinkOpen:', err.message);
+    console.error('Error logging admin link open:', err.message);
   }
 }
-
-// ================================================================
-//  Invite Tracking API Endpoints
-// ================================================================
-
-// Get invite tracking stats for a user
-app.get('/api/invite-tracking/user/:telegramId', async (req, res) => {
-  const { telegramId } = req.params;
-  
-  try {
-    const { data: records, error } = await supabase
-      .from('invite_tracking')
-      .select(`
-        *,
-        admins:admin_id (
-          id,
-          name,
-          phone,
-          invite_code
-        )
-      `)
-      .eq('telegram_id', String(telegramId))
-      .order('first_open_at', { ascending: false });
-
-    if (error) throw error;
-
-    res.json({
-      success: true,
-      records: records || []
-    });
-  } catch (err) {
-    console.error('Error fetching invite tracking:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Get invite tracking stats for a specific invite code
-app.get('/api/invite-tracking/code/:inviteCode', async (req, res) => {
-  const { inviteCode } = req.params;
-  
-  try {
-    const { data: records, error } = await supabase
-      .from('invite_tracking')
-      .select(`
-        *,
-        admins:admin_id (
-          id,
-          name,
-          phone
-        )
-      `)
-      .eq('invite_code', inviteCode)
-      .order('first_open_at', { ascending: false });
-
-    if (error) throw error;
-
-    const stats = {
-      totalOpens: 0,
-      uniqueUsers: 0,
-      registeredUsers: 0,
-      unregisteredUsers: 0,
-      records: records || []
-    };
-
-    if (records) {
-      stats.totalOpens = records.reduce((sum, r) => sum + r.open_count, 0);
-      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
-      stats.registeredUsers = records.filter(r => r.is_registered).length;
-      stats.unregisteredUsers = records.filter(r => !r.is_registered).length;
-    }
-
-    res.json({
-      success: true,
-      stats,
-      records
-    });
-  } catch (err) {
-    console.error('Error fetching invite tracking by code:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Get invite tracking stats for an admin
-app.get('/api/invite-tracking/admin/:adminId', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { adminId } = req.params;
-  
-  // Ensure admin can only view their own stats
-  if (parseInt(adminId) !== admin.id) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
-
-  try {
-    const { data: records, error } = await supabase
-      .from('invite_tracking')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('first_open_at', { ascending: false });
-
-    if (error) throw error;
-
-    const stats = {
-      totalOpens: 0,
-      uniqueUsers: 0,
-      registeredUsers: 0,
-      unregisteredUsers: 0,
-      todayOpens: 0,
-      thisWeekOpens: 0,
-      thisMonthOpens: 0
-    };
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-
-    if (records) {
-      stats.totalOpens = records.reduce((sum, r) => sum + r.open_count, 0);
-      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
-      stats.registeredUsers = records.filter(r => r.is_registered).length;
-      stats.unregisteredUsers = records.filter(r => !r.is_registered).length;
-
-      // Time-based stats
-      records.forEach(r => {
-        const firstOpen = new Date(r.first_open_at);
-        if (firstOpen >= today) stats.todayOpens += r.open_count;
-        if (firstOpen >= weekStart) stats.thisWeekOpens += r.open_count;
-        if (firstOpen >= monthStart) stats.thisMonthOpens += r.open_count;
-      });
-    }
-
-    res.json({
-      success: true,
-      stats,
-      records: records || []
-    });
-  } catch (err) {
-    console.error('Error fetching admin invite stats:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get current user's invite tracking
-app.get('/api/invite-tracking/my-stats', async (req, res) => {
-  const userId = req.session?.userId;
-  if (!userId) {
-    return res.status(401).json({ success: false, error: 'Not logged in' });
-  }
-
-  try {
-    const { data: records, error } = await supabase
-      .from('invite_tracking')
-      .select(`
-        *,
-        admins:admin_id (
-          id,
-          name,
-          phone,
-          invite_code
-        )
-      `)
-      .eq('telegram_id', String(userId))
-      .order('first_open_at', { ascending: false });
-
-    if (error) throw error;
-
-    // Also get user info
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('invite_code_used, admin_id, assigned_admin_name')
-      .eq('telegram_id', String(userId))
-      .maybeSingle();
-
-    res.json({
-      success: true,
-      inviteRecords: records || [],
-      user: user || null,
-      totalInvites: records ? records.length : 0,
-      totalOpens: records ? records.reduce((sum, r) => sum + r.open_count, 0) : 0
-    });
-  } catch (err) {
-    console.error('Error fetching user invite stats:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Admin endpoint to get invite tracking summary
-app.get('/admin/invite-tracking-summary', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const { data: records, error } = await supabase
-      .from('invite_tracking')
-      .select('*')
-      .eq('admin_id', admin.id);
-
-    if (error) throw error;
-
-    const stats = {
-      totalInviteClicks: 0,
-      uniqueUsers: 0,
-      registeredUsers: 0,
-      conversionRate: 0,
-      topInvites: [],
-      dailyStats: {}
-    };
-
-    if (records && records.length > 0) {
-      stats.totalInviteClicks = records.reduce((sum, r) => sum + r.open_count, 0);
-      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
-      stats.registeredUsers = records.filter(r => r.is_registered).length;
-      stats.conversionRate = (stats.registeredUsers / stats.uniqueUsers) * 100;
-
-      // Group by invite code
-      const codeMap = {};
-      records.forEach(r => {
-        if (!codeMap[r.invite_code]) {
-          codeMap[r.invite_code] = { opens: 0, users: new Set() };
-        }
-        codeMap[r.invite_code].opens += r.open_count;
-        codeMap[r.invite_code].users.add(r.telegram_id);
-      });
-
-      stats.topInvites = Object.entries(codeMap)
-        .map(([code, data]) => ({
-          inviteCode: code,
-          opens: data.opens,
-          uniqueUsers: data.users.size
-        }))
-        .sort((a, b) => b.opens - a.opens)
-        .slice(0, 10);
-
-      // Daily stats
-      records.forEach(r => {
-        const date = new Date(r.first_open_at).toISOString().split('T')[0];
-        if (!stats.dailyStats[date]) {
-          stats.dailyStats[date] = { opens: 0, uniqueUsers: new Set() };
-        }
-        stats.dailyStats[date].opens += r.open_count;
-        stats.dailyStats[date].uniqueUsers.add(r.telegram_id);
-      });
-    }
-
-    res.json({
-      success: true,
-      stats,
-      recentRecords: records ? records.slice(0, 20) : []
-    });
-  } catch (err) {
-    console.error('Error fetching invite tracking summary:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
@@ -910,22 +664,48 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
 
     if (data) {
       let needUpdate = false;
+      
       // If user has no admin and we have an invite code, try to assign
       if (!data.admin_id && inviteCode) {
         let adminData = null;
-        // 1) Try admins table (direct invite_code)
-        const { data: admins, error: adminsErr } = await supabase
-          .from('admins')
-          .select('id, name')
+        
+        // First try to get admin from invite tracking
+        const { data: inviteTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('admin_id, admin_name')
+          .eq('telegram_id', id)
           .eq('invite_code', inviteCode)
-          .eq('is_active', true)
           .maybeSingle();
-        if (!adminsErr && admins) {
-          adminData = admins;
-        } else {
-          // 2) Try invite_code_used table
+        
+        if (!trackErr && inviteTrack && inviteTrack.admin_id) {
+          // Get admin details
+          const { data: admin, error: adminErr } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('id', inviteTrack.admin_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (!adminErr && admin) {
+            adminData = admin;
+          }
+        }
+        
+        // If not found in invite tracking, try admins table directly
+        if (!adminData) {
+          const { data: admins, error: adminsErr } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('invite_code', inviteCode)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (!adminsErr && admins) {
+            adminData = admins;
+          }
+        }
+        
+        // If still not found, try invite_code_used table
+        if (!adminData) {
           let inviteUsed = null;
-          let errInvite = null;
           const { data: used1, error: err1 } = await supabase
             .from('invite_code_used')
             .select('admin_id, invite_code')
@@ -982,6 +762,21 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           })
           .eq('telegram_id', id);
         if (updateErr) console.error('Failed to update user:', updateErr.message);
+        
+        // Also update invite tracking
+        if (data.admin_id && inviteCode) {
+          const { error: trackUpdateErr } = await supabase
+            .from('invite_tracking')
+            .update({ 
+              admin_id: data.admin_id, 
+              admin_name: data.assigned_admin_name 
+            })
+            .eq('telegram_id', id)
+            .eq('invite_code', inviteCode);
+          if (trackUpdateErr) {
+            console.error('Failed to update invite tracking:', trackUpdateErr.message);
+          }
+        }
       }
 
       users[id] = {
@@ -1005,17 +800,42 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       
       if (!finalAdminId && inviteCode) {
         let adminData = null;
-        // 1) admins table
-        const { data: admins, error: adminsErr } = await supabase
-          .from('admins')
-          .select('id, name')
+        
+        // First try invite tracking
+        const { data: inviteTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('admin_id, admin_name')
+          .eq('telegram_id', id)
           .eq('invite_code', inviteCode)
-          .eq('is_active', true)
           .maybeSingle();
-        if (!adminsErr && admins) {
-          adminData = admins;
-        } else {
-          // 2) invite_code_used
+        
+        if (!trackErr && inviteTrack && inviteTrack.admin_id) {
+          const { data: admin, error: adminErr } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('id', inviteTrack.admin_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (!adminErr && admin) {
+            adminData = admin;
+          }
+        }
+        
+        if (!adminData) {
+          // Try admins table
+          const { data: admins, error: adminsErr } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('invite_code', inviteCode)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (!adminsErr && admins) {
+            adminData = admins;
+          }
+        }
+        
+        if (!adminData) {
+          // Try invite_code_used
           let inviteUsed = null;
           const { data: used1, error: err1 } = await supabase
             .from('invite_code_used')
@@ -1046,6 +866,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
             }
           }
         }
+        
         if (adminData) {
           finalAdminId = adminData.id;
           adminName = adminData.name;
@@ -1068,6 +889,30 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
+      
+      // Also create invite tracking entry if not exists
+      if (inviteCode && finalAdminId) {
+        const { data: existingTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('id')
+          .eq('telegram_id', id)
+          .eq('invite_code', inviteCode)
+          .maybeSingle();
+        
+        if (!trackErr && !existingTrack) {
+          await supabase
+            .from('invite_tracking')
+            .insert({
+              telegram_id: id,
+              username: username || 'Player',
+              invite_code: inviteCode,
+              admin_id: finalAdminId,
+              admin_name: adminName,
+              ip_address: null,
+              user_agent: null
+            });
+        }
+      }
       
       users[id] = {
         id,
@@ -1123,8 +968,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
     
-    // Log link open AND store in invite tracking table
-    await logAdminLinkOpen(startParam, id, ip, userAgent);
+    // Log link open with invite tracking
+    await logAdminLinkOpen(startParam, id, ip, userAgent, displayName);
 
     // Force refresh if startParam is present
     const user = await loadUser(id, displayName, handle, startParam, !!startParam);
@@ -1304,7 +1149,16 @@ app.get('/api/user/invite-code', async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
-    // Also get admin info for the invite code
+    // Get invite tracking info
+    const { data: inviteTrack, error: trackErr } = await supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('telegram_id', String(userId))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Also get admin info
     let adminInfo = null;
     if (user.admin_id) {
       const { data: admin, error: adminErr } = await supabase
@@ -1322,11 +1176,78 @@ app.get('/api/user/invite-code', async (req, res) => {
       invite_code_used: user.invite_code_used,
       admin_id: user.admin_id,
       assigned_admin_name: user.assigned_admin_name,
-      admin: adminInfo
+      admin: adminInfo,
+      invite_tracking: inviteTrack || null
     });
   } catch (err) {
     console.error('Error fetching invite code:', err.message);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- Get Invite Tracking Stats ----------
+app.get('/admin/invite-tracking', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  try {
+    const { from, to, limit = 100 } = req.query;
+
+    let query = supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('admin_id', admin.id)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(parseInt(limit), 1000));
+
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+
+    const { data: invites, error } = await query;
+    if (error) throw error;
+
+    // Get stats
+    const { data: allInvites, error: statsErr } = await supabase
+      .from('invite_tracking')
+      .select('telegram_id, created_at')
+      .eq('admin_id', admin.id);
+
+    if (statsErr) throw statsErr;
+
+    const totalInvites = allInvites.length;
+    const uniqueUsers = new Set(allInvites.map(i => i.telegram_id)).size;
+    
+    // Get daily stats
+    const dailyStats = {};
+    allInvites.forEach(invite => {
+      const date = new Date(invite.created_at).toISOString().split('T')[0];
+      if (!dailyStats[date]) dailyStats[date] = 0;
+      dailyStats[date]++;
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        totalInvites,
+        uniqueUsers,
+        dailyStats
+      },
+      invites: invites
+    });
+  } catch (err) {
+    console.error('Error fetching invite tracking:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1347,7 +1268,7 @@ app.post('/admin/update-invite-code', async (req, res) => {
     // Verify the user belongs to this admin
     const { data: user, error: findErr } = await supabase
       .from('users')
-      .select('id, admin_id')
+      .select('id, admin_id, username')
       .eq('telegram_id', String(telegramId))
       .maybeSingle();
 
@@ -1359,12 +1280,33 @@ app.post('/admin/update-invite-code', async (req, res) => {
       return res.status(403).json({ error: 'User not assigned to you' });
     }
 
+    // Update user
     const { error: updateErr } = await supabase
       .from('users')
       .update({ invite_code_used: inviteCode })
       .eq('telegram_id', String(telegramId));
 
     if (updateErr) throw updateErr;
+
+    // Update or insert invite tracking
+    const { data: existingTrack, error: trackFindErr } = await supabase
+      .from('invite_tracking')
+      .select('id')
+      .eq('telegram_id', String(telegramId))
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+
+    if (!trackFindErr && !existingTrack) {
+      await supabase
+        .from('invite_tracking')
+        .insert({
+          telegram_id: String(telegramId),
+          username: user.username,
+          invite_code: inviteCode,
+          admin_id: admin.id,
+          admin_name: admin.name
+        });
+    }
 
     // Update cache
     if (users[String(telegramId)]) {
@@ -1385,8 +1327,7 @@ app.post('/admin/update-invite-code', async (req, res) => {
 
 // ---------- Legacy admin balance management ----------
 app.post('/admin/add-balance', async (req, res) => {
-  const { secret, telegramId, amount } = req.body;
-  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const { secret, telegramId, amount } = req.body;  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   const strId = String(telegramId);
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
