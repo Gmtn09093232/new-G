@@ -989,12 +989,245 @@
             }
         });
 
-        // ========== GAME FUNCTIONS ==========
-        // (Keep your existing game functions: genCard, createState, renderCard, buildGrid, etc.)
-        // For brevity, I'm including only the essential updated functions.
-        // The rest are unchanged from your original code.
+        // ============================================================
+        //  GAME FUNCTIONS (Full Implementation)
+        // ============================================================
 
-        // ========== CONNECT TO GAME (updated with invite tracking) ==========
+        // ---------- Card Generation ----------
+        function genCard() {
+            const cols = [
+                [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
+                [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
+                [31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],
+                [46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
+                [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75]
+            ];
+            const c = [];
+            for (let col = 0; col < 5; col++) {
+                const nums = [];
+                const avail = [...cols[col]];
+                for (let row = 0; row < 5; row++) {
+                    if (col === 2 && row === 2) nums.push('FREE');
+                    else nums.push(avail.splice(Math.floor(Math.random() * avail.length), 1)[0]);
+                }
+                c.push(nums);
+            }
+            const t = [];
+            for (let r = 0; r < 5; r++) t.push([c[0][r], c[1][r], c[2][r], c[3][r], c[4][r]]);
+            return t;
+        }
+
+        // ---------- Game State (local, not used for server) ----------
+        function createState(fee) { return { status: 'lobby', players: [], taken: new Set(), called: [], fee, prize: 0, timer: null, interval: null, end: 0, cards: Array.from({ length: 100 }, () => genCard()), winners: [], grace: null, winNum: null, botTimeouts: [], bot3Added: false, forceActive: false, forceBot: null, forceCount: 0 }; }
+
+        // ---------- Render Card ----------
+        function renderCard(card, container, clickable) {
+            const cont = $(container);
+            if (!cont) return;
+            cont.innerHTML = '';
+            if (!card || !Array.isArray(card) || !card.length) {
+                cont.innerHTML = '<div style="text-align:center;padding:20px;">🎴 Select a card number to see your Bingo card</div>';
+                return;
+            }
+            const tbl = document.createElement('table');
+            tbl.style.borderCollapse = 'separate';
+            tbl.style.borderSpacing = '10px';
+            const th = document.createElement('thead'), hr = document.createElement('tr');
+            ['B','I','N','G','O'].forEach(l => { const th2 = document.createElement('th'); th2.textContent = l; hr.appendChild(th2); });
+            th.appendChild(hr);
+            tbl.appendChild(th);
+            const tb = document.createElement('tbody');
+            for (let r = 0; r < 5; r++) {
+                const tr = document.createElement('tr');
+                for (let c = 0; c < 5; c++) {
+                    const val = card[r][c], td = document.createElement('td');
+                    td.textContent = val === 'FREE' ? '★' : val;
+                    if (val === 'FREE') td.classList.add('free');
+                    if (markedNumbers.includes(val)) td.classList.add('marked');
+                    if (clickable && val !== 'FREE') {
+                        td.style.cursor = 'pointer';
+                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); };
+                    }
+                    tr.appendChild(td);
+                }
+                tb.appendChild(tr);
+            }
+            tbl.appendChild(tb);
+            cont.appendChild(tbl);
+        }
+
+        // ---------- Build Number Grid ----------
+        function buildGrid() {
+            if (!numberGrid) return;
+            numberGrid.innerHTML = '';
+            for (let i = 1; i <= 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.number = i;
+                cell.textContent = i;
+                const taken = displayTaken.has(i), own = (selectedCardNumber === i);
+                if (taken && !own) { cell.classList.add('taken'); cell.onclick = null; }
+                else if (own) { cell.classList.add('own-card'); cell.onclick = null; }
+                else {
+                    cell.onclick = () => {
+                        if (!isGameActive && socket && !displayTaken.has(i) && !serverTaken.has(i)) {
+                            if (selectedCardNumber !== null && selectedCardNumber !== i) { serverTaken.delete(selectedCardNumber); displayTaken.delete(selectedCardNumber); }
+                            pendingSelection = i;
+                            selectedCardNumber = i;
+                            selectedNumber.textContent = i;
+                            buildGrid();
+                            socket.emit('selectCardNumber', i);
+                        }
+                    };
+                }
+                numberGrid.appendChild(cell);
+            }
+        }
+
+        function updateGrid(takenArr) {
+            const newSet = new Set(takenArr);
+            serverTaken = newSet;
+            const disp = new Set(takenArr);
+            if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
+            displayTaken = disp;
+            buildGrid();
+            updateCount(serverTaken.size);
+        }
+
+        function updateCount(c) { const v = c !== undefined ? c : serverTaken.size; if (playersCount) playersCount.innerText = v; if (gamePlayersCount) gamePlayersCount.innerText = v; }
+
+        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l = 'O'; return `${l}-${n}`; }
+
+        // ---------- Page Navigation ----------
+        function showLobby(sec) {
+            currentPage = 'lobby';
+            timerSeconds = sec;
+            $('stakePage').classList.add('hidden');
+            $('lobbyPage').classList.remove('hidden');
+            $('gamePage').classList.add('hidden');
+            $('historyPage').classList.add('hidden');
+            $('walletPage').classList.add('hidden');
+            $('profilePage').classList.add('hidden');
+            isGameActive = false;
+            markedNumbers = [];
+            if (socket) socket.emit('getBalance');
+            startTimer(sec);
+            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            updateStatsUI();
+        }
+
+        function showGame() {
+            currentPage = 'game';
+            $('stakePage').classList.add('hidden');
+            $('lobbyPage').classList.add('hidden');
+            $('gamePage').classList.remove('hidden');
+            $('historyPage').classList.add('hidden');
+            $('walletPage').classList.add('hidden');
+            $('profilePage').classList.add('hidden');
+            isGameActive = true;
+            clearInterval(lobbyTimerInterval);
+            if (socket) socket.emit('getBalance');
+            if (userCard.length) renderCard(userCard, 'gameCard', true);
+        }
+
+        function startTimer(sec) {
+            let left = sec;
+            lobbyTimer.textContent = left + 's';
+            clearInterval(lobbyTimerInterval);
+            lobbyTimerInterval = setInterval(() => { left--; timerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval); showGame(); } else lobbyTimer.textContent = left + 's'; }, 1000);
+        }
+
+        function goBack() { if (currentPage === 'lobby') showLobby(timerSeconds > 0 ? timerSeconds : 30); else if (currentPage === 'game') showGame(); else showLobby(30); }
+
+        function goStake() {
+            resetDepositState();
+            if (socket) { socket.disconnect(); socket = null; }
+            isGameActive = false;
+            userCard = [];
+            markedNumbers = [];
+            selectedCardNumber = null;
+            serverTaken.clear();
+            displayTaken.clear();
+            currentStake = null;
+            localStorage.removeItem('dot_bingo_stake');
+            clearInterval(lobbyTimerInterval);
+            $('lobbyPage').classList.add('hidden');
+            $('gamePage').classList.add('hidden');
+            $('stakePage').classList.remove('hidden');
+            selectedNumber.textContent = '-';
+            pendingSelection = null;
+            pendingRandom = false;
+            currentGameId = null;
+            unlockSpeech();
+        }
+
+        // ---------- Winner Display ----------
+        function showWinner(data) {
+            if (data.noWinner) { if (currentGameId) addRecord(false, 0, currentGameId, currentStake, [], null, 0); alert('No winner this round.'); return; }
+            const winners = data.winners || [data.winner].filter(Boolean);
+            const winNum = data.winningNumber;
+            const total = data.totalPrize || 0;
+            const each = data.prizeEach || 0;
+            const title = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
+            $('winTitle').innerHTML = title;
+            $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">${w}</span>`).join('');
+            $('winPrize').innerHTML = each + ' <small>ETB</small>';
+            $('winnerOverlay').classList.add('active');
+            const conf = document.createElement('div');
+            conf.className = 'confetti';
+            for (let i = 0; i < 120; i++) { const p = document.createElement('div'); p.className = 'confetti-piece'; p.style.left = Math.random() * 100 + '%'; p.style.animationDuration = (Math.random() * 3 + 2) + 's'; p.style.backgroundColor = `hsl(${Math.random()*30+20},90%,60%)`; conf.appendChild(p); }
+            document.body.appendChild(conf);
+            setTimeout(() => conf.remove(), 4000);
+            if (currentGameId) addRecord(true, each, currentGameId, currentStake, winners, winNum, total);
+            unlockSpeech();
+        }
+
+        // ---------- History & Stats ----------
+        function addRecord(win, prize, id, stake, winners, winNum, total) {
+            totalGames++;
+            if (win) { totalWins++; totalEarned += prize; }
+            recentGames.unshift({ gameId: id, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake, playerPrize: prize, totalPrize: total || 0, winnersList: winners || [], winningNumber: winNum || null });
+            if (recentGames.length > 10) recentGames.pop();
+            saveStats();
+            updateStatsUI();
+        }
+
+        function saveStats() {
+            localStorage.setItem('dot_bingo_total_games', totalGames);
+            localStorage.setItem('dot_bingo_total_wins', totalWins);
+            localStorage.setItem('dot_bingo_total_earned', totalEarned);
+            localStorage.setItem('dot_bingo_recent_games', JSON.stringify(recentGames.slice(0, 10)));
+        }
+
+        function loadStats() {
+            try {
+                totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
+                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
+                totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0');
+                const stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
+                recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake, playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0), winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g.winningNumber || null }));
+            } catch(e) { recentGames = []; }
+            updateStatsUI();
+        }
+
+        function updateStatsUI() {
+            $('totalGamesCount').innerText = totalGames;
+            const div = $('recentGamesList');
+            if (!div) return;
+            if (!recentGames.length) { div.innerHTML = '<div class="history-card">✨ No games played yet. Join a round!</div>'; return; }
+            div.innerHTML = recentGames.map(g => {
+                const w = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—');
+                const last = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g.winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g.winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—';
+                const prize = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—');
+                return `<div class="history-card"><div><strong>🎮 Game ID:</strong> ${g.gameId}</div><div><strong>🏆 Winner(s):</strong> ${w}</div><div><strong>🎯 Last Called:</strong> ${last}</div><div><strong>💰 Total Prize:</strong> ${prize}</div><div style="font-size:0.7rem;color:#7c2d12;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
+            }).join('');
+        }
+
+        function syncBalance(v) { balance = v; lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($('profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $('gameBalanceDisplay').innerText = v; }
+
+        // ============================================================
+        //  CONNECT TO GAME (with invite tracking)
+        // ============================================================
         async function connectToGame(stake) {
             if (!isAuthenticated) {
                 await authenticateUser();
@@ -1018,13 +1251,62 @@
                 }
             });
             socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true); else renderCard(card, 'lobbyCardPreview', false); });
-            socket.on('cardTaken', data => { /* same as before */ });
-            socket.on('cardSelectionFailed', msg => { /* same as before */ });
-            socket.on('playersCount', (data) => { /* same as before */ });
-            socket.on('gameStarted', data => { /* same as before */ });
-            socket.on('numberCalled', data => { /* same as before */ });
-            socket.on('markedNumbers', nums => { /* same as before */ });
-            socket.on('gameEnded', data => { /* same as before */ });
+            socket.on('cardTaken', data => {
+                if (data.stake !== currentStake) return;
+                const newSet = new Set(data.takenNumbers);
+                serverTaken = newSet;
+                const disp = new Set(data.takenNumbers);
+                if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
+                displayTaken = disp;
+                buildGrid();
+                updateCount(serverTaken.size);
+                if (pendingSelection && data.number === pendingSelection) {
+                    selectedCardNumber = data.number;
+                    selectedNumber.textContent = data.number;
+                    pendingSelection = null;
+                    buildGrid();
+                }
+                if (pendingRandom && data.number) {
+                    selectedCardNumber = data.number;
+                    selectedNumber.textContent = data.number;
+                    pendingRandom = false;
+                    buildGrid();
+                }
+            });
+            socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null; if (selectedCardNumber) { selectedCardNumber = null; selectedNumber.textContent = '-'; buildGrid(); } } if (pendingRandom) pendingRandom = false; });
+            socket.on('playersCount', (data) => {
+                const s = currentStake !== null ? currentStake : parseInt(localStorage.getItem('dot_bingo_stake'));
+                if (data.stake === s) updateCount(data.count);
+                if (s && winningBalance && !isGameActive) {
+                    winningBalance.innerText = Math.floor(data.count * s * 0.8);
+                }
+            });
+            socket.on('gameStarted', data => {
+                if (data.stake !== currentStake) return;
+                if (data?.prizePool) winningBalance.innerText = data.prizePool;
+                if (data?.playersCount) updateCount(data.playersCount);
+                showGame();
+                currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
+            });
+            socket.on('numberCalled', data => {
+                if (data.stake !== currentStake) return;
+                const num = data.number;
+                currentCall.innerText = formatCall(num);
+                const full = data.calledNumbers || [];
+                const hist = full.slice(0, -1);
+                calledList.innerText = 'Called: ' + (hist.length ? hist.map(n => formatCall(n)).join(', ') : '—');
+                scrollEnd();
+                speakAmharic(num);
+            });
+            socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true); else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
+            socket.on('gameEnded', data => {
+                if (data.stake !== currentStake) return;
+                if (data.winningNumber) currentCall.innerText = formatCall(data.winningNumber);
+                showWinner(data);
+                currentGameId = null;
+                markedNumbers = [];
+                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            });
             socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
             socket.on('depositStatus', d => alert(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` : '❌ Deposit rejected.'));
             socket.on('withdrawStatus', d => alert(d.status === 'approved' ? `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.'));
@@ -1034,7 +1316,32 @@
         function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const d = new SpeechSynthesisUtterance(' '); d.volume = 0; window.speechSynthesis.speak(d); setTimeout(() => window.speechSynthesis.cancel(), 100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMute(); if (soundMuted && utterance) { window.speechSynthesis.cancel(); utterance = null; } unlockSpeech(); }
         function updateMute() { const btn = $('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; btn.style.background = soundMuted ? '#1e293b' : '#f97316'; } }
-        // ... (speakAmharic and other helpers)
+        function getLetter(n) { if (n <= 15) return "ቢ"; if (n <= 30) return "አይ"; if (n <= 45) return "ኤን"; if (n <= 60) return "ጂ"; return "ኦ"; }
+        function getAmharicWord(n) {
+            const ones = ["","አንድ","ሁለት","ሶስት","አራት","አምስት","ስድስት","ሰባት","ስምንት","ዘጠኝ"];
+            const tens = ["","አስር","ሃያ","ሰላሳ","አርባ","ሃምሳ","ስልሳ","ሰባ","ሰማንያ","ዘጠና"];
+            if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; }
+            if (n < 20) return "አስር " + (n === 10 ? "" : ones[n-10]);
+            const ten = Math.floor(n/10), unit = n%10;
+            if (unit === 0) return tens[ten];
+            return tens[ten] + " " + ones[unit];
+        }
+        function speakAmharic(n) {
+            if (soundMuted || n < 1 || n > 75) return;
+            if (!speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharic(n), 100); return; }
+            const text = getLetter(n) + " " + getAmharicWord(n);
+            if (window.speechSynthesis) {
+                if (utterance) window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'am-ET';
+                u.rate = 0.85;
+                const voices = window.speechSynthesis.getVoices();
+                const am = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am'));
+                if (am) u.voice = am;
+                utterance = u;
+                window.speechSynthesis.speak(u);
+            }
+        }
 
         // ========== RESTORE SESSION ==========
         function restoreSession() {
