@@ -498,130 +498,75 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
     return users[id];
   }
   try {
-    const { data, error } = await supabase
+    // 1. Fetch user from DB
+    let { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('telegram_id', id)
       .maybeSingle();
     if (error) throw error;
 
+    // 2. If user exists, update with any missing invite info from invite_tracking
     if (data) {
       let needUpdate = false;
-      
-      // If user has no admin and we have an invite code, try to assign
-      if (!data.admin_id && inviteCode) {
-        let adminData = null;
-        
-        // First try to get admin from invite tracking
+      // Check if we are missing invite_code or admin_id
+      if (!data.invite_code || !data.admin_id) {
+        // Look up the most recent invite_tracking entry for this user
         const { data: inviteTrack, error: trackErr } = await supabase
           .from('invite_tracking')
-          .select('admin_id, admin_name')
+          .select('invite_code, admin_id, admin_name')
           .eq('telegram_id', id)
-          .eq('invite_code', inviteCode)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
-        
-        if (!trackErr && inviteTrack && inviteTrack.admin_id) {
-          // Get admin details
-          const { data: admin, error: adminErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('id', inviteTrack.admin_id)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminErr && admin) {
-            adminData = admin;
+        if (!trackErr && inviteTrack) {
+          if (!data.invite_code && inviteTrack.invite_code) {
+            data.invite_code = inviteTrack.invite_code;
+            needUpdate = true;
           }
-        }
-        
-        // If not found in invite tracking, try admins table directly
-        if (!adminData) {
-          const { data: admins, error: adminsErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('invite_code', inviteCode)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminsErr && admins) {
-            adminData = admins;
+          if (!data.admin_id && inviteTrack.admin_id) {
+            data.admin_id = inviteTrack.admin_id;
+            data.admin_name = inviteTrack.admin_name || null;
+            needUpdate = true;
           }
-        }
-        
-        // If still not found, try invite_code_used (legacy)
-        if (!adminData) {
-          let inviteUsed = null;
-          const { data: used1, error: err1 } = await supabase
-            .from('invite_code_used')
-            .select('admin_id, invite_code')
-            .eq('invite_code', inviteCode)
-            .maybeSingle();
-          if (!err1 && used1) {
-            inviteUsed = used1;
-          } else {
-            const { data: used2, error: err2 } = await supabase
-              .from('invite_code_used')
-              .select('admin_id, invite_code_used')
-              .eq('invite_code_used', inviteCode)
-              .maybeSingle();
-            if (!err2 && used2) {
-              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
-            }
-          }
-          if (inviteUsed) {
-            const { data: adminFromUsed, error: adminUsedErr } = await supabase
-              .from('admins')
-              .select('id, name')
-              .eq('id', inviteUsed.admin_id)
-              .eq('is_active', true)
-              .maybeSingle();
-            if (!adminUsedErr && adminFromUsed) {
-              adminData = adminFromUsed;
-            }
-          }
-        }
-
-        if (adminData) {
-          data.admin_id = adminData.id;
-          data.admin_name = adminData.name;   // changed from assigned_admin_name
-          needUpdate = true;
-          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code ${inviteCode}`);
-        } else {
-          console.log(`❌ No admin found for invite code ${inviteCode}`);
         }
       }
 
-      // Store the invite code used if not already set
+      // Also, if we received an inviteCode via parameter, use that if not set
       if (inviteCode && !data.invite_code) {
         data.invite_code = inviteCode;
         needUpdate = true;
       }
 
-      if (needUpdate) {
-        const { error: updateErr } = await supabase
-          .from('users')
-          .update({ 
-            admin_id: data.admin_id, 
-            admin_name: data.admin_name,   // changed
-            invite_code: data.invite_code
-          })
-          .eq('telegram_id', id);
-        if (updateErr) console.error('Failed to update user:', updateErr.message);
-        
-        // Also update invite tracking
-        if (data.admin_id && inviteCode) {
-          const { error: trackUpdateErr } = await supabase
-            .from('invite_tracking')
-            .update({ 
-              admin_id: data.admin_id, 
-              admin_name: data.admin_name 
-            })
-            .eq('telegram_id', id)
-            .eq('invite_code', inviteCode);
-          if (trackUpdateErr) {
-            console.error('Failed to update invite tracking:', trackUpdateErr.message);
-          }
+      // If admin not set but we have an invite code, try to assign admin from admins table
+      if (!data.admin_id && data.invite_code) {
+        const { data: admin, error: adminErr } = await supabase
+          .from('admins')
+          .select('id, name')
+          .eq('invite_code', data.invite_code)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!adminErr && admin) {
+          data.admin_id = admin.id;
+          data.admin_name = admin.name;
+          needUpdate = true;
         }
       }
 
+      if (needUpdate) {
+        const { error: updateErr } = await supabase
+          .from('users')
+          .update({
+            invite_code: data.invite_code,
+            admin_id: data.admin_id,
+            admin_name: data.admin_name
+          })
+          .eq('telegram_id', id);
+        if (updateErr) console.error('Failed to update user:', updateErr.message);
+        else console.log(`✅ Updated user ${id} with invite info (invite: ${data.invite_code}, admin: ${data.admin_name})`);
+      }
+
+      // Update cache and return
       users[id] = {
         id,
         username: data.username,
@@ -630,133 +575,87 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         invite_code: data.invite_code,
         first_deposit_amount: data.first_deposit_amount || 0,
         admin_id: data.admin_id,
-        admin_name: data.admin_name   // changed
+        admin_name: data.admin_name
       };
       console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.admin_name || 'none'})`);
       return users[id];
     } else {
-      // Create new user
+      // 3. User does not exist – create new
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
-      
+
+      // First, try to get invite data from invite_tracking
+      let finalInviteCode = inviteCode || null;
       let finalAdminId = adminId || null;
-      let adminName = null;
-      
-      if (!finalAdminId && inviteCode) {
-        let adminData = null;
-        
-        // First try invite tracking
+      let finalAdminName = null;
+
+      if (!finalInviteCode || !finalAdminId) {
         const { data: inviteTrack, error: trackErr } = await supabase
           .from('invite_tracking')
-          .select('admin_id, admin_name')
+          .select('invite_code, admin_id, admin_name')
           .eq('telegram_id', id)
-          .eq('invite_code', inviteCode)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
-        
-        if (!trackErr && inviteTrack && inviteTrack.admin_id) {
-          const { data: admin, error: adminErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('id', inviteTrack.admin_id)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminErr && admin) {
-            adminData = admin;
+        if (!trackErr && inviteTrack) {
+          if (!finalInviteCode) finalInviteCode = inviteTrack.invite_code;
+          if (!finalAdminId) {
+            finalAdminId = inviteTrack.admin_id;
+            finalAdminName = inviteTrack.admin_name;
           }
-        }
-        
-        if (!adminData) {
-          // Try admins table
-          const { data: admins, error: adminsErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('invite_code', inviteCode)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminsErr && admins) {
-            adminData = admins;
-          }
-        }
-        
-        if (!adminData) {
-          // Try invite_code_used (legacy)
-          let inviteUsed = null;
-          const { data: used1, error: err1 } = await supabase
-            .from('invite_code_used')
-            .select('admin_id, invite_code')
-            .eq('invite_code', inviteCode)
-            .maybeSingle();
-          if (!err1 && used1) {
-            inviteUsed = used1;
-          } else {
-            const { data: used2, error: err2 } = await supabase
-              .from('invite_code_used')
-              .select('admin_id, invite_code_used')
-              .eq('invite_code_used', inviteCode)
-              .maybeSingle();
-            if (!err2 && used2) {
-              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
-            }
-          }
-          if (inviteUsed) {
-            const { data: adminFromUsed, error: adminUsedErr } = await supabase
-              .from('admins')
-              .select('id, name')
-              .eq('id', inviteUsed.admin_id)
-              .eq('is_active', true)
-              .maybeSingle();
-            if (!adminUsedErr && adminFromUsed) {
-              adminData = adminFromUsed;
-            }
-          }
-        }
-        
-        if (adminData) {
-          finalAdminId = adminData.id;
-          adminName = adminData.name;
-          console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
-        } else {
-          console.log(`❌ No admin found for invite code ${inviteCode} during user creation`);
         }
       }
-      
+
+      // If still no admin, try to find admin from the invite code
+      if (!finalAdminId && finalInviteCode) {
+        const { data: admin, error: adminErr } = await supabase
+          .from('admins')
+          .select('id, name')
+          .eq('invite_code', finalInviteCode)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!adminErr && admin) {
+          finalAdminId = admin.id;
+          finalAdminName = admin.name;
+        }
+      }
+
       const newUser = {
         telegram_id: id,
         username: username || 'Player',
         telegram_handle: telegramHandle || null,
         balance: 10,
-        invite_code: inviteCode || null,
+        invite_code: finalInviteCode,
         first_deposit_amount: 0,
         admin_id: finalAdminId,
-        admin_name: adminName   // changed
+        admin_name: finalAdminName
       };
-      
+
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
-      
-      // Also create invite tracking entry if not exists
-      if (inviteCode && finalAdminId) {
+
+      // Optionally, update invite_tracking to link admin if missing
+      if (finalInviteCode && finalAdminId) {
         const { data: existingTrack, error: trackErr } = await supabase
           .from('invite_tracking')
           .select('id')
           .eq('telegram_id', id)
-          .eq('invite_code', inviteCode)
+          .eq('invite_code', finalInviteCode)
           .maybeSingle();
-        
         if (!trackErr && !existingTrack) {
           await supabase
             .from('invite_tracking')
             .insert({
               telegram_id: id,
               username: username || 'Player',
-              invite_code: inviteCode,
+              invite_code: finalInviteCode,
               admin_id: finalAdminId,
-              admin_name: adminName,
+              admin_name: finalAdminName,
               ip_address: null,
               user_agent: null
             });
         }
       }
-      
+
       users[id] = {
         id,
         username: newUser.username,
@@ -765,8 +664,9 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         invite_code: newUser.invite_code,
         first_deposit_amount: 0,
         admin_id: newUser.admin_id,
-        admin_name: newUser.admin_name   // changed
+        admin_name: newUser.admin_name
       };
+      console.log(`✅ Created user ${id} with invite ${finalInviteCode || 'none'}, admin ${finalAdminName || 'none'}`);
       return users[id];
     }
   } catch (err) {
