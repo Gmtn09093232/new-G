@@ -6,8 +6,7 @@
 //             & Import Players by Username/Handle
 //             & DUPLICATE TRANSACTION NUMBER CHECK
 //             & SMART TRANSACTION NUMBER EXTRACTION
-//             & STORE INVITE CODE IN USER TABLE
-//             & BOTS TABLE WITH INVITE CODE MANAGEMENT
+//             & NEW INVITE TRACKING TABLE
 // ================================================================
 
 require('dotenv').config();
@@ -33,25 +32,6 @@ const supabase = createClient(
   if (error) console.error('❌ Supabase error:', error.message);
   else console.log('✅ Supabase connected');
 })();
-
-// ---------- Ensure tables exist ----------
-async function ensureTables() {
-  // Check if bots table exists, create if not
-  try {
-    const { error } = await supabase.from('bots').select('id', { count: 'exact', head: true, limit: 1 });
-    if (error && error.message.includes('relation "bots" does not exist')) {
-      console.log('📦 Creating bots table...');
-      // Note: You'll need to create this table manually in Supabase SQL editor
-      // Or use the provided SQL schema
-      console.log('⚠️ Please create the bots table using the provided SQL schema');
-    } else {
-      console.log('✅ Bots table exists');
-    }
-  } catch (err) {
-    console.log('ℹ️ Bots table check:', err.message);
-  }
-}
-ensureTables();
 
 // ---------- Ensure deposit-photos bucket ----------
 async function ensureDepositBucket() {
@@ -149,183 +129,97 @@ const Audit = {
 };
 
 // ================================================================
-//  BOTS TABLE FUNCTIONS
-// ================================================================
-
-// Get a bot by Telegram ID
-async function getBotByTelegramId(telegramId) {
-  try {
-    const { data, error } = await supabase
-      .from('bots')
-      .select('*')
-      .eq('telegram_id', String(telegramId))
-      .maybeSingle();
-    if (error) throw error;
-    return data;
-  } catch (err) {
-    console.error('Error fetching bot:', err.message);
-    return null;
-  }
-}
-
-// Get all bots for an admin
-async function getBotsByAdmin(adminId) {
-  try {
-    const { data, error } = await supabase
-      .from('bots')
-      .select('*')
-      .eq('admin_id', adminId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error('Error fetching bots:', err.message);
-    return [];
-  }
-}
-
-// Create or update a bot
-async function upsertBot(telegramId, username, adminId = null, inviteCode = null, isActive = true) {
-  try {
-    const existing = await getBotByTelegramId(telegramId);
-    
-    if (existing) {
-      // Update existing bot
-      const updates = {};
-      if (username) updates.username = username;
-      if (adminId !== null) updates.admin_id = adminId;
-      if (inviteCode !== null) updates.invite_code = inviteCode;
-      if (isActive !== null) updates.is_active = isActive;
-      updates.updated_at = new Date().toISOString();
-      
-      const { data, error } = await supabase
-        .from('bots')
-        .update(updates)
-        .eq('telegram_id', String(telegramId))
-        .select()
-        .single();
-      
-      if (error) throw error;
-      console.log(`✅ Bot ${telegramId} updated`);
-      return data;
-    } else {
-      // Create new bot
-      const newBot = {
-        telegram_id: String(telegramId),
-        username: username || `Bot_${String(telegramId).slice(-4)}`,
-        admin_id: adminId,
-        invite_code: inviteCode,
-        is_active: isActive,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      const { data, error } = await supabase
-        .from('bots')
-        .insert(newBot)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      console.log(`✅ New bot created: ${telegramId}`);
-      return data;
-    }
-  } catch (err) {
-    console.error('Error upserting bot:', err.message);
-    return null;
-  }
-}
-
-// Get users associated with a bot's invite code
-async function getUsersByBotInviteCode(inviteCode) {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('invite_code_used', inviteCode)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  } catch (err) {
-    console.error('Error fetching users by bot invite code:', err.message);
-    return [];
-  }
-}
-
-// Get bot with user stats
-async function getBotWithStats(telegramId) {
-  try {
-    const bot = await getBotByTelegramId(telegramId);
-    if (!bot) return null;
-    
-    const users = await getUsersByBotInviteCode(bot.invite_code);
-    
-    // Get additional stats
-    const { data: deposits, error: depErr } = await supabase
-      .from('deposit_requests')
-      .select('amount, status')
-      .eq('admin_id', bot.admin_id)
-      .in('telegram_id', users.map(u => u.telegram_id));
-    
-    if (depErr) console.error('Error fetching deposits for bot stats:', depErr.message);
-    
-    const totalDeposits = deposits?.filter(d => d.status === 'approved').reduce((sum, d) => sum + Number(d.amount), 0) || 0;
-    const pendingDeposits = deposits?.filter(d => d.status === 'pending').length || 0;
-    
-    return {
-      ...bot,
-      stats: {
-        totalUsers: users.length,
-        totalDeposits,
-        pendingDeposits,
-        activeUsers: users.filter(u => u.balance > 0).length
-      },
-      users
-    };
-  } catch (err) {
-    console.error('Error getting bot with stats:', err.message);
-    return null;
-  }
-}
-
-// ================================================================
-//  Log Admin Link Open & Store Invite Code in User Table
+//  Log Admin Link Open & Store in Invite Tracking Table
 // ================================================================
 async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
   try {
     let adminId = null;
-    let botId = null;
-    
+    let username = null;
+
+    // Find the admin
     if (inviteCode) {
-      // First check if it's a bot invite code
-      const { data: bot } = await supabase
-        .from('bots')
-        .select('id, admin_id')
+      const { data: admin } = await supabase
+        .from('admins')
+        .select('id')
         .eq('invite_code', inviteCode)
-        .eq('is_active', true)
         .maybeSingle();
-      
-      if (bot) {
-        botId = bot.id;
-        adminId = bot.admin_id;
+      if (admin) adminId = admin.id;
+    }
+
+    // Get user info if userId exists
+    if (userId) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('username')
+        .eq('telegram_id', String(userId))
+        .maybeSingle();
+      if (user) username = user.username;
+    }
+
+    // Check if this invite tracking record already exists
+    const { data: existingRecord, error: checkError } = await supabase
+      .from('invite_tracking')
+      .select('id, open_count, is_registered')
+      .eq('telegram_id', String(userId))
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking existing invite record:', checkError.message);
+    }
+
+    if (existingRecord) {
+      // Update existing record
+      const { error: updateError } = await supabase
+        .from('invite_tracking')
+        .update({
+          open_count: existingRecord.open_count + 1,
+          last_open_at: new Date().toISOString(),
+          user_agent: userAgent || existingRecord.user_agent,
+          ip_address: ip || existingRecord.ip_address,
+          username: username || existingRecord.username,
+          // If user now exists in users table, mark as registered
+          is_registered: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingRecord.id);
+
+      if (updateError) {
+        console.error('Error updating invite tracking:', updateError.message);
       } else {
-        // Check if it's an admin invite code
-        const { data: admin } = await supabase
-          .from('admins')
-          .select('id')
-          .eq('invite_code', inviteCode)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (admin) adminId = admin.id;
+        console.log(`✅ Updated invite tracking for user ${userId} with invite ${inviteCode} (${existingRecord.open_count + 1} opens)`);
+      }
+    } else {
+      // Insert new record
+      const { error: insertError } = await supabase
+        .from('invite_tracking')
+        .insert({
+          telegram_id: String(userId),
+          username: username || null,
+          invite_code: inviteCode || null,
+          admin_id: adminId,
+          first_open_at: new Date().toISOString(),
+          last_open_at: new Date().toISOString(),
+          open_count: 1,
+          is_registered: !!userId, // If userId exists, they're registered
+          user_agent: userAgent || null,
+          ip_address: ip || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insertError) {
+        console.error('Error inserting invite tracking:', insertError.message);
+      } else {
+        console.log(`✅ Created invite tracking for user ${userId} with invite ${inviteCode}`);
       }
     }
 
-    // Log the link open
+    // Also log to admin_link_opens for backwards compatibility
     const { error } = await supabase
       .from('admin_link_opens')
       .insert({
         admin_id: adminId,
-        bot_id: botId,
         invite_code: inviteCode || null,
         user_id: userId || null,
         ip_address: ip,
@@ -333,15 +227,12 @@ async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
       });
     if (error) console.error('Failed to log admin link open:', error.message);
 
-    // Store invite code in user table if userId exists and we have an inviteCode
+    // If user exists, also update the users table with invite_code_used
     if (userId && inviteCode) {
-      const userIdStr = String(userId);
-      
-      // Check if user exists
       const { data: existingUser, error: findError } = await supabase
         .from('users')
-        .select('id, invite_code_used')
-        .eq('telegram_id', userIdStr)
+        .select('invite_code_used')
+        .eq('telegram_id', String(userId))
         .maybeSingle();
 
       if (findError) {
@@ -349,34 +240,291 @@ async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
         return;
       }
 
-      // Only update if user exists and doesn't already have an invite code
       if (existingUser && !existingUser.invite_code_used) {
         const { error: updateError } = await supabase
           .from('users')
-          .update({ 
-            invite_code_used: inviteCode,
-            bot_invite_code: inviteCode // Store bot invite code separately if needed
-          })
-          .eq('telegram_id', userIdStr);
+          .update({ invite_code_used: inviteCode })
+          .eq('telegram_id', String(userId));
         
         if (updateError) {
           console.error('Failed to store invite code in user table:', updateError.message);
         } else {
-          console.log(`✅ Stored invite code ${inviteCode} for user ${userId}`);
+          console.log(`✅ Stored invite code ${inviteCode} in users table for ${userId}`);
           
-          // Also update the in-memory cache if user exists there
-          if (users[userIdStr]) {
-            users[userIdStr].invite_code_used = inviteCode;
+          if (users[String(userId)]) {
+            users[String(userId)].invite_code_used = inviteCode;
           }
         }
-      } else if (existingUser && existingUser.invite_code_used) {
-        console.log(`ℹ️ User ${userId} already has invite code: ${existingUser.invite_code_used}`);
       }
     }
+
   } catch (err) {
-    console.error('Error logging admin link open:', err.message);
+    console.error('Error in logAdminLinkOpen:', err.message);
   }
 }
+
+// ================================================================
+//  Invite Tracking API Endpoints
+// ================================================================
+
+// Get invite tracking stats for a user
+app.get('/api/invite-tracking/user/:telegramId', async (req, res) => {
+  const { telegramId } = req.params;
+  
+  try {
+    const { data: records, error } = await supabase
+      .from('invite_tracking')
+      .select(`
+        *,
+        admins:admin_id (
+          id,
+          name,
+          phone,
+          invite_code
+        )
+      `)
+      .eq('telegram_id', String(telegramId))
+      .order('first_open_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      records: records || []
+    });
+  } catch (err) {
+    console.error('Error fetching invite tracking:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get invite tracking stats for a specific invite code
+app.get('/api/invite-tracking/code/:inviteCode', async (req, res) => {
+  const { inviteCode } = req.params;
+  
+  try {
+    const { data: records, error } = await supabase
+      .from('invite_tracking')
+      .select(`
+        *,
+        admins:admin_id (
+          id,
+          name,
+          phone
+        )
+      `)
+      .eq('invite_code', inviteCode)
+      .order('first_open_at', { ascending: false });
+
+    if (error) throw error;
+
+    const stats = {
+      totalOpens: 0,
+      uniqueUsers: 0,
+      registeredUsers: 0,
+      unregisteredUsers: 0,
+      records: records || []
+    };
+
+    if (records) {
+      stats.totalOpens = records.reduce((sum, r) => sum + r.open_count, 0);
+      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
+      stats.registeredUsers = records.filter(r => r.is_registered).length;
+      stats.unregisteredUsers = records.filter(r => !r.is_registered).length;
+    }
+
+    res.json({
+      success: true,
+      stats,
+      records
+    });
+  } catch (err) {
+    console.error('Error fetching invite tracking by code:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get invite tracking stats for an admin
+app.get('/api/invite-tracking/admin/:adminId', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  const { adminId } = req.params;
+  
+  // Ensure admin can only view their own stats
+  if (parseInt(adminId) !== admin.id) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  try {
+    const { data: records, error } = await supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('admin_id', adminId)
+      .order('first_open_at', { ascending: false });
+
+    if (error) throw error;
+
+    const stats = {
+      totalOpens: 0,
+      uniqueUsers: 0,
+      registeredUsers: 0,
+      unregisteredUsers: 0,
+      todayOpens: 0,
+      thisWeekOpens: 0,
+      thisMonthOpens: 0
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    if (records) {
+      stats.totalOpens = records.reduce((sum, r) => sum + r.open_count, 0);
+      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
+      stats.registeredUsers = records.filter(r => r.is_registered).length;
+      stats.unregisteredUsers = records.filter(r => !r.is_registered).length;
+
+      // Time-based stats
+      records.forEach(r => {
+        const firstOpen = new Date(r.first_open_at);
+        if (firstOpen >= today) stats.todayOpens += r.open_count;
+        if (firstOpen >= weekStart) stats.thisWeekOpens += r.open_count;
+        if (firstOpen >= monthStart) stats.thisMonthOpens += r.open_count;
+      });
+    }
+
+    res.json({
+      success: true,
+      stats,
+      records: records || []
+    });
+  } catch (err) {
+    console.error('Error fetching admin invite stats:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get current user's invite tracking
+app.get('/api/invite-tracking/my-stats', async (req, res) => {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+
+  try {
+    const { data: records, error } = await supabase
+      .from('invite_tracking')
+      .select(`
+        *,
+        admins:admin_id (
+          id,
+          name,
+          phone,
+          invite_code
+        )
+      `)
+      .eq('telegram_id', String(userId))
+      .order('first_open_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Also get user info
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('invite_code_used, admin_id, assigned_admin_name')
+      .eq('telegram_id', String(userId))
+      .maybeSingle();
+
+    res.json({
+      success: true,
+      inviteRecords: records || [],
+      user: user || null,
+      totalInvites: records ? records.length : 0,
+      totalOpens: records ? records.reduce((sum, r) => sum + r.open_count, 0) : 0
+    });
+  } catch (err) {
+    console.error('Error fetching user invite stats:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin endpoint to get invite tracking summary
+app.get('/admin/invite-tracking-summary', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  try {
+    const { data: records, error } = await supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('admin_id', admin.id);
+
+    if (error) throw error;
+
+    const stats = {
+      totalInviteClicks: 0,
+      uniqueUsers: 0,
+      registeredUsers: 0,
+      conversionRate: 0,
+      topInvites: [],
+      dailyStats: {}
+    };
+
+    if (records && records.length > 0) {
+      stats.totalInviteClicks = records.reduce((sum, r) => sum + r.open_count, 0);
+      stats.uniqueUsers = new Set(records.map(r => r.telegram_id)).size;
+      stats.registeredUsers = records.filter(r => r.is_registered).length;
+      stats.conversionRate = (stats.registeredUsers / stats.uniqueUsers) * 100;
+
+      // Group by invite code
+      const codeMap = {};
+      records.forEach(r => {
+        if (!codeMap[r.invite_code]) {
+          codeMap[r.invite_code] = { opens: 0, users: new Set() };
+        }
+        codeMap[r.invite_code].opens += r.open_count;
+        codeMap[r.invite_code].users.add(r.telegram_id);
+      });
+
+      stats.topInvites = Object.entries(codeMap)
+        .map(([code, data]) => ({
+          inviteCode: code,
+          opens: data.opens,
+          uniqueUsers: data.users.size
+        }))
+        .sort((a, b) => b.opens - a.opens)
+        .slice(0, 10);
+
+      // Daily stats
+      records.forEach(r => {
+        const date = new Date(r.first_open_at).toISOString().split('T')[0];
+        if (!stats.dailyStats[date]) {
+          stats.dailyStats[date] = { opens: 0, uniqueUsers: new Set() };
+        }
+        stats.dailyStats[date].opens += r.open_count;
+        stats.dailyStats[date].uniqueUsers.add(r.telegram_id);
+      });
+    }
+
+    res.json({
+      success: true,
+      stats,
+      recentRecords: records ? records.slice(0, 20) : []
+    });
+  } catch (err) {
+    console.error('Error fetching invite tracking summary:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
@@ -765,66 +913,45 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       // If user has no admin and we have an invite code, try to assign
       if (!data.admin_id && inviteCode) {
         let adminData = null;
-        // 1) Check bots table first
-        const { data: bot, error: botErr } = await supabase
-          .from('bots')
-          .select('admin_id, username')
+        // 1) Try admins table (direct invite_code)
+        const { data: admins, error: adminsErr } = await supabase
+          .from('admins')
+          .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        
-        if (!botErr && bot) {
-          // Get admin details
-          const { data: adminFromBot, error: adminErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('id', bot.admin_id)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminErr && adminFromBot) {
-            adminData = adminFromBot;
-            console.log(`🤖 Bot ${bot.username} invited user ${id}`);
-          }
+        if (!adminsErr && admins) {
+          adminData = admins;
         } else {
-          // 2) Try admins table (direct invite_code)
-          const { data: admins, error: adminsErr } = await supabase
-            .from('admins')
-            .select('id, name')
+          // 2) Try invite_code_used table
+          let inviteUsed = null;
+          let errInvite = null;
+          const { data: used1, error: err1 } = await supabase
+            .from('invite_code_used')
+            .select('admin_id, invite_code')
             .eq('invite_code', inviteCode)
-            .eq('is_active', true)
             .maybeSingle();
-          if (!adminsErr && admins) {
-            adminData = admins;
+          if (!err1 && used1) {
+            inviteUsed = used1;
           } else {
-            // 3) Try invite_code_used table
-            let inviteUsed = null;
-            const { data: used1, error: err1 } = await supabase
+            const { data: used2, error: err2 } = await supabase
               .from('invite_code_used')
-              .select('admin_id, invite_code')
-              .eq('invite_code', inviteCode)
+              .select('admin_id, invite_code_used')
+              .eq('invite_code_used', inviteCode)
               .maybeSingle();
-            if (!err1 && used1) {
-              inviteUsed = used1;
-            } else {
-              const { data: used2, error: err2 } = await supabase
-                .from('invite_code_used')
-                .select('admin_id, invite_code_used')
-                .eq('invite_code_used', inviteCode)
-                .maybeSingle();
-              if (!err2 && used2) {
-                inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
-              }
+            if (!err2 && used2) {
+              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
             }
-            if (inviteUsed) {
-              const { data: adminFromUsed, error: adminUsedErr } = await supabase
-                .from('admins')
-                .select('id, name')
-                .eq('id', inviteUsed.admin_id)
-                .eq('is_active', true)
-                .maybeSingle();
-              if (!adminUsedErr && adminFromUsed) {
-                adminData = adminFromUsed;
-              }
+          }
+          if (inviteUsed) {
+            const { data: adminFromUsed, error: adminUsedErr } = await supabase
+              .from('admins')
+              .select('id, name')
+              .eq('id', inviteUsed.admin_id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (!adminUsedErr && adminFromUsed) {
+              adminData = adminFromUsed;
             }
           }
         }
@@ -878,74 +1005,47 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
       
       if (!finalAdminId && inviteCode) {
         let adminData = null;
-        let botInfo = null;
-        
-        // Check bots table first
-        const { data: bot, error: botErr } = await supabase
-          .from('bots')
-          .select('admin_id, username')
+        // 1) admins table
+        const { data: admins, error: adminsErr } = await supabase
+          .from('admins')
+          .select('id, name')
           .eq('invite_code', inviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        
-        if (!botErr && bot) {
-          botInfo = bot;
-          const { data: adminFromBot, error: adminErr } = await supabase
-            .from('admins')
-            .select('id, name')
-            .eq('id', bot.admin_id)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (!adminErr && adminFromBot) {
-            adminData = adminFromBot;
-            console.log(`🤖 Bot ${bot.username} invited user ${id}`);
-          }
-        }
-        
-        if (!adminData) {
-          // 1) admins table
-          const { data: admins, error: adminsErr } = await supabase
-            .from('admins')
-            .select('id, name')
+        if (!adminsErr && admins) {
+          adminData = admins;
+        } else {
+          // 2) invite_code_used
+          let inviteUsed = null;
+          const { data: used1, error: err1 } = await supabase
+            .from('invite_code_used')
+            .select('admin_id, invite_code')
             .eq('invite_code', inviteCode)
-            .eq('is_active', true)
             .maybeSingle();
-          if (!adminsErr && admins) {
-            adminData = admins;
+          if (!err1 && used1) {
+            inviteUsed = used1;
           } else {
-            // 2) invite_code_used
-            let inviteUsed = null;
-            const { data: used1, error: err1 } = await supabase
+            const { data: used2, error: err2 } = await supabase
               .from('invite_code_used')
-              .select('admin_id, invite_code')
-              .eq('invite_code', inviteCode)
+              .select('admin_id, invite_code_used')
+              .eq('invite_code_used', inviteCode)
               .maybeSingle();
-            if (!err1 && used1) {
-              inviteUsed = used1;
-            } else {
-              const { data: used2, error: err2 } = await supabase
-                .from('invite_code_used')
-                .select('admin_id, invite_code_used')
-                .eq('invite_code_used', inviteCode)
-                .maybeSingle();
-              if (!err2 && used2) {
-                inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
-              }
+            if (!err2 && used2) {
+              inviteUsed = { admin_id: used2.admin_id, invite_code: used2.invite_code_used };
             }
-            if (inviteUsed) {
-              const { data: adminFromUsed, error: adminUsedErr } = await supabase
-                .from('admins')
-                .select('id, name')
-                .eq('id', inviteUsed.admin_id)
-                .eq('is_active', true)
-                .maybeSingle();
-              if (!adminUsedErr && adminFromUsed) {
-                adminData = adminFromUsed;
-              }
+          }
+          if (inviteUsed) {
+            const { data: adminFromUsed, error: adminUsedErr } = await supabase
+              .from('admins')
+              .select('id, name')
+              .eq('id', inviteUsed.admin_id)
+              .eq('is_active', true)
+              .maybeSingle();
+            if (!adminUsedErr && adminFromUsed) {
+              adminData = adminFromUsed;
             }
           }
         }
-        
         if (adminData) {
           finalAdminId = adminData.id;
           adminName = adminData.name;
@@ -1006,7 +1106,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- Telegram auth (with link open logging and invite code storage) ----------
+// ---------- Telegram auth (with link open logging and invite tracking) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -1023,7 +1123,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
     
-    // Log link open AND store invite code in user table
+    // Log link open AND store in invite tracking table
     await logAdminLinkOpen(startParam, id, ip, userAgent);
 
     // Force refresh if startParam is present
@@ -1204,9 +1304,8 @@ app.get('/api/user/invite-code', async (req, res) => {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
 
+    // Also get admin info for the invite code
     let adminInfo = null;
-    let botInfo = null;
-    
     if (user.admin_id) {
       const { data: admin, error: adminErr } = await supabase
         .from('admins')
@@ -1217,27 +1316,13 @@ app.get('/api/user/invite-code', async (req, res) => {
         adminInfo = admin;
       }
     }
-    
-    // Check if the invite code belongs to a bot
-    if (user.invite_code_used) {
-      const { data: bot, error: botErr } = await supabase
-        .from('bots')
-        .select('username, invite_code, admin_id')
-        .eq('invite_code', user.invite_code_used)
-        .eq('is_active', true)
-        .maybeSingle();
-      if (!botErr && bot) {
-        botInfo = bot;
-      }
-    }
 
     res.json({
       success: true,
       invite_code_used: user.invite_code_used,
       admin_id: user.admin_id,
       assigned_admin_name: user.assigned_admin_name,
-      admin: adminInfo,
-      bot: botInfo
+      admin: adminInfo
     });
   } catch (err) {
     console.error('Error fetching invite code:', err.message);
@@ -1294,266 +1379,6 @@ app.post('/admin/update-invite-code', async (req, res) => {
     res.json({ success: true, message: 'Invite code updated' });
   } catch (err) {
     console.error('Error updating invite code:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ================================================================
-//  BOTS ENDPOINTS
-// ================================================================
-
-// Get all bots for the admin
-app.get('/admin/bots', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const bots = await getBotsByAdmin(admin.id);
-    const botsWithStats = await Promise.all(bots.map(async (bot) => {
-      const users = await getUsersByBotInviteCode(bot.invite_code);
-      return {
-        ...bot,
-        stats: {
-          totalUsers: users.length,
-          activeUsers: users.filter(u => u.balance > 0).length
-        }
-      };
-    }));
-    
-    res.json({ success: true, bots: botsWithStats });
-  } catch (err) {
-    console.error('Error fetching bots:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Create a new bot
-app.post('/admin/bots/create', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId, username } = req.body;
-  if (!telegramId) {
-    return res.status(400).json({ error: 'Telegram ID is required' });
-  }
-
-  try {
-    // Check if bot already exists
-    const existing = await getBotByTelegramId(telegramId);
-    if (existing) {
-      return res.status(400).json({ error: 'Bot already exists' });
-    }
-
-    // Generate a unique invite code for the bot
-    const inviteCode = 'BOT' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    
-    const bot = await upsertBot(
-      telegramId,
-      username || `Bot_${String(telegramId).slice(-4)}`,
-      admin.id,
-      inviteCode,
-      true
-    );
-
-    if (!bot) {
-      return res.status(500).json({ error: 'Failed to create bot' });
-    }
-
-    await Audit.adminAction('CREATE_BOT', admin.id, req.ip, {
-      botId: telegramId,
-      inviteCode
-    });
-
-    res.json({ success: true, bot });
-  } catch (err) {
-    console.error('Error creating bot:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Update bot
-app.put('/admin/bots/:telegramId', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId } = req.params;
-  const { username, isActive } = req.body;
-
-  try {
-    const existing = await getBotByTelegramId(telegramId);
-    if (!existing) {
-      return res.status(404).json({ error: 'Bot not found' });
-    }
-
-    if (existing.admin_id !== admin.id) {
-      return res.status(403).json({ error: 'Bot not assigned to you' });
-    }
-
-    const updates = {};
-    if (username !== undefined) updates.username = username;
-    if (isActive !== undefined) updates.is_active = isActive;
-    updates.updated_at = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('bots')
-      .update(updates)
-      .eq('telegram_id', String(telegramId))
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    await Audit.adminAction('UPDATE_BOT', admin.id, req.ip, {
-      botId: telegramId,
-      updates
-    });
-
-    res.json({ success: true, bot: data });
-  } catch (err) {
-    console.error('Error updating bot:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Delete bot
-app.delete('/admin/bots/:telegramId', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId } = req.params;
-
-  try {
-    const existing = await getBotByTelegramId(telegramId);
-    if (!existing) {
-      return res.status(404).json({ error: 'Bot not found' });
-    }
-
-    if (existing.admin_id !== admin.id) {
-      return res.status(403).json({ error: 'Bot not assigned to you' });
-    }
-
-    const { error } = await supabase
-      .from('bots')
-      .delete()
-      .eq('telegram_id', String(telegramId));
-
-    if (error) throw error;
-
-    await Audit.adminAction('DELETE_BOT', admin.id, req.ip, {
-      botId: telegramId
-    });
-
-    res.json({ success: true, message: 'Bot deleted' });
-  } catch (err) {
-    console.error('Error deleting bot:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get bot details with users
-app.get('/admin/bots/:telegramId', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId } = req.params;
-
-  try {
-    const botWithStats = await getBotWithStats(telegramId);
-    if (!botWithStats) {
-      return res.status(404).json({ error: 'Bot not found' });
-    }
-
-    if (botWithStats.admin_id !== admin.id) {
-      return res.status(403).json({ error: 'Bot not assigned to you' });
-    }
-
-    res.json({ success: true, bot: botWithStats });
-  } catch (err) {
-    console.error('Error fetching bot details:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get bot invite link
-app.get('/admin/bots/:telegramId/invite-link', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  const { telegramId } = req.params;
-
-  try {
-    const bot = await getBotByTelegramId(telegramId);
-    if (!bot) {
-      return res.status(404).json({ error: 'Bot not found' });
-    }
-
-    if (bot.admin_id !== admin.id) {
-      return res.status(403).json({ error: 'Bot not assigned to you' });
-    }
-
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'bingomkmk0120_bot';
-    const inviteLink = `https://t.me/${botUsername}?start=${bot.invite_code}`;
-
-    res.json({
-      success: true,
-      inviteLink,
-      inviteCode: bot.invite_code
-    });
-  } catch (err) {
-    console.error('Error generating bot invite link:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Get bot statistics
-app.get('/admin/bots/stats/summary', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  try {
-    const bots = await getBotsByAdmin(admin.id);
-    const totalBots = bots.length;
-    let totalUsers = 0;
-    let totalActiveUsers = 0;
-
-    for (const bot of bots) {
-      const users = await getUsersByBotInviteCode(bot.invite_code);
-      totalUsers += users.length;
-      totalActiveUsers += users.filter(u => u.balance > 0).length;
-    }
-
-    res.json({
-      success: true,
-      stats: {
-        totalBots,
-        totalUsers,
-        totalActiveUsers,
-        bots
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching bot stats:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1710,10 +1535,10 @@ const games = {
   30: createGameState(30)
 };
 
-// Bot constants (for game bots - these are separate from the bots table)
-const GAME_BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
+// Bot constants
+const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
 const botBalances = new Map();
-GAME_BOT_IDS.forEach(id => botBalances.set(id, 1000));
+BOT_IDS.forEach(id => botBalances.set(id, 1000));
 
 const ETHIOPIAN_MALE_NAMES = [
   'Abe', 'Alex', 'mekia', 'Dawit', 'Fikru', 'Girma', 'Haile', 'zid',
@@ -1731,20 +1556,20 @@ function getRandomMaleEthiopianName() {
 
 let gameCounter = 0;
 const botLastWinGame = new Map();
-GAME_BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
+BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
 const forceBotWinNextGame = { 20: false, 10: false, 30: false };
 let globalForcedBotId = null;
 let botGameHistory = [];
 const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
 const botNameAssignments = new Map();
 
-function getGameBotName(botId) {
+function getBotName(botId) {
   const now = Date.now();
   const entry = botNameAssignments.get(botId);
   if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) return entry.name;
   const newName = getRandomMaleEthiopianName();
   botNameAssignments.set(botId, { name: newName, assignedAt: now });
-  console.log(`🆕 Game bot ${botId} assigned new name: ${newName} (valid for 12h)`);
+  console.log(`🆕 Bot ${botId} assigned new name: ${newName} (valid for 12h)`);
   return newName;
 }
 
@@ -1755,7 +1580,7 @@ function addSingleBotToGame(botId, stake) {
   if (game.players.find(p => p.telegramId === botId)) return false;
   const balance = botBalances.get(botId) || 0;
   if (balance < game.entryFee) {
-    console.log(`⚠️ Game bot ${botId} insufficient balance (${balance}) to join stake ${stake}`);
+    console.log(`⚠️ Bot ${botId} insufficient balance (${balance}) to join stake ${stake}`);
     return false;
   }
   const availableNumbers = [];
@@ -1763,12 +1588,12 @@ function addSingleBotToGame(botId, stake) {
     if (!game.takenCardNumbers.has(i)) availableNumbers.push(i);
   }
   if (availableNumbers.length === 0) {
-    console.log('⚠️ No available numbers for game bot');
+    console.log('⚠️ No available numbers for bot');
     return false;
   }
   const cardNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
   const card = game.cardSet[cardNumber - 1];
-  const botName = getGameBotName(botId);
+  const botName = getBotName(botId);
   const botPlayer = {
     telegramId: botId,
     username: botName,
@@ -1788,7 +1613,7 @@ function addSingleBotToGame(botId, stake) {
   });
   broadcastPlayerCount(stake);
   notifyAdminClients();
-  console.log(`🤖 Game bot ${botId} joined stake ${stake} with card ${cardNumber}`);
+  console.log(`🤖 Bot ${botId} joined stake ${stake} with card ${cardNumber}`);
   return true;
 }
 
@@ -1807,7 +1632,7 @@ function removeBotFromGame(botId, stake) {
   });
   broadcastPlayerCount(stake);
   notifyAdminClients();
-  console.log(`🤖 Game bot ${botId} removed from stake ${stake}`);
+  console.log(`🤖 Bot ${botId} removed from stake ${stake}`);
   return true;
 }
 
@@ -1821,9 +1646,9 @@ function checkAndAddThirdBot(stake) {
     game.bot3Added = true;
     setTimeout(() => {
       if (game.status !== 'lobby') return;
-      if (game.players.find(p => p.telegramId === GAME_BOT_IDS[2])) return;
-      addSingleBotToGame(GAME_BOT_IDS[2], stake);
-      console.log(`🤖 Third game bot (${GAME_BOT_IDS[2]}) added because 3 real players joined.`);
+      if (game.players.find(p => p.telegramId === BOT_IDS[2])) return;
+      addSingleBotToGame(BOT_IDS[2], stake);
+      console.log(`🤖 Third bot (${BOT_IDS[2]}) added because 3 real players joined.`);
     }, 500);
   }
 }
@@ -1966,7 +1791,7 @@ function resetGame(stake) {
     game.forceActive = true;
     game.forcedBotId = globalForcedBotId;
     game.forcedCallCounter = 0;
-    console.log(`⏳ Forced win active for game bot ${game.forcedBotId} on 21st call.`);
+    console.log(`⏳ Forced win active for bot ${game.forcedBotId} on 21st call.`);
   } else {
     game.forceActive = false;
     game.forcedBotId = null;
@@ -1974,13 +1799,13 @@ function resetGame(stake) {
 
   if (stake === 20) {
     const scheduleBotAtRemaining = (botIndex, remainingSeconds) => {
-      if (botIndex >= GAME_BOT_IDS.length) return;
+      if (botIndex >= BOT_IDS.length) return;
       const absoluteTime = game.lobbyEndTime - remainingSeconds * 1000;
       const delay = absoluteTime - Date.now();
       if (delay <= 0) return;
       const timeout = setTimeout(() => {
         if (game.status !== 'lobby') return;
-        const botId = GAME_BOT_IDS[botIndex];
+        const botId = BOT_IDS[botIndex];
         if (game.players.find(p => p.telegramId === botId)) return;
         addSingleBotToGame(botId, stake);
       }, delay);
@@ -2051,7 +1876,7 @@ async function startGame(stake) {
     if (p.isBot) {
       const bal = botBalances.get(p.telegramId) || 0;
       botBalances.set(p.telegramId, bal - game.entryFee);
-      console.log(`💸 Game bot ${p.telegramId} paid entry fee ${game.entryFee}, balance now ${botBalances.get(p.telegramId)}`);
+      console.log(`💸 Bot ${p.telegramId} paid entry fee ${game.entryFee}, balance now ${botBalances.get(p.telegramId)}`);
       continue;
     }
     const user = users[p.telegramId];
@@ -2108,7 +1933,7 @@ function startCalling(stake) {
             forcedBot.markedNumbers.push(number);
           }
           handleBingoClaim(game.forcedBotId, stake, true);
-          console.log(`🤖 Forced game bot ${game.forcedBotId} claimed bingo on 21st call.`);
+          console.log(`🤖 Forced bot ${game.forcedBotId} claimed bingo on 21st call.`);
           game.forceActive = false;
           forceBotWinNextGame[20] = false;
           return;
@@ -2169,14 +1994,14 @@ async function endGameWithWinners(stake) {
           (botBalances.get(a.telegramId) || 0) < (botBalances.get(b.telegramId) || 0) ? a : b
         );
         globalForcedBotId = forcedBot.telegramId;
-        console.log(`🤖 Next game will force game bot ${globalForcedBotId} to win on the 21st call.`);
+        console.log(`🤖 Next game will force bot ${globalForcedBotId} to win on the 21st call.`);
       } else {
         globalForcedBotId = null;
       }
     }
     if (botWinners.length > 0) {
       forceBotWinNextGame[20] = false;
-      console.log(`🤖 Game bot won naturally in stake 20, forceBotWinNextGame[20] = false`);
+      console.log(`🤖 Bot won naturally in stake 20, forceBotWinNextGame[20] = false`);
     }
   }
 
@@ -2306,7 +2131,7 @@ async function endGameWithWinners(stake) {
     for (const w of finalBotWinners) {
       const bal = botBalances.get(w.telegramId) || 0;
       botBalances.set(w.telegramId, bal + prizeEachBot);
-      console.log(`🏆 Game bot ${w.telegramId} won ${prizeEachBot} (balance now ${botBalances.get(w.telegramId)})`);
+      console.log(`🏆 Bot ${w.telegramId} won ${prizeEachBot} (balance now ${botBalances.get(w.telegramId)})`);
     }
 
     const ipCounts = {};
@@ -2346,11 +2171,11 @@ async function endGameWithWinners(stake) {
   notifyAdminClients();
 }
 
-// ---------- Game Bot Admin Endpoints ----------
-app.get('/admin/game-bots-status', (req, res) => {
+// ---------- Bot Admin Endpoints ----------
+app.get('/admin/bots-status', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const botData = GAME_BOT_IDS.map(id => {
+  const botData = BOT_IDS.map(id => {
     const balance = botBalances.get(id) || 0;
     const lastWin = botLastWinGame.get(id) || 0;
     const game = getGame(20);
@@ -2367,29 +2192,29 @@ app.get('/admin/game-bots-status', (req, res) => {
   res.json({ success: true, bots: botData, currentGame: gameCounter });
 });
 
-app.post('/admin/game-bot-reset-balance', async (req, res) => {
+app.post('/admin/bot-reset-balance', async (req, res) => {
   const { secret, botId, newBalance } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  if (!GAME_BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid game bot ID' });
+  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
   const bal = Number(newBalance);
   if (isNaN(bal) || bal < 0) return res.status(400).json({ error: 'Balance must be non-negative' });
   botBalances.set(botId, bal);
-  Audit.adminAction('GAME_BOT_BALANCE_RESET', 'admin', req.ip, { botId, newBalance: bal });
+  Audit.adminAction('BOT_BALANCE_RESET', 'admin', req.ip, { botId, newBalance: bal });
   res.json({ success: true, newBalance: bal });
 });
 
-app.post('/admin/game-bot-force-win', async (req, res) => {
+app.post('/admin/bot-force-win', async (req, res) => {
   const { secret, botId } = req.body;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  if (!GAME_BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid game bot ID' });
+  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
   const game = getGame(20);
   if (!game || game.status !== 'running') {
     return res.status(400).json({ error: 'Game is not running' });
   }
   const player = game.players.find(p => p.telegramId === botId);
-  if (!player) return res.status(400).json({ error: 'Game bot is not in the current game' });
+  if (!player) return res.status(400).json({ error: 'Bot is not in the current game' });
   if (game.winners.find(w => w.telegramId === botId)) {
-    return res.status(400).json({ error: 'Game bot already won this game' });
+    return res.status(400).json({ error: 'Bot already won this game' });
   }
   if (game.winningNumber === null) {
     game.winningNumber = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : 1;
@@ -2401,14 +2226,14 @@ app.post('/admin/game-bot-force-win', async (req, res) => {
     isForced: true
   });
   botLastWinGame.set(botId, gameCounter);
-  Audit.adminAction('GAME_BOT_FORCED_WIN', 'admin', req.ip, { botId, game: gameCounter });
+  Audit.adminAction('BOT_FORCED_WIN', 'admin', req.ip, { botId, game: gameCounter });
   clearTimeout(game.bingoGraceTimeout);
   game.bingoGraceTimeout = null;
   endGameWithWinners(20);
-  res.json({ success: true, message: `Game bot ${botId} forced to win. Game ending.` });
+  res.json({ success: true, message: `Bot ${botId} forced to win. Game ending.` });
 });
 
-app.get('/admin/game-bot-history', (req, res) => {
+app.get('/admin/bot-history', (req, res) => {
   const { secret, from, to } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   let history = botGameHistory;
@@ -2425,8 +2250,8 @@ app.get('/admin/game-bot-history', (req, res) => {
   res.json({ success: true, history, from: from || null, to: to || null });
 });
 
-app.get('/admin-game-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-game-bots.html')));
-app.get('/admin-game-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-game-bot-stats.html')));
+app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
+app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ---------- Player deposit endpoints ----------
 const handleDepositRequest = async (req, res) => {
