@@ -3930,7 +3930,7 @@ app.get('/admin/link-stats', async (req, res) => {
 });
 
 // ================================================================
-//  TELEGRAM BOT (Integrated) – safe initialization
+//  TELEGRAM BOT (Integrated) – FIXED with invite tracking
 // ================================================================
 const botToken = process.env.BOT_TOKEN;
 if (!botToken) {
@@ -3946,6 +3946,48 @@ if (!botToken) {
       const startParam = match[1] ? match[1].trim() : '';
       const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
 
+      // ✅ FIX: Pass start parameter to web app URL
+      const webAppUrlWithParam = startParam 
+        ? `${webAppUrl}?start_param=${startParam}` 
+        : webAppUrl;
+
+      // Also log the invite usage
+      if (startParam) {
+        console.log(`🔗 User ${chatId} opened invite link with code: ${startParam}`);
+        
+        // Store invite link open immediately
+        const userId = msg.from.id.toString();
+        const username = msg.from.username || msg.from.first_name || 'Unknown';
+        
+        supabase
+          .from('admin_link_opens')
+          .insert({
+            admin_id: null,
+            invite_code: startParam,
+            user_id: userId,
+            ip_address: null,
+            user_agent: 'telegram_bot'
+          })
+          .then(() => {
+            console.log(`✅ Logged invite link open for user ${userId} with code ${startParam}`);
+            // Also update user's invite code if they exist
+            return supabase
+              .from('users')
+              .update({ invite_code_used: startParam })
+              .eq('telegram_id', userId);
+          })
+          .then(({ error }) => {
+            if (error && error.code !== 'PGRST116') {
+              console.error('Failed to update user invite code:', error.message);
+            } else if (!error) {
+              console.log(`✅ Updated user ${userId} with invite code ${startParam}`);
+            }
+          })
+          .catch(err => {
+            console.error('Error logging invite:', err.message);
+          });
+      }
+
       const messageText = startParam
         ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
         : '🎯 Welcome! Click below to start playing.';
@@ -3956,7 +3998,7 @@ if (!botToken) {
             [
               {
                 text: '🎮 Open Game',
-                web_app: { url: webAppUrl }
+                web_app: { url: webAppUrlWithParam }
               }
             ]
           ]
