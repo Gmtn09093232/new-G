@@ -3,6 +3,11 @@
 //             & Admin Link Open Tracking
 //             & INVITE TRACKING TABLE
 //             & Auto-assign Admin from Invite Code
+//             & Manual Balance Adjustments Affecting Deposit Stats
+//             & 1500 ETB Limit for Manual Additions
+//             & Import Players by Username/Handle
+//             & DUPLICATE TRANSACTION NUMBER CHECK
+//             & SMART TRANSACTION NUMBER EXTRACTION
 // ================================================================
 
 require('dotenv').config();
@@ -637,6 +642,7 @@ app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'adm
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html')));
+app.get('/invite-tracking-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-tracking-dashboard.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -1327,7 +1333,8 @@ app.post('/admin/update-invite-code', async (req, res) => {
 
 // ---------- Legacy admin balance management ----------
 app.post('/admin/add-balance', async (req, res) => {
-  const { secret, telegramId, amount } = req.body;  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const { secret, telegramId, amount } = req.body;
+  if (secret !== process.env.ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
   const strId = String(telegramId);
   const amt = Number(amount);
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
