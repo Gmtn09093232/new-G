@@ -1,6 +1,7 @@
 // ================================================================
 //  server.js – Full Bingo Server
 //             with invite tracking (invite_code, admin_name)
+//             & FORCE INVITE ONLY (no invite → no account)
 // ================================================================
 
 require('dotenv').config();
@@ -490,7 +491,9 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser ----------
+// ============================================================
+//  loadUser – with FORCE INVITE ONLY
+// ============================================================
 async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
@@ -619,6 +622,13 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         }
       }
 
+      // 🔒 FORCE INVITE ONLY – if no invite code, reject creation
+      if (!finalInviteCode) {
+        console.log(`❌ Blocked user creation for ${id} – no invite code provided.`);
+        throw new Error('Invite required. Please use an invite link from an admin to create an account.');
+      }
+
+      // Proceed with creation
       const newUser = {
         telegram_id: id,
         username: username || 'Player',
@@ -666,7 +676,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         admin_id: newUser.admin_id,
         admin_name: newUser.admin_name
       };
-      console.log(`✅ Created user ${id} with invite ${finalInviteCode || 'none'}, admin ${finalAdminName || 'none'}`);
+      console.log(`✅ Created user ${id} with invite ${finalInviteCode}, admin ${finalAdminName || 'none'}`);
       return users[id];
     }
   } catch (err) {
@@ -711,8 +721,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
 
-    // Log invite (this function will update invite_tracking and users)
-    // We'll rely on loadUser to handle it.
+    // Load user – this will now enforce invite for new users
     const user = await loadUser(id, displayName, handle, startParam, !!startParam);
     req.session.userId = id;
     req.session.save((err) => {
@@ -727,11 +736,15 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         balance: user.balance,
         telegram_handle: user.telegram_handle,
         admin_id: user.admin_id,
-        admin_name: user.admin_name,   // changed
+        admin_name: user.admin_name,
         invite_code: user.invite_code
       });
     });
   } catch (err) {
+    // Catch the "invite required" error and return a friendly message
+    if (err.message === 'Invite required. Please use an invite link from an admin to create an account.') {
+      return res.status(403).json({ success: false, error: 'Invite required. Please use an invite link from an admin.' });
+    }
     console.error('❌ Auth error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
@@ -882,7 +895,7 @@ app.get('/api/user/invite-code', async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('invite_code, admin_id, admin_name')   // changed
+      .select('invite_code, admin_id, admin_name')
       .eq('telegram_id', String(userId))
       .maybeSingle();
 
@@ -916,7 +929,7 @@ app.get('/api/user/invite-code', async (req, res) => {
       success: true,
       invite_code: user.invite_code,
       admin_id: user.admin_id,
-      admin_name: user.admin_name,   // changed
+      admin_name: user.admin_name,
       admin: adminInfo,
       invite_tracking: inviteTrack || null
     });
@@ -2114,7 +2127,7 @@ app.post('/api/request-withdraw', async (req, res) => {
     if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
 
     let adminId = user.admin_id;
-    let adminName = user.admin_name;   // changed
+    let adminName = user.admin_name;
     if (!adminId) {
       const admins = await getAllAdmins();
       if (admins.length > 0) { adminId = admins[0].id; adminName = admins[0].name; }
@@ -2129,7 +2142,7 @@ app.post('/api/request-withdraw', async (req, res) => {
       withdrawal_type,
       receiver_name: receiverName,
       admin_id: adminId,
-      admin_name: adminName   // changed from assigned_admin_name
+      admin_name: adminName
     }).select().single();
 
     if (error) throw error;
@@ -3519,7 +3532,7 @@ app.post('/admin/import-players', async (req, res) => {
             invite_code: null,
             first_deposit_amount: 0,
             admin_id: null,
-            admin_name: null   // changed
+            admin_name: null
           };
           results.push({ telegramId, success: true, created: true });
           successCount++;
@@ -3760,7 +3773,7 @@ if (!botToken) {
             const updates = { invite_code: startParam };
             if (adminId && !user.admin_id) {
               updates.admin_id = adminId;
-              updates.admin_name = adminName;   // changed
+              updates.admin_name = adminName;
             }
             await supabase
               .from('users')
@@ -3939,7 +3952,7 @@ adminNamespace.on('connection', (socket) => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, admin_name') // changed
+        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, admin_name');
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
@@ -3949,7 +3962,7 @@ adminNamespace.on('connection', (socket) => {
         invite_code: u.invite_code,
         first_deposit_amount: u.first_deposit_amount || 0,
         admin_id: u.admin_id,
-        admin_name: u.admin_name   // changed
+        admin_name: u.admin_name
       }));
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
