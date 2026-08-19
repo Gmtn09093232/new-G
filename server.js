@@ -1,6 +1,6 @@
 // ================================================================
 //  server.js – Full Bingo Server
-//             with Invite Tracking (invite_code column)
+//             with invite tracking (invite_code, admin_name)
 // ================================================================
 
 require('dotenv').config();
@@ -546,7 +546,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           }
         }
         
-        // If still not found, try invite_code_used table (legacy)
+        // If still not found, try invite_code_used (legacy)
         if (!adminData) {
           let inviteUsed = null;
           const { data: used1, error: err1 } = await supabase
@@ -581,7 +581,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
 
         if (adminData) {
           data.admin_id = adminData.id;
-          data.assigned_admin_name = adminData.name;
+          data.admin_name = adminData.name;   // changed from assigned_admin_name
           needUpdate = true;
           console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code ${inviteCode}`);
         } else {
@@ -589,7 +589,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         }
       }
 
-      // Store the invite code used if not already set (column renamed to "invite_code")
+      // Store the invite code used if not already set
       if (inviteCode && !data.invite_code) {
         data.invite_code = inviteCode;
         needUpdate = true;
@@ -600,7 +600,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
           .from('users')
           .update({ 
             admin_id: data.admin_id, 
-            assigned_admin_name: data.assigned_admin_name,
+            admin_name: data.admin_name,   // changed
             invite_code: data.invite_code
           })
           .eq('telegram_id', id);
@@ -612,7 +612,7 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
             .from('invite_tracking')
             .update({ 
               admin_id: data.admin_id, 
-              admin_name: data.assigned_admin_name 
+              admin_name: data.admin_name 
             })
             .eq('telegram_id', id)
             .eq('invite_code', inviteCode);
@@ -627,12 +627,12 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: data.username,
         balance: Number(data.balance),
         telegram_handle: data.telegram_handle,
-        invite_code: data.invite_code,          // renamed
+        invite_code: data.invite_code,
         first_deposit_amount: data.first_deposit_amount || 0,
         admin_id: data.admin_id,
-        assigned_admin_name: data.assigned_admin_name
+        admin_name: data.admin_name   // changed
       };
-      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
+      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.admin_name || 'none'})`);
       return users[id];
     } else {
       // Create new user
@@ -724,10 +724,10 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: username || 'Player',
         telegram_handle: telegramHandle || null,
         balance: 10,
-        invite_code: inviteCode || null,      // renamed
+        invite_code: inviteCode || null,
         first_deposit_amount: 0,
         admin_id: finalAdminId,
-        assigned_admin_name: adminName
+        admin_name: adminName   // changed
       };
       
       const { error: insertError } = await supabase.from('users').insert(newUser);
@@ -762,10 +762,10 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         username: newUser.username,
         balance: 10,
         telegram_handle: newUser.telegram_handle,
-        invite_code: newUser.invite_code,     // renamed
+        invite_code: newUser.invite_code,
         first_deposit_amount: 0,
         admin_id: newUser.admin_id,
-        assigned_admin_name: newUser.assigned_admin_name
+        admin_name: newUser.admin_name   // changed
       };
       return users[id];
     }
@@ -812,12 +812,7 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
     const userAgent = req.headers['user-agent'] || null;
 
     // Log invite (this function will update invite_tracking and users)
-    // We'll inline the logic here to avoid the separate function.
-    // For simplicity, we'll rely on loadUser to handle it.
-    // But we also need to log the invite tracking entry.
-    // We'll just call loadUser with startParam and let it handle.
-    
-    // Force refresh if startParam is present
+    // We'll rely on loadUser to handle it.
     const user = await loadUser(id, displayName, handle, startParam, !!startParam);
     req.session.userId = id;
     req.session.save((err) => {
@@ -832,8 +827,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         balance: user.balance,
         telegram_handle: user.telegram_handle,
         admin_id: user.admin_id,
-        assigned_admin_name: user.assigned_admin_name,
-        invite_code: user.invite_code          // renamed
+        admin_name: user.admin_name,   // changed
+        invite_code: user.invite_code
       });
     });
   } catch (err) {
@@ -987,7 +982,7 @@ app.get('/api/user/invite-code', async (req, res) => {
   try {
     const { data: user, error } = await supabase
       .from('users')
-      .select('invite_code, admin_id, assigned_admin_name')   // renamed
+      .select('invite_code, admin_id, admin_name')   // changed
       .eq('telegram_id', String(userId))
       .maybeSingle();
 
@@ -1019,9 +1014,9 @@ app.get('/api/user/invite-code', async (req, res) => {
 
     res.json({
       success: true,
-      invite_code: user.invite_code,            // renamed
+      invite_code: user.invite_code,
       admin_id: user.admin_id,
-      assigned_admin_name: user.assigned_admin_name,
+      admin_name: user.admin_name,   // changed
       admin: adminInfo,
       invite_tracking: inviteTrack || null
     });
@@ -1129,7 +1124,7 @@ app.post('/admin/update-invite-code', async (req, res) => {
     // Update user
     const { error: updateErr } = await supabase
       .from('users')
-      .update({ invite_code: inviteCode })   // renamed
+      .update({ invite_code: inviteCode })
       .eq('telegram_id', String(telegramId));
 
     if (updateErr) throw updateErr;
@@ -1156,7 +1151,7 @@ app.post('/admin/update-invite-code', async (req, res) => {
 
     // Update cache
     if (users[String(telegramId)]) {
-      users[String(telegramId)].invite_code = inviteCode;   // renamed
+      users[String(telegramId)].invite_code = inviteCode;
     }
 
     await Audit.adminAction('UPDATE_INVITE_CODE', admin.id, req.ip, {
@@ -2219,7 +2214,7 @@ app.post('/api/request-withdraw', async (req, res) => {
     if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
 
     let adminId = user.admin_id;
-    let adminName = user.assigned_admin_name;
+    let adminName = user.admin_name;   // changed
     if (!adminId) {
       const admins = await getAllAdmins();
       if (admins.length > 0) { adminId = admins[0].id; adminName = admins[0].name; }
@@ -2234,7 +2229,7 @@ app.post('/api/request-withdraw', async (req, res) => {
       withdrawal_type,
       receiver_name: receiverName,
       admin_id: adminId,
-      assigned_admin_name: adminName
+      admin_name: adminName   // changed from assigned_admin_name
     }).select().single();
 
     if (error) throw error;
@@ -3607,7 +3602,7 @@ app.post('/admin/import-players', async (req, res) => {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
-            invite_code: null,           // renamed
+            invite_code: null,
             first_deposit_amount: 0,
             telegram_handle: null
           };
@@ -3621,10 +3616,10 @@ app.post('/admin/import-players', async (req, res) => {
             username: newUser.username,
             balance: newUser.balance,
             telegram_handle: null,
-            invite_code: null,            // renamed
+            invite_code: null,
             first_deposit_amount: 0,
             admin_id: null,
-            assigned_admin_name: null
+            admin_name: null   // changed
           };
           results.push({ telegramId, success: true, created: true });
           successCount++;
@@ -3786,12 +3781,11 @@ if (!botToken) {
       const startParam = match[1] ? match[1].trim() : '';
       const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
 
-      // ✅ Pass start parameter to web app URL
+      // Pass start parameter to web app URL
       const webAppUrlWithParam = startParam 
         ? `${webAppUrl}?start_param=${startParam}` 
         : webAppUrl;
 
-      // If there is a start parameter, log the invite immediately
       if (startParam) {
         const userId = msg.from.id.toString();
         const username = msg.from.username || msg.from.first_name || 'Unknown';
@@ -3816,7 +3810,7 @@ if (!botToken) {
           console.error('Error looking up admin:', e.message);
         }
 
-        // 2. Insert/Update invite_tracking (upsert)
+        // Insert/Update invite_tracking
         try {
           const { data: existing } = await supabase
             .from('invite_tracking')
@@ -3854,7 +3848,7 @@ if (!botToken) {
           console.error('Error with invite_tracking:', e.message);
         }
 
-        // 3. Update users table (if user exists)
+        // Update users table (if user exists)
         try {
           const { data: user } = await supabase
             .from('users')
@@ -3863,10 +3857,10 @@ if (!botToken) {
             .maybeSingle();
 
           if (user) {
-            const updates = { invite_code: startParam };   // renamed
+            const updates = { invite_code: startParam };
             if (adminId && !user.admin_id) {
               updates.admin_id = adminId;
-              updates.assigned_admin_name = adminName;
+              updates.admin_name = adminName;   // changed
             }
             await supabase
               .from('users')
@@ -4045,17 +4039,17 @@ adminNamespace.on('connection', (socket) => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, assigned_admin_name'); // renamed
+        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, admin_name') // changed
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
         telegram_handle: u.telegram_handle,
-        invite_code: u.invite_code,            // renamed
+        invite_code: u.invite_code,
         first_deposit_amount: u.first_deposit_amount || 0,
         admin_id: u.admin_id,
-        assigned_admin_name: u.assigned_admin_name
+        admin_name: u.admin_name   // changed
       }));
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
