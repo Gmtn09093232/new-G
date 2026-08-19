@@ -6,6 +6,7 @@
 //             & Import Players by Username/Handle
 //             & DUPLICATE TRANSACTION NUMBER CHECK
 //             & SMART TRANSACTION NUMBER EXTRACTION
+//             & STORE INVITE CODE IN USER TABLE
 // ================================================================
 
 require('dotenv').config();
@@ -128,7 +129,7 @@ const Audit = {
 };
 
 // ================================================================
-//  Log Admin Link Open (for tracking invite link clicks)
+//  Log Admin Link Open & Store Invite Code in User Table
 // ================================================================
 async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
   try {
@@ -142,6 +143,7 @@ async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
       if (admin) adminId = admin.id;
     }
 
+    // Log the link open
     const { error } = await supabase
       .from('admin_link_opens')
       .insert({
@@ -152,6 +154,44 @@ async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
         user_agent: userAgent || null
       });
     if (error) console.error('Failed to log admin link open:', error.message);
+
+    // Store invite code in user table if userId exists and we have an inviteCode
+    if (userId && inviteCode) {
+      const userIdStr = String(userId);
+      
+      // Check if user exists
+      const { data: existingUser, error: findError } = await supabase
+        .from('users')
+        .select('id, invite_code_used')
+        .eq('telegram_id', userIdStr)
+        .maybeSingle();
+
+      if (findError) {
+        console.error('Error finding user:', findError.message);
+        return;
+      }
+
+      // Only update if user exists and doesn't already have an invite code
+      if (existingUser && !existingUser.invite_code_used) {
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ invite_code_used: inviteCode })
+          .eq('telegram_id', userIdStr);
+        
+        if (updateError) {
+          console.error('Failed to store invite code in user table:', updateError.message);
+        } else {
+          console.log(`✅ Stored invite code ${inviteCode} for user ${userId}`);
+          
+          // Also update the in-memory cache if user exists there
+          if (users[userIdStr]) {
+            users[userIdStr].invite_code_used = inviteCode;
+          }
+        }
+      } else if (existingUser && existingUser.invite_code_used) {
+        console.log(`ℹ️ User ${userId} already has invite code: ${existingUser.invite_code_used}`);
+      }
+    }
   } catch (err) {
     console.error('Error logging admin link open:', err.message);
   }
@@ -737,7 +777,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- Telegram auth (with link open logging) ----------
+// ---------- Telegram auth (with link open logging and invite code storage) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -753,6 +793,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
+    
+    // Log link open AND store invite code in user table
     await logAdminLinkOpen(startParam, id, ip, userAgent);
 
     // Force refresh if startParam is present
@@ -770,7 +812,8 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         balance: user.balance,
         telegram_handle: user.telegram_handle,
         admin_id: user.admin_id,
-        assigned_admin_name: user.assigned_admin_name
+        assigned_admin_name: user.assigned_admin_name,
+        invite_code_used: user.invite_code_used // Return the invite code
       });
     });
   } catch (err) {
@@ -910,6 +953,103 @@ app.get('/admin/invite-info', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching invite info:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Get User Invite Code ----------
+app.get('/api/user/invite-code', async (req, res) => {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('invite_code_used, admin_id, assigned_admin_name')
+      .eq('telegram_id', String(userId))
+      .maybeSingle();
+
+    if (error || !user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Also get admin info for the invite code
+    let adminInfo = null;
+    if (user.admin_id) {
+      const { data: admin, error: adminErr } = await supabase
+        .from('admins')
+        .select('name, invite_code')
+        .eq('id', user.admin_id)
+        .maybeSingle();
+      if (!adminErr && admin) {
+        adminInfo = admin;
+      }
+    }
+
+    res.json({
+      success: true,
+      invite_code_used: user.invite_code_used,
+      admin_id: user.admin_id,
+      assigned_admin_name: user.assigned_admin_name,
+      admin: adminInfo
+    });
+  } catch (err) {
+    console.error('Error fetching invite code:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- Admin endpoint to update user's invite code ----------
+app.post('/admin/update-invite-code', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  const { telegramId, inviteCode } = req.body;
+  if (!telegramId || !inviteCode) {
+    return res.status(400).json({ error: 'Telegram ID and invite code required' });
+  }
+
+  try {
+    // Verify the user belongs to this admin
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('id, admin_id')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.admin_id !== admin.id) {
+      return res.status(403).json({ error: 'User not assigned to you' });
+    }
+
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ invite_code_used: inviteCode })
+      .eq('telegram_id', String(telegramId));
+
+    if (updateErr) throw updateErr;
+
+    // Update cache
+    if (users[String(telegramId)]) {
+      users[String(telegramId)].invite_code_used = inviteCode;
+    }
+
+    await Audit.adminAction('UPDATE_INVITE_CODE', admin.id, req.ip, {
+      targetUserId: telegramId,
+      newInviteCode: inviteCode
+    });
+
+    res.json({ success: true, message: 'Invite code updated' });
+  } catch (err) {
+    console.error('Error updating invite code:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1840,8 +1980,6 @@ const handleDepositRequest = async (req, res) => {
 
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // ❌ REMOVED: automatic admin assignment on deposit
 
     let photoUrl = null;
     if (photoFile) {
