@@ -3257,7 +3257,7 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   }
 });
 // ============================================================
-//  SUPER ADMIN – Send Telegram Message to Player
+//  SUPER ADMIN Send Telegram Message to Player
 // ============================================================
 app.post('/super-admin/send-telegram-message', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
