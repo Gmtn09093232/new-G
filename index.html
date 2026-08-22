@@ -1038,18 +1038,6 @@
         #inviteRequiredOverlay .btn-bot:active {
             transform: scale(0.96);
         }
-        /* ===== HOW TO PAY PHOTO/GUIDE ===== */
-        #howToPayContent img {
-            max-width: 100%;
-            border-radius: 16px;
-            margin: 12px 0;
-            border: 1px solid #e2e8f0;
-        }
-        #howToPayContent .step-img {
-            display: block;
-            max-width: 90%;
-            margin: 8px auto;
-        }
     </style>
 </head>
 <body>
@@ -1114,7 +1102,9 @@
                 <div class="step-number">1️⃣ Step 1:</div>
                 <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this number</div>
                 <div class="step-content">
-                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:6px;" id="howToPayTrigger" data-key="howToPay">📞 How to pay? (with photos)</div>
+                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:6px;">
+                        <span id="howToPayTrigger" style="cursor:pointer; text-decoration:underline; color:#f97316;" data-key="howToPay">📞 How to pay?</span>
+                    </div>
                     <div class="recipient-number"><span class="number" id="paymentRecipientNumber">📞 0953677690</span><button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button></div>
                     <div style="font-size:0.7rem; color:#64748b; margin-top:8px;">Open your payment app → Send Money → Paste the number → Make the transfer</div>
                 </div>
@@ -1132,10 +1122,16 @@
         </div>
     </div>
 
-    <!-- ===== HOW TO PAY MODAL (with photos) ===== -->
+    <!-- ===== HOW TO PAY MODAL ===== -->
     <div id="howToPayModal" class="modal">
         <div class="modal-content" style="max-width:420px;">
-            <div class="bank-header"><span class="bank-icon">📖</span><div><div class="bank-title" id="howToPayTitle">How to Pay</div><div class="bank-sub" id="howToPayMethod">Telebirr</div></div></div>
+            <div class="bank-header">
+                <span class="bank-icon">📖</span>
+                <div>
+                    <div class="bank-title" id="howToPayTitle" data-key="howToPayTitle">How to Pay</div>
+                    <div class="bank-sub" id="howToPayMethod">Telebirr</div>
+                </div>
+            </div>
             <div id="howToPayContent" style="font-size:0.9rem; line-height:1.6; color:#1e293b; max-height:400px; overflow-y:auto; padding-right:8px;"></div>
             <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">Got it</button>
         </div>
@@ -1304,7 +1300,7 @@
         //  DOT BINGO – Full Frontend with Invite Tracking (admin names hidden)
         //  Deposit flow: select method directly (no admin step)
         //  Logos: Telebirr, CBE Birr, M-Pesa using official Wikimedia SVGs
-        //  "How to pay" photo/guide section is restored
+        //  "How to pay" modal added back
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1413,7 +1409,8 @@
                 selectMethod: "💳 የክፍያ ዘዴ ይምረጡ",
                 confirmPayment: "Confirm Payment →",
                 copy: "Copy",
-                howToPay: "📞 How to pay? (with photos)",
+                howToPay: "📞 How to pay?",
+                howToPayTitle: "How to Pay",
                 enterInvoice: "Enter your Invoice Number",
                 invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
                 invoicePlaceholder: "e.g. CKU3JPX6M3",
@@ -1495,7 +1492,8 @@
                 selectMethod: "💳 Select Deposit Method",
                 confirmPayment: "Confirm Payment →",
                 copy: "Copy",
-                howToPay: "📞 How to pay? (with photos)",
+                howToPay: "📞 How to pay?",
+                howToPayTitle: "How to Pay",
                 enterInvoice: "Enter your Invoice Number",
                 invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
                 invoicePlaceholder: "e.g. CKU3JPX6M3",
@@ -1879,7 +1877,7 @@
             if (phoneInput) phoneInput.value = '';
             if (amountInput) amountInput.value = '';
             if (invoiceInput) invoiceInput.value = '';
-            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal'];
+            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal'];
             modals.forEach(id => { const el = $(id); if (el) el.classList.remove('active'); });
             const confirmBtn = $('confirmPaymentBtn');
             if (confirmBtn) {
@@ -1952,48 +1950,32 @@
             if (savedAmount) $('depositAmountSimple').value = savedAmount;
         }
 
-        // ========== HOW TO PAY (with photos) ==========
+        // ========== HOW TO PAY ==========
         function openHowToPay() {
             const method = selectedDepositType || 'telebirr';
             const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
             document.getElementById('howToPayMethod').textContent = methodLabel;
             const content = document.getElementById('howToPayContent');
-            const instructions = getPaymentInstructions(method, pendingAmount);
+            const instructions = getPaymentInstructions(method);
             content.innerHTML = instructions;
+            const amountSpan = document.getElementById('howToPayAmount');
+            if (amountSpan) amountSpan.textContent = pendingAmount || '10';
             document.getElementById('howToPayModal').classList.add('active');
             unlockSpeech();
         }
 
         function closeHowToPay() { document.getElementById('howToPayModal').classList.remove('active'); }
 
-        function getPaymentInstructions(method, amount) {
+        function getPaymentInstructions(method) {
             const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
-            const photoBase = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
-            const stepImgs = {
-                telebirr: {
-                    step1: photoBase + '6/6c/Telebirr_logo.svg/120px-Telebirr_logo.svg.png',
-                    step2: photoBase + '6/6c/Telebirr_logo.svg/120px-Telebirr_logo.svg.png'
-                },
-                cbebirr: {
-                    step1: photoBase + '8/8c/Commercial_Bank_of_Ethiopia_logo.svg/120px-Commercial_Bank_of_Ethiopia_logo.svg.png',
-                    step2: photoBase + '8/8c/Commercial_Bank_of_Ethiopia_logo.svg/120px-Commercial_Bank_of_Ethiopia_logo.svg.png'
-                },
-                mpesa: {
-                    step1: photoBase + '7/7e/M-Pesa_Logo.svg/120px-M-Pesa_Logo.svg.png',
-                    step2: photoBase + '7/7e/M-Pesa_Logo.svg/120px-M-Pesa_Logo.svg.png'
-                }
-            };
-            const imgs = stepImgs[method] || stepImgs.telebirr;
             return `
                 <p><strong>📌 Follow these steps carefully:</strong></p>
                 <ol>
-                    <li><strong>Open your ${methodLabel} app</strong> (or mobile money service).</li>
-                    <img src="${imgs.step1}" alt="${methodLabel} logo" class="step-img" />
+                    <li>Open your ${methodLabel} app or mobile money service.</li>
                     <li>Select <strong>Send Money</strong> (or <strong>Transfer</strong>).</li>
                     <li>Enter the admin's phone number shown above.</li>
-                    <li>Enter the exact amount (<strong>${amount || '...'}</strong> ETB).</li>
+                    <li>Enter the exact amount (<span id="howToPayAmount">${pendingAmount || '...'}</span> ETB).</li>
                     <li>Complete the transaction and copy the <strong>Invoice Number</strong> (or the full SMS confirmation).</li>
-                    <img src="${imgs.step2}" alt="Transaction confirmation example" class="step-img" />
                     <li>Paste that Invoice Number in the field below and tap <strong>Confirm Payment</strong>.</li>
                 </ol>
                 <p style="margin-top:12px; background:#fef3c7; padding:10px; border-radius:16px;">
@@ -2013,6 +1995,56 @@
             `;
         }
 
+        // ========== WITHDRAW DETAILS ==========
+        function openWithdrawDetails(admin, method, number) {
+            if (!admin || !method || !number) { alert('Please select a valid withdrawal method.'); return; }
+            selectedAdminObj = admin;
+            selectedAdminId = admin.id;
+            selectedWithdrawType = method;
+            selectedMethodNumber = number;
+            const title = method === 'telebirr' ? 'Telebirr' : method === 'cbebirr' ? 'CBE Birr' : 'M-Pesa';
+            const hint = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
+            $('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`;
+            $('withdrawReceiver').placeholder = hint;
+            $('withdrawReceiver').value = '';
+            $('withdrawAmount').value = '';
+            $('withdrawName').value = '';
+            $('withdrawDetailsModal').classList.add('active');
+            unlockSpeech();
+        }
+
+        async function submitWithdraw() {
+            if (submittingW) return;
+            const rec = $('withdrawReceiver').value.trim(),
+                amt = $('withdrawAmount').value.trim(),
+                name = $('withdrawName').value.trim();
+            if (!name) { alert("Full name required"); return; }
+            if (!amt || isNaN(amt) || Number(amt) < 20) { alert('Minimum withdrawal is 20 ETB'); return; }
+            if (!rec.match(/^(09|07)\d{8}$/)) { alert(
+                    `Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`
+                    ); return; }
+            submittingW = true;
+            const btn = $('submitWithdrawBtn');
+            const orig = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = '⏳ Processing...';
+            try {
+                const r = await fetch('/api/request-withdraw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: Number(amt), phone: rec, withdrawal_type: selectedWithdrawType,
+                        name, admin_id: selectedAdminId })
+                });
+                const d = await r.json();
+                if (d.success) { alert('✅ Withdrawal request submitted!');
+                    $('withdrawDetailsModal').classList.remove('active');
+                    resetDepositState(); } else { alert('❌ Error: ' + (d.error || 'Submission failed')); }
+            } catch (err) { alert('⚠️ Network error.'); } finally { submittingW = false;
+                btn.disabled = false;
+                btn.innerText = orig;
+                unlockSpeech(); }
+        }
+
         // ========== EVENT DELEGATION ==========
         document.addEventListener('click', e => {
             const t = e.target.closest('#requestDepositBtn');
@@ -2029,15 +2061,6 @@
         document.addEventListener('click', e => {
             const t = e.target.closest('#backPaymentBtn');
             if (t) closePaymentConfirm();
-        });
-        // How to pay trigger
-        document.addEventListener('click', e => {
-            const t = e.target.closest('#howToPayTrigger');
-            if (t) openHowToPay();
-        });
-        document.addEventListener('click', e => {
-            const t = e.target.closest('#closeHowToPayBtn');
-            if (t) closeHowToPay();
         });
 
         // ========== CONFIRM PAYMENT ==========
@@ -2336,8 +2359,8 @@
 
         function syncBalance(v) { balance = v;
             lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($(
-                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $((
-                'gameBalanceDisplay')).innerText = v; }
+                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $(((
+                'gameBalanceDisplay'))).innerText = v; }
 
         // ============================================================
         //  CONNECT TO GAME
@@ -2510,7 +2533,7 @@
             await authenticateUser();
             await fetchUserInviteInfo();
             restoreSession();
-            console.log('✨ DOT BINGO ready – deposit method logos, How-to-pay with photos restored.');
+            console.log('✨ DOT BINGO ready – deposit method logos updated, "How to pay" re-added.');
         }
 
         // ============================================================
@@ -2600,6 +2623,10 @@
             const raw = el.textContent.replace('📞 ', '').trim();
             if (raw) copy(raw);
         });
+
+        // How to pay trigger
+        $('howToPayTrigger')?.addEventListener('click', openHowToPay);
+        $('closeHowToPayBtn')?.addEventListener('click', closeHowToPay);
 
         $('backWithdrawBtn')?.addEventListener('click', () => { $('withdrawDetailsModal').classList.remove('active');
             openWithdrawFlow(); });
