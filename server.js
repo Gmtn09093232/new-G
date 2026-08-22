@@ -3491,14 +3491,16 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 });
 
 // ============================================================
-//  NEW: GET ALL REGISTERED PLAYERS (with admin info)
+//  GET ALL REGISTERED PLAYERS (with admin info)
 // ============================================================
- app.get('/super-admin/players', async (req, res) => {
+app.get('/super-admin/players', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
 
   try {
     const { adminId, search, limit = 100, page = 1 } = req.query;
+
+    // Build the base query
     let query = supabase.from('users').select('*', { count: 'exact' });
 
     // Filter by admin
@@ -3506,7 +3508,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       query = query.eq('admin_id', adminId);
     }
 
-    // Search by username or telegram handle or telegram_id
+    // Search
     if (search) {
       query = query.or(`username.ilike.%${search}%,telegram_handle.ilike.%${search}%,telegram_id.ilike.%${search}%`);
     }
@@ -3515,14 +3517,29 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     const pageNum = Math.max(parseInt(page) || 1, 1);
     const offset = (pageNum - 1) * limitNum;
 
-    // ✅ FIX: order by telegram_id instead of created_at (which may not exist)
+    // ✅ SAFE ORDER – use a column that definitely exists
+    // Use 'telegram_id' (always present) or 'username'
     const { data, error, count } = await query
-      .order('telegram_id', { ascending: false })
+      .order('telegram_id', { ascending: false })   // <-- this column exists
       .range(offset, offset + limitNum - 1);
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Supabase query error:', error);
+      // Fallback: try without ordering
+      const { data: fallbackData, error: fallbackErr, count: fallbackCount } = await query
+        .range(offset, offset + limitNum - 1);
+      if (fallbackErr) throw fallbackErr;
+      return res.json({
+        success: true,
+        players: fallbackData || [],
+        total: fallbackCount || 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil((fallbackCount || 0) / limitNum)
+      });
+    }
 
-    // Fetch admin names for players that have admin_id
+    // Fetch admin names
     const adminIds = [...new Set(data.map(u => u.admin_id).filter(id => id))];
     let adminsMap = {};
     if (adminIds.length) {
@@ -3549,10 +3566,11 @@ app.get('/super-admin/platform-stats', async (req, res) => {
       totalPages: Math.ceil(count / limitNum)
     });
   } catch (err) {
-    console.error('Error fetching all players:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('❌ Error fetching all players:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
+ 
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
