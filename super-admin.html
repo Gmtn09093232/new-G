@@ -291,6 +291,13 @@
             min-height: 28px;
             border-radius: 6px;
         }
+        .btn-indigo {
+            background: #6366f1;
+            color: #fff;
+        }
+        .btn-indigo:active {
+            background: #4f46e5;
+        }
 
         /* ─── STATS GRID ─── */
         .stats-grid {
@@ -1142,6 +1149,19 @@
             color: #94a3b8;
             padding: 0 4px;
         }
+
+        .player-note {
+            font-size: 12px;
+            color: #94a3b8;
+            background: #f8fafc;
+            padding: 8px 14px;
+            border-radius: 8px;
+            margin: 6px 0 10px;
+            border: 1px dashed #e2e8f0;
+        }
+        .player-note strong {
+            color: #475569;
+        }
     </style>
 </head>
 <body>
@@ -1422,13 +1442,14 @@
                 `;
             } catch (err) {
                 container.innerHTML =
-                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
         // ─── REDUCE DEPOSIT BALANCE ───
         async function reduceDepositBalance(adminId, currentBalance) {
-            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
+            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`,
+            '');
             if (amountStr === null) return;
             const amount = parseFloat(amountStr);
             if (isNaN(amount) || amount <= 0) {
@@ -1445,11 +1466,13 @@
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId, amount: -amount, description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
+                    body: JSON.stringify({ adminId, amount: -amount,
+                        description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`, 'success');
+                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`,
+                        'success');
                     refreshAll();
                 } else {
                     throw new Error(data.error || 'Failed');
@@ -1474,7 +1497,7 @@
 
                 if (data.admins.length === 0) {
                     container.innerHTML =
-                    `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
+                        `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
                     return;
                 }
 
@@ -1514,14 +1537,14 @@
                                 ${admin.is_active ? 'Deactivate' : 'Activate'}
                             </button>
                             <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">Reduce</button>
-                            <button class="btn btn-indigo btn-sm" style="background:#6366f1;color:#fff;" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')">👥 Players</button>
+                            <button class="btn btn-indigo btn-sm" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')">👥 Players</button>
                         </div>
                     </div>
                 `}).join('');
 
             } catch (err) {
                 container.innerHTML =
-                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1537,86 +1560,131 @@
             });
         }
 
-        // ─── LOAD ADMIN PLAYERS (for modal) ───
-        let currentPlayersPage = 1;
+        // ─── PLAYER LIST HELPERS ───
         const PLAYERS_PER_PAGE = 20;
         let currentPlayersAdminId = null;
+        let currentPlayersPage = 1;
         let currentPlayersData = [];
 
+        // ─── LOAD ADMIN PLAYERS (using admin detail + deposits) ───
         async function loadAdminPlayers(adminId, page = 1) {
             currentPlayersAdminId = adminId;
             currentPlayersPage = page;
             const container = document.getElementById('modalBody');
             try {
-                const url = apiUrl(`/super-admin/admin/${adminId}/players`, { page, limit: PLAYERS_PER_PAGE });
+                // Fetch admin detail – this gives us deposits with usernames
+                const url = apiUrl(`/super-admin/admin/${adminId}`);
                 const res = await fetch(url);
-                if (!res.ok) throw new Error('Failed to load players');
+                if (!res.ok) throw new Error('Failed to load admin data');
                 const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Failed to fetch players');
+                if (!data.success) throw new Error(data.error || 'Failed to fetch data');
 
-                currentPlayersData = data.players || [];
-                const total = data.total || currentPlayersData.length;
-                const totalPages = Math.ceil(total / PLAYERS_PER_PAGE);
+                const a = data.admin;
+                const stats = data.stats;
 
-                if (currentPlayersData.length === 0) {
+                // Build unique player list from deposits
+                const playerMap = new Map();
+                if (stats.deposits && stats.deposits.length > 0) {
+                    stats.deposits.forEach(d => {
+                        const username = d.username || 'Unknown';
+                        if (!playerMap.has(username)) {
+                            playerMap.set(username, {
+                                username: username,
+                                phone: d.phone_number || 'N/A',
+                                totalDeposited: 0,
+                                depositCount: 0,
+                                status: d.status || 'active'
+                            });
+                        }
+                        const p = playerMap.get(username);
+                        p.totalDeposited += Number(d.amount) || 0;
+                        p.depositCount += 1;
+                        // Update phone if available
+                        if (d.phone_number) p.phone = d.phone_number;
+                    });
+                }
+
+                const allPlayers = Array.from(playerMap.values());
+                // Sort by total deposited (highest first)
+                allPlayers.sort((a, b) => b.totalDeposited - a.totalDeposited);
+                const totalPlayers = stats.players || allPlayers.length;
+
+                const totalPages = Math.max(1, Math.ceil(allPlayers.length / PLAYERS_PER_PAGE));
+                const start = (page - 1) * PLAYERS_PER_PAGE;
+                const end = Math.min(start + PLAYERS_PER_PAGE, allPlayers.length);
+                const pagePlayers = allPlayers.slice(start, end);
+
+                // ─── RENDER ───
+                if (allPlayers.length === 0) {
                     container.innerHTML = `
-                        <div class="empty-state"><div class="icon">👤</div><p>No players found for this admin</p>
-                        <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button></div>
+                        <div class="empty-state">
+                            <div class="icon">👤</div>
+                            <p>No players found for this admin</p>
+                            <p style="font-size:12px;color:#94a3b8;">Only players who have made deposits are shown here.</p>
+                            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                                <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            </div>
+                        </div>
                     `;
                     return;
                 }
 
-                const playersHtml = currentPlayersData.map((p, idx) => `
+                const playersHtml = pagePlayers.map(p => `
                     <div class="player-row">
                         <div class="info">
-                            <span class="name">${escapeHtml(p.username || 'Unknown')}</span>
-                            <span class="phone">${escapeHtml(p.phone || 'N/A')}</span>
+                            <span class="name">${escapeHtml(p.username)}</span>
+                            <span class="phone">${escapeHtml(p.phone)}</span>
                         </div>
                         <div class="details">
-                            <span class="bal">${(p.balance || 0).toFixed(0)} ETB</span>
+                            <span class="bal">${p.totalDeposited.toFixed(0)} ETB</span>
                             <span class="status-badge ${p.status === 'active' ? 'active' : p.status === 'banned' ? 'banned' : 'inactive'}">${p.status || 'active'}</span>
                         </div>
                     </div>
                 `).join('');
 
-                // pagination
+                // Pagination controls
                 let paginationHtml = '';
                 if (totalPages > 1) {
+                    const pagesToShow = Math.min(totalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(page - 2, totalPages - pagesToShow + 1));
+                    const endPage = Math.min(totalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === page ? 'active-page' : ''}" onclick="loadAdminPlayers(${adminId}, ${p})">${p}</button>`;
+                    }
                     paginationHtml = `
                         <div class="mini-pagination">
                             <button onclick="loadAdminPlayers(${adminId}, ${page - 1})" ${page <= 1 ? 'disabled' : ''}>◀</button>
-                            ${Array.from({length: Math.min(totalPages, 5)}, (_, i) => {
-                                let p = i + 1;
-                                // show pages around current
-                                if (totalPages > 5) {
-                                    if (i === 0) p = 1;
-                                    else if (i === 1) p = Math.max(2, page - 1);
-                                    else if (i === 2) p = page;
-                                    else if (i === 3) p = Math.min(totalPages - 1, page + 1);
-                                    else if (i === 4) p = totalPages;
-                                    // avoid duplicates
-                                    if (i > 0 && p === (i === 1 ? 1 : (i === 2 ? Math.max(2, page - 1) : (i === 3 ? page : (i === 4 ? Math.min(totalPages - 1, page + 1) : totalPages))))) {
-                                        // skip dupes
-                                    }
-                                }
-                                const pageNum = p;
-                                return `<button class="${pageNum === page ? 'active-page' : ''}" onclick="loadAdminPlayers(${adminId}, ${pageNum})">${pageNum}</button>`;
-                            }).join('')}
+                            ${pageButtons}
                             <button onclick="loadAdminPlayers(${adminId}, ${page + 1})" ${page >= totalPages ? 'disabled' : ''}>▶</button>
                             <span>${page} / ${totalPages}</span>
                         </div>
                     `;
                 }
 
+                // Show a note if total players from stats is higher than what we show
+                const noteHtml = (totalPlayers > allPlayers.length) ? `
+                    <div class="player-note">
+                        <strong>ℹ️</strong> Showing ${allPlayers.length} players who have made deposits. 
+                        Total player count reported: <strong>${totalPlayers}</strong>. 
+                        (Full list requires backend endpoint <code style="background:#e2e8f0;padding:1px 8px;border-radius:4px;">/super-admin/admin/${adminId}/players</code>)
+                    </div>
+                ` : `
+                    <div class="player-note">
+                        <strong>👥</strong> ${allPlayers.length} player${allPlayers.length > 1 ? 's' : ''} found (from deposit activity).
+                    </div>
+                `;
+
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                        <div><strong>👥 ${total} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(page-1)*PLAYERS_PER_PAGE + 1}–${Math.min(page*PLAYERS_PER_PAGE, total)}</span></div>
+                        <div><strong>👥 ${totalPlayers} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${Math.min(allPlayers.length, (page-1)*PLAYERS_PER_PAGE + 1)}–${Math.min(allPlayers.length, page*PLAYERS_PER_PAGE)}</span></div>
                         <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                     </div>
+                    ${noteHtml}
                     <div class="section-card players" style="border-left-color:#6366f1;">
                         <div class="section-header">
-                            <h4>Players</h4>
-                            <span class="total">${total}</span>
+                            <h4>Players with deposits</h4>
+                            <span class="total">${allPlayers.length}</span>
                         </div>
                         <div class="section-body">
                             ${playersHtml}
@@ -1627,8 +1695,15 @@
 
             } catch (err) {
                 container.innerHTML = `
-                    <div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p>
-                    <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button></div>
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
+                        <p style="font-size:12px;color:#94a3b8;">Could not load player data. Using fallback from deposits.</p>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            <button class="btn btn-primary btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">Retry</button>
+                        </div>
+                    </div>
                 `;
             }
         }
@@ -1708,7 +1783,7 @@
                     </div>
 
                     <div style="margin-bottom:12px;">
-                        <button class="btn btn-indigo btn-sm" style="background:#6366f1;color:#fff;" onclick="loadAdminPlayers(${adminId}, 1)">👥 View All Players (${stats.players})</button>
+                        <button class="btn btn-indigo btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">👥 View All Players (${stats.players})</button>
                     </div>
 
                     <div class="section-card deposits">
@@ -1740,14 +1815,14 @@
                         <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">Deactivate</button>
                         <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">Activate</button>
                         <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">Set Commission</button>
-                        <button class="btn btn-indigo" style="background:#6366f1;color:#fff;" onclick="loadAdminPlayers(${a.id}, 1)">👥 Players</button>
+                        <button class="btn btn-indigo" onclick="loadAdminPlayers(${a.id}, 1)">👥 Players</button>
                         <button class="btn btn-outline" onclick="closeModal()">Close</button>
                     </div>
                 `;
 
             } catch (err) {
                 body.innerHTML =
-                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1772,7 +1847,7 @@
 
                 if (data.requests.length === 0) {
                     container.innerHTML =
-                    `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
+                        `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
                     return;
                 }
 
@@ -1805,7 +1880,7 @@
                 `;
             } catch (err) {
                 container.innerHTML =
-                `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
