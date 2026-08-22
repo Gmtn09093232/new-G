@@ -1095,7 +1095,7 @@
     <!--  MODALS                                                       -->
     <!-- ============================================================ -->
 
-    <!-- ===== DEPOSIT ADMIN LIST ===== -->
+    <!-- ===== DEPOSIT ADMIN LIST (kept but no longer used for deposit) ===== -->
     <div id="depositAdminListModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <div class="deposit-step-header">
@@ -1116,7 +1116,7 @@
             <div class="deposit-step-header">
                 <button class="step-back" id="depositMethodListBackBtn">←</button>
                 <span class="step-title" id="methodListAdminName">👤 Admin</span>
-                <span class="step-sub" style="font-size:0.65rem; background:#f1f5f9; padding:2px 12px; border-radius:30px;" id="depositMethodListStepLabel">Step 2/2</span>
+                <span class="step-sub" style="font-size:0.65rem; background:#f1f5f9; padding:2px 12px; border-radius:30px; display:none;" id="depositMethodListStepLabel">Step 2/2</span>
             </div>
             <div id="methodListContainer" style="max-height:380px; overflow-y:auto; padding:4px 0;">
                 <div class="empty-state"><div class="empty-icon">💳</div><div>No payment methods available</div></div>
@@ -1132,7 +1132,7 @@
                 <span class="bank-icon">💸</span>
                 <div>
                     <div class="bank-title" data-key="deposit">Deposit</div>
-                    <div class="bank-sub" data-key="sendPayment">Send payment to the selected admin</div>
+                    <div class="bank-sub" data-key="sendPayment">Send payment to the selected method</div>
                 </div>
             </div>
             <div class="input-group"><label data-key="yourPhone">🔒 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required autocomplete="off"></div>
@@ -1202,7 +1202,7 @@
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
                 <p data-key="rulesPrize">• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።<br>• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።<br>• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።</p>
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesDepositTitle">💰 ገንዘብ ማስገባት</h3>
-                <p data-key="rulesDeposit">1. <strong>➕ Deposit</strong> ይጫኑ።<br>2. አድሚን ይምረጡ።<br>3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።<br>4. ገንዘብ ይላኩ።<br>5. <strong>Deposit ይጠይቁ</strong>።<br>6. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
+                <p data-key="rulesDeposit">1. <strong>➕ Deposit</strong> ይጫኑ።<br>2. <strong>Select Deposit Method</strong> ከሚታዩት ዘዴዎች ይምረጡ።<br>3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።<br>4. ገንዘብ ይላኩ።<br>5. <strong>Deposit ይጠይቁ</strong>።<br>6. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
                 <p data-key="rulesWithdraw">1. <strong>➖ Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
                 <h3 style="font-size:1rem; margin-top:16px;" data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
@@ -1342,6 +1342,7 @@
     <script>
         // ============================================================
         //  DOT BINGO – Full Frontend with Invite Tracking (admin names hidden)
+        //  CHANGED: Deposit now shows "Select Deposit Method" directly, no admin step.
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1430,6 +1431,10 @@
         let withdrawMethodMap = {};
         let userInviteData = { invite_code: null, admin_id: null, admin_name: null };
         let isAuthenticated = false;
+        let depositAdmins = [];
+
+        // Flag: are we showing the method list for deposit (vs withdrawal)?
+        window._isDepositMethodSelection = false;
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
@@ -1447,7 +1452,7 @@
                 amountLabel: "💰 መጠን (ETB)",
                 depositHint: "⚠️ ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
                 sendPayment: "ክፍያ ወደ ታችኛው ቁጥር ይላኩ",
-                selectAdmin: "👤 አስተዳዳሪ ይምረጡ",
+                selectAdmin: "💰 የመክፈያ ዘዴ ይምረጡ",
                 confirmPayment: "Confirm Payment →",
                 copy: "Copy",
                 howToPay: "📞 How to pay?",
@@ -1494,7 +1499,7 @@
                 rulesPrizeTitle: "🏆 የሽልማት ህግ",
                 rulesPrize: "• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።\n• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።\n• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።",
                 rulesDepositTitle: "💰 ገንዘብ ማስገባት",
-                rulesDeposit: "1. **➕ Deposit** ይጫኑ።\n2. አድሚን ይምረጡ።\n3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።\n4. ገንዘብ ይላኩ።\n5. **Deposit ይጠይቁ**።\n6. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።\n\n**ዝቅተኛ መጠን፦ 10 ብር**",
+                rulesDeposit: "1. **➕ Deposit** ይጫኑ።\n2. **Select Deposit Method** ከሚታዩት ዘዴዎች ይምረጡ።\n3. Telebirr፣ CBE Birr ወይም M-Pesa ይምረጡ።\n4. ገንዘብ ይላኩ።\n5. **Deposit ይጠይቁ**።\n6. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።\n\n**ዝቅተኛ መጠን፦ 10 ብር**",
                 rulesWithdrawTitle: "💸 ገንዘብ ማውጣት",
                 rulesWithdraw: "1. **➖ Withdraw** ይጫኑ።\n2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።\n3. ሙሉ ስምዎን ያስገቡ።\n4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።\n5. የሚያወጡትን መጠን ያስገቡ።\n6. **Withdrawal ይጠይቁ**።\n7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።\n\n**ዝቅተኛ መጠን፦ 20 ብር**",
                 rulesGameRulesTitle: "⚖️ የጨዋታ ህጎች",
@@ -1528,8 +1533,8 @@
                 yourPhone: "📞 Your Phone Number (for verification)",
                 amountLabel: "💰 Amount (ETB)",
                 depositHint: "⚠️ After sending payment, admin will verify your deposit using your phone number.",
-                sendPayment: "Send payment to the selected admin",
-                selectAdmin: "👤 Select Admin",
+                sendPayment: "Send payment to the selected method",
+                selectAdmin: "💰 Select Deposit Method",
                 confirmPayment: "Confirm Payment →",
                 copy: "Copy",
                 howToPay: "📞 How to pay?",
@@ -1576,7 +1581,7 @@
                 rulesPrizeTitle: "🏆 Prize Rules",
                 rulesPrize: "• If 2 or more players, 80% of the total entry fees goes to the winner(s).\n• If only 1 player, you get 100% of your entry fee back if you call BINGO.\n• If multiple winners, the prize is shared equally.",
                 rulesDepositTitle: "💰 Deposit",
-                rulesDeposit: "1. Tap **➕ Deposit**.\n2. Select an admin.\n3. Choose Telebirr, CBE Birr, or M-Pesa.\n4. Send payment.\n5. Tap **Request Deposit**.\n6. Your balance updates after admin approval.\n\n**Minimum amount:** 10 Birr",
+                rulesDeposit: "1. Tap **➕ Deposit**.\n2. **Select Deposit Method** from the list.\n3. Choose Telebirr, CBE Birr, or M-Pesa.\n4. Send payment.\n5. Tap **Request Deposit**.\n6. Your balance updates after admin approval.\n\n**Minimum amount:** 10 Birr",
                 rulesWithdrawTitle: "💸 Withdraw",
                 rulesWithdraw: "1. Tap **➖ Withdraw**.\n2. Select a withdrawal method (from the methods the admin accepts).\n3. Enter your full name.\n4. Enter your phone/account number.\n5. Enter the amount to withdraw.\n6. Tap **Request Withdrawal**.\n7. Funds are sent after admin approval.\n\n**Minimum amount:** 20 Birr",
                 rulesGameRulesTitle: "⚖️ Game Rules",
@@ -1609,8 +1614,13 @@
                 el.innerText = (lang === 'am' ? data.am[k] : data.en[k]) || el.innerText;
             });
             langBtn.textContent = lang === 'am' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
-            if ($('depositAdminListTitle')) { $('depositAdminListTitle').innerHTML = lang === 'am' ? '👤 አስተዳዳሪ ይምረጡ' :
-                    '👤 Select Admin'; }
+            if ($('depositAdminListTitle')) {
+                $('depositAdminListTitle').innerHTML = lang === 'am' ? '💰 የመክፈያ ዘዴ ይምረጡ' : '💰 Select Deposit Method';
+            }
+            // Also update method list title if visible
+            if ($('methodListAdminName') && window._isDepositMethodSelection) {
+                $('methodListAdminName').innerHTML = lang === 'am' ? '💰 የመክፈያ ዘዴ ይምረጡ' : '💰 Select Deposit Method';
+            }
             updateInviteInfoUI();
         }
 
@@ -1649,12 +1659,10 @@
         function updateInviteInfoUI() {
             const container = $('inviteInfoContainer');
             if (!container) return;
-            // show only invite code, admin name is hidden
             if (userInviteData.invite_code) {
                 container.classList.remove('hidden');
                 const codeEl = $('userInviteCode');
                 if (codeEl) codeEl.textContent = userInviteData.invite_code;
-                // profile invite code
                 const profileCode = $('profileInviteCode');
                 if (profileCode) profileCode.textContent = userInviteData.invite_code;
             } else {
@@ -1662,7 +1670,6 @@
                 const profileCode = $('profileInviteCode');
                 if (profileCode) profileCode.textContent = '—';
             }
-            // admin name is never shown to the player
         }
 
         // ============================================================
@@ -1728,9 +1735,79 @@
             }
         }
 
-        // ---------- DEPOSIT ACCOUNTS ----------
-        let depositAdmins = [];
+        // ============================================================
+        //  DEPOSIT — NEW: show methods directly, no admin step
+        // ============================================================
+        async function openDepositType() {
+            resetDepositState();
+            try {
+                const r = await fetch('/api/deposit-accounts');
+                const d = await r.json();
+                if (!d.success || !d.admins || !d.admins.length) {
+                    alert(lang === 'am' ? 'ምንም የክፍያ ዘዴዎች የሉም' : 'No payment methods available');
+                    return;
+                }
+                depositAdmins = d.admins;
+                const methods = [];
+                depositAdmins.forEach(admin => {
+                    if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin
+                            .telebirr, icon: '📱', adminId: admin.id });
+                    if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin
+                            .cbebirr, icon: '🏦', adminId: admin.id });
+                    if (admin.mpesa) methods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa,
+                            icon: '📲', adminId: admin.id });
+                });
+                if (!methods.length) {
+                    alert(lang === 'am' ? 'ምንም የክፍያ ዘዴዎች የሉም' : 'No payment methods available');
+                    return;
+                }
+                showAllDepositMethods(methods);
+            } catch (e) {
+                alert(lang === 'am' ? 'የክፍያ ዘዴዎችን በማምጣት ላይ ስህተት' : 'Error loading payment methods');
+                console.error(e);
+            }
+        }
 
+        function showAllDepositMethods(methods) {
+            const c = $('methodListContainer'),
+                t = $('methodListAdminName');
+            if (!c || !t) return;
+            // Set title to "Select Deposit Method"
+            t.innerHTML = lang === 'am' ? '💰 የመክፈያ ዘዴ ይምረጡ' : '💰 Select Deposit Method';
+            // Hide step label
+            const stepLabel = $('depositMethodListStepLabel');
+            if (stepLabel) stepLabel.style.display = 'none';
+            // Show back button
+            const backBtn = $('depositMethodListBackBtn');
+            if (backBtn) backBtn.style.display = '';
+            // Set flag
+            window._isDepositMethodSelection = true;
+            // Render methods
+            c.innerHTML = methods.map(m => {
+                const disp = getSafeNumber(m.number);
+                return `<div class="method-list-item" data-method="${m.type}" data-number="${m.number}" data-admin="${m.adminId}"><div class="method-icon">${m.icon}</div><div class="method-info"><div class="method-name">${m.label}</div><div class="method-number">${disp}</div></div><div class="method-select-badge">Select</div></div>`;
+            }).join('');
+            c.querySelectorAll('.method-list-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const method = el.dataset.method;
+                    const adminId = parseInt(el.dataset.admin);
+                    const number = el.dataset.number;
+                    const admin = depositAdmins.find(a => a.id === adminId);
+                    if (!admin) { alert('Admin not found'); return; }
+                    selectedDepositType = method;
+                    selectedMethodNumber = number;
+                    selectedAdminId = adminId;
+                    selectedAdminObj = admin;
+                    $('depositMethodListModal').classList.remove('active');
+                    window._isDepositMethodSelection = false;
+                    openDepositDetails(admin, method, number);
+                });
+            });
+            $('depositMethodListModal').classList.add('active');
+            unlockSpeech();
+        }
+
+        // ---------- LEGACY ADMIN LIST (kept but not used for deposit) ----------
         async function loadAdmins() {
             try {
                 const r = await fetch('/api/deposit-accounts');
@@ -1747,7 +1824,6 @@
             const valid = admins.filter(a => a.telebirr || a.cbebirr || a.mpesa);
             if (!valid.length) { c.innerHTML =
                     `<div class="empty-state"><div class="empty-icon">📂</div><div>No admins available</div></div>`; return; }
-            // show generic "Admin" labels, no real names
             c.innerHTML = valid.map((a, i) =>
                     `<div class="admin-list-item" data-id="${a.id}"><div class="admin-number">${i+1}</div><div class="admin-name">Admin</div><div class="admin-arrow">›</div></div>`
                     ).join('');
@@ -1766,9 +1842,12 @@
             const c = $('methodListContainer'),
                 t = $('methodListAdminName');
             if (!c || !t) return;
-            // show generic "Admin" without real name
             t.textContent = '👤 Admin';
-            $('depositMethodListStepLabel').textContent = 'Step 2/2';
+            const stepLabel = $('depositMethodListStepLabel');
+            if (stepLabel) stepLabel.style.display = '';
+            const backBtn = $('depositMethodListBackBtn');
+            if (backBtn) backBtn.style.display = '';
+            window._isDepositMethodSelection = false;
             const methods = [];
             if (admin.telebirr) methods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr, icon: '📱' });
             if (admin.cbebirr) methods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr, icon: '🏦' });
@@ -1784,7 +1863,7 @@
                     selectedDepositType = el.dataset.method;
                     selectedMethodNumber = el.dataset.number;
                     $('depositMethodListModal').classList.remove('active');
-                    openDepositDetails(selectedAdminObj, selectedDepositType, selectedMethodNumber);
+                    openDepositDetails(admin, selectedDepositType, selectedMethodNumber);
                 });
             });
             $('depositMethodListModal').classList.add('active');
@@ -1797,7 +1876,9 @@
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
         }
 
-        // ========== WITHDRAW ==========
+        // ============================================================
+        //  WITHDRAW (unchanged)
+        // ============================================================
         async function openWithdrawFlow() {
             resetDepositState();
             try {
@@ -1814,8 +1895,7 @@
                 if (Object.keys(methodMap).length === 0) { alert('No withdrawal methods available.'); return; }
                 withdrawMethodMap = methodMap;
                 showWithdrawMethods(methodMap);
-            } catch (e) { alert('Error loading withdrawal methods.');
-                console.error(e); }
+            } catch (e) { alert('Error loading withdrawal methods.'); }
         }
 
         function showWithdrawMethods(methodMap) {
@@ -1823,9 +1903,11 @@
                 t = $('methodListAdminName');
             if (!c || !t) return;
             t.innerHTML = lang === 'am' ? '💸 የማውጫ ዘዴ ይምረጡ' : '💸 Select Withdrawal Method';
-            $('depositMethodListStepLabel').textContent = '';
+            const stepLabel = $('depositMethodListStepLabel');
+            if (stepLabel) stepLabel.style.display = 'none';
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = 'none';
+            window._isDepositMethodSelection = false;
             const methodList = [];
             const icons = { telebirr: '📱', cbebirr: '🏦', mpesa: '📲' };
             const labels = { telebirr: 'Telebirr', cbebirr: 'CBE Birr', mpesa: 'M-Pesa' };
@@ -1862,7 +1944,9 @@
             unlockSpeech();
         }
 
-        // ========== RESET STATE ==========
+        // ============================================================
+        //  RESET STATE
+        // ============================================================
         function resetDepositState() {
             selectedAdminId = null;
             selectedAdminObj = null;
@@ -1873,6 +1957,7 @@
             savedPhone = '';
             savedAmount = '';
             submitting = false;
+            window._isDepositMethodSelection = false;
             const phoneInput = $('depositPlayerPhone');
             const amountInput = $('depositAmountSimple');
             const invoiceInput = $('paymentInvoiceNumber');
@@ -1890,31 +1975,27 @@
             }
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = '';
-            if ($('depositAdminListTitle')) { $('depositAdminListTitle').innerHTML = lang === 'am' ?
-                    '👤 አስተዳዳሪ ይምረጡ' : '👤 Select Admin'; }
-            if ($('depositAdminListStepLabel')) $('depositAdminListStepLabel').textContent = 'Step 1/2';
+            if ($('depositAdminListTitle')) {
+                $('depositAdminListTitle').innerHTML = lang === 'am' ? '💰 የመክፈያ ዘዴ ይምረጡ' : '💰 Select Deposit Method';
+            }
+            if ($('depositAdminListStepLabel')) $('depositAdminListStepLabel').textContent = '';
+            const stepLabel = $('depositMethodListStepLabel');
+            if (stepLabel) stepLabel.style.display = 'none';
         }
 
-        // ========== DEPOSIT FLOW ==========
-        function openDepositType() {
-            resetDepositState();
-            if ($('depositAdminListTitle')) { $('depositAdminListTitle').innerHTML = lang === 'am' ?
-                    '👤 አስተዳዳሪ ይምረጡ' : '👤 Select Admin'; }
-            if ($('depositAdminListStepLabel')) $('depositAdminListStepLabel').textContent = 'Step 1/2';
-            $('depositAdminListModal').classList.add('active');
-            loadAdmins();
-            unlockSpeech();
-        }
-
-        function closeAdminList() { resetDepositState(); }
-
-        function closeMethodList() { $('depositMethodListModal').classList.remove('active');
-            $('depositAdminListModal').classList.add('active'); }
-
+        // ============================================================
+        //  DEPOSIT DETAILS / PAYMENT
+        // ============================================================
         function closeDepositDetails() {
             $('depositDetailsModal').classList.remove('active');
-            if (selectedAdminObj) { showMethods(selectedAdminObj); } else { $('depositAdminListModal').classList.add(
-                    'active'); }
+            // Go back to method list (deposit mode)
+            if (window._isDepositMethodSelection) {
+                openDepositType();
+            } else if (selectedAdminObj) {
+                showMethods(selectedAdminObj);
+            } else {
+                openDepositType();
+            }
         }
 
         function openDepositDetails(admin, method, number) {
@@ -1956,7 +2037,9 @@
             if (savedAmount) $('depositAmountSimple').value = savedAmount;
         }
 
-        // ========== WITHDRAW DETAILS ==========
+        // ============================================================
+        //  WITHDRAW DETAILS (unchanged)
+        // ============================================================
         function openWithdrawDetails(admin, method, number) {
             if (!admin || !method || !number) { alert('Please select a valid withdrawal method.'); return; }
             selectedAdminObj = admin;
@@ -2006,7 +2089,9 @@
                 unlockSpeech(); }
         }
 
-        // ========== HOW TO PAY ==========
+        // ============================================================
+        //  HOW TO PAY (unchanged)
+        // ============================================================
         function openHowToPay() {
             const method = selectedDepositType || 'telebirr';
             const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
@@ -2051,7 +2136,9 @@
             `;
         }
 
-        // ========== EVENT DELEGATION ==========
+        // ============================================================
+        //  EVENT DELEGATION
+        // ============================================================
         document.addEventListener('click', e => {
             const t = e.target.closest('#requestDepositBtn');
             if (t) {
@@ -2069,7 +2156,9 @@
             if (t) closePaymentConfirm();
         });
 
-        // ========== CONFIRM PAYMENT ==========
+        // ============================================================
+        //  CONFIRM PAYMENT (unchanged)
+        // ============================================================
         $('confirmPaymentBtn')?.addEventListener('click', async function() {
             if (submitting) return;
             const phone = $('depositPlayerPhone').value.trim();
@@ -2109,9 +2198,8 @@
         });
 
         // ============================================================
-        //  GAME FUNCTIONS
+        //  GAME FUNCTIONS (unchanged)
         // ============================================================
-
         function genCard() {
             const cols = [
                 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
@@ -2255,8 +2343,7 @@
             let left = sec;
             lobbyTimer.textContent = left + 's';
             clearInterval(lobbyTimerInterval);
-            lobbyTimerInterval = setInterval(() => { left--;
-                timerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval);
+            lobbyTimerInterval = setInterval(() => { left--; if (left <= 0) { clearInterval(lobbyTimerInterval);
                     showGame(); } else lobbyTimer.textContent = left + 's'; }, 1000);
         }
 
@@ -2291,7 +2378,6 @@
             if (data.noWinner) { if (currentGameId) addRecord(false, 0, currentGameId, currentStake, [], null, 0);
                 alert('No winner this round.'); return; }
             const winners = data.winners || [data.winner].filter(Boolean);
-            const winNum = data.winningNumber;
             const total = data.totalPrize || 0;
             const each = data.prizeEach || 0;
             const title = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
@@ -2309,7 +2395,7 @@
                 conf.appendChild(p); }
             document.body.appendChild(conf);
             setTimeout(() => conf.remove(), 4000);
-            if (currentGameId) addRecord(true, each, currentGameId, currentStake, winners, winNum, total);
+            if (currentGameId) addRecord(true, each, currentGameId, currentStake, winners, null, total);
             unlockSpeech();
         }
 
@@ -2365,11 +2451,11 @@
 
         function syncBalance(v) { balance = v;
             lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($(
-                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $(
-                'gameBalanceDisplay').innerText = v; }
+                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $((
+                'gameBalanceDisplay')).innerText = v; }
 
         // ============================================================
-        //  CONNECT TO GAME
+        //  CONNECT TO GAME (unchanged)
         // ============================================================
         async function connectToGame(stake) {
             if (!isAuthenticated) {
@@ -2464,7 +2550,9 @@
                 `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.'));
         }
 
-        // ========== SPEECH ==========
+        // ============================================================
+        //  SPEECH (unchanged)
+        // ============================================================
         function unlockSpeech() { if (speechUnlocked) return;
             speechUnlocked = true; const d = new SpeechSynthesisUtterance(' ');
             d.volume = 0;
@@ -2512,7 +2600,9 @@
             }
         }
 
-        // ========== RESTORE SESSION ==========
+        // ============================================================
+        //  RESTORE SESSION (unchanged)
+        // ============================================================
         function restoreSession() {
             const saved = localStorage.getItem('dot_bingo_stake');
             if (saved) {
@@ -2524,22 +2614,6 @@
                     }, 500);
                 }
             }
-        }
-
-        // ========== INIT ==========
-        async function init() {
-            if (!checkInviteRequired()) {
-                return;
-            }
-            buildGrid();
-            loadStats();
-            updateMute();
-            window.speechSynthesis.getVoices();
-            $('stakePage').classList.remove('hidden');
-            await authenticateUser();
-            await fetchUserInviteInfo();
-            restoreSession();
-            console.log('✨ DOT BINGO ready (admin names hidden)');
         }
 
         // ============================================================
@@ -2606,27 +2680,47 @@
         $('withdrawBtn')?.addEventListener('click', openWithdrawFlow);
         $('withdrawBtnGame')?.addEventListener('click', openWithdrawFlow);
 
-        $('closeAdminListBtn')?.addEventListener('click', closeAdminList);
-        $('depositAdminListBackBtn')?.addEventListener('click', closeAdminList);
-        $('closeMethodListBtn')?.addEventListener('click', () => {
-            if (Object.keys(withdrawMethodMap).length > 0 && !$('depositAdminListModal').classList.contains(
-                    'active')) {
-                $('depositMethodListModal').classList.remove('active');
-                resetDepositState();
-            } else {
-                closeMethodList();
-            }
-        });
+        // Close admin list (legacy, kept)
+        $('closeAdminListBtn')?.addEventListener('click', () => { $('depositAdminListModal').classList.remove('active');
+            resetDepositState(); });
+        $('depositAdminListBackBtn')?.addEventListener('click', () => { $('depositAdminListModal').classList.remove(
+            'active');
+            resetDepositState(); });
+
+        // Method list back button – now checks deposit mode
         $('depositMethodListBackBtn')?.addEventListener('click', () => {
-            if (Object.keys(withdrawMethodMap).length > 0 && !$('depositAdminListModal').classList.contains(
-                    'active')) {
+            if (window._isDepositMethodSelection) {
+                // In deposit mode: close the modal
                 $('depositMethodListModal').classList.remove('active');
                 resetDepositState();
+                window._isDepositMethodSelection = false;
             } else {
+                // In withdrawal mode: go back to admin list (legacy)
                 $('depositMethodListModal').classList.remove('active');
                 $('depositAdminListModal').classList.add('active');
             }
         });
+
+        // Method list close button – checks deposit mode
+        $('closeMethodListBtn')?.addEventListener('click', () => {
+            if (window._isDepositMethodSelection) {
+                // In deposit mode: close the modal
+                $('depositMethodListModal').classList.remove('active');
+                resetDepositState();
+                window._isDepositMethodSelection = false;
+            } else {
+                // In withdrawal mode: existing logic
+                if (Object.keys(withdrawMethodMap).length > 0 && !$('depositAdminListModal').classList.contains(
+                        'active')) {
+                    $('depositMethodListModal').classList.remove('active');
+                    resetDepositState();
+                } else {
+                    $('depositMethodListModal').classList.remove('active');
+                    $('depositAdminListModal').classList.add('active');
+                }
+            }
+        });
+
         $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
 
         $('paymentCopyBtn')?.addEventListener('click', function() {
@@ -2661,8 +2755,23 @@
         });
 
         // ============================================================
-        //  START
+        //  INIT
         // ============================================================
+        async function init() {
+            if (!checkInviteRequired()) {
+                return;
+            }
+            buildGrid();
+            loadStats();
+            updateMute();
+            window.speechSynthesis.getVoices();
+            $('stakePage').classList.remove('hidden');
+            await authenticateUser();
+            await fetchUserInviteInfo();
+            restoreSession();
+            console.log('✨ DOT BINGO ready (deposit: methods only, admin hidden)');
+        }
+
         init();
     </script>
 </body>
