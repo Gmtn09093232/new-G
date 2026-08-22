@@ -1352,6 +1352,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const SECRET = urlParams.get('secret') || '';
 
+        // If no secret is provided, show a friendly error
         if (!SECRET) {
             document.body.innerHTML = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;background:#f4f6fb;font-family:system-ui;">
@@ -1614,7 +1615,7 @@
             }
         }
 
-        // ─── PLAYER LIST (per admin) – NOW USING /super-admin/players ───
+        // ─── PLAYER LIST (per admin) – ALL REGISTERED PLAYERS ───
         const ADMIN_PLAYERS_PER_PAGE = 20;
         let currentPlayersAdminId = null;
         let currentPlayersPage = 1;
@@ -1625,6 +1626,15 @@
             currentPlayersAdminId = adminId;
             currentPlayersPage = page;
             const container = document.getElementById('modalBody');
+            
+            // Show loading state
+            container.innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <span>Loading players…</span>
+                </div>
+            `;
+
             try {
                 const params = {
                     limit: ADMIN_PLAYERS_PER_PAGE,
@@ -1632,10 +1642,23 @@
                     adminId: adminId
                 };
                 const url = apiUrl('/super-admin/players', params);
+                
+                console.log('🔍 Fetching players for admin', adminId, 'URL:', url);
+                
                 const res = await fetch(url);
-                if (!res.ok) throw new Error('Failed to load players');
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error('❌ HTTP error:', res.status, errorText);
+                    throw new Error(`HTTP ${res.status}: ${errorText || 'Unknown error'}`);
+                }
+                
                 const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Failed to fetch players');
+                
+                if (!data.success) {
+                    console.error('❌ API error:', data.error);
+                    throw new Error(data.error || 'Failed to fetch players');
+                }
 
                 currentPlayersTotal = data.total || 0;
                 currentPlayersTotalPages = data.totalPages || 1;
@@ -1649,6 +1672,7 @@
                         <div class="empty-state">
                             <div class="icon">👤</div>
                             <p>No registered players found for this admin.</p>
+                            <p style="font-size:12px;color:#94a3b8;">Players are linked to admins via the <code>admin_id</code> field in the users table.</p>
                             <div style="margin-top:12px;">
                                 <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                             </div>
@@ -1662,8 +1686,8 @@
                         <td><strong>${escapeHtml(p.username || 'Unknown')}</strong></td>
                         <td>${escapeHtml(p.telegram_id || '')}</td>
                         <td>${escapeHtml(p.telegram_handle || 'N/A')}</td>
-                        <td>${p.balance.toFixed(0)} ETB</td>
-                        <td>${p.invite_code || 'N/A'}</td>
+                        <td>${(p.balance || 0).toFixed(0)} ETB</td>
+                        <td>${escapeHtml(p.invite_code || 'N/A')}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                     </tr>
                 `).join('');
@@ -1718,11 +1742,13 @@
                 `;
 
             } catch (err) {
+                console.error('❌ Error loading players:', err);
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">❌</div>
-                        <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
-                        <div style="margin-top:12px;">
+                        <p style="color:#ef4444;font-weight:600;">${escapeHtml(err.message)}</p>
+                        <p style="font-size:12px;color:#94a3b8;">Check the browser console (F12) for more details.</p>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
                             <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                             <button class="btn btn-primary btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">Retry</button>
                         </div>
