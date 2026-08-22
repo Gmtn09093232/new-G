@@ -3489,9 +3489,8 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ============================================================
-//  GET ALL REGISTERED PLAYERS (with admin info)
+//  GET ALL REGISTERED PLAYERS (with admin info) – DEBUG VERSION
 // ============================================================
 app.get('/super-admin/players', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -3499,36 +3498,53 @@ app.get('/super-admin/players', async (req, res) => {
 
   try {
     const { adminId, search, limit = 100, page = 1 } = req.query;
+    console.log(`📥 /super-admin/players called with: adminId=${adminId}, search=${search}, page=${page}`);
 
-    // Build the base query
+    // ─── STEP 1: SIMPLE COUNT – just to verify the table has rows ───
+    const { count: totalCount, error: countErr } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    if (countErr) {
+      console.error('❌ Count error:', countErr);
+      return res.status(500).json({ success: false, error: countErr.message });
+    }
+    console.log(`📊 Total users in table: ${totalCount}`);
+
+    // ─── STEP 2: BUILD QUERY WITHOUT ANY FILTERS FIRST ───
     let query = supabase.from('users').select('*', { count: 'exact' });
 
-    // Filter by admin
+    // Apply filters only if provided
     if (adminId && adminId !== 'all') {
       query = query.eq('admin_id', adminId);
+      console.log(`🔍 Filtering by admin_id = ${adminId}`);
     }
-
-    // Search
     if (search) {
       query = query.or(`username.ilike.%${search}%,telegram_handle.ilike.%${search}%,telegram_id.ilike.%${search}%`);
+      console.log(`🔍 Searching for "${search}"`);
     }
 
     const limitNum = Math.min(parseInt(limit) || 100, 1000);
     const pageNum = Math.max(parseInt(page) || 1, 1);
     const offset = (pageNum - 1) * limitNum;
 
-    // ✅ SAFE ORDER – use a column that definitely exists
-    // Use 'telegram_id' (always present) or 'username'
+    // ─── STEP 3: EXECUTE WITH PAGINATION (NO ORDERING) ───
+    // Ordering can cause issues if the column doesn't exist or is not indexed.
+    // We'll try without ordering first, then add it optionally.
     const { data, error, count } = await query
-      .order('telegram_id', { ascending: false })   // <-- this column exists
       .range(offset, offset + limitNum - 1);
 
     if (error) {
       console.error('❌ Supabase query error:', error);
-      // Fallback: try without ordering
-      const { data: fallbackData, error: fallbackErr, count: fallbackCount } = await query
+      // If error, try a plain select without any filters
+      const { data: fallbackData, error: fallbackErr, count: fallbackCount } = await supabase
+        .from('users')
+        .select('*', { count: 'exact' })
         .range(offset, offset + limitNum - 1);
-      if (fallbackErr) throw fallbackErr;
+      if (fallbackErr) {
+        console.error('❌ Fallback error:', fallbackErr);
+        return res.status(500).json({ success: false, error: fallbackErr.message });
+      }
+      console.log(`✅ Fallback returned ${fallbackData?.length || 0} rows`);
       return res.json({
         success: true,
         players: fallbackData || [],
@@ -3539,7 +3555,9 @@ app.get('/super-admin/players', async (req, res) => {
       });
     }
 
-    // Fetch admin names
+    console.log(`✅ Query returned ${data?.length || 0} rows (total: ${count})`);
+
+    // ─── STEP 4: FETCH ADMIN NAMES ───
     const adminIds = [...new Set(data.map(u => u.admin_id).filter(id => id))];
     let adminsMap = {};
     if (adminIds.length) {
@@ -3566,11 +3584,11 @@ app.get('/super-admin/players', async (req, res) => {
       totalPages: Math.ceil(count / limitNum)
     });
   } catch (err) {
-    console.error('❌ Error fetching all players:', err.message);
+    console.error('❌ Error in /super-admin/players:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
- 
+
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
