@@ -3257,7 +3257,7 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   }
 });
 // ============================================================
-//  SUPER ADMIN Send Telegram Message to Player
+//  SUPER ADMIN – Send Telegram Message to Player
 // ============================================================
 app.post('/super-admin/send-telegram-message', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -3268,8 +3268,12 @@ app.post('/super-admin/send-telegram-message', async (req, res) => {
     return res.status(400).json({ error: 'Missing userId or message' });
   }
 
-  // Hardcoded bot token (as requested)
-  const BOT_TOKEN = '8646093965:AAGcb7fkvbgy2QnsJg1EQvDUc-Bc1f2NjwE';
+  // ✅ Use the same bot token from environment variables
+  const BOT_TOKEN = process.env.BOT_TOKEN;
+  if (!BOT_TOKEN) {
+    return res.status(500).json({ success: false, error: 'BOT_TOKEN not configured in environment' });
+  }
+
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
   try {
@@ -3279,7 +3283,7 @@ app.post('/super-admin/send-telegram-message', async (req, res) => {
       body: JSON.stringify({
         chat_id: userId,
         text: message,
-        parse_mode: 'HTML' // optional
+        parse_mode: 'HTML'
       })
     });
 
@@ -3287,7 +3291,11 @@ app.post('/super-admin/send-telegram-message', async (req, res) => {
     if (data.ok) {
       res.json({ success: true, result: data.result });
     } else {
-      throw new Error(data.description || 'Telegram API error');
+      let errorMsg = data.description || 'Telegram API error';
+      if (errorMsg.includes('chat not found')) {
+        errorMsg = 'User has not started the bot yet. Ask them to open the game first.';
+      }
+      throw new Error(errorMsg);
     }
   } catch (error) {
     console.error('Telegram send error:', error.message);
