@@ -1188,6 +1188,17 @@
         .search-bar .btn {
             flex-shrink: 0;
         }
+
+        /* clickable admin name */
+        .admin-link {
+            color: #7c3aed;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: underline dotted;
+        }
+        .admin-link:hover {
+            color: #4f46e5;
+        }
     </style>
 </head>
 <body>
@@ -1311,7 +1322,7 @@
 
             <!-- PLAYERS (global) -->
             <div class="tab-pane" id="tab-players">
-                <h2>All Players <span class="sub">— across all admins</span></h2>
+                <h2>All Registered Players <span class="sub">— full list</span></h2>
                 <div class="search-bar">
                     <input type="text" id="globalPlayerSearch" placeholder="Search by username or phone..." />
                     <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
@@ -2033,7 +2044,7 @@
             refreshAll();
         }
 
-        // ─── GLOBAL PLAYERS ───
+        // ─── GLOBAL PLAYERS (from dedicated endpoint) ───
         let allGlobalPlayers = [];
         let filteredGlobalPlayers = [];
         let globalPlayersPage = 1;
@@ -2042,7 +2053,57 @@
         async function loadGlobalPlayers() {
             const container = document.getElementById('globalPlayersList');
             try {
-                // First load all admins to get their deposits
+                // Use the dedicated endpoint for all players
+                const url = apiUrl('/super-admin/all-players');
+                const res = await fetch(url);
+                if (!res.ok) {
+                    // If endpoint doesn't exist, show a friendly error with instructions
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">🚧</div>
+                            <p style="font-weight:600;color:#0b1120;">Endpoint not available</p>
+                            <p style="max-width:400px;margin:4px auto;">The backend endpoint <code style="background:#e2e8f0;padding:2px 8px;border-radius:4px;">/super-admin/all-players</code> is required to fetch all registered players.</p>
+                            <p style="font-size:13px;color:#94a3b8;margin-top:6px;">Please implement it or use the deposit-based fallback below.</p>
+                            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                                <button class="btn btn-outline btn-sm" onclick="loadGlobalPlayersFallback()">Use deposit-based fallback</button>
+                                <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to load players');
+
+                // Expecting data.players array with { id, username, phone, status, balance, admin_id, admin_name, created_at, etc }
+                const players = data.players || [];
+                allGlobalPlayers = players;
+                filteredGlobalPlayers = [...allGlobalPlayers];
+                document.getElementById('globalPlayersBadge').textContent = allGlobalPlayers.length;
+
+                renderGlobalPlayers();
+
+            } catch (err) {
+                console.warn('Error loading all players:', err);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
+                        <p style="font-size:13px;color:#94a3b8;">Try using the deposit-based fallback.</p>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <button class="btn btn-outline btn-sm" onclick="loadGlobalPlayersFallback()">Use fallback</button>
+                            <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // ─── FALLBACK: build from deposits (keep for compatibility) ───
+        async function loadGlobalPlayersFallback() {
+            const container = document.getElementById('globalPlayersList');
+            showToast('Loading deposit-based player list...', 'info');
+            try {
                 const adminsUrl = apiUrl('/super-admin/admins');
                 const adminsRes = await fetch(adminsUrl);
                 if (!adminsRes.ok) throw new Error('Failed to load admins');
@@ -2050,7 +2111,6 @@
                 if (!adminsData.success) throw new Error(adminsData.error);
                 const admins = adminsData.admins;
 
-                // For each admin, fetch their detail to get deposits
                 const playerMap = new Map();
                 for (const admin of admins) {
                     try {
@@ -2071,15 +2131,16 @@
                                         depositCount: 0,
                                         adminName: admin.name,
                                         adminId: admin.id,
-                                        status: d.status || 'active'
+                                        status: d.status || 'active',
+                                        balance: d.balance || 0,
                                     });
                                 }
                                 const p = playerMap.get(key);
                                 p.totalDeposited += Number(d.amount) || 0;
                                 p.depositCount += 1;
                                 if (d.phone_number) p.phone = d.phone_number;
-                                // Keep latest status
                                 if (d.status) p.status = d.status;
+                                if (d.balance) p.balance = d.balance;
                             });
                         }
                     } catch (e) {
@@ -2088,20 +2149,18 @@
                 }
 
                 allGlobalPlayers = Array.from(playerMap.values());
-                // Sort by total deposited descending
                 allGlobalPlayers.sort((a, b) => b.totalDeposited - a.totalDeposited);
                 filteredGlobalPlayers = [...allGlobalPlayers];
                 document.getElementById('globalPlayersBadge').textContent = allGlobalPlayers.length;
-
-                renderGlobalPlayers();
-
+                renderGlobalPlayers(true);
+                showToast('Loaded deposit-based player list', 'info');
             } catch (err) {
                 container.innerHTML =
                     `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
-        function renderGlobalPlayers() {
+        function renderGlobalPlayers(isFallback = false) {
             const container = document.getElementById('globalPlayersList');
             const total = filteredGlobalPlayers.length;
             const totalPages = Math.max(1, Math.ceil(total / GLOBAL_PLAYERS_PER_PAGE));
@@ -2115,7 +2174,7 @@
                     <div class="empty-state">
                         <div class="icon">👤</div>
                         <p>No players found</p>
-                        <p style="font-size:12px;color:#94a3b8;">Make sure admins have deposits recorded.</p>
+                        <p style="font-size:12px;color:#94a3b8;">No registered players exist or the data source returned empty.</p>
                     </div>
                 `;
                 return;
@@ -2126,8 +2185,8 @@
                     <td><strong>${escapeHtml(p.username)}</strong></td>
                     <td>${escapeHtml(p.phone)}</td>
                     <td><span class="status-badge ${p.status === 'active' ? 'active' : p.status === 'banned' ? 'banned' : 'inactive'}">${p.status || 'active'}</span></td>
-                    <td><strong>${p.totalDeposited.toFixed(0)} ETB</strong></td>
-                    <td><span style="cursor:pointer;color:#7c3aed;font-weight:500;" onclick="openModal(${p.adminId})">${escapeHtml(p.adminName)}</span></td>
+                    <td><strong>${(p.balance || p.totalDeposited || 0).toFixed(0)} ETB</strong></td>
+                    <td>${p.adminId ? `<span class="admin-link" onclick="openModal(${p.adminId})">${escapeHtml(p.adminName)}</span>` : '—'}</td>
                 </tr>
             `).join('');
 
@@ -2150,6 +2209,17 @@
                 `;
             }
 
+            const noteHtml = isFallback ? `
+                <div class="player-note" style="margin-top:12px;">
+                    <strong>ℹ️</strong> This list is built from deposit records (fallback). Players without deposits are not shown.
+                    <button class="btn btn-outline btn-xs" style="margin-left:8px;" onclick="loadGlobalPlayers()">Try primary endpoint</button>
+                </div>
+            ` : `
+                <div class="player-note" style="margin-top:12px;">
+                    <strong>✅</strong> Full player list from <code>/super-admin/all-players</code>.
+                </div>
+            `;
+
             container.innerHTML = `
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
                     <div><strong>👥 ${total} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${start+1}–${end}</span></div>
@@ -2161,7 +2231,7 @@
                                 <th>Username</th>
                                 <th>Phone</th>
                                 <th>Status</th>
-                                <th>Total Deposited</th>
+                                <th>Balance</th>
                                 <th>Admin</th>
                             </tr>
                         </thead>
@@ -2169,9 +2239,7 @@
                     </table>
                 </div>
                 ${paginationHtml}
-                <div class="player-note" style="margin-top:12px;">
-                    <strong>ℹ️</strong> This list is built from deposit records. Players without deposits are not shown.
-                </div>
+                ${noteHtml}
             `;
         }
 
