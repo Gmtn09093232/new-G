@@ -3256,7 +3256,44 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ============================================================
+//  SUPER ADMIN – Send Telegram Message to Player
+// ============================================================
+app.post('/super-admin/send-telegram-message', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
+  const { userId, message } = req.body;
+  if (!userId || !message) {
+    return res.status(400).json({ error: 'Missing userId or message' });
+  }
+
+  // Hardcoded bot token (as requested)
+  const BOT_TOKEN = '8646093965:AAGcb7fkvbgy2QnsJg1EQvDUc-Bc1f2NjwE';
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: message,
+        parse_mode: 'HTML' // optional
+      })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      res.json({ success: true, result: data.result });
+    } else {
+      throw new Error(data.description || 'Telegram API error');
+    }
+  } catch (error) {
+    console.error('Telegram send error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
