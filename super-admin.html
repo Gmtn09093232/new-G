@@ -1685,8 +1685,12 @@
                     return;
                 }
 
+                // ─── BUILD PLAYERS TABLE WITH CHECKBOXES ───
                 const playersHtml = data.players.map(p => `
                     <tr>
+                        <td>
+                            <input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" />
+                        </td>
                         <td><strong>${escapeHtml(p.username || 'Unknown')}</strong></td>
                         <td>${escapeHtml(p.telegram_id || '')}</td>
                         <td>${escapeHtml(p.telegram_handle || 'N/A')}</td>
@@ -1699,7 +1703,7 @@
                     </tr>
                 `).join('');
 
-                // Pagination
+                // ─── PAGINATION ───
                 let paginationHtml = '';
                 if (currentPlayersTotalPages > 1) {
                     const pagesToShow = Math.min(currentPlayersTotalPages, 5);
@@ -1719,10 +1723,20 @@
                     `;
                 }
 
+                // ─── RENDER MODAL CONTENT ───
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                        <div><strong>👥 ${currentPlayersTotal} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(page-1)*ADMIN_PLAYERS_PER_PAGE + 1}–${Math.min(page*ADMIN_PLAYERS_PER_PAGE, currentPlayersTotal)}</span></div>
-                        <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                        <div>
+                            <strong>👥 ${currentPlayersTotal} players</strong>
+                            <span style="color:#94a3b8;font-size:13px;">— showing ${(page-1)*ADMIN_PLAYERS_PER_PAGE + 1}–${Math.min(page*ADMIN_PLAYERS_PER_PAGE, currentPlayersTotal)}</span>
+                            <label style="margin-left:16px;font-size:13px;font-weight:500;">
+                                <input type="checkbox" id="selectAllModalPlayers" onchange="toggleAllModalPlayers()" /> Select All
+                            </label>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn btn-success btn-sm" onclick="sendBulkMessage()">📨 Send to Selected</button>
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                        </div>
                     </div>
                     <div class="section-card players" style="border-left-color:#6366f1;">
                         <div class="section-header">
@@ -1733,6 +1747,7 @@
                             <table>
                                 <thead>
                                     <tr>
+                                        <th style="width:40px;">Select</th>
                                         <th>Username</th>
                                         <th>Telegram ID</th>
                                         <th>Handle</th>
@@ -1763,6 +1778,12 @@
                     </div>
                 `;
             }
+        }
+
+        // ─── SELECT ALL TOGGLE FOR MODAL ───
+        function toggleAllModalPlayers() {
+            const checked = document.getElementById('selectAllModalPlayers').checked;
+            document.querySelectorAll('#modalBody .player-select').forEach(cb => cb.checked = checked);
         }
 
         function openModalPlayers(adminId, adminName) {
@@ -2081,7 +2102,7 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                console.log('📦 Players API response:', data); // 👈 LOG FOR DEBUGGING
+                console.log('📦 Players API response:', data);
 
                 globalPlayersTotal = data.total || 0;
                 globalPlayersTotalPages = data.totalPages || 1;
@@ -2102,6 +2123,7 @@
 
                 const playersHtml = data.players.map(p => `
                     <tr>
+                        <td><input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" /></td>
                         <td><strong>${escapeHtml(p.username || 'Unknown')}</strong></td>
                         <td>${escapeHtml(p.telegram_id || '')}</td>
                         <td>${escapeHtml(p.telegram_handle || 'N/A')}</td>
@@ -2110,7 +2132,6 @@
                         <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                         <td>
-                            <input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" />
                             <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
                         </td>
                     </tr>
@@ -2139,11 +2160,17 @@
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
                         <div><strong>👥 ${globalPlayersTotal} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</span></div>
+                        <div>
+                            <label style="font-size:13px;font-weight:500;margin-right:12px;">
+                                <input type="checkbox" id="selectAllGlobalPlayers" onchange="toggleAllGlobalPlayers()" /> Select All
+                            </label>
+                        </div>
                     </div>
                     <div class="table-wrapper">
                         <table>
                             <thead>
                                 <tr>
+                                    <th style="width:40px;">Select</th>
                                     <th>Username</th>
                                     <th>Telegram ID</th>
                                     <th>Handle</th>
@@ -2169,6 +2196,11 @@
                     </div>
                 `;
             }
+        }
+
+        function toggleAllGlobalPlayers() {
+            const checked = document.getElementById('selectAllGlobalPlayers').checked;
+            document.querySelectorAll('#globalPlayersList .player-select').forEach(cb => cb.checked = checked);
         }
 
         function goToGlobalPage(page) {
