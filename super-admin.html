@@ -1162,6 +1162,32 @@
         .player-note strong {
             color: #475569;
         }
+
+        /* search bar */
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1 1 200px;
+            padding: 10px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            min-height: 44px;
+            background: #fafcff;
+            outline: none;
+            transition: 0.2s;
+        }
+        .search-bar input:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
+        }
+        .search-bar .btn {
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
@@ -1251,6 +1277,9 @@
             <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
                 Platform
             </button>
+            <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
+                Players <span class="badge" id="globalPlayersBadge">0</span>
+            </button>
         </div>
 
         <!-- ─── TAB CONTENT ─── -->
@@ -1278,6 +1307,17 @@
             <div class="tab-pane" id="tab-platform">
                 <h2>Platform Overview <span class="sub">— key metrics</span></h2>
                 <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+            </div>
+
+            <!-- PLAYERS (global) -->
+            <div class="tab-pane" id="tab-players">
+                <h2>All Players <span class="sub">— across all admins</span></h2>
+                <div class="search-bar">
+                    <input type="text" id="globalPlayerSearch" placeholder="Search by username or phone..." />
+                    <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
+                    <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()">Reset</button>
+                </div>
+                <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
 
         </div>
@@ -1380,6 +1420,7 @@
             if (tab === 'admins') loadAdmins();
             else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
             else if (tab === 'platform') loadPlatformStats();
+            else if (tab === 'players') loadGlobalPlayers();
 
             const container = document.getElementById('tabContainer');
             const activeBtn = container.querySelector('.tab-btn.active');
@@ -1560,19 +1601,17 @@
             });
         }
 
-        // ─── PLAYER LIST HELPERS ───
+        // ─── PLAYER LIST HELPERS (per admin) ───
         const PLAYERS_PER_PAGE = 20;
         let currentPlayersAdminId = null;
         let currentPlayersPage = 1;
         let currentPlayersData = [];
 
-        // ─── LOAD ADMIN PLAYERS (using admin detail + deposits) ───
         async function loadAdminPlayers(adminId, page = 1) {
             currentPlayersAdminId = adminId;
             currentPlayersPage = page;
             const container = document.getElementById('modalBody');
             try {
-                // Fetch admin detail – this gives us deposits with usernames
                 const url = apiUrl(`/super-admin/admin/${adminId}`);
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to load admin data');
@@ -1582,7 +1621,6 @@
                 const a = data.admin;
                 const stats = data.stats;
 
-                // Build unique player list from deposits
                 const playerMap = new Map();
                 if (stats.deposits && stats.deposits.length > 0) {
                     stats.deposits.forEach(d => {
@@ -1599,13 +1637,11 @@
                         const p = playerMap.get(username);
                         p.totalDeposited += Number(d.amount) || 0;
                         p.depositCount += 1;
-                        // Update phone if available
                         if (d.phone_number) p.phone = d.phone_number;
                     });
                 }
 
                 const allPlayers = Array.from(playerMap.values());
-                // Sort by total deposited (highest first)
                 allPlayers.sort((a, b) => b.totalDeposited - a.totalDeposited);
                 const totalPlayers = stats.players || allPlayers.length;
 
@@ -1614,7 +1650,6 @@
                 const end = Math.min(start + PLAYERS_PER_PAGE, allPlayers.length);
                 const pagePlayers = allPlayers.slice(start, end);
 
-                // ─── RENDER ───
                 if (allPlayers.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
@@ -1642,7 +1677,6 @@
                     </div>
                 `).join('');
 
-                // Pagination controls
                 let paginationHtml = '';
                 if (totalPages > 1) {
                     const pagesToShow = Math.min(totalPages, 5);
@@ -1662,7 +1696,6 @@
                     `;
                 }
 
-                // Show a note if total players from stats is higher than what we show
                 const noteHtml = (totalPlayers > allPlayers.length) ? `
                     <div class="player-note">
                         <strong>ℹ️</strong> Showing ${allPlayers.length} players who have made deposits. 
@@ -1708,7 +1741,6 @@
             }
         }
 
-        // ─── OPEN MODAL (PLAYERS TAB) ───
         function openModalPlayers(adminId, adminName) {
             document.getElementById('modalOverlay').classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -2001,6 +2033,177 @@
             refreshAll();
         }
 
+        // ─── GLOBAL PLAYERS ───
+        let allGlobalPlayers = [];
+        let filteredGlobalPlayers = [];
+        let globalPlayersPage = 1;
+        const GLOBAL_PLAYERS_PER_PAGE = 30;
+
+        async function loadGlobalPlayers() {
+            const container = document.getElementById('globalPlayersList');
+            try {
+                // First load all admins to get their deposits
+                const adminsUrl = apiUrl('/super-admin/admins');
+                const adminsRes = await fetch(adminsUrl);
+                if (!adminsRes.ok) throw new Error('Failed to load admins');
+                const adminsData = await adminsRes.json();
+                if (!adminsData.success) throw new Error(adminsData.error);
+                const admins = adminsData.admins;
+
+                // For each admin, fetch their detail to get deposits
+                const playerMap = new Map();
+                for (const admin of admins) {
+                    try {
+                        const detailUrl = apiUrl(`/super-admin/admin/${admin.id}`);
+                        const detailRes = await fetch(detailUrl);
+                        if (!detailRes.ok) continue;
+                        const detailData = await detailRes.json();
+                        if (!detailData.success) continue;
+                        const stats = detailData.stats;
+                        if (stats.deposits) {
+                            stats.deposits.forEach(d => {
+                                const key = d.username || d.phone || 'unknown';
+                                if (!playerMap.has(key)) {
+                                    playerMap.set(key, {
+                                        username: d.username || 'Unknown',
+                                        phone: d.phone_number || 'N/A',
+                                        totalDeposited: 0,
+                                        depositCount: 0,
+                                        adminName: admin.name,
+                                        adminId: admin.id,
+                                        status: d.status || 'active'
+                                    });
+                                }
+                                const p = playerMap.get(key);
+                                p.totalDeposited += Number(d.amount) || 0;
+                                p.depositCount += 1;
+                                if (d.phone_number) p.phone = d.phone_number;
+                                // Keep latest status
+                                if (d.status) p.status = d.status;
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch deposits for admin', admin.id, e);
+                    }
+                }
+
+                allGlobalPlayers = Array.from(playerMap.values());
+                // Sort by total deposited descending
+                allGlobalPlayers.sort((a, b) => b.totalDeposited - a.totalDeposited);
+                filteredGlobalPlayers = [...allGlobalPlayers];
+                document.getElementById('globalPlayersBadge').textContent = allGlobalPlayers.length;
+
+                renderGlobalPlayers();
+
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        function renderGlobalPlayers() {
+            const container = document.getElementById('globalPlayersList');
+            const total = filteredGlobalPlayers.length;
+            const totalPages = Math.max(1, Math.ceil(total / GLOBAL_PLAYERS_PER_PAGE));
+            if (globalPlayersPage > totalPages) globalPlayersPage = totalPages;
+            const start = (globalPlayersPage - 1) * GLOBAL_PLAYERS_PER_PAGE;
+            const end = Math.min(start + GLOBAL_PLAYERS_PER_PAGE, total);
+            const pagePlayers = filteredGlobalPlayers.slice(start, end);
+
+            if (total === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">👤</div>
+                        <p>No players found</p>
+                        <p style="font-size:12px;color:#94a3b8;">Make sure admins have deposits recorded.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const playersHtml = pagePlayers.map(p => `
+                <tr>
+                    <td><strong>${escapeHtml(p.username)}</strong></td>
+                    <td>${escapeHtml(p.phone)}</td>
+                    <td><span class="status-badge ${p.status === 'active' ? 'active' : p.status === 'banned' ? 'banned' : 'inactive'}">${p.status || 'active'}</span></td>
+                    <td><strong>${p.totalDeposited.toFixed(0)} ETB</strong></td>
+                    <td><span style="cursor:pointer;color:#7c3aed;font-weight:500;" onclick="openModal(${p.adminId})">${escapeHtml(p.adminName)}</span></td>
+                </tr>
+            `).join('');
+
+            let paginationHtml = '';
+            if (totalPages > 1) {
+                const pagesToShow = Math.min(totalPages, 5);
+                let pageButtons = '';
+                const startPage = Math.max(1, Math.min(globalPlayersPage - 2, totalPages - pagesToShow + 1));
+                const endPage = Math.min(totalPages, startPage + pagesToShow - 1);
+                for (let p = startPage; p <= endPage; p++) {
+                    pageButtons += `<button class="${p === globalPlayersPage ? 'active-page' : ''}" onclick="goToGlobalPage(${p})">${p}</button>`;
+                }
+                paginationHtml = `
+                    <div class="mini-pagination">
+                        <button onclick="goToGlobalPage(${globalPlayersPage - 1})" ${globalPlayersPage <= 1 ? 'disabled' : ''}>◀</button>
+                        ${pageButtons}
+                        <button onclick="goToGlobalPage(${globalPlayersPage + 1})" ${globalPlayersPage >= totalPages ? 'disabled' : ''}>▶</button>
+                        <span>${globalPlayersPage} / ${totalPages}</span>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                    <div><strong>👥 ${total} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${start+1}–${end}</span></div>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Phone</th>
+                                <th>Status</th>
+                                <th>Total Deposited</th>
+                                <th>Admin</th>
+                            </tr>
+                        </thead>
+                        <tbody>${playersHtml}</tbody>
+                    </table>
+                </div>
+                ${paginationHtml}
+                <div class="player-note" style="margin-top:12px;">
+                    <strong>ℹ️</strong> This list is built from deposit records. Players without deposits are not shown.
+                </div>
+            `;
+        }
+
+        function goToGlobalPage(page) {
+            const total = filteredGlobalPlayers.length;
+            const totalPages = Math.max(1, Math.ceil(total / GLOBAL_PLAYERS_PER_PAGE));
+            if (page < 1 || page > totalPages) return;
+            globalPlayersPage = page;
+            renderGlobalPlayers();
+        }
+
+        function filterGlobalPlayers() {
+            const search = document.getElementById('globalPlayerSearch').value.toLowerCase().trim();
+            if (!search) {
+                filteredGlobalPlayers = [...allGlobalPlayers];
+            } else {
+                filteredGlobalPlayers = allGlobalPlayers.filter(p =>
+                    p.username.toLowerCase().includes(search) ||
+                    p.phone.includes(search)
+                );
+            }
+            globalPlayersPage = 1;
+            renderGlobalPlayers();
+        }
+
+        function resetGlobalPlayerSearch() {
+            document.getElementById('globalPlayerSearch').value = '';
+            filteredGlobalPlayers = [...allGlobalPlayers];
+            globalPlayersPage = 1;
+            renderGlobalPlayers();
+        }
+
         // ─── REFRESH ───
         async function refreshAll() {
             if (isRefreshing) return;
@@ -2009,6 +2212,7 @@
                 if (currentTab === 'admins') await loadAdmins();
                 else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
                 else if (currentTab === 'platform') await loadPlatformStats();
+                else if (currentTab === 'players') await loadGlobalPlayers();
                 showToast('Refreshed', 'info');
             } catch (err) {
                 console.error('Refresh error:', err);
@@ -2044,6 +2248,7 @@
             await loadAdmins();
             await loadPlatformStats();
             await loadAdminWithdrawals('pending');
+            await loadGlobalPlayers();
             startAutoRefresh();
         }
 
