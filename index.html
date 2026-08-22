@@ -127,12 +127,20 @@
         .bank-header .bank-icon {
             font-size: 2rem;
             flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .bank-header .bank-icon img {
-            width: 40px;
-            height: 40px;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             border-radius: 8px;
+        }
+        .bank-header .bank-icon .fallback-icon {
+            font-size: 2rem;
         }
         .bank-header .bank-title {
             font-weight: 700;
@@ -303,8 +311,8 @@
         }
         .method-list-item .method-icon {
             flex-shrink: 0;
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -314,6 +322,9 @@
             max-height: 100%;
             object-fit: contain;
             border-radius: 6px;
+        }
+        .method-list-item .method-icon .fallback-icon {
+            font-size: 1.8rem;
         }
         .method-list-item .method-info {
             flex: 1;
@@ -1299,7 +1310,7 @@
         // ============================================================
         //  DOT BINGO – Full Frontend with Invite Tracking (admin names hidden)
         //  Deposit flow: select method directly (no admin step)
-        //  Logos: Telebirr, CBE Birr, M-Pesa using official Wikimedia SVGs
+        //  Logos: Telebirr, CBE Birr, M-Pesa using official Wikimedia SVGs with fallback
         //  "How to pay" modal added back
         // ============================================================
 
@@ -1695,15 +1706,25 @@
                 return []; }
         }
 
-        // ========== LOGO HELPERS ==========
+        // ========== LOGO HELPERS with fallback ==========
         function getMethodLogo(type) {
-            const base = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
+            // Use direct SVG from Wikimedia (not thumbnail) for better quality
             const logos = {
-                telebirr: base + '6/6c/Telebirr_logo.svg/60px-Telebirr_logo.svg.png',
-                cbebirr: base + '8/8c/Commercial_Bank_of_Ethiopia_logo.svg/60px-Commercial_Bank_of_Ethiopia_logo.svg.png',
-                mpesa: base + '7/7e/M-Pesa_Logo.svg/60px-M-Pesa_Logo.svg.png'
+                telebirr: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Telebirr_logo.svg',
+                cbebirr: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/Commercial_Bank_of_Ethiopia_logo.svg',
+                mpesa: 'https://upload.wikimedia.org/wikipedia/commons/7/7e/M-Pesa_Logo.svg'
             };
-            return logos[type] || '📱';
+            return logos[type] || null;
+        }
+
+        // Generate fallback icon (first letter + color)
+        function getFallbackIcon(type) {
+            const map = {
+                telebirr: { letter: 'T', color: '#f97316' },
+                cbebirr: { letter: 'C', color: '#1e40af' },
+                mpesa: { letter: 'M', color: '#10b981' }
+            };
+            return map[type] || { letter: '💰', color: '#6b7280' };
         }
 
         // ========== DEPOSIT: SHOW METHODS DIRECTLY (no admin step) ==========
@@ -1750,11 +1771,16 @@
             c.innerHTML = methods.map(m => {
                 const disp = getSafeNumber(m.number);
                 const logoUrl = getMethodLogo(m.type);
-                const iconHtml = (typeof logoUrl === 'string' && logoUrl.startsWith('http')) ?
-                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" />` :
-                    `<span style="font-size:1.8rem;">${logoUrl}</span>`;
+                const fallback = getFallbackIcon(m.type);
+                // Build image with onerror fallback
+                const imgHtml = logoUrl ?
+                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" referrerpolicy="no-referrer" 
+                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                              style="width:100%;height:100%;object-fit:contain;" />
+                              <span class="fallback-icon" style="display:none; font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>` :
+                    `<span class="fallback-icon" style="font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
                 return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                            <div class="method-icon">${iconHtml}</div>
+                            <div class="method-icon">${imgHtml}</div>
                             <div class="method-info">
                                 <div class="method-name">${m.label}</div>
                                 <div class="method-number">${disp}</div>
@@ -1830,11 +1856,15 @@
             }
             c.innerHTML = methodList.map(m => {
                 const logoUrl = getMethodLogo(m.type);
-                const iconHtml = (typeof logoUrl === 'string' && logoUrl.startsWith('http')) ?
-                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" />` :
-                    `<span style="font-size:1.8rem;">${logoUrl}</span>`;
+                const fallback = getFallbackIcon(m.type);
+                const imgHtml = logoUrl ?
+                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" referrerpolicy="no-referrer" 
+                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                              style="width:100%;height:100%;object-fit:contain;" />
+                              <span class="fallback-icon" style="display:none; font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>` :
+                    `<span class="fallback-icon" style="font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
                 return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                            <div class="method-icon">${iconHtml}</div>
+                            <div class="method-icon">${imgHtml}</div>
                             <div class="method-info">
                                 <div class="method-name">${m.label}</div>
                             </div>
@@ -1926,14 +1956,21 @@
             $('paymentRecipientNumber').textContent = `📞 ${disp}`;
             const title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
             $('paymentMethodTitle').textContent = title + ' P2P';
-            // Set logo in payment modal header
+            // Set logo in payment modal header with fallback
             const iconContainer = $('paymentMethodIcon');
             if (iconContainer) {
                 const logoUrl = getMethodLogo(selectedDepositType);
-                if (typeof logoUrl === 'string' && logoUrl.startsWith('http')) {
-                    iconContainer.innerHTML = `<img src="${logoUrl}" alt="${title}" />`;
+                const fallback = getFallbackIcon(selectedDepositType);
+                if (logoUrl) {
+                    iconContainer.innerHTML = `
+                        <img src="${logoUrl}" alt="${title}" referrerpolicy="no-referrer" 
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                             style="width:40px;height:40px;object-fit:contain;" />
+                        <span class="fallback-icon" style="display:none; font-size:2rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>
+                    `;
                 } else {
-                    iconContainer.innerHTML = logoUrl;
+                    iconContainer.innerHTML =
+                        `<span class="fallback-icon" style="font-size:2rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
                 }
             }
             $('paymentInvoiceNumber').value = '';
@@ -2533,7 +2570,7 @@
             await authenticateUser();
             await fetchUserInviteInfo();
             restoreSession();
-            console.log('✨ DOT BINGO ready – deposit method logos updated, "How to pay" re-added.');
+            console.log('✨ DOT BINGO ready – logos with fallback, "How to pay" re-added.');
         }
 
         // ============================================================
