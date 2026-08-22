@@ -1321,6 +1321,7 @@
                     </select>
                     <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
                     <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()">Reset</button>
+                    <button class="btn btn-success" onclick="sendBulkMessage()">📨 Send to Selected</button>
                 </div>
                 <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
@@ -1689,6 +1690,9 @@
                         <td>${(p.balance || 0).toFixed(0)} ETB</td>
                         <td>${escapeHtml(p.invite_code || 'N/A')}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                        </td>
                     </tr>
                 `).join('');
 
@@ -1732,6 +1736,7 @@
                                         <th>Balance</th>
                                         <th>Invite Code</th>
                                         <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>${playersHtml}</tbody>
@@ -2097,6 +2102,10 @@
                         <td>${p.invite_code || 'N/A'}</td>
                         <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" />
+                            <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                        </td>
                     </tr>
                 `).join('');
 
@@ -2135,6 +2144,7 @@
                                     <th>Invite Code</th>
                                     <th>Admin</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>${playersHtml}</tbody>
@@ -2164,6 +2174,66 @@
             document.getElementById('playerAdminFilter').value = 'all';
             globalPlayersPage = 1;
             loadGlobalPlayers();
+        }
+
+        // ─── TELEGRAM MESSAGING FUNCTIONS ───
+        async function sendMessageToPlayer(userId, userName) {
+            if (!userId) {
+                showToast('This player has no Telegram ID.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${userName} (Telegram ID: ${userId}):`);
+            if (message === null || message.trim() === '') return;
+
+            try {
+                const url = '/super-admin/send-telegram-message';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, message, secret: SECRET })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`Message sent to ${userName}!`, 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to send');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        async function sendBulkMessage() {
+            const checkboxes = document.querySelectorAll('.player-select:checked');
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${checkboxes.length} selected players:`);
+            if (message === null || message.trim() === '') return;
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let successCount = 0;
+            for (const p of players) {
+                try {
+                    const res = await fetch('/super-admin/send-telegram-message', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: p.id, message, secret: SECRET })
+                    });
+                    const data = await res.json();
+                    if (data.success) successCount++;
+                } catch (e) { /* ignore individual errors */ }
+            }
+
+            showToast(`Sent to ${successCount}/${players.length} players.`, 'info');
         }
 
         // ─── REFRESH ───
