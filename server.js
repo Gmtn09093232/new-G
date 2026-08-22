@@ -3448,7 +3448,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
 // ============================================================
 //  NEW: GET ALL REGISTERED PLAYERS (with admin info)
 // ============================================================
-app.get('/super-admin/players', async (req, res) => {
+ app.get('/super-admin/players', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
 
@@ -3470,8 +3470,9 @@ app.get('/super-admin/players', async (req, res) => {
     const pageNum = Math.max(parseInt(page) || 1, 1);
     const offset = (pageNum - 1) * limitNum;
 
+    // ✅ FIX: order by telegram_id instead of created_at (which may not exist)
     const { data, error, count } = await query
-      .order('created_at', { ascending: false })
+      .order('telegram_id', { ascending: false })
       .range(offset, offset + limitNum - 1);
 
     if (error) throw error;
@@ -3507,7 +3508,6 @@ app.get('/super-admin/players', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
