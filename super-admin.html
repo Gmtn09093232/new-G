@@ -1170,8 +1170,9 @@
             flex-wrap: wrap;
             margin-bottom: 16px;
         }
-        .search-bar input {
-            flex: 1 1 200px;
+        .search-bar input,
+        .search-bar select {
+            flex: 1 1 180px;
             padding: 10px 14px;
             border: 1.5px solid #e2e8f0;
             border-radius: 10px;
@@ -1181,23 +1182,13 @@
             outline: none;
             transition: 0.2s;
         }
-        .search-bar input:focus {
+        .search-bar input:focus,
+        .search-bar select:focus {
             border-color: #7c3aed;
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
         }
         .search-bar .btn {
             flex-shrink: 0;
-        }
-
-        /* clickable admin name */
-        .admin-link {
-            color: #7c3aed;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: underline dotted;
-        }
-        .admin-link:hover {
-            color: #4f46e5;
         }
     </style>
 </head>
@@ -1320,11 +1311,14 @@
                 <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
             </div>
 
-            <!-- PLAYERS (global) -->
+            <!-- PLAYERS (updated) -->
             <div class="tab-pane" id="tab-players">
-                <h2>All Registered Players <span class="sub">— full list</span></h2>
+                <h2>All Players <span class="sub">— all registered users</span></h2>
                 <div class="search-bar">
-                    <input type="text" id="globalPlayerSearch" placeholder="Search by username or phone..." />
+                    <input type="text" id="globalPlayerSearch" placeholder="Search by username, handle, or ID..." />
+                    <select id="playerAdminFilter">
+                        <option value="all">All Admins</option>
+                    </select>
                     <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
                     <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()">Reset</button>
                 </div>
@@ -1500,8 +1494,7 @@
 
         // ─── REDUCE DEPOSIT BALANCE ───
         async function reduceDepositBalance(adminId, currentBalance) {
-            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`,
-            '');
+            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
             if (amountStr === null) return;
             const amount = parseFloat(amountStr);
             if (isNaN(amount) || amount <= 0) {
@@ -1518,13 +1511,11 @@
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ adminId, amount: -amount,
-                        description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
+                    body: JSON.stringify({ adminId, amount: -amount, description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`,
-                        'success');
+                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`, 'success');
                     refreshAll();
                 } else {
                     throw new Error(data.error || 'Failed');
@@ -1610,9 +1601,20 @@
                 opt.textContent = admin.name;
                 select.appendChild(opt);
             });
+            // Also populate the players tab admin filter
+            const playerAdminFilter = document.getElementById('playerAdminFilter');
+            if (playerAdminFilter) {
+                playerAdminFilter.innerHTML = '<option value="all">All Admins</option>';
+                admins.forEach(admin => {
+                    const opt = document.createElement('option');
+                    opt.value = admin.id;
+                    opt.textContent = admin.name;
+                    playerAdminFilter.appendChild(opt);
+                });
+            }
         }
 
-        // ─── PLAYER LIST HELPERS (per admin) ───
+        // ─── PLAYER LIST HELPERS (per admin, from deposits) ───
         const PLAYERS_PER_PAGE = 20;
         let currentPlayersAdminId = null;
         let currentPlayersPage = 1;
@@ -2044,232 +2046,121 @@
             refreshAll();
         }
 
-        // ─── GLOBAL PLAYERS (from dedicated endpoint) ───
-        let allGlobalPlayers = [];
-        let filteredGlobalPlayers = [];
+        // ─── GLOBAL PLAYERS (new) ───
         let globalPlayersPage = 1;
+        let globalPlayersTotal = 0;
+        let globalPlayersTotalPages = 0;
         const GLOBAL_PLAYERS_PER_PAGE = 30;
 
         async function loadGlobalPlayers() {
             const container = document.getElementById('globalPlayersList');
+            const adminFilter = document.getElementById('playerAdminFilter')?.value || 'all';
+            const search = document.getElementById('globalPlayerSearch')?.value || '';
+
             try {
-                // Use the dedicated endpoint for all players
-                const url = apiUrl('/super-admin/all-players');
+                const params = {
+                    limit: GLOBAL_PLAYERS_PER_PAGE,
+                    page: globalPlayersPage,
+                    adminId: adminFilter,
+                    search: search || undefined
+                };
+                const url = apiUrl('/super-admin/players', params);
                 const res = await fetch(url);
-                if (!res.ok) {
-                    // If endpoint doesn't exist, show a friendly error with instructions
+                if (!res.ok) throw new Error('Failed to load players');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                globalPlayersTotal = data.total || 0;
+                globalPlayersTotalPages = data.totalPages || 1;
+
+                document.getElementById('globalPlayersBadge').textContent = globalPlayersTotal;
+
+                if (globalPlayersTotal === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="icon">🚧</div>
-                            <p style="font-weight:600;color:#0b1120;">Endpoint not available</p>
-                            <p style="max-width:400px;margin:4px auto;">The backend endpoint <code style="background:#e2e8f0;padding:2px 8px;border-radius:4px;">/super-admin/all-players</code> is required to fetch all registered players.</p>
-                            <p style="font-size:13px;color:#94a3b8;margin-top:6px;">Please implement it or use the deposit-based fallback below.</p>
-                            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-                                <button class="btn btn-outline btn-sm" onclick="loadGlobalPlayersFallback()">Use deposit-based fallback</button>
-                                <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button>
-                            </div>
+                            <div class="icon">👤</div>
+                            <p>No players found</p>
                         </div>
                     `;
                     return;
                 }
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Failed to load players');
 
-                // Expecting data.players array with { id, username, phone, status, balance, admin_id, admin_name, created_at, etc }
-                const players = data.players || [];
-                allGlobalPlayers = players;
-                filteredGlobalPlayers = [...allGlobalPlayers];
-                document.getElementById('globalPlayersBadge').textContent = allGlobalPlayers.length;
+                const playersHtml = data.players.map(p => `
+                    <tr>
+                        <td><strong>${escapeHtml(p.username || 'Unknown')}</strong></td>
+                        <td>${escapeHtml(p.telegram_id || '')}</td>
+                        <td>${escapeHtml(p.telegram_handle || 'N/A')}</td>
+                        <td>${p.balance.toFixed(0)} ETB</td>
+                        <td>${p.invite_code || 'N/A'}</td>
+                        <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
+                        <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                    </tr>
+                `).join('');
 
-                renderGlobalPlayers();
-
-            } catch (err) {
-                console.warn('Error loading all players:', err);
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">❌</div>
-                        <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
-                        <p style="font-size:13px;color:#94a3b8;">Try using the deposit-based fallback.</p>
-                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
-                            <button class="btn btn-outline btn-sm" onclick="loadGlobalPlayersFallback()">Use fallback</button>
-                            <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        // ─── FALLBACK: build from deposits (keep for compatibility) ───
-        async function loadGlobalPlayersFallback() {
-            const container = document.getElementById('globalPlayersList');
-            showToast('Loading deposit-based player list...', 'info');
-            try {
-                const adminsUrl = apiUrl('/super-admin/admins');
-                const adminsRes = await fetch(adminsUrl);
-                if (!adminsRes.ok) throw new Error('Failed to load admins');
-                const adminsData = await adminsRes.json();
-                if (!adminsData.success) throw new Error(adminsData.error);
-                const admins = adminsData.admins;
-
-                const playerMap = new Map();
-                for (const admin of admins) {
-                    try {
-                        const detailUrl = apiUrl(`/super-admin/admin/${admin.id}`);
-                        const detailRes = await fetch(detailUrl);
-                        if (!detailRes.ok) continue;
-                        const detailData = await detailRes.json();
-                        if (!detailData.success) continue;
-                        const stats = detailData.stats;
-                        if (stats.deposits) {
-                            stats.deposits.forEach(d => {
-                                const key = d.username || d.phone || 'unknown';
-                                if (!playerMap.has(key)) {
-                                    playerMap.set(key, {
-                                        username: d.username || 'Unknown',
-                                        phone: d.phone_number || 'N/A',
-                                        totalDeposited: 0,
-                                        depositCount: 0,
-                                        adminName: admin.name,
-                                        adminId: admin.id,
-                                        status: d.status || 'active',
-                                        balance: d.balance || 0,
-                                    });
-                                }
-                                const p = playerMap.get(key);
-                                p.totalDeposited += Number(d.amount) || 0;
-                                p.depositCount += 1;
-                                if (d.phone_number) p.phone = d.phone_number;
-                                if (d.status) p.status = d.status;
-                                if (d.balance) p.balance = d.balance;
-                            });
-                        }
-                    } catch (e) {
-                        console.warn('Failed to fetch deposits for admin', admin.id, e);
+                // Pagination
+                let paginationHtml = '';
+                if (globalPlayersTotalPages > 1) {
+                    const pagesToShow = Math.min(globalPlayersTotalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(globalPlayersPage - 2, globalPlayersTotalPages - pagesToShow + 1));
+                    const endPage = Math.min(globalPlayersTotalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === globalPlayersPage ? 'active-page' : ''}" onclick="goToGlobalPage(${p})">${p}</button>`;
                     }
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="goToGlobalPage(${globalPlayersPage - 1})" ${globalPlayersPage <= 1 ? 'disabled' : ''}>◀</button>
+                            ${pageButtons}
+                            <button onclick="goToGlobalPage(${globalPlayersPage + 1})" ${globalPlayersPage >= globalPlayersTotalPages ? 'disabled' : ''}>▶</button>
+                            <span>${globalPlayersPage} / ${globalPlayersTotalPages}</span>
+                        </div>
+                    `;
                 }
 
-                allGlobalPlayers = Array.from(playerMap.values());
-                allGlobalPlayers.sort((a, b) => b.totalDeposited - a.totalDeposited);
-                filteredGlobalPlayers = [...allGlobalPlayers];
-                document.getElementById('globalPlayersBadge').textContent = allGlobalPlayers.length;
-                renderGlobalPlayers(true);
-                showToast('Loaded deposit-based player list', 'info');
+                container.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                        <div><strong>👥 ${globalPlayersTotal} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</span></div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Telegram ID</th>
+                                    <th>Handle</th>
+                                    <th>Balance</th>
+                                    <th>Invite Code</th>
+                                    <th>Admin</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>${playersHtml}</tbody>
+                        </table>
+                    </div>
+                    ${paginationHtml}
+                `;
             } catch (err) {
                 container.innerHTML =
                     `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
-        function renderGlobalPlayers(isFallback = false) {
-            const container = document.getElementById('globalPlayersList');
-            const total = filteredGlobalPlayers.length;
-            const totalPages = Math.max(1, Math.ceil(total / GLOBAL_PLAYERS_PER_PAGE));
-            if (globalPlayersPage > totalPages) globalPlayersPage = totalPages;
-            const start = (globalPlayersPage - 1) * GLOBAL_PLAYERS_PER_PAGE;
-            const end = Math.min(start + GLOBAL_PLAYERS_PER_PAGE, total);
-            const pagePlayers = filteredGlobalPlayers.slice(start, end);
-
-            if (total === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">👤</div>
-                        <p>No players found</p>
-                        <p style="font-size:12px;color:#94a3b8;">No registered players exist or the data source returned empty.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const playersHtml = pagePlayers.map(p => `
-                <tr>
-                    <td><strong>${escapeHtml(p.username)}</strong></td>
-                    <td>${escapeHtml(p.phone)}</td>
-                    <td><span class="status-badge ${p.status === 'active' ? 'active' : p.status === 'banned' ? 'banned' : 'inactive'}">${p.status || 'active'}</span></td>
-                    <td><strong>${(p.balance || p.totalDeposited || 0).toFixed(0)} ETB</strong></td>
-                    <td>${p.adminId ? `<span class="admin-link" onclick="openModal(${p.adminId})">${escapeHtml(p.adminName)}</span>` : '—'}</td>
-                </tr>
-            `).join('');
-
-            let paginationHtml = '';
-            if (totalPages > 1) {
-                const pagesToShow = Math.min(totalPages, 5);
-                let pageButtons = '';
-                const startPage = Math.max(1, Math.min(globalPlayersPage - 2, totalPages - pagesToShow + 1));
-                const endPage = Math.min(totalPages, startPage + pagesToShow - 1);
-                for (let p = startPage; p <= endPage; p++) {
-                    pageButtons += `<button class="${p === globalPlayersPage ? 'active-page' : ''}" onclick="goToGlobalPage(${p})">${p}</button>`;
-                }
-                paginationHtml = `
-                    <div class="mini-pagination">
-                        <button onclick="goToGlobalPage(${globalPlayersPage - 1})" ${globalPlayersPage <= 1 ? 'disabled' : ''}>◀</button>
-                        ${pageButtons}
-                        <button onclick="goToGlobalPage(${globalPlayersPage + 1})" ${globalPlayersPage >= totalPages ? 'disabled' : ''}>▶</button>
-                        <span>${globalPlayersPage} / ${totalPages}</span>
-                    </div>
-                `;
-            }
-
-            const noteHtml = isFallback ? `
-                <div class="player-note" style="margin-top:12px;">
-                    <strong>ℹ️</strong> This list is built from deposit records (fallback). Players without deposits are not shown.
-                    <button class="btn btn-outline btn-xs" style="margin-left:8px;" onclick="loadGlobalPlayers()">Try primary endpoint</button>
-                </div>
-            ` : `
-                <div class="player-note" style="margin-top:12px;">
-                    <strong>✅</strong> Full player list from <code>/super-admin/all-players</code>.
-                </div>
-            `;
-
-            container.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                    <div><strong>👥 ${total} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${start+1}–${end}</span></div>
-                </div>
-                <div class="table-wrapper">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Phone</th>
-                                <th>Status</th>
-                                <th>Balance</th>
-                                <th>Admin</th>
-                            </tr>
-                        </thead>
-                        <tbody>${playersHtml}</tbody>
-                    </table>
-                </div>
-                ${paginationHtml}
-                ${noteHtml}
-            `;
-        }
-
         function goToGlobalPage(page) {
-            const total = filteredGlobalPlayers.length;
-            const totalPages = Math.max(1, Math.ceil(total / GLOBAL_PLAYERS_PER_PAGE));
-            if (page < 1 || page > totalPages) return;
+            if (page < 1 || page > globalPlayersTotalPages) return;
             globalPlayersPage = page;
-            renderGlobalPlayers();
+            loadGlobalPlayers();
         }
 
         function filterGlobalPlayers() {
-            const search = document.getElementById('globalPlayerSearch').value.toLowerCase().trim();
-            if (!search) {
-                filteredGlobalPlayers = [...allGlobalPlayers];
-            } else {
-                filteredGlobalPlayers = allGlobalPlayers.filter(p =>
-                    p.username.toLowerCase().includes(search) ||
-                    p.phone.includes(search)
-                );
-            }
             globalPlayersPage = 1;
-            renderGlobalPlayers();
+            loadGlobalPlayers();
         }
 
         function resetGlobalPlayerSearch() {
             document.getElementById('globalPlayerSearch').value = '';
-            filteredGlobalPlayers = [...allGlobalPlayers];
+            document.getElementById('playerAdminFilter').value = 'all';
             globalPlayersPage = 1;
-            renderGlobalPlayers();
+            loadGlobalPlayers();
         }
 
         // ─── REFRESH ───
