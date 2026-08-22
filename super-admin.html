@@ -285,6 +285,12 @@
             background: #7c3aed;
             color: #fff;
         }
+        .btn-xs {
+            padding: 4px 10px;
+            font-size: 11px;
+            min-height: 28px;
+            border-radius: 6px;
+        }
 
         /* ─── STATS GRID ─── */
         .stats-grid {
@@ -595,6 +601,10 @@
             background: #dbeafe;
             color: #1e40af;
         }
+        .status-badge.banned {
+            background: #fef2f2;
+            color: #991b1b;
+        }
 
         /* ─── ADMIN CARDS ─── */
         .admin-card {
@@ -777,7 +787,7 @@
             background: #fff;
             border-radius: 24px;
             padding: 28px;
-            max-width: 740px;
+            max-width: 840px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
@@ -876,6 +886,9 @@
         .section-card.adjustments {
             border-left-color: #3b82f6;
         }
+        .section-card.players {
+            border-left-color: #6366f1;
+        }
         .section-card .section-header {
             display: flex;
             justify-content: space-between;
@@ -900,7 +913,7 @@
         }
         .section-card .section-body {
             font-size: 13px;
-            max-height: 160px;
+            max-height: 200px;
             overflow-y: auto;
         }
         .section-card .section-body .row-item {
@@ -922,6 +935,42 @@
             color: #0b1120;
             text-align: right;
             flex-shrink: 0;
+        }
+        .section-card .section-body .player-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #f1f5f9;
+            gap: 8px;
+            align-items: center;
+            font-size: 13px;
+        }
+        .section-card .section-body .player-row:last-child {
+            border-bottom: none;
+        }
+        .section-card .section-body .player-row .info {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        .section-card .section-body .player-row .info .name {
+            font-weight: 600;
+            color: #0b1120;
+        }
+        .section-card .section-body .player-row .info .phone {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        .section-card .section-body .player-row .details {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .section-card .section-body .player-row .details .bal {
+            font-weight: 600;
+            color: #0b1120;
+            font-size: 13px;
         }
 
         .modal-actions {
@@ -959,6 +1008,14 @@
             }
             .modal-content .modal-header h2 {
                 font-size: 18px;
+            }
+            .section-card .section-body .player-row {
+                flex-wrap: wrap;
+            }
+            .section-card .section-body .player-row .details {
+                width: 100%;
+                justify-content: flex-start;
+                gap: 8px;
             }
         }
 
@@ -1047,6 +1104,43 @@
             .filter-bar .row {
                 flex: 1;
             }
+        }
+
+        /* mini pagination for players */
+        .mini-pagination {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .mini-pagination button {
+            background: #f1f5f9;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            cursor: pointer;
+            min-height: 32px;
+            transition: 0.15s;
+        }
+        .mini-pagination button:active {
+            transform: scale(0.94);
+        }
+        .mini-pagination button.active-page {
+            background: #7c3aed;
+            color: #fff;
+        }
+        .mini-pagination button:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        .mini-pagination span {
+            font-size: 13px;
+            color: #94a3b8;
+            padding: 0 4px;
         }
     </style>
 </head>
@@ -1402,11 +1496,12 @@
                                     <span>Code: ${admin.invite_code || 'N/A'}</span>
                                     <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
                                     <span>${(admin.commission_rate * 100)}% commission</span>
+                                    <span>👥 ${admin.stats.playerCount || 0} players</span>
                                 </div>
                             </div>
                         </div>
                         <div class="admin-stats">
-                            <div class="stat-item"><strong>${admin.stats.playerCount}</strong><span class="slabel">Players</span></div>
+                            <div class="stat-item"><strong>${admin.stats.playerCount || 0}</strong><span class="slabel">Players</span></div>
                             <div class="stat-item"><strong>${rawDeposits.toFixed(0)}</strong><span class="slabel">Deposits</span></div>
                             <div class="stat-item"><strong>${balance.toFixed(0)}</strong><span class="slabel">Balance</span></div>
                             <div class="stat-item"><strong>${admin.stats.totalEarned.toFixed(0)}</strong><span class="slabel">Earned</span></div>
@@ -1419,6 +1514,7 @@
                                 ${admin.is_active ? 'Deactivate' : 'Activate'}
                             </button>
                             <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">Reduce</button>
+                            <button class="btn btn-indigo btn-sm" style="background:#6366f1;color:#fff;" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')">👥 Players</button>
                         </div>
                     </div>
                 `}).join('');
@@ -1439,6 +1535,110 @@
                 opt.textContent = admin.name;
                 select.appendChild(opt);
             });
+        }
+
+        // ─── LOAD ADMIN PLAYERS (for modal) ───
+        let currentPlayersPage = 1;
+        const PLAYERS_PER_PAGE = 20;
+        let currentPlayersAdminId = null;
+        let currentPlayersData = [];
+
+        async function loadAdminPlayers(adminId, page = 1) {
+            currentPlayersAdminId = adminId;
+            currentPlayersPage = page;
+            const container = document.getElementById('modalBody');
+            try {
+                const url = apiUrl(`/super-admin/admin/${adminId}/players`, { page, limit: PLAYERS_PER_PAGE });
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load players');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to fetch players');
+
+                currentPlayersData = data.players || [];
+                const total = data.total || currentPlayersData.length;
+                const totalPages = Math.ceil(total / PLAYERS_PER_PAGE);
+
+                if (currentPlayersData.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state"><div class="icon">👤</div><p>No players found for this admin</p>
+                        <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button></div>
+                    `;
+                    return;
+                }
+
+                const playersHtml = currentPlayersData.map((p, idx) => `
+                    <div class="player-row">
+                        <div class="info">
+                            <span class="name">${escapeHtml(p.username || 'Unknown')}</span>
+                            <span class="phone">${escapeHtml(p.phone || 'N/A')}</span>
+                        </div>
+                        <div class="details">
+                            <span class="bal">${(p.balance || 0).toFixed(0)} ETB</span>
+                            <span class="status-badge ${p.status === 'active' ? 'active' : p.status === 'banned' ? 'banned' : 'inactive'}">${p.status || 'active'}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+                // pagination
+                let paginationHtml = '';
+                if (totalPages > 1) {
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="loadAdminPlayers(${adminId}, ${page - 1})" ${page <= 1 ? 'disabled' : ''}>◀</button>
+                            ${Array.from({length: Math.min(totalPages, 5)}, (_, i) => {
+                                let p = i + 1;
+                                // show pages around current
+                                if (totalPages > 5) {
+                                    if (i === 0) p = 1;
+                                    else if (i === 1) p = Math.max(2, page - 1);
+                                    else if (i === 2) p = page;
+                                    else if (i === 3) p = Math.min(totalPages - 1, page + 1);
+                                    else if (i === 4) p = totalPages;
+                                    // avoid duplicates
+                                    if (i > 0 && p === (i === 1 ? 1 : (i === 2 ? Math.max(2, page - 1) : (i === 3 ? page : (i === 4 ? Math.min(totalPages - 1, page + 1) : totalPages))))) {
+                                        // skip dupes
+                                    }
+                                }
+                                const pageNum = p;
+                                return `<button class="${pageNum === page ? 'active-page' : ''}" onclick="loadAdminPlayers(${adminId}, ${pageNum})">${pageNum}</button>`;
+                            }).join('')}
+                            <button onclick="loadAdminPlayers(${adminId}, ${page + 1})" ${page >= totalPages ? 'disabled' : ''}>▶</button>
+                            <span>${page} / ${totalPages}</span>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                        <div><strong>👥 ${total} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(page-1)*PLAYERS_PER_PAGE + 1}–${Math.min(page*PLAYERS_PER_PAGE, total)}</span></div>
+                        <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                    </div>
+                    <div class="section-card players" style="border-left-color:#6366f1;">
+                        <div class="section-header">
+                            <h4>Players</h4>
+                            <span class="total">${total}</span>
+                        </div>
+                        <div class="section-body">
+                            ${playersHtml}
+                        </div>
+                        ${paginationHtml}
+                    </div>
+                `;
+
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p>
+                    <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button></div>
+                `;
+            }
+        }
+
+        // ─── OPEN MODAL (PLAYERS TAB) ───
+        function openModalPlayers(adminId, adminName) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('modalTitle').textContent = `Players of ${adminName}`;
+            loadAdminPlayers(adminId, 1);
         }
 
         // ─── LOAD ADMIN DETAIL (modal) ───
@@ -1507,6 +1707,10 @@
                         <div class="item"><span class="label">Balance (adjusted)</span><span class="value"><strong>${(stats.holdingBalance || 0).toFixed(0)} ETB</strong></span></div>
                     </div>
 
+                    <div style="margin-bottom:12px;">
+                        <button class="btn btn-indigo btn-sm" style="background:#6366f1;color:#fff;" onclick="loadAdminPlayers(${adminId}, 1)">👥 View All Players (${stats.players})</button>
+                    </div>
+
                     <div class="section-card deposits">
                         <div class="section-header"><h4>Recent Deposits</h4><span class="total">Total: ${totalDeposits.toFixed(0)} ETB</span></div>
                         <div class="section-body">${depositsHtml}</div>
@@ -1536,6 +1740,7 @@
                         <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">Deactivate</button>
                         <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">Activate</button>
                         <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">Set Commission</button>
+                        <button class="btn btn-indigo" style="background:#6366f1;color:#fff;" onclick="loadAdminPlayers(${a.id}, 1)">👥 Players</button>
                         <button class="btn btn-outline" onclick="closeModal()">Close</button>
                     </div>
                 `;
