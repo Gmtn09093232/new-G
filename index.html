@@ -295,8 +295,16 @@
             border-color: #f97316;
         }
         .method-list-item .method-icon {
-            font-size: 1.6rem;
             flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .method-list-item .method-icon svg {
+            width: 36px;
+            height: 36px;
         }
         .method-list-item .method-info {
             flex: 1;
@@ -1258,7 +1266,7 @@
         // ============================================================
         //  DOT BINGO – Full Frontend with Invite Tracking (admin names hidden)
         //  Deposit flow: select method directly (no admin step)
-        //  "How to pay" photo section removed
+        //  Telebirr logo icon added, "How to pay" photo section removed
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1649,6 +1657,28 @@
                 return []; }
         }
 
+        // ========== CUSTOM ICON FOR TELEBIRR ==========
+        function getMethodIconHTML(type) {
+            if (type === 'telebirr') {
+                // Telebirr logo: blue gradient circle with white "Telebirr" text
+                return `<svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="tbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#1E88E5"/>
+                                    <stop offset="100%" stop-color="#0D47A1"/>
+                                </linearGradient>
+                            </defs>
+                            <circle cx="40" cy="40" r="36" fill="url(#tbGrad)" />
+                            <text x="40" y="46" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">Telebirr</text>
+                        </svg>`;
+            } else if (type === 'cbebirr') {
+                return '🏦';
+            } else if (type === 'mpesa') {
+                return '📲';
+            }
+            return '💳';
+        }
+
         // ========== DEPOSIT: SHOW METHODS DIRECTLY (no admin step) ==========
         async function openDepositMethods() {
             resetDepositState();
@@ -1692,7 +1722,15 @@
             if (backBtn) backBtn.style.display = '';
             c.innerHTML = methods.map(m => {
                 const disp = getSafeNumber(m.number);
-                return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}"><div class="method-icon">${m.icon}</div><div class="method-info"><div class="method-name">${m.label}</div><div class="method-number">${disp}</div></div><div class="method-select-badge">Select</div></div>`;
+                const iconHTML = getMethodIconHTML(m.type);
+                return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
+                            <div class="method-icon">${iconHTML}</div>
+                            <div class="method-info">
+                                <div class="method-name">${m.label}</div>
+                                <div class="method-number">${disp}</div>
+                            </div>
+                            <div class="method-select-badge">Select</div>
+                        </div>`;
             }).join('');
             c.querySelectorAll('.method-list-item').forEach(el => {
                 el.addEventListener('click', () => {
@@ -1762,7 +1800,14 @@
                 return;
             }
             c.innerHTML = methodList.map(m => {
-                return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}"><div class="method-icon">${m.icon}</div><div class="method-info"><div class="method-name">${m.label}</div></div><div class="method-select-badge">Select</div></div>`;
+                const iconHTML = getMethodIconHTML(m.type);
+                return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
+                            <div class="method-icon">${iconHTML}</div>
+                            <div class="method-info">
+                                <div class="method-name">${m.label}</div>
+                            </div>
+                            <div class="method-select-badge">Select</div>
+                        </div>`;
             }).join('');
             c.querySelectorAll('.method-list-item').forEach(el => {
                 el.addEventListener('click', () => {
