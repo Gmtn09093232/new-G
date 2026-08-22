@@ -414,7 +414,66 @@ function extractTransactionNumber(text) {
 
   return null;
 }
+// ─── GET ALL REGISTERED PLAYERS (with admin info) ───
+app.get('/super-admin/players', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
+  try {
+    const { adminId, search, limit = 100, page = 1 } = req.query;
+    let query = supabase.from('users').select('*', { count: 'exact' });
+
+    // Filter by admin
+    if (adminId && adminId !== 'all') {
+      query = query.eq('admin_id', adminId);
+    }
+
+    // Search by username or telegram handle or telegram_id
+    if (search) {
+      query = query.or(`username.ilike.%${search}%,telegram_handle.ilike.%${search}%,telegram_id.ilike.%${search}%`);
+    }
+
+    const limitNum = Math.min(parseInt(limit) || 100, 1000);
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const offset = (pageNum - 1) * limitNum;
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limitNum - 1);
+
+    if (error) throw error;
+
+    // Fetch admin names for players that have admin_id
+    const adminIds = [...new Set(data.map(u => u.admin_id).filter(id => id))];
+    let adminsMap = {};
+    if (adminIds.length) {
+      const { data: admins, error: adminErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .in('id', adminIds);
+      if (!adminErr) {
+        adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
+      }
+    }
+
+    const players = data.map(u => ({
+      ...u,
+      admin_name: u.admin_id ? adminsMap[u.admin_id] || null : null
+    }));
+
+    res.json({
+      success: true,
+      players,
+      total: count,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(count / limitNum)
+    });
+  } catch (err) {
+    console.error('Error fetching all players:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ---------- Static endpoints ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
