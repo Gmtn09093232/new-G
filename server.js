@@ -3588,7 +3588,126 @@ app.get('/super-admin/players', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+// ============================================================
+//  SUPER ADMIN – ANALYSIS (per admin & game)
+// ============================================================
+app.get('/super-admin/analysis', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
+  try {
+    const { from, to, adminId } = req.query;
+
+    // 1. Build query for contributions joined with game rounds
+    let query = supabase
+      .from('game_admin_contributions')
+      .select(`
+        admin_id,
+        house_profit_share,
+        game_rounds!inner (
+          id,
+          stake,
+          created_at
+        )
+      `);
+
+    // Apply date filters
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      query = query.gte('game_rounds.created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      query = query.lte('game_rounds.created_at', toDate.toISOString());
+    }
+
+    // Admin filter
+    if (adminId && adminId !== 'all') {
+      query = query.eq('admin_id', adminId);
+    }
+
+    const { data: contributions, error: contribErr } = await query;
+    if (contribErr) throw contribErr;
+    if (!contributions || contributions.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // 2. Group by admin_id and stake
+    const grouped = {};
+    for (const row of contributions) {
+      const adminId = row.admin_id;
+      const stake = row.game_rounds.stake;
+      const key = `${adminId}-${stake}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          admin_id: adminId,
+          stake: stake,
+          total_commission: 0,
+          // We'll count players later
+        };
+      }
+      grouped[key].total_commission += Number(row.house_profit_share) || 0;
+    }
+
+    // 3. Fetch admin names and player counts
+    const adminIds = [...new Set(Object.values(grouped).map(g => g.admin_id))];
+    let adminsMap = {};
+    if (adminIds.length) {
+      const { data: admins, error: adminErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .in('id', adminIds);
+      if (!adminErr) {
+        adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
+      }
+    }
+
+    // 4. Fetch player counts per admin (total users assigned to that admin)
+    const playerCounts = {};
+    if (adminIds.length) {
+      const { data: users, error: userErr } = await supabase
+        .from('users')
+        .select('admin_id')
+        .in('admin_id', adminIds);
+      if (!userErr && users) {
+        for (const u of users) {
+          const id = u.admin_id;
+          if (!playerCounts[id]) playerCounts[id] = 0;
+          playerCounts[id]++;
+        }
+      }
+    }
+
+    // 5. Build result rows
+    const result = [];
+    for (const key of Object.keys(grouped)) {
+      const g = grouped[key];
+      const adminName = adminsMap[g.admin_id] || `Admin ${g.admin_id}`;
+      const playerCount = playerCounts[g.admin_id] || 0;
+      // For "game_name", use stake as a label
+      const gameName = `Bingo ${g.stake} ETB`;
+      // Admin share = total_commission (since it's already the admin's share)
+      result.push({
+        game_name: gameName,
+        admin_name: adminName,
+        player_count: playerCount,
+        total_commission: g.total_commission,
+        admin_share: g.total_commission   // same as commission because it's already the admin's cut
+      });
+    }
+
+    // Sort by game name then admin
+    result.sort((a, b) => a.game_name.localeCompare(b.game_name) || a.admin_name.localeCompare(b.admin_name));
+
+    res.json({ success: true, data: result });
+
+  } catch (err) {
+    console.error('❌ Analysis error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
