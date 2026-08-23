@@ -1193,6 +1193,17 @@
         .search-bar .btn {
             flex-shrink: 0;
         }
+
+        /* ─── WITHDRAWAL FILTER BUTTONS ─── */
+        .withdrawal-filter-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+        .withdrawal-filter-group .btn {
+            transition: 0.2s;
+        }
     </style>
 </head>
 <body>
@@ -1296,14 +1307,14 @@
                 <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
             </div>
 
-            <!-- WITHDRAWALS -->
+            <!-- WITHDRAWALS (updated with filter buttons) -->
             <div class="tab-pane" id="tab-withdrawals">
                 <h2>Admin Withdrawals <span class="sub">— requests from admins</span></h2>
-                <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-                    <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('pending')">Pending</button>
-                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('approved')">Approved</button>
-                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('rejected')">Rejected</button>
-                    <button class="btn btn-outline btn-sm" onclick="loadAdminWithdrawals('all')">All</button>
+                <div class="withdrawal-filter-group" id="withdrawalFilterGroup">
+                    <button class="btn btn-primary btn-sm" data-status="pending" onclick="setWithdrawalFilter('pending')">Pending</button>
+                    <button class="btn btn-outline btn-sm" data-status="approved" onclick="setWithdrawalFilter('approved')">Approved</button>
+                    <button class="btn btn-outline btn-sm" data-status="rejected" onclick="setWithdrawalFilter('rejected')">Rejected</button>
+                    <button class="btn btn-outline btn-sm" data-status="all" onclick="setWithdrawalFilter('all')">All</button>
                 </div>
                 <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
             </div>
@@ -1314,7 +1325,7 @@
                 <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
             </div>
 
-            <!-- PLAYERS (updated) -->
+            <!-- PLAYERS -->
             <div class="tab-pane" id="tab-players">
                 <h2>All Players <span class="sub">— all registered users</span></h2>
                 <div class="search-bar">
@@ -1428,13 +1439,38 @@
                 pane.classList.toggle('active', pane.id === `tab-${tab}`)
             );
             if (tab === 'admins') loadAdmins();
-            else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
-            else if (tab === 'platform') loadPlatformStats();
+            else if (tab === 'withdrawals') {
+                // When switching to withdrawals tab, ensure the filter button styles match currentWithdrawFilter
+                updateWithdrawalFilterButtons(currentWithdrawFilter);
+                loadAdminWithdrawals(currentWithdrawFilter);
+            } else if (tab === 'platform') loadPlatformStats();
             else if (tab === 'players') loadGlobalPlayers();
 
             const container = document.getElementById('tabContainer');
             const activeBtn = container.querySelector('.tab-btn.active');
             if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+
+        // ─── WITHDRAWAL FILTER BUTTON STATE ───
+        function updateWithdrawalFilterButtons(activeStatus) {
+            const group = document.getElementById('withdrawalFilterGroup');
+            if (!group) return;
+            const buttons = group.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                const status = btn.dataset.status;
+                if (status === activeStatus) {
+                    btn.className = 'btn btn-primary btn-sm';
+                } else {
+                    btn.className = 'btn btn-outline btn-sm';
+                }
+            });
+        }
+
+        // ─── SET WITHDRAWAL FILTER (wrapper) ───
+        function setWithdrawalFilter(status) {
+            currentWithdrawFilter = status;
+            updateWithdrawalFilterButtons(status);
+            loadAdminWithdrawals(status);
         }
 
         // ─── PLATFORM STATS ───
@@ -1630,7 +1666,7 @@
             currentPlayersAdminId = adminId;
             currentPlayersPage = page;
             const container = document.getElementById('modalBody');
-            
+
             // Show loading state
             container.innerHTML = `
                 <div class="loading-state">
@@ -1646,19 +1682,19 @@
                     adminId: adminId
                 };
                 const url = apiUrl('/super-admin/players', params);
-                
+
                 console.log('🔍 Fetching players for admin', adminId, 'URL:', url);
-                
+
                 const res = await fetch(url);
-                
+
                 if (!res.ok) {
                     const errorText = await res.text();
                     console.error('❌ HTTP error:', res.status, errorText);
                     throw new Error(`HTTP ${res.status}: ${errorText || 'Unknown error'}`);
                 }
-                
+
                 const data = await res.json();
-                
+
                 if (!data.success) {
                     console.error('❌ API error:', data.error);
                     throw new Error(data.error || 'Failed to fetch players');
@@ -1903,9 +1939,13 @@
             }
         }
 
-        // ─── LOAD ADMIN WITHDRAWALS ───
+        // ─── LOAD ADMIN WITHDRAWALS (updated with button styling) ───
         async function loadAdminWithdrawals(status = 'pending') {
             currentWithdrawFilter = status;
+
+            // Ensure the filter buttons reflect the current status
+            updateWithdrawalFilterButtons(status);
+
             const container = document.getElementById('withdrawalsList');
             try {
                 const params = { status, limit: 100 };
@@ -2287,8 +2327,11 @@
             isRefreshing = true;
             try {
                 if (currentTab === 'admins') await loadAdmins();
-                else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
-                else if (currentTab === 'platform') await loadPlatformStats();
+                else if (currentTab === 'withdrawals') {
+                    // Ensure button styles match current filter
+                    updateWithdrawalFilterButtons(currentWithdrawFilter);
+                    await loadAdminWithdrawals(currentWithdrawFilter);
+                } else if (currentTab === 'platform') await loadPlatformStats();
                 else if (currentTab === 'players') await loadGlobalPlayers();
                 showToast('Refreshed', 'info');
             } catch (err) {
@@ -2324,6 +2367,8 @@
         async function init() {
             await loadAdmins();
             await loadPlatformStats();
+            // Ensure the withdrawal filter buttons are correctly styled on load
+            updateWithdrawalFilterButtons('pending');
             await loadAdminWithdrawals('pending');
             await loadGlobalPlayers();
             startAutoRefresh();
