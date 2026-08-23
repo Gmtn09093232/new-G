@@ -1194,15 +1194,138 @@
             flex-shrink: 0;
         }
 
-        /* ─── WITHDRAWAL FILTER BUTTONS ─── */
-        .withdrawal-filter-group {
+        /* ─── ANALYSIS SPECIFIC STYLES ─── */
+        .analysis-toggle {
             display: flex;
             gap: 8px;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
+            margin-bottom: 16px;
         }
-        .withdrawal-filter-group .btn {
-            transition: 0.2s;
+        .analysis-toggle .btn {
+            min-width: 100px;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            background: #f8fafc;
+            border-radius: 14px;
+            padding: 16px 20px;
+            border: 1px solid #eef2f6;
+        }
+        .chart-container h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #0b1120;
+        }
+        .chart-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .chart-bar-label {
+            width: 100px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            flex-shrink: 0;
+            text-align: right;
+        }
+        .chart-bar-track {
+            flex: 1;
+            height: 28px;
+            background: #eef2f6;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+        }
+        .chart-bar-segment {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            padding: 0 4px;
+            min-width: 20px;
+        }
+        .chart-bar-total {
+            font-size: 13px;
+            font-weight: 600;
+            color: #0b1120;
+            width: 80px;
+            text-align: left;
+            flex-shrink: 0;
+        }
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #475569;
+        }
+        .chart-legend-item .color-box {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .analysis-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .analysis-summary .stat-box {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #eef2f6;
+            text-align: center;
+        }
+        .analysis-summary .stat-box .num {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0b1120;
+        }
+        .analysis-summary .stat-box .lbl {
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        @media (max-width: 640px) {
+            .chart-bar-label {
+                width: 70px;
+                font-size: 11px;
+            }
+            .chart-bar-total {
+                width: 60px;
+                font-size: 12px;
+            }
+            .chart-bar-track {
+                height: 22px;
+            }
+            .chart-bar-segment {
+                font-size: 8px;
+                min-width: 14px;
+            }
+            .analysis-summary {
+                grid-template-columns: 1fr 1fr;
+            }
         }
     </style>
 </head>
@@ -1307,7 +1430,7 @@
                 <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
             </div>
 
-            <!-- WITHDRAWALS (updated with filter buttons) -->
+            <!-- WITHDRAWALS -->
             <div class="tab-pane" id="tab-withdrawals">
                 <h2>Admin Withdrawals <span class="sub">— requests from admins</span></h2>
                 <div class="withdrawal-filter-group" id="withdrawalFilterGroup">
@@ -1319,10 +1442,31 @@
                 <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
             </div>
 
-            <!-- PLATFORM -->
+            <!-- PLATFORM (now with Overview / Analysis toggle) -->
             <div class="tab-pane" id="tab-platform">
-                <h2>Platform Overview <span class="sub">— key metrics</span></h2>
-                <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+                <h2>Platform <span class="sub">— overview &amp; analysis</span></h2>
+
+                <!-- Toggle buttons -->
+                <div class="analysis-toggle">
+                    <button class="btn btn-primary btn-sm" id="platformOverviewBtn" onclick="showPlatformView('overview')">Overview</button>
+                    <button class="btn btn-outline btn-sm" id="platformAnalysisBtn" onclick="showPlatformView('analysis')">Analysis</button>
+                </div>
+
+                <!-- Overview content (existing) -->
+                <div id="platformOverview">
+                    <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+                </div>
+
+                <!-- Analysis content (new) -->
+                <div id="platformAnalysis" style="display:none;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+                        <button class="btn btn-primary" onclick="fetchAnalysis()">📊 Load Analysis</button>
+                        <span style="font-size:13px; color:#94a3b8;">Uses the date and admin filters above.</span>
+                    </div>
+                    <div id="analysisResults">
+                        <div class="loading-state"><div class="spinner"></div><span>Load analysis data by clicking the button above.</span></div>
+                    </div>
+                </div>
             </div>
 
             <!-- PLAYERS -->
@@ -1440,18 +1584,49 @@
             );
             if (tab === 'admins') loadAdmins();
             else if (tab === 'withdrawals') {
-                // When switching to withdrawals tab, ensure the filter button styles match currentWithdrawFilter
                 updateWithdrawalFilterButtons(currentWithdrawFilter);
                 loadAdminWithdrawals(currentWithdrawFilter);
-            } else if (tab === 'platform') loadPlatformStats();
-            else if (tab === 'players') loadGlobalPlayers();
+            } else if (tab === 'platform') {
+                // Show overview by default when switching to platform tab
+                showPlatformView('overview');
+                loadPlatformStats(); // load overview data
+            } else if (tab === 'players') loadGlobalPlayers();
 
             const container = document.getElementById('tabContainer');
             const activeBtn = container.querySelector('.tab-btn.active');
             if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
 
-        // ─── WITHDRAWAL FILTER BUTTON STATE ───
+        // ─── PLATFORM VIEW TOGGLE ───
+        let currentPlatformView = 'overview';
+
+        function showPlatformView(view) {
+            currentPlatformView = view;
+            const overviewBtn = document.getElementById('platformOverviewBtn');
+            const analysisBtn = document.getElementById('platformAnalysisBtn');
+            const overviewDiv = document.getElementById('platformOverview');
+            const analysisDiv = document.getElementById('platformAnalysis');
+
+            if (view === 'overview') {
+                overviewBtn.className = 'btn btn-primary btn-sm';
+                analysisBtn.className = 'btn btn-outline btn-sm';
+                overviewDiv.style.display = 'block';
+                analysisDiv.style.display = 'none';
+                // Ensure overview data is loaded
+                if (document.getElementById('platformContent').querySelector('.loading-state')) {
+                    loadPlatformStats();
+                }
+            } else {
+                overviewBtn.className = 'btn btn-outline btn-sm';
+                analysisBtn.className = 'btn btn-primary btn-sm';
+                overviewDiv.style.display = 'none';
+                analysisDiv.style.display = 'block';
+                // Optionally auto-load analysis if filters are set
+                // We'll let the user click the button
+            }
+        }
+
+        // ─── WITHDRAWAL FILTER BUTTONS ───
         function updateWithdrawalFilterButtons(activeStatus) {
             const group = document.getElementById('withdrawalFilterGroup');
             if (!group) return;
@@ -1466,14 +1641,13 @@
             });
         }
 
-        // ─── SET WITHDRAWAL FILTER (wrapper) ───
         function setWithdrawalFilter(status) {
             currentWithdrawFilter = status;
             updateWithdrawalFilterButtons(status);
             loadAdminWithdrawals(status);
         }
 
-        // ─── PLATFORM STATS ───
+        // ─── PLATFORM STATS (Overview) ───
         async function loadPlatformStats() {
             const container = document.getElementById('platformContent');
             try {
@@ -1667,7 +1841,6 @@
             currentPlayersPage = page;
             const container = document.getElementById('modalBody');
 
-            // Show loading state
             container.innerHTML = `
                 <div class="loading-state">
                     <div class="spinner"></div>
@@ -1682,28 +1855,14 @@
                     adminId: adminId
                 };
                 const url = apiUrl('/super-admin/players', params);
-
-                console.log('🔍 Fetching players for admin', adminId, 'URL:', url);
-
                 const res = await fetch(url);
-
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    console.error('❌ HTTP error:', res.status, errorText);
-                    throw new Error(`HTTP ${res.status}: ${errorText || 'Unknown error'}`);
-                }
-
+                if (!res.ok) throw new Error('Failed to load players');
                 const data = await res.json();
-
-                if (!data.success) {
-                    console.error('❌ API error:', data.error);
-                    throw new Error(data.error || 'Failed to fetch players');
-                }
+                if (!data.success) throw new Error(data.error);
 
                 currentPlayersTotal = data.total || 0;
                 currentPlayersTotalPages = data.totalPages || 1;
 
-                // Update modal title to show admin name and count
                 const adminName = document.getElementById('modalTitle').textContent.replace('Players of ', '');
                 document.getElementById('modalTitle').textContent = `Players of ${adminName} (${currentPlayersTotal})`;
 
@@ -1712,7 +1871,6 @@
                         <div class="empty-state">
                             <div class="icon">👤</div>
                             <p>No registered players found for this admin.</p>
-                            <p style="font-size:12px;color:#94a3b8;">Players are linked to admins via the <code>admin_id</code> field in the users table.</p>
                             <div style="margin-top:12px;">
                                 <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                             </div>
@@ -1721,7 +1879,6 @@
                     return;
                 }
 
-                // ─── BUILD PLAYERS TABLE WITH CHECKBOXES ───
                 const playersHtml = data.players.map(p => `
                     <tr>
                         <td>
@@ -1739,7 +1896,6 @@
                     </tr>
                 `).join('');
 
-                // ─── PAGINATION ───
                 let paginationHtml = '';
                 if (currentPlayersTotalPages > 1) {
                     const pagesToShow = Math.min(currentPlayersTotalPages, 5);
@@ -1759,7 +1915,6 @@
                     `;
                 }
 
-                // ─── RENDER MODAL CONTENT ───
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
                         <div>
@@ -1801,12 +1956,10 @@
                 `;
 
             } catch (err) {
-                console.error('❌ Error loading players:', err);
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">❌</div>
                         <p style="color:#ef4444;font-weight:600;">${escapeHtml(err.message)}</p>
-                        <p style="font-size:12px;color:#94a3b8;">Check the browser console (F12) for more details.</p>
                         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
                             <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                             <button class="btn btn-primary btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">Retry</button>
@@ -1816,7 +1969,6 @@
             }
         }
 
-        // ─── SELECT ALL TOGGLE FOR MODAL ───
         function toggleAllModalPlayers() {
             const checked = document.getElementById('selectAllModalPlayers').checked;
             document.querySelectorAll('#modalBody .player-select').forEach(cb => cb.checked = checked);
@@ -1939,11 +2091,9 @@
             }
         }
 
-        // ─── LOAD ADMIN WITHDRAWALS (updated with button styling) ───
+        // ─── LOAD ADMIN WITHDRAWALS ───
         async function loadAdminWithdrawals(status = 'pending') {
             currentWithdrawFilter = status;
-
-            // Ensure the filter buttons reflect the current status
             updateWithdrawalFilterButtons(status);
 
             const container = document.getElementById('withdrawalsList');
@@ -2142,8 +2292,6 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                console.log('📦 Players API response:', data);
-
                 globalPlayersTotal = data.total || 0;
                 globalPlayersTotalPages = data.totalPages || 1;
 
@@ -2154,7 +2302,6 @@
                         <div class="empty-state">
                             <div class="icon">👤</div>
                             <p>No players found.</p>
-                            <p style="font-size:12px;color:#94a3b8;">Check the browser console for API response details.</p>
                             <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()">⟳ Retry</button>
                         </div>
                     `;
@@ -2177,7 +2324,6 @@
                     </tr>
                 `).join('');
 
-                // Pagination
                 let paginationHtml = '';
                 if (globalPlayersTotalPages > 1) {
                     const pagesToShow = Math.min(globalPlayersTotalPages, 5);
@@ -2227,7 +2373,6 @@
                     ${paginationHtml}
                 `;
             } catch (err) {
-                console.error('❌ Error loading global players:', err);
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="icon">❌</div>
@@ -2261,7 +2406,7 @@
             loadGlobalPlayers();
         }
 
-        // ─── TELEGRAM MESSAGING FUNCTIONS ───
+        // ─── TELEGRAM MESSAGING ───
         async function sendMessageToPlayer(userId, userName) {
             if (!userId) {
                 showToast('This player has no Telegram ID.', 'error');
@@ -2315,10 +2460,170 @@
                     });
                     const data = await res.json();
                     if (data.success) successCount++;
-                } catch (e) { /* ignore individual errors */ }
+                } catch (e) { /* ignore */ }
             }
 
             showToast(`Sent to ${successCount}/${players.length} players.`, 'info');
+        }
+
+        // ─── ANALYSIS: FETCH AND RENDER ───
+        async function fetchAnalysis() {
+            const container = document.getElementById('analysisResults');
+            container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading analysis…</span></div>`;
+
+            try {
+                const params = {};
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/analysis', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load analysis data');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                const rows = data.data || [];
+
+                if (rows.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📊</div>
+                            <p>No data found for the selected filters.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // --- Compute summary stats ---
+                const totalPlayers = rows.reduce((sum, r) => sum + (r.player_count || 0), 0);
+                const totalCommission = rows.reduce((sum, r) => sum + (r.total_commission || 0), 0);
+                const totalAdminShare = rows.reduce((sum, r) => sum + (r.admin_share || 0), 0);
+                const uniqueGames = [...new Set(rows.map(r => r.game_name))].length;
+
+                // --- Build table ---
+                let tableHtml = `
+                    <div class="analysis-summary">
+                        <div class="stat-box"><div class="num">${uniqueGames}</div><div class="lbl">Games</div></div>
+                        <div class="stat-box"><div class="num">${totalPlayers}</div><div class="lbl">Total Players</div></div>
+                        <div class="stat-box"><div class="num">${totalCommission.toFixed(0)} ETB</div><div class="lbl">Total Commission</div></div>
+                        <div class="stat-box"><div class="num">${totalAdminShare.toFixed(0)} ETB</div><div class="lbl">Admin Share</div></div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Game</th>
+                                    <th>Admin</th>
+                                    <th>Players</th>
+                                    <th>Total Commission (ETB)</th>
+                                    <th>Admin Share (ETB)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows.map(r => `
+                                    <tr>
+                                        <td><strong>${escapeHtml(r.game_name)}</strong></td>
+                                        <td>${escapeHtml(r.admin_name)}</td>
+                                        <td>${r.player_count || 0}</td>
+                                        <td>${(r.total_commission || 0).toFixed(0)}</td>
+                                        <td>${(r.admin_share || 0).toFixed(0)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                // --- Build stacked bar chart (per game, showing admin shares) ---
+                // Group rows by game
+                const gameMap = new Map();
+                rows.forEach(r => {
+                    const key = r.game_name;
+                    if (!gameMap.has(key)) {
+                        gameMap.set(key, { game: key, admins: [] });
+                    }
+                    gameMap.get(key).admins.push({
+                        admin: r.admin_name,
+                        share: r.admin_share || 0,
+                        commission: r.total_commission || 0,
+                        players: r.player_count || 0
+                    });
+                });
+
+                // Assign distinct colors to admins across all games
+                const allAdmins = [...new Set(rows.map(r => r.admin_name))];
+                const colorPalette = [
+                    '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                    '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+                    '#06b6d4', '#d946ef', '#22c55e', '#eab308', '#f43f5e'
+                ];
+                const adminColorMap = {};
+                allAdmins.forEach((name, idx) => {
+                    adminColorMap[name] = colorPalette[idx % colorPalette.length];
+                });
+
+                // Determine max total commission for scaling
+                let maxTotal = 0;
+                gameMap.forEach((g) => {
+                    const total = g.admins.reduce((sum, a) => sum + a.share, 0);
+                    if (total > maxTotal) maxTotal = total;
+                });
+                if (maxTotal === 0) maxTotal = 1;
+
+                let chartHtml = `
+                    <div class="chart-container">
+                        <h4>Admin Share per Game (stacked bar)</h4>
+                        ${Array.from(gameMap.entries()).map(([gameName, gameData]) => {
+                            const total = gameData.admins.reduce((sum, a) => sum + a.share, 0);
+                            const widthPercent = Math.max(10, (total / maxTotal) * 100);
+                            // Build segments
+                            let segments = '';
+                            let cumulative = 0;
+                            gameData.admins.forEach(a => {
+                                const share = a.share || 0;
+                                const segWidth = (share / total) * 100;
+                                if (segWidth > 0) {
+                                    segments += `
+                                        <div class="chart-bar-segment" style="width:${segWidth}%;background:${adminColorMap[a.admin]};">
+                                            ${segWidth > 8 ? Math.round(share) : ''}
+                                        </div>
+                                    `;
+                                }
+                                cumulative += share;
+                            });
+                            return `
+                                <div class="chart-bar-row">
+                                    <div class="chart-bar-label" title="${escapeHtml(gameName)}">${escapeHtml(gameName)}</div>
+                                    <div class="chart-bar-track">
+                                        ${segments}
+                                    </div>
+                                    <div class="chart-bar-total">${total.toFixed(0)} ETB</div>
+                                </div>
+                            `;
+                        }).join('')}
+                        <div class="chart-legend">
+                            ${allAdmins.map(name => `
+                                <div class="chart-legend-item">
+                                    <span class="color-box" style="background:${adminColorMap[name]};"></span>
+                                    ${escapeHtml(name)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = tableHtml + chartHtml;
+
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">❌</div>
+                        <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="fetchAnalysis()">⟳ Retry</button>
+                    </div>
+                `;
+            }
         }
 
         // ─── REFRESH ───
@@ -2328,11 +2633,15 @@
             try {
                 if (currentTab === 'admins') await loadAdmins();
                 else if (currentTab === 'withdrawals') {
-                    // Ensure button styles match current filter
                     updateWithdrawalFilterButtons(currentWithdrawFilter);
                     await loadAdminWithdrawals(currentWithdrawFilter);
-                } else if (currentTab === 'platform') await loadPlatformStats();
-                else if (currentTab === 'players') await loadGlobalPlayers();
+                } else if (currentTab === 'platform') {
+                    if (currentPlatformView === 'overview') {
+                        await loadPlatformStats();
+                    } else {
+                        await fetchAnalysis();
+                    }
+                } else if (currentTab === 'players') await loadGlobalPlayers();
                 showToast('Refreshed', 'info');
             } catch (err) {
                 console.error('Refresh error:', err);
@@ -2367,7 +2676,6 @@
         async function init() {
             await loadAdmins();
             await loadPlatformStats();
-            // Ensure the withdrawal filter buttons are correctly styled on load
             updateWithdrawalFilterButtons('pending');
             await loadAdminWithdrawals('pending');
             await loadGlobalPlayers();
