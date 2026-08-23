@@ -1295,6 +1295,12 @@
             <button id="rulesBtnGame" style="background:#f1f5f9; color:#7c2d12; border:1px solid #fed7aa; border-radius:40px; padding:4px 12px; cursor:pointer;" data-key="rulesBtn">📜 Rules</button>
         </div>
         <div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
+
+        <!-- ===== NEW: BACK TO LOBBY BUTTON (hidden by default) ===== -->
+        <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
+            <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby">← Back to Lobby</button>
+        </div>
+
         <div class="last-call-area"><div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div><div class="last-call-number" id="currentCall">0 - 75</div><div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div></div>
         <div id="gameCard" class="card-container"></div>
         <button id="bingoBtn" data-key="claimBingo">🏆 CLAIM BINGO! 🏆</button>
@@ -1489,6 +1495,7 @@
                 selectWithdrawMethod: "💸 Select Withdrawal Method",
                 inviteCodeLabel: "🔑 Invite Code",
                 assignedAdminLabel: "👤 Admin",
+                backToLobby: "← Back to Lobby",
             },
             en: {
                 deposit: "+Deposit",
@@ -1572,6 +1579,7 @@
                 selectWithdrawMethod: "💸 Select Withdrawal Method",
                 inviteCodeLabel: "🔑 Invite Code",
                 assignedAdminLabel: "👤 Admin",
+                backToLobby: "← Back to Lobby",
             }
         };
 
@@ -2228,6 +2236,8 @@
                             selectedNumber.textContent = i;
                             buildGrid();
                             socket.emit('selectCardNumber', i);
+                            // Update back-to-lobby button visibility
+                            updateBackToLobbyVisibility();
                         }
                     };
                 }
@@ -2251,6 +2261,15 @@
         function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l =
                 'O'; return `${l}-${n}`; }
 
+        // ----- Back to Lobby visibility -----
+        function updateBackToLobbyVisibility() {
+            const container = $('backToLobbyContainer');
+            if (container) {
+                // Show only if the player has NOT selected a card (i.e., watching)
+                container.classList.toggle('hidden', selectedCardNumber !== null);
+            }
+        }
+
         function showLobby(sec) {
             currentPage = 'lobby';
             timerSeconds = sec;
@@ -2266,6 +2285,9 @@
             startTimer(sec);
             if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
             updateStatsUI();
+            // Not in game page, hide back-to-lobby button
+            const container = $('backToLobbyContainer');
+            if (container) container.classList.add('hidden');
         }
 
         function showGame() {
@@ -2280,6 +2302,8 @@
             clearInterval(lobbyTimerInterval);
             if (socket) socket.emit('getBalance');
             if (userCard.length) renderCard(userCard, 'gameCard', true);
+            // Update back-to-lobby button
+            updateBackToLobbyVisibility();
         }
 
         function startTimer(sec) {
@@ -2315,6 +2339,9 @@
             pendingSelection = null;
             pendingRandom = false;
             currentGameId = null;
+            // Hide back-to-lobby button
+            const container = $('backToLobbyContainer');
+            if (container) container.classList.add('hidden');
             unlockSpeech();
         }
 
@@ -2439,18 +2466,21 @@
                     selectedNumber.textContent = data.number;
                     pendingSelection = null;
                     buildGrid();
+                    updateBackToLobbyVisibility();
                 }
                 if (pendingRandom && data.number) {
                     selectedCardNumber = data.number;
                     selectedNumber.textContent = data.number;
                     pendingRandom = false;
                     buildGrid();
+                    updateBackToLobbyVisibility();
                 }
             });
             socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null;
                     if (selectedCardNumber) { selectedCardNumber = null;
                         selectedNumber.textContent = '-';
-                        buildGrid(); } } if (pendingRandom) pendingRandom = false; });
+                        buildGrid();
+                        updateBackToLobbyVisibility(); } } if (pendingRandom) pendingRandom = false; });
             socket.on('playersCount', (data) => {
                 const s = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
                     'dot_bingo_stake'));
@@ -2465,6 +2495,7 @@
                 if (data?.playersCount) updateCount(data.playersCount);
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
+                updateBackToLobbyVisibility();
             });
             socket.on('numberCalled', data => {
                 if (data.stake !== currentStake) return;
@@ -2487,6 +2518,9 @@
                 currentGameId = null;
                 markedNumbers = [];
                 if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+                // Hide back-to-lobby button after game ends (player can't be in game)
+                const container = $('backToLobbyContainer');
+                if (container) container.classList.add('hidden');
             });
             socket.on('invalidBingo', () => alert('❌ Not a valid bingo yet!'));
             socket.on('depositStatus', d => alert(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` :
@@ -2593,12 +2627,19 @@
                 socket.emit('newCardNumber');
                 selectedCardNumber = null;
                 selectedNumber.textContent = '⚡ ...';
-                buildGrid(); }
+                buildGrid();
+                updateBackToLobbyVisibility();
+            }
             unlockSpeech(); });
         $('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo');
             unlockSpeech(); });
         $('muteToggleBtn')?.addEventListener('click', toggleMute);
         $('backToStakeBtn')?.addEventListener('click', goStake);
+
+        // Back to Lobby button handler
+        $('backToLobbyBtn')?.addEventListener('click', function() {
+            goStake();
+        });
 
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
