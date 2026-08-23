@@ -3589,7 +3589,7 @@ app.get('/super-admin/players', async (req, res) => {
   }
 });
 // ============================================================
-//  SUPER ADMIN – ANALYSIS (per admin & game)
+//  SUPER ADMIN – ANALYSIS (per round, per admin)
 // ============================================================
 app.get('/super-admin/analysis', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -3598,20 +3598,19 @@ app.get('/super-admin/analysis', async (req, res) => {
   try {
     const { from, to, adminId } = req.query;
 
-    // 1. Build query for contributions joined with game rounds
+    // 1. Fetch contributions with game_round details
     let query = supabase
       .from('game_admin_contributions')
       .select(`
         admin_id,
         house_profit_share,
+        game_round_id,
         game_rounds!inner (
-          id,
           stake,
           created_at
         )
       `);
 
-    // Apply date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -3622,8 +3621,6 @@ app.get('/super-admin/analysis', async (req, res) => {
       toDate.setHours(23,59,59,999);
       query = query.lte('game_rounds.created_at', toDate.toISOString());
     }
-
-    // Admin filter
     if (adminId && adminId !== 'all') {
       query = query.eq('admin_id', adminId);
     }
@@ -3634,25 +3631,8 @@ app.get('/super-admin/analysis', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    // 2. Group by admin_id and stake
-    const grouped = {};
-    for (const row of contributions) {
-      const adminId = row.admin_id;
-      const stake = row.game_rounds.stake;
-      const key = `${adminId}-${stake}`;
-      if (!grouped[key]) {
-        grouped[key] = {
-          admin_id: adminId,
-          stake: stake,
-          total_commission: 0,
-          // We'll count players later
-        };
-      }
-      grouped[key].total_commission += Number(row.house_profit_share) || 0;
-    }
-
-    // 3. Fetch admin names and player counts
-    const adminIds = [...new Set(Object.values(grouped).map(g => g.admin_id))];
+    // 2. Fetch admin names
+    const adminIds = [...new Set(contributions.map(c => c.admin_id))];
     let adminsMap = {};
     if (adminIds.length) {
       const { data: admins, error: adminErr } = await supabase
@@ -3664,42 +3644,17 @@ app.get('/super-admin/analysis', async (req, res) => {
       }
     }
 
-    // 4. Fetch player counts per admin (total users assigned to that admin)
-    const playerCounts = {};
-    if (adminIds.length) {
-      const { data: users, error: userErr } = await supabase
-        .from('users')
-        .select('admin_id')
-        .in('admin_id', adminIds);
-      if (!userErr && users) {
-        for (const u of users) {
-          const id = u.admin_id;
-          if (!playerCounts[id]) playerCounts[id] = 0;
-          playerCounts[id]++;
-        }
-      }
-    }
+    // 3. Build result rows (one per contribution)
+    const result = contributions.map(c => ({
+      round_id: c.game_round_id,
+      stake: c.game_rounds.stake,
+      admin_name: adminsMap[c.admin_id] || `Admin ${c.admin_id}`,
+      commission: Number(c.house_profit_share) || 0,
+      date: c.game_rounds.created_at
+    }));
 
-    // 5. Build result rows
-    const result = [];
-    for (const key of Object.keys(grouped)) {
-      const g = grouped[key];
-      const adminName = adminsMap[g.admin_id] || `Admin ${g.admin_id}`;
-      const playerCount = playerCounts[g.admin_id] || 0;
-      // For "game_name", use stake as a label
-      const gameName = `Bingo ${g.stake} ETB`;
-      // Admin share = total_commission (since it's already the admin's share)
-      result.push({
-        game_name: gameName,
-        admin_name: adminName,
-        player_count: playerCount,
-        total_commission: g.total_commission,
-        admin_share: g.total_commission   // same as commission because it's already the admin's cut
-      });
-    }
-
-    // Sort by game name then admin
-    result.sort((a, b) => a.game_name.localeCompare(b.game_name) || a.admin_name.localeCompare(b.admin_name));
+    // Sort by date descending
+    result.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json({ success: true, data: result });
 
