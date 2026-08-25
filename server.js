@@ -1231,8 +1231,11 @@ const games = {
   30: createGameState(30)
 };
 
-// Bot constants
-const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
+// Bot constants – now 9 bots
+const BOT_IDS = [
+  '1945854', '8696548', '78963521', '45896872', '1236584',
+  '4567890', '9876543', '3216549', '7539512'
+];
 const botBalances = new Map();
 BOT_IDS.forEach(id => botBalances.set(id, 1000));
 
@@ -1332,21 +1335,10 @@ function removeBotFromGame(botId, stake) {
   return true;
 }
 
+// checkAndAddThirdBot is no longer used; we keep it empty or remove. We'll keep it but not call it.
 function checkAndAddThirdBot(stake) {
-  if (stake !== 20) return;
-  const game = getGame(stake);
-  if (!game || game.status !== 'lobby') return;
-  if (game.bot3Added) return;
-  const realPlayers = game.players.filter(p => !p.isBot);
-  if (realPlayers.length >= 3) {
-    game.bot3Added = true;
-    setTimeout(() => {
-      if (game.status !== 'lobby') return;
-      if (game.players.find(p => p.telegramId === BOT_IDS[2])) return;
-      addSingleBotToGame(BOT_IDS[2], stake);
-      console.log(`🤖 Third bot (${BOT_IDS[2]}) added because 3 real players joined.`);
-    }, 500);
-  }
+  // Deprecated – now all 9 bots are scheduled randomly
+  return;
 }
 
 function updateBotsOnNumber(stake, number) {
@@ -1483,32 +1475,29 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
 
-  if (stake === 20 && forceBotWinNextGame[20]) {
-    game.forceActive = true;
-    game.forcedBotId = globalForcedBotId;
-    game.forcedCallCounter = 0;
-    console.log(`⏳ Forced win active for bot ${game.forcedBotId} on 21st call.`);
-  } else {
-    game.forceActive = false;
-    game.forcedBotId = null;
-  }
-
+  // ---- NEW BOT JOINING LOGIC FOR 20 ETB ----
   if (stake === 20) {
-    const scheduleBotAtRemaining = (botIndex, remainingSeconds) => {
-      if (botIndex >= BOT_IDS.length) return;
-      const absoluteTime = game.lobbyEndTime - remainingSeconds * 1000;
-      const delay = absoluteTime - Date.now();
-      if (delay <= 0) return;
+    // Schedule each of the 9 bots to join at a random time during the lobby
+    const lobbyDuration = 45000; // 45 seconds
+    const botsToSchedule = BOT_IDS; // all 9
+
+    for (const botId of botsToSchedule) {
+      // Random delay between 1 second and lobbyDuration - 1 second (so they don't all join at the very end)
+      const delay = 1000 + Math.random() * (lobbyDuration - 2000);
       const timeout = setTimeout(() => {
-        if (game.status !== 'lobby') return;
-        const botId = BOT_IDS[botIndex];
-        if (game.players.find(p => p.telegramId === botId)) return;
-        addSingleBotToGame(botId, stake);
+        // Only add if game is still in lobby and bot not already in game
+        if (game.status === 'lobby' && !game.players.find(p => p.telegramId === botId)) {
+          addSingleBotToGame(botId, stake);
+        }
       }, delay);
       game.botTimeouts.push(timeout);
-    };
-    scheduleBotAtRemaining(0, 41);
-    scheduleBotAtRemaining(1, 39);
+    }
+  }
+  // -----------------------------------------
+
+  if (stake === 20) {
+    game.forceActive = false;
+    game.forcedBotId = null;
   }
 
   io.to(`stake_${stake}`).emit('lobbyState', {
@@ -4133,7 +4122,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
+    // checkAndAddThirdBot is removed – no longer needed
   });
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
@@ -4156,7 +4145,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
+    // checkAndAddThirdBot removed
   });
   socket.on('markNumber', (number) => {
     if (!currentStake) return;
