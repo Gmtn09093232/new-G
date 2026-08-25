@@ -577,7 +577,7 @@
             display: flex;
             gap: 20px;
             justify-content: center;
-            margin: 30px 0;
+            margin: 20px 0 16px;
             flex-wrap: wrap;
         }
         .stake-option {
@@ -607,6 +607,95 @@
             background: #1e2a36;
             padding: 2px 8px;
             border-radius: 40px;
+        }
+
+        /* ===== NEW: PLAYER TABLE ON STAKE PAGE ===== */
+        .stake-table-wrap {
+            background: #fef9f0;
+            border-radius: 32px;
+            padding: 12px 16px 16px;
+            margin: 8px 0 18px;
+            border: 1px solid #fed7aa;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+        .stake-table-wrap .table-title {
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: #7c2d12;
+            text-align: center;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+        .stake-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        .stake-table th {
+            background: #f97316;
+            color: white;
+            font-weight: 700;
+            padding: 10px 8px;
+            text-align: center;
+            font-size: 0.8rem;
+            letter-spacing: 0.3px;
+        }
+        .stake-table td {
+            padding: 10px 8px;
+            text-align: center;
+            background: white;
+            border-bottom: 1px solid #f1f5f9;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .stake-table tr:last-child td {
+            border-bottom: none;
+        }
+        .stake-table .stake-amount {
+            font-weight: 800;
+            color: #ea580c;
+        }
+        .stake-table .stake-players {
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .stake-table .stake-players .count-num {
+            display: inline-block;
+            background: #fef3c7;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            min-width: 28px;
+        }
+        .stake-table .stake-bar-wrap {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            max-width: 120px;
+            margin: 0 auto;
+        }
+        .stake-table .stake-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #f97316, #ea580c);
+            border-radius: 20px;
+            transition: width 0.4s ease;
+            width: 0%;
+        }
+        @media (max-width:500px) {
+            .stake-table {
+                font-size: 0.75rem;
+            }
+            .stake-table th,
+            .stake-table td {
+                padding: 8px 4px;
+            }
+            .stake-table .stake-bar-wrap {
+                max-width: 70px;
+            }
         }
 
         .rules-text {
@@ -1217,7 +1306,38 @@
             </div>
         </div>
 
-        <h3 style="text-align:center; margin:20px 0 10px;" data-key="chooseStake">Choose Your Stake</h3>
+        <!-- ===== NEW: PLAYER COUNT TABLE ===== -->
+        <div class="stake-table-wrap">
+            <div class="table-title">👥 ተጫዋቾች በውርርድ / Players by Stake</div>
+            <table class="stake-table" id="stakeTable">
+                <thead>
+                    <tr>
+                        <th>💰 Stake (ETB)</th>
+                        <th>👥 Players</th>
+                        <th>📊 Popularity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="stake-amount">10</td>
+                        <td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td>
+                    </tr>
+                    <tr>
+                        <td class="stake-amount">20</td>
+                        <td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td>
+                    </tr>
+                    <tr>
+                        <td class="stake-amount">30</td>
+                        <td class="stake-players"><span class="count-num" id="stakeTable30Count">0</span></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30" style="width:0%;"></div></div></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="text-align:center; margin:10px 0 6px;" data-key="chooseStake">Choose Your Stake</h3>
         <div class="stake-page-buttons">
             <div style="text-align:center;"><button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="stake10Count">👥 0 players</div></div>
             <div style="text-align:center;"><button id="stake20Btn" class="stake-option" data-stake="20">20 ETB</button><div class="player-count-badge" id="stake20Count">👥 0 players</div></div>
@@ -1296,7 +1416,7 @@
         </div>
         <div class="prize-pool"><span data-key="prizePoolLabel">🏆 PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
 
-        <!-- ===== NEW: BACK TO LOBBY BUTTON (hidden by default) ===== -->
+        <!-- ===== BACK TO LOBBY BUTTON (hidden by default) ===== -->
         <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
             <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby">← Back to Lobby</button>
         </div>
@@ -1314,10 +1434,8 @@
 
     <script>
         // ============================================================
-        //  DOT BINGO – Full Frontend with Invite Tracking (admin names hidden)
-        //  Deposit flow: select method directly (no admin step)
-        //  Logos: Telebirr, CBE Birr, M-Pesa using official Wikimedia SVGs with fallback
-        //  "How to pay" modal added back
+        //  DOT BINGO – Full Frontend with Player Table on Stake Page
+        //  Adds a live table showing player counts per stake level
         // ============================================================
 
         // ---------- DOM REFS ----------
@@ -1341,12 +1459,32 @@
             if (d.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${d.count} players`;
             if (d.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${d.count} players`;
             if (d.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${d.count} players`;
+            // Update table too
+            updateStakeTable(d.stake, d.count);
         });
         stakeSocket.on('lobbyState', s => {
             if (s.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${s.playersCount} players`;
             if (s.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${s.playersCount} players`;
             if (s.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${s.playersCount} players`;
+            updateStakeTable(s.stake, s.playersCount);
         });
+
+        // ===== NEW: update the stake table with live counts =====
+        // We'll store counts in an object and update bars based on max
+        const stakeCounts = { 10: 0, 20: 0, 30: 0 };
+
+        function updateStakeTable(stake, count) {
+            if (![10, 20, 30].includes(stake)) return;
+            stakeCounts[stake] = count;
+            const el = $(`stakeTable${stake}Count`);
+            if (el) el.innerText = count;
+
+            // Update bar widths relative to max
+            const maxVal = Math.max(stakeCounts[10], stakeCounts[20], stakeCounts[30], 1);
+            const pct = Math.round((count / maxVal) * 100);
+            const bar = $(`stakeBar${stake}`);
+            if (bar) bar.style.width = pct + '%';
+        }
 
         // ---------- UTILITY ----------
         const copy = t => { if (!t) return;
@@ -1716,7 +1854,6 @@
 
         // ========== LOGO HELPERS with fallback ==========
         function getMethodLogo(type) {
-            // Use direct SVG from Wikimedia (not thumbnail) for better quality
             const logos = {
                 telebirr: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Telebirr_logo.svg',
                 cbebirr: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/Commercial_Bank_of_Ethiopia_logo.svg',
@@ -1725,7 +1862,6 @@
             return logos[type] || null;
         }
 
-        // Generate fallback icon (first letter + color)
         function getFallbackIcon(type) {
             const map = {
                 telebirr: { letter: 'T', color: '#f97316' },
@@ -1735,7 +1871,7 @@
             return map[type] || { letter: '💰', color: '#6b7280' };
         }
 
-        // ========== DEPOSIT: SHOW METHODS DIRECTLY (no admin step) ==========
+        // ========== DEPOSIT: SHOW METHODS DIRECTLY ==========
         async function openDepositMethods() {
             resetDepositState();
             const admins = await loadAdmins();
@@ -1780,7 +1916,6 @@
                 const disp = getSafeNumber(m.number);
                 const logoUrl = getMethodLogo(m.type);
                 const fallback = getFallbackIcon(m.type);
-                // Build image with onerror fallback
                 const imgHtml = logoUrl ?
                     `<img src="${logoUrl}" alt="${m.label}" loading="lazy" referrerpolicy="no-referrer" 
                               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
@@ -1964,7 +2099,6 @@
             $('paymentRecipientNumber').textContent = `📞 ${disp}`;
             const title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
             $('paymentMethodTitle').textContent = title + ' P2P';
-            // Set logo in payment modal header with fallback
             const iconContainer = $('paymentMethodIcon');
             if (iconContainer) {
                 const logoUrl = getMethodLogo(selectedDepositType);
@@ -2236,7 +2370,6 @@
                             selectedNumber.textContent = i;
                             buildGrid();
                             socket.emit('selectCardNumber', i);
-                            // Update back-to-lobby button visibility
                             updateBackToLobbyVisibility();
                         }
                     };
@@ -2261,11 +2394,9 @@
         function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l =
                 'O'; return `${l}-${n}`; }
 
-        // ----- Back to Lobby visibility -----
         function updateBackToLobbyVisibility() {
             const container = $('backToLobbyContainer');
             if (container) {
-                // Show only if the player has NOT selected a card (i.e., watching)
                 container.classList.toggle('hidden', selectedCardNumber !== null);
             }
         }
@@ -2285,7 +2416,6 @@
             startTimer(sec);
             if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
             updateStatsUI();
-            // Not in game page, hide back-to-lobby button
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
         }
@@ -2302,7 +2432,6 @@
             clearInterval(lobbyTimerInterval);
             if (socket) socket.emit('getBalance');
             if (userCard.length) renderCard(userCard, 'gameCard', true);
-            // Update back-to-lobby button
             updateBackToLobbyVisibility();
         }
 
@@ -2339,7 +2468,6 @@
             pendingSelection = null;
             pendingRandom = false;
             currentGameId = null;
-            // Hide back-to-lobby button
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
             unlockSpeech();
@@ -2423,8 +2551,8 @@
 
         function syncBalance(v) { balance = v;
             lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($(
-                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $(((
-                'gameBalanceDisplay'))).innerText = v; }
+                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $((((
+                'gameBalanceDisplay')))).innerText = v; }
 
         // ============================================================
         //  CONNECT TO GAME
@@ -2448,6 +2576,8 @@
                     showLobby(state.startsIn);
                     if (state.takenNumbers) updateGrid(state.takenNumbers);
                     updateCount(state.playersCount);
+                    // Also update the stake table with this stake's count
+                    updateStakeTable(state.stake, state.playersCount);
                 }
             });
             socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true);
@@ -2488,6 +2618,8 @@
                 if (s && winningBalance && !isGameActive) {
                     winningBalance.innerText = Math.floor(data.count * s * 0.8);
                 }
+                // Update stake table for all stake levels
+                updateStakeTable(data.stake, data.count);
             });
             socket.on('gameStarted', data => {
                 if (data.stake !== currentStake) return;
@@ -2518,7 +2650,6 @@
                 currentGameId = null;
                 markedNumbers = [];
                 if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
-                // Hide back-to-lobby button after game ends (player can't be in game)
                 const container = $('backToLobbyContainer');
                 if (container) container.classList.add('hidden');
             });
@@ -2604,7 +2735,7 @@
             await authenticateUser();
             await fetchUserInviteInfo();
             restoreSession();
-            console.log('✨ DOT BINGO ready – logos with fallback, "How to pay" re-added.');
+            console.log('✨ DOT BINGO ready – with live player table on stake page.');
         }
 
         // ============================================================
@@ -2636,7 +2767,6 @@
         $('muteToggleBtn')?.addEventListener('click', toggleMute);
         $('backToStakeBtn')?.addEventListener('click', goStake);
 
-        // Back to Lobby button handler
         $('backToLobbyBtn')?.addEventListener('click', function() {
             goStake();
         });
@@ -2702,7 +2832,6 @@
             if (raw) copy(raw);
         });
 
-        // How to pay trigger
         $('howToPayTrigger')?.addEventListener('click', openHowToPay);
         $('closeHowToPayBtn')?.addEventListener('click', closeHowToPay);
 
