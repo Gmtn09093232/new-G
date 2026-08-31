@@ -1335,9 +1335,7 @@ function removeBotFromGame(botId, stake) {
   return true;
 }
 
-// checkAndAddThirdBot is no longer used; we keep it empty or remove. We'll keep it but not call it.
 function checkAndAddThirdBot(stake) {
-  // Deprecated – now all 9 bots are scheduled randomly
   return;
 }
 
@@ -1477,15 +1475,11 @@ function resetGame(stake) {
 
   // ---- NEW BOT JOINING LOGIC FOR 20 ETB ----
   if (stake === 20) {
-    // Schedule each of the 9 bots to join at a random time during the lobby
-    const lobbyDuration = 45000; // 45 seconds
-    const botsToSchedule = BOT_IDS; // all 9
-
+    const lobbyDuration = 45000;
+    const botsToSchedule = BOT_IDS;
     for (const botId of botsToSchedule) {
-      // Random delay between 1 second and lobbyDuration - 1 second (so they don't all join at the very end)
       const delay = 1000 + Math.random() * (lobbyDuration - 2000);
       const timeout = setTimeout(() => {
-        // Only add if game is still in lobby and bot not already in game
         if (game.status === 'lobby' && !game.players.find(p => p.telegramId === botId)) {
           addSingleBotToGame(botId, stake);
         }
@@ -3697,6 +3691,193 @@ app.get('/super-admin/analysis', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ============================================================
+//  SUPER ADMIN – DELETE PLAYER
+// ============================================================
+app.delete('/super-admin/delete-player', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramId } = req.body;
+  if (!telegramId) {
+    return res.status(400).json({ error: 'telegramId is required' });
+  }
+
+  try {
+    // 1. Check if user exists
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    // 2. Delete the user from users table
+    const { error: deleteErr } = await supabase
+      .from('users')
+      .delete()
+      .eq('telegram_id', String(telegramId));
+
+    if (deleteErr) throw deleteErr;
+
+    // 3. Remove from in-memory cache
+    if (users[String(telegramId)]) {
+      delete users[String(telegramId)];
+    }
+
+    // 4. Remove from any active games
+    for (const stake of [10, 20, 30]) {
+      const game = getGame(stake);
+      if (!game) continue;
+      const idx = game.players.findIndex(p => p.telegramId === String(telegramId));
+      if (idx !== -1) {
+        const player = game.players[idx];
+        if (player.cardNumber) {
+          game.takenCardNumbers.delete(player.cardNumber);
+        }
+        game.players.splice(idx, 1);
+        io.to(`stake_${stake}`).emit('cardTaken', {
+          stake,
+          number: player.cardNumber,
+          takenNumbers: Array.from(game.takenCardNumbers)
+        });
+        broadcastPlayerCount(stake);
+        notifyAdminClients();
+      }
+    }
+
+    // 5. Audit log
+    await Audit.adminAction('SUPER_ADMIN_DELETE_PLAYER', auth.adminId || 'secret', req.ip, {
+      targetUserId: telegramId,
+      username: user.username,
+      adminId: user.admin_id
+    });
+
+    res.json({ success: true, message: `Player ${telegramId} deleted successfully` });
+
+  } catch (err) {
+    console.error('❌ Error deleting player:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+//  SUPER ADMIN – TRANSFER PLAYER
+// ============================================================
+app.post('/super-admin/transfer-player', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramId, targetAdminId } = req.body;
+  if (!telegramId || !targetAdminId) {
+    return res.status(400).json({ error: 'telegramId and targetAdminId are required' });
+  }
+
+  try {
+    // 1. Check if user exists
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id, admin_name, invite_code')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    // 2. Check if target admin exists and is active
+    const { data: targetAdmin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, invite_code')
+      .eq('id', targetAdminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !targetAdmin) {
+      return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
+    }
+
+    // 3. Update user with new admin
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({
+        admin_id: targetAdmin.id,
+        admin_name: targetAdmin.name,
+        invite_code: targetAdmin.invite_code || user.invite_code
+      })
+      .eq('telegram_id', String(telegramId));
+
+    if (updateErr) throw updateErr;
+
+    // 4. Update in-memory cache
+    if (users[String(telegramId)]) {
+      users[String(telegramId)].admin_id = targetAdmin.id;
+      users[String(telegramId)].admin_name = targetAdmin.name;
+    }
+
+    // 5. Update invite_tracking
+    const { data: existingTrack, error: trackFindErr } = await supabase
+      .from('invite_tracking')
+      .select('id')
+      .eq('telegram_id', String(telegramId))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!trackFindErr && existingTrack) {
+      await supabase
+        .from('invite_tracking')
+        .update({
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          invite_code: targetAdmin.invite_code || user.invite_code
+        })
+        .eq('id', existingTrack.id);
+    } else {
+      await supabase
+        .from('invite_tracking')
+        .insert({
+          telegram_id: String(telegramId),
+          username: user.username,
+          invite_code: targetAdmin.invite_code || user.invite_code,
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          ip_address: req.ip || null,
+          user_agent: req.headers['user-agent'] || null
+        });
+    }
+
+    // 6. Audit log
+    await Audit.adminAction('SUPER_ADMIN_TRANSFER_PLAYER', auth.adminId || 'secret', req.ip, {
+      targetUserId: telegramId,
+      username: user.username,
+      fromAdminId: user.admin_id,
+      fromAdminName: user.admin_name,
+      toAdminId: targetAdmin.id,
+      toAdminName: targetAdmin.name
+    });
+
+    res.json({
+      success: true,
+      message: `Player ${telegramId} transferred to ${targetAdmin.name}`,
+      player: {
+        telegram_id: telegramId,
+        username: user.username,
+        admin_id: targetAdmin.id,
+        admin_name: targetAdmin.name
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ Error transferring player:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ============================================================
 //  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
