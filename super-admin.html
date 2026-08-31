@@ -298,6 +298,13 @@
         .btn-indigo:active {
             background: #4f46e5;
         }
+        .btn-rose {
+            background: #f43f5e;
+            color: #fff;
+        }
+        .btn-rose:active {
+            background: #e11d48;
+        }
 
         /* ─── STATS GRID ─── */
         .stats-grid {
@@ -1327,6 +1334,57 @@
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+        /* ─── DELETE CONFIRM OVERLAY ─── */
+        .delete-confirm-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 4000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .delete-confirm-overlay.active {
+            display: flex;
+        }
+        .delete-confirm-box {
+            background: #fff;
+            border-radius: 20px;
+            padding: 32px 28px;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+            animation: modalIn 0.2s ease;
+        }
+        .delete-confirm-box .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .delete-confirm-box h3 {
+            font-size: 20px;
+            color: #0b1120;
+            margin-bottom: 6px;
+        }
+        .delete-confirm-box p {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .delete-confirm-box .btn-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .delete-confirm-box .btn-group .btn {
+            min-width: 100px;
+        }
     </style>
 </head>
 <body>
@@ -1442,22 +1500,19 @@
                 <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
             </div>
 
-            <!-- PLATFORM (now with Overview / Analysis toggle) -->
+            <!-- PLATFORM -->
             <div class="tab-pane" id="tab-platform">
                 <h2>Platform <span class="sub">— overview &amp; analysis</span></h2>
 
-                <!-- Toggle buttons -->
                 <div class="analysis-toggle">
                     <button class="btn btn-primary btn-sm" id="platformOverviewBtn" onclick="showPlatformView('overview')">Overview</button>
                     <button class="btn btn-outline btn-sm" id="platformAnalysisBtn" onclick="showPlatformView('analysis')">Analysis</button>
                 </div>
 
-                <!-- Overview content (existing) -->
                 <div id="platformOverview">
                     <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
                 </div>
 
-                <!-- Analysis content (new) -->
                 <div id="platformAnalysis" style="display:none;">
                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
                         <button class="btn btn-primary" onclick="fetchAnalysis()">📊 Load Analysis</button>
@@ -1503,15 +1558,27 @@
         </div>
     </div>
 
+    <!-- ─── DELETE CONFIRM OVERLAY ─── -->
+    <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
+        <div class="delete-confirm-box">
+            <div class="icon">⚠️</div>
+            <h3>Delete Player</h3>
+            <p id="deleteConfirmMessage">Are you sure you want to delete this player?</p>
+            <div class="btn-group">
+                <button class="btn btn-outline" onclick="cancelDelete()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ============================================================
-        //  SUPER ADMIN – Full functionality (preserved & enhanced)
+        //  SUPER ADMIN – Full functionality + DELETE PLAYER
         // ============================================================
 
         const urlParams = new URLSearchParams(window.location.search);
         const SECRET = urlParams.get('secret') || '';
 
-        // If no secret is provided, show a friendly error
         if (!SECRET) {
             document.body.innerHTML = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;background:#f4f6fb;font-family:system-ui;">
@@ -1562,6 +1629,14 @@
         let filterTo = '';
         let filterAdmin = 'all';
 
+        // ─── DELETE STATE ───
+        let deletePending = {
+            telegramId: null,
+            username: null,
+            adminId: null,
+            source: null // 'modal' or 'global'
+        };
+
         // ─── TOAST ───
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
@@ -1587,9 +1662,8 @@
                 updateWithdrawalFilterButtons(currentWithdrawFilter);
                 loadAdminWithdrawals(currentWithdrawFilter);
             } else if (tab === 'platform') {
-                // Show overview by default when switching to platform tab
                 showPlatformView('overview');
-                loadPlatformStats(); // load overview data
+                loadPlatformStats();
             } else if (tab === 'players') loadGlobalPlayers();
 
             const container = document.getElementById('tabContainer');
@@ -1612,7 +1686,6 @@
                 analysisBtn.className = 'btn btn-outline btn-sm';
                 overviewDiv.style.display = 'block';
                 analysisDiv.style.display = 'none';
-                // Ensure overview data is loaded
                 if (document.getElementById('platformContent').querySelector('.loading-state')) {
                     loadPlatformStats();
                 }
@@ -1621,8 +1694,6 @@
                 analysisBtn.className = 'btn btn-primary btn-sm';
                 overviewDiv.style.display = 'none';
                 analysisDiv.style.display = 'block';
-                // Optionally auto-load analysis if filters are set
-                // We'll let the user click the button
             }
         }
 
@@ -1816,7 +1887,6 @@
                 opt.textContent = admin.name;
                 select.appendChild(opt);
             });
-            // Also populate the players tab admin filter
             const playerAdminFilter = document.getElementById('playerAdminFilter');
             if (playerAdminFilter) {
                 playerAdminFilter.innerHTML = '<option value="all">All Admins</option>';
@@ -1829,7 +1899,58 @@
             }
         }
 
-        // ─── PLAYER LIST (per admin) – ALL REGISTERED PLAYERS ───
+        // ─── DELETE PLAYER ───
+        function showDeleteConfirm(telegramId, username, adminId, source) {
+            deletePending.telegramId = telegramId;
+            deletePending.username = username;
+            deletePending.adminId = adminId;
+            deletePending.source = source;
+
+            document.getElementById('deleteConfirmMessage').textContent =
+                `Are you sure you want to delete player "${username}" (ID: ${telegramId})? This action cannot be undone.`;
+            document.getElementById('deleteConfirmOverlay').classList.add('active');
+        }
+
+        function cancelDelete() {
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+            deletePending = { telegramId: null, username: null, adminId: null, source: null };
+        }
+
+        async function confirmDelete() {
+            const { telegramId, username, adminId, source } = deletePending;
+            if (!telegramId) return;
+
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+
+            try {
+                const url = apiUrl('/super-admin/delete-player');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Player "${username}" deleted successfully!`, 'success');
+                    // Refresh the appropriate list
+                    if (source === 'modal' && adminId) {
+                        loadAdminPlayers(adminId, currentPlayersPage || 1);
+                    } else if (source === 'global') {
+                        loadGlobalPlayers();
+                    } else {
+                        refreshAll();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to delete player');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                deletePending = { telegramId: null, username: null, adminId: null, source: null };
+            }
+        }
+
+        // ─── LOAD ADMIN PLAYERS (modal) ───
         const ADMIN_PLAYERS_PER_PAGE = 20;
         let currentPlayersAdminId = null;
         let currentPlayersPage = 1;
@@ -1891,7 +2012,10 @@
                         <td>${escapeHtml(p.invite_code || 'N/A')}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                         <td>
-                            <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')">🗑 Delete</button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
@@ -1996,14 +2120,14 @@
                 document.getElementById('modalTitle').textContent = `Admin: ${a.name}`;
 
                 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric',
-                    year: 'numeric' }) : 'N/A';
+                        year: 'numeric' }) : 'N/A';
 
                 const totalDeposits = stats.deposits ? stats.deposits.reduce((s, d) => s + Number(d.amount), 0) : 0;
                 const totalWithdrawals = stats.withdrawals ? stats.withdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
                 const totalAdminWithdrawals = stats.adminWithdrawals ? stats.adminWithdrawals.reduce((s, w) => s + Number(w
                     .amount), 0) : 0;
                 const totalEarnings = stats.earnings ? stats.earnings.reduce((s, e) => s + Number(e.commission_amount), 0) :
-                0;
+                    0;
 
                 const depositsHtml = stats.deposits && stats.deposits.length > 0 ?
                     stats.deposits.slice(0, 10).map(d =>
@@ -2319,7 +2443,10 @@
                         <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                         <td>
-                            <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')">🗑 Delete</button>
+                            </div>
                         </td>
                     </tr>
                 `).join('');
@@ -2495,13 +2622,11 @@
                     return;
                 }
 
-                // --- Compute summary stats ---
                 const totalPlayers = rows.reduce((sum, r) => sum + (r.player_count || 0), 0);
                 const totalCommission = rows.reduce((sum, r) => sum + (r.total_commission || 0), 0);
                 const totalAdminShare = rows.reduce((sum, r) => sum + (r.admin_share || 0), 0);
                 const uniqueGames = [...new Set(rows.map(r => r.game_name))].length;
 
-                // --- Build table ---
                 let tableHtml = `
                     <div class="analysis-summary">
                         <div class="stat-box"><div class="num">${uniqueGames}</div><div class="lbl">Games</div></div>
@@ -2535,8 +2660,6 @@
                     </div>
                 `;
 
-                // --- Build stacked bar chart (per game, showing admin shares) ---
-                // Group rows by game
                 const gameMap = new Map();
                 rows.forEach(r => {
                     const key = r.game_name;
@@ -2551,7 +2674,6 @@
                     });
                 });
 
-                // Assign distinct colors to admins across all games
                 const allAdmins = [...new Set(rows.map(r => r.admin_name))];
                 const colorPalette = [
                     '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -2563,7 +2685,6 @@
                     adminColorMap[name] = colorPalette[idx % colorPalette.length];
                 });
 
-                // Determine max total commission for scaling
                 let maxTotal = 0;
                 gameMap.forEach((g) => {
                     const total = g.admins.reduce((sum, a) => sum + a.share, 0);
@@ -2576,10 +2697,7 @@
                         <h4>Admin Share per Game (stacked bar)</h4>
                         ${Array.from(gameMap.entries()).map(([gameName, gameData]) => {
                             const total = gameData.admins.reduce((sum, a) => sum + a.share, 0);
-                            const widthPercent = Math.max(10, (total / maxTotal) * 100);
-                            // Build segments
                             let segments = '';
-                            let cumulative = 0;
                             gameData.admins.forEach(a => {
                                 const share = a.share || 0;
                                 const segWidth = (share / total) * 100;
@@ -2590,7 +2708,6 @@
                                         </div>
                                     `;
                                 }
-                                cumulative += share;
                             });
                             return `
                                 <div class="chart-bar-row">
