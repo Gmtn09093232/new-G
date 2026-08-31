@@ -1612,6 +1612,7 @@
                     <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
                     <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()">Reset</button>
                     <button class="btn btn-success" onclick="sendBulkMessage()">📨 Send to Selected</button>
+                    <button class="btn btn-teal" onclick="transferSelectedPlayers('global')">↗️ Transfer Selected</button>
                 </div>
                 <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
@@ -1651,13 +1652,13 @@
     <!-- ─── TRANSFER OVERLAY ─── -->
     <div class="transfer-overlay" id="transferOverlay">
         <div class="transfer-box">
-            <h3>Transfer Player</h3>
+            <h3 id="transferTitle">Transfer Player</h3>
             <p id="transferMessage">Select a new admin for this player.</p>
             <label for="transferAdminSelect">Target Admin</label>
             <select id="transferAdminSelect"></select>
             <div class="btn-group">
                 <button class="btn btn-outline" onclick="cancelTransfer()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmTransfer()">Transfer</button>
+                <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Transfer</button>
             </div>
         </div>
     </div>
@@ -1719,22 +1720,21 @@
         let filterFrom = '';
         let filterTo = '';
         let filterAdmin = 'all';
-        let allAdmins = []; // cached for transfer dropdown
+        let allAdmins = [];
 
         // ─── DELETE STATE ───
         let deletePending = {
             telegramId: null,
             username: null,
             adminId: null,
-            source: null // 'modal' or 'global'
+            source: null
         };
 
         // ─── TRANSFER STATE ───
         let transferPending = {
-            telegramId: null,
-            username: null,
-            currentAdminId: null,
-            source: null
+            players: [], // array of { id, name }
+            source: null,
+            currentAdminId: null
         };
 
         // ─── TOAST ───
@@ -1921,7 +1921,7 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                allAdmins = data.admins; // cache for transfer
+                allAdmins = data.admins;
                 document.getElementById('adminBadge').textContent = allAdmins.length;
                 populateAdminDropdown(allAdmins);
 
@@ -1998,7 +1998,6 @@
                     playerAdminFilter.appendChild(opt);
                 });
             }
-            // Also populate transfer dropdown (will be filled on demand)
             populateTransferDropdown(admins);
         }
 
@@ -2063,21 +2062,34 @@
             }
         }
 
-        // ─── TRANSFER PLAYER ───
-        function showTransferDialog(telegramId, username, currentAdminId, source) {
-            transferPending.telegramId = telegramId;
-            transferPending.username = username;
-            transferPending.currentAdminId = currentAdminId;
-            transferPending.source = source;
+        // ─── TRANSFER PLAYER (single and bulk) ───
+        function showTransferDialog(players, source, currentAdminId) {
+            if (!Array.isArray(players)) {
+                // Single player passed as object
+                players = [players];
+            }
+            if (players.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
 
+            transferPending.players = players;
+            transferPending.source = source;
+            transferPending.currentAdminId = currentAdminId;
+
+            const count = players.length;
+            const names = players.map(p => p.name).join(', ');
+            document.getElementById('transferTitle').textContent = count === 1 ? 'Transfer Player' : `Transfer ${count} Players`;
             document.getElementById('transferMessage').textContent =
-                `Transfer player "${username}" to which admin?`;
+                count === 1
+                    ? `Transfer player "${players[0].name}" to which admin?`
+                    : `Transfer ${count} players (${names}) to which admin?`;
+
             // Populate dropdown, exclude current admin if we know it
             const select = document.getElementById('transferAdminSelect');
-            // Rebuild from allAdmins
             select.innerHTML = '';
             allAdmins.forEach(admin => {
-                if (currentAdminId && admin.id == currentAdminId) return; // skip current
+                if (currentAdminId && admin.id == currentAdminId) return;
                 const opt = document.createElement('option');
                 opt.value = admin.id;
                 opt.textContent = admin.name + (admin.is_super_admin ? ' (Super)' : '');
@@ -2091,7 +2103,7 @@
 
         function cancelTransfer() {
             document.getElementById('transferOverlay').classList.remove('active');
-            transferPending = { telegramId: null, username: null, currentAdminId: null, source: null };
+            transferPending = { players: [], source: null, currentAdminId: null };
         }
 
         async function confirmTransfer() {
@@ -2101,21 +2113,26 @@
                 showToast('Please select a target admin.', 'error');
                 return;
             }
-            const { telegramId, username, source, currentAdminId } = transferPending;
-            if (!telegramId) return;
+            const { players, source, currentAdminId } = transferPending;
+            if (!players || players.length === 0) {
+                showToast('No players to transfer.', 'error');
+                return;
+            }
 
             document.getElementById('transferOverlay').classList.remove('active');
 
             try {
-                const url = apiUrl('/super-admin/transfer-player');
+                // Use bulk endpoint
+                const telegramIds = players.map(p => p.id);
+                const url = apiUrl('/super-admin/transfer-players');
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegramId, targetAdminId })
+                    body: JSON.stringify({ telegramIds, targetAdminId })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`Player "${username}" transferred successfully!`, 'success');
+                    showToast(data.message, 'success');
                     if (source === 'modal' && currentAdminId) {
                         loadAdminPlayers(currentAdminId, currentPlayersPage || 1);
                     } else if (source === 'global') {
@@ -2124,13 +2141,44 @@
                         refreshAll();
                     }
                 } else {
-                    throw new Error(data.error || 'Failed to transfer player');
+                    throw new Error(data.error || 'Failed to transfer players');
                 }
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             } finally {
-                transferPending = { telegramId: null, username: null, currentAdminId: null, source: null };
+                transferPending = { players: [], source: null, currentAdminId: null };
             }
+        }
+
+        // ─── TRANSFER SELECTED (bulk action) ───
+        function transferSelectedPlayers(source) {
+            let checkboxes;
+            if (source === 'global') {
+                checkboxes = document.querySelectorAll('#globalPlayersList .player-select:checked');
+            } else if (source === 'modal') {
+                checkboxes = document.querySelectorAll('#modalBody .player-select:checked');
+            } else {
+                showToast('Invalid source.', 'error');
+                return;
+            }
+
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let currentAdminId = null;
+            if (source === 'modal') {
+                // current admin is the one whose modal is open
+                currentAdminId = currentPlayersAdminId;
+            }
+
+            showTransferDialog(players, source, currentAdminId);
         }
 
         // ─── LOAD ADMIN PLAYERS (modal) ───
@@ -2197,7 +2245,7 @@
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
                                 <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
-                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')">↗️ Transfer</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'modal', ${adminId})">↗️ Transfer</button>
                                 <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')">🗑 Delete</button>
                             </div>
                         </td>
@@ -2234,6 +2282,7 @@
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <button class="btn btn-success btn-sm" onclick="sendBulkMessage()">📨 Send to Selected</button>
+                            <button class="btn btn-teal btn-sm" onclick="transferSelectedPlayers('modal')">↗️ Transfer Selected</button>
                             <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                         </div>
                     </div>
@@ -2631,7 +2680,7 @@
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
                                 <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
-                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'global')">↗️ Transfer</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'global', ${adminId})">↗️ Transfer</button>
                                 <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')">🗑 Delete</button>
                             </div>
                         </td>
