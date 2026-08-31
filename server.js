@@ -3693,7 +3693,7 @@ app.get('/super-admin/analysis', async (req, res) => {
 });
 
 // ============================================================
-//  SUPER ADMIN – DELETE PLAYER
+//  SUPER ADMIN – DELETE PLAYER (single)
 // ============================================================
 app.delete('/super-admin/delete-player', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -3766,7 +3766,7 @@ app.delete('/super-admin/delete-player', async (req, res) => {
 });
 
 // ============================================================
-//  SUPER ADMIN – TRANSFER PLAYER
+//  SUPER ADMIN – TRANSFER PLAYER (single)
 // ============================================================
 app.post('/super-admin/transfer-player', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
@@ -3874,6 +3874,126 @@ app.post('/super-admin/transfer-player', async (req, res) => {
 
   } catch (err) {
     console.error('❌ Error transferring player:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+//  SUPER ADMIN – BULK TRANSFER PLAYERS
+// ============================================================
+app.post('/super-admin/transfer-players', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramIds, targetAdminId } = req.body;
+  if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
+    return res.status(400).json({ error: 'telegramIds array is required' });
+  }
+  if (!targetAdminId) {
+    return res.status(400).json({ error: 'targetAdminId is required' });
+  }
+
+  try {
+    // 1. Verify target admin exists and is active
+    const { data: targetAdmin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, invite_code')
+      .eq('id', targetAdminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !targetAdmin) {
+      return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
+    }
+
+    // 2. Fetch all selected users
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id, admin_name, invite_code')
+      .in('telegram_id', telegramIds.map(id => String(id)));
+
+    if (usersErr) throw usersErr;
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: 'No valid players found' });
+    }
+
+    // 3. Update each user's admin
+    const updatedUsers = [];
+    for (const user of users) {
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          invite_code: targetAdmin.invite_code || user.invite_code
+        })
+        .eq('telegram_id', user.telegram_id);
+
+      if (updateErr) {
+        console.error(`Failed to update user ${user.telegram_id}:`, updateErr.message);
+        continue; // skip this user, but continue with others
+      }
+
+      // Update in-memory cache
+      if (users[user.telegram_id]) {
+        users[user.telegram_id].admin_id = targetAdmin.id;
+        users[user.telegram_id].admin_name = targetAdmin.name;
+      }
+
+      // Update invite_tracking
+      const { data: existingTrack, error: trackFindErr } = await supabase
+        .from('invite_tracking')
+        .select('id')
+        .eq('telegram_id', user.telegram_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!trackFindErr && existingTrack) {
+        await supabase
+          .from('invite_tracking')
+          .update({
+            admin_id: targetAdmin.id,
+            admin_name: targetAdmin.name,
+            invite_code: targetAdmin.invite_code || user.invite_code
+          })
+          .eq('id', existingTrack.id);
+      } else {
+        await supabase
+          .from('invite_tracking')
+          .insert({
+            telegram_id: user.telegram_id,
+            username: user.username,
+            invite_code: targetAdmin.invite_code || user.invite_code,
+            admin_id: targetAdmin.id,
+            admin_name: targetAdmin.name,
+            ip_address: req.ip || null,
+            user_agent: req.headers['user-agent'] || null
+          });
+      }
+
+      updatedUsers.push({
+        telegram_id: user.telegram_id,
+        username: user.username
+      });
+    }
+
+    // 4. Audit log
+    await Audit.adminAction('SUPER_ADMIN_BULK_TRANSFER_PLAYERS', auth.adminId || 'secret', req.ip, {
+      targetAdminId: targetAdmin.id,
+      targetAdminName: targetAdmin.name,
+      playersTransferred: updatedUsers.length,
+      playerIds: updatedUsers.map(u => u.telegram_id)
+    });
+
+    res.json({
+      success: true,
+      message: `${updatedUsers.length} player(s) transferred to ${targetAdmin.name}`,
+      transferred: updatedUsers
+    });
+
+  } catch (err) {
+    console.error('❌ Error in bulk transfer:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
