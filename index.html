@@ -6,7 +6,7 @@
     <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -16,824 +16,560 @@
             user-select: none;
             -webkit-tap-highlight-color: transparent;
         }
+        :root {
+            --bg: #0B132B;
+            --panel: #1C2541;
+            --panel-light: #2A3A5C;
+            --yellow: #FBBF24;
+            --yellow-dark: #B45309;
+            --red: #EF4444;
+            --text: #FFFFFF;
+            --text-muted: #94A3B8;
+            --border: rgba(255, 255, 255, 0.08);
+        }
         body {
             min-height: 100vh;
-            background: #0B132B;
-            background-image: radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
-            background-size: 100% 100%, 100% 100%;
+            background: var(--bg);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            color: #FFFFFF;
-            padding: 12px;
+            color: var(--text);
+            padding: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow-x: hidden;
         }
         .page {
-            max-width: 600px;
+            max-width: 480px;
             width: 100%;
             margin: 0 auto;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-radius: 32px;
-            padding: 20px 16px 24px;
-            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5),
-                        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: var(--bg);
+            border-radius: 24px;
+            padding: 16px 12px 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 95vh;
         }
         .page.hidden {
-            display: none;
+            display: none !important;
         }
 
-        /* ===== LANGUAGE TOGGLE ===== */
-        .lang-toggle {
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            background: rgba(30, 41, 59, 0.9);
-            backdrop-filter: blur(8px);
-            color: #FBBF24;
-            border: 1px solid rgba(251, 191, 36, 0.3);
-            border-radius: 40px;
-            padding: 8px 18px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 1000;
-            font-size: 0.8rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: background 0.2s, transform 0.1s;
-        }
-        .lang-toggle:active {
-            transform: scale(0.95);
-        }
-        @media (max-width:550px) {
-            .lang-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 14px;
-                font-size: 0.7rem;
-            }
-        }
+        /* ===== TYPOGRAPHY & UTILS ===== */
+        .text-yellow { color: var(--yellow); }
+        .text-muted { color: var(--text-muted); }
+        .text-white { color: var(--text); }
+        .font-bold { font-weight: 700; }
+        .font-black { font-weight: 900; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .flex-center { display: flex; justify-content: center; align-items: center; }
+        .gap-2 { gap: 8px; }
+        .gap-4 { gap: 16px; }
+        .mt-2 { margin-top: 8px; }
+        .mt-4 { margin-top: 16px; }
+        .mb-2 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 16px; }
 
-        /* ===== MODALS ===== */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        .modal.active .modal-content {
-            transform: scale(1) translateY(0);
-            opacity: 1;
-        }
-        .modal-content {
-            background: #1E293B;
-            border-radius: 32px;
-            padding: 28px 24px;
-            max-width: 92%;
-            width: 400px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
-            text-align: left;
-            transform: scale(0.92) translateY(12px);
-            opacity: 0;
-            transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.35s ease;
-            max-height: 92vh;
-            overflow-y: auto;
-            color: #F1F5F9;
-        }
-        @media (max-width:480px) {
-            .modal-content {
-                padding: 20px 16px;
-                width: 95%;
-            }
-        }
-
-        /* ===== MODAL COMPONENTS ===== */
-        .bank-header {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 14px;
-        }
-        .bank-header .bank-icon {
-            font-size: 2.2rem;
-            flex-shrink: 0;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-        }
-        .bank-header .bank-icon img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-        .bank-header .bank-icon .fallback-icon {
-            font-size: 2rem;
-        }
-        .bank-header .bank-title {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: #F8FAFC;
-            letter-spacing: -0.02em;
-        }
-        .bank-header .bank-sub {
-            font-size: 0.8rem;
-            color: #94A3B8;
-            font-weight: 400;
-        }
-
-        .input-group {
-            margin: 16px 0;
-        }
-        .input-group label {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #CBD5E1;
-            display: block;
-            margin-bottom: 6px;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 14px 18px;
-            border-radius: 60px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(15, 23, 42, 0.6);
-            font-size: 0.95rem;
-            font-family: inherit;
-            color: #F8FAFC;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .input-group input:focus {
-            outline: none;
-            border-color: #FBBF24;
-            box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
-        }
-
-        .transaction-summary {
-            background: rgba(30, 41, 59, 0.6);
-            border-radius: 20px;
-            padding: 14px 16px;
-            font-size: 0.8rem;
-            color: #FCD34D;
-            margin: 14px 0;
-            text-align: center;
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-        .modal-buttons button {
-            flex: 1;
-            padding: 14px;
-            border-radius: 60px;
-            font-weight: 700;
+        /* ===== BUTTONS ===== */
+        .btn {
             border: none;
-            min-height: 52px;
-            font-size: 1rem;
+            border-radius: 12px;
+            font-weight: 700;
             cursor: pointer;
-            transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
+            transition: transform 0.1s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
-        .modal-buttons button:active {
-            transform: scale(0.96);
-        }
+        .btn:active { transform: scale(0.96); }
         .btn-primary {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
-            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+            background: var(--yellow);
+            color: var(--bg);
+            padding: 14px 24px;
+            font-size: 1rem;
+            box-shadow: 0 4px 0 var(--yellow-dark), 0 4px 12px rgba(251, 191, 36, 0.2);
         }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #F59E0B, #D97706);
-        }
+        .btn-primary:active { transform: translateY(4px); box-shadow: 0 0 0 var(--yellow-dark); }
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #F1F5F9;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: var(--panel);
+            color: var(--text);
+            padding: 12px 24px;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
         }
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
+        .btn-outline {
+            background: transparent;
+            color: var(--yellow);
+            border: 1px solid var(--yellow);
+            padding: 10px 20px;
+            font-size: 0.85rem;
         }
 
-        .deposit-step {
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 24px;
-            padding: 18px;
-            margin: 14px 0;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+        /* ===== TOP BARS & HEADERS ===== */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
         }
-        .deposit-step .step-number {
-            font-weight: 700;
-            color: #FBBF24;
-            font-size: 0.9rem;
-        }
-        .deposit-step .step-title {
+        .top-bar .user-info {
+            font-size: 0.95rem;
             font-weight: 600;
-            color: #F8FAFC;
-            margin-top: 4px;
         }
-        .deposit-step .step-content {
-            margin-top: 10px;
+        .top-bar .balance-info {
+            background: var(--panel);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--yellow);
+            border: 1px solid var(--border);
         }
-        .deposit-step .recipient-number {
+        .header-back {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        /* ===== STAKE PAGE (Screenshot 4) ===== */
+        .logo-area {
+            text-align: center;
+            margin: 10px 0 20px;
+        }
+        .logo-area h1 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--yellow);
+            letter-spacing: 2px;
+            text-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+            margin: 0;
+        }
+        .logo-area .bingo-balls {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+            letter-spacing: 8px;
+        }
+        .timer-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .timer-ring {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 6px solid var(--panel-light);
+            border-top-color: var(--yellow);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .timer-ring .timer-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .timer-ring .timer-number {
+            font-size: 2.4rem;
+            font-weight: 900;
+            color: var(--yellow);
+            line-height: 1;
+        }
+        .game-info {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .game-info .players {
             display: flex;
             align-items: center;
-            gap: 12px;
-            background: rgba(15, 23, 42, 0.6);
-            padding: 12px 18px;
-            border-radius: 60px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            justify-content: space-between;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 4px;
+            color: var(--text);
+            font-weight: 600;
         }
-        .deposit-step .recipient-number .number {
+        .stake-options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .stake-btn {
+            flex: 1;
+            background: var(--panel);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 14px 0;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text);
             font-weight: 700;
             font-size: 1.1rem;
-            font-family: 'Inter', monospace;
-            color: #F8FAFC;
+            position: relative;
         }
-        .deposit-step .recipient-number .copy-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            padding: 6px 16px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 0.75rem;
-            color: #FBBF24;
-            cursor: pointer;
+        .stake-btn .badge {
+            display: block;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-top: 4px;
         }
-        .deposit-step .invoice-input input {
-            width: 100%;
-            padding: 14px 18px;
-            border-radius: 60px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(15, 23, 42, 0.6);
-            font-size: 0.95rem;
-            color: #F8FAFC;
+        .stake-btn.active {
+            border-color: var(--yellow);
+            background: rgba(251, 191, 36, 0.1);
+            color: var(--yellow);
         }
-        .deposit-step .invoice-input input:focus {
-            outline: none;
-            border-color: #FBBF24;
+        .stake-btn.active .badge {
+            color: var(--yellow);
         }
-
-        .amount-display {
+        .prize-entry-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .prize-entry-row .box {
+            flex: 1;
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 12px;
             text-align: center;
-            font-size: 2.4rem;
+            border: 1px solid var(--border);
+        }
+        .prize-entry-row .box .label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .prize-entry-row .box .value {
+            font-size: 1rem;
             font-weight: 800;
-            color: #FBBF24;
-            margin: 10px 0 18px;
+            color: var(--yellow);
+            margin-top: 4px;
         }
-
-        .method-list-item {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            background: rgba(15, 23, 42, 0.5);
-            border-radius: 20px;
-            padding: 16px 20px;
-            margin: 12px 0;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            cursor: pointer;
-            transition: all 0.2s ease;
+        .play-btn-wrap {
+            margin-bottom: 16px;
         }
-        .method-list-item:active {
-            transform: scale(0.97);
-            background: rgba(30, 41, 59, 0.8);
-            border-color: #FBBF24;
-        }
-        .method-list-item .method-icon {
-            flex-shrink: 0;
-            width: 48px;
-            height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
+        .play-btn-wrap .btn {
+            width: 100%;
+            font-size: 1.2rem;
+            padding: 16px;
             border-radius: 16px;
         }
-        .method-list-item .method-icon img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+        .bottom-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
         }
-        .method-list-item .method-info {
+        .bottom-actions .btn {
             flex: 1;
-            text-align: left;
-        }
-        .method-list-item .method-name {
-            font-weight: 700;
-            font-size: 1rem;
-            color: #F8FAFC;
-        }
-        .method-list-item .method-number {
-            font-size: 0.8rem;
-            color: #94A3B8;
-            font-family: 'Inter', monospace;
-            margin-top: 2px;
-        }
-        .method-list-item .method-select-badge {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
-            padding: 4px 16px;
-            border-radius: 40px;
-            font-size: 0.7rem;
-            font-weight: 700;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 0.9rem;
         }
 
-        .deposit-step-header {
+        /* ===== BOTTOM NAV ===== */
+        .bottom-nav {
             display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 18px;
+            justify-content: space-around;
+            background: var(--panel);
+            border-radius: 20px;
+            padding: 8px;
+            margin-top: auto;
+            border: 1px solid var(--border);
         }
-        .deposit-step-header .step-back {
-            background: rgba(255, 255, 255, 0.05);
+        .bottom-nav .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            background: transparent;
             border: none;
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
-            font-size: 1.2rem;
-            color: #F1F5F9;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .deposit-step-header .step-back:active {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .deposit-step-header .step-title {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: #F8FAFC;
-            flex: 1;
-        }
-        .deposit-step-header .step-sub {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 4px 14px;
-            border-radius: 30px;
+            color: var(--text-muted);
             font-size: 0.65rem;
-            color: #94A3B8;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 12px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .bottom-nav .nav-item.active {
+            color: var(--yellow);
+            background: rgba(251, 191, 36, 0.1);
+        }
+        .bottom-nav .nav-item i {
+            font-size: 1.2rem;
         }
 
-        .type-btn {
-            background: rgba(255, 255, 255, 0.05);
+        /* ===== LOBBY PAGE (Screenshot 3 - Pick Card) ===== */
+        .pick-card-header {
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 14px;
-            border-radius: 60px;
-            margin: 10px 0;
-            font-weight: 600;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            width: 100%;
-            color: #F1F5F9;
-            cursor: pointer;
+            margin-bottom: 20px;
         }
-        .type-btn:active {
-            transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.1);
+        .pick-card-header h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
         }
-
-        .empty-state {
+        .pick-timer {
             text-align: center;
-            padding: 40px 20px;
-            color: #64748B;
+            margin-bottom: 16px;
         }
-        .empty-state .empty-icon {
-            font-size: 3.2rem;
-            margin-bottom: 12px;
+        .pick-timer .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-
-        /* ===== CARD CONTAINER ===== */
-        .card-container {
-            margin: 20px 0 16px;
+        .pick-timer .number {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--yellow);
+            line-height: 1.1;
+        }
+        .pick-timer .selected-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .legend {
             display: flex;
             justify-content: center;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 24px;
-            padding: 16px 8px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 0.7rem;
+        }
+        .legend .item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .legend .dot.available { background: var(--panel-light); }
+        .legend .dot.taken { background: var(--red); }
+        .legend .dot.mine { background: var(--yellow); }
+
+        .grid-100 {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            margin-bottom: 20px;
+            background: var(--panel);
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        .grid-100 .grid-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--panel-light);
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .grid-100 .grid-cell.taken {
+            background: var(--red);
+            color: white;
+            cursor: not-allowed;
+        }
+        .grid-100 .grid-cell.own-card {
+            background: var(--yellow);
+            color: var(--bg);
+            font-weight: 800;
+            cursor: not-allowed;
+            box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+        }
+        .lock-in-btn-wrap {
+            margin-top: auto;
+        }
+        .lock-in-btn-wrap .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1rem;
+            border-radius: 16px;
+        }
+
+        /* ===== GAME PAGE (Screenshot 2) ===== */
+        .game-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            background: var(--panel);
+            padding: 8px 12px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+        .game-top-bar .game-id {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .game-top-bar .game-id strong {
+            color: var(--text);
+        }
+        .game-top-bar .ball-display {
+            width: 42px;
+            height: 42px;
+            background: var(--yellow);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--bg);
+            font-weight: 900;
+            font-size: 1rem;
+            line-height: 1;
+            box-shadow: 0 4px 8px rgba(251, 191, 36, 0.3);
+        }
+        .game-top-bar .ball-display .letter {
+            font-size: 0.5rem;
+            font-weight: 700;
+        }
+        .game-top-bar .card-info {
+            text-align: right;
+            font-size: 0.75rem;
+        }
+        .game-top-bar .card-info strong {
+            display: block;
+            color: var(--text);
+            font-size: 0.85rem;
+        }
+        .game-top-bar .card-info .away {
+            color: var(--yellow);
+            font-weight: 600;
+        }
+
+        .card-container {
+            margin: 8px 0 16px;
+            display: flex;
+            justify-content: center;
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 10px;
+            border: 1px solid var(--border);
             overflow-x: auto;
-            min-height: 200px;
         }
         .card-container table {
             border-collapse: separate;
-            border-spacing: 8px;
+            border-spacing: 6px;
             margin: 0 auto;
         }
         .card-container thead tr th {
             font-family: 'Inter', monospace;
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             font-weight: 800;
-            color: #FBBF24;
-            padding: 8px 0;
+            color: var(--yellow);
+            padding: 4px 0;
             text-align: center;
-            width: 56px;
+            width: 48px;
             letter-spacing: 1px;
         }
         .card-container td {
-            width: 56px;
-            height: 56px;
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 16px;
+            width: 48px;
+            height: 48px;
+            background: var(--panel-light);
+            border-radius: 10px;
             text-align: center;
             vertical-align: middle;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-family: 'Inter', monospace;
-            color: #F8FAFC;
+            color: var(--text);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            transition: all 0.2s;
             cursor: pointer;
         }
         .card-container td.free {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
-            font-size: 1.4rem;
-            border-color: #FCD34D;
+            background: var(--yellow);
+            color: var(--bg);
+            font-size: 1.2rem;
         }
         .card-container td.marked {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
+            background: var(--yellow);
+            color: var(--bg);
             box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.4);
-            border-color: #FCD34D;
-            transform: scale(0.92);
-        }
-        @media (max-width:550px) {
-            .card-container td {
-                width: 48px;
-                height: 48px;
-                border-radius: 12px;
-                font-size: 0.9rem;
-            }
-            .card-container thead tr th {
-                width: 48px;
-                font-size: 1.1rem;
-            }
-            .card-container table {
-                border-spacing: 5px;
-            }
+            border-color: var(--yellow);
+            transform: scale(0.95);
         }
 
-        /* ===== GRID 1-100 ===== */
-        .grid-100 {
+        .called-section {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        .called-section .called-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .mini-grid-75 {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 6px;
-            margin: 20px 0;
-            background: rgba(15, 23, 42, 0.6);
-            padding: 12px;
-            border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .grid-cell {
-            background: rgba(30, 41, 59, 0.8);
-            border-radius: 12px;
-            aspect-ratio: 1/1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.75rem;
-            color: #CBD5E1;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            cursor: pointer;
-            transition: 0.15s ease;
-        }
-        .grid-cell.taken {
-            background: #EF4444;
-            color: white;
-            border-color: #F87171;
-            cursor: not-allowed;
-        }
-        .grid-cell.own-card {
-            background: #FBBF24;
-            color: #0B132B;
-            border-color: #FCD34D;
-            box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
-            cursor: not-allowed;
-        }
-
-        /* ===== BINGO BUTTON ===== */
-        #bingoBtn {
-            display: block;
-            width: 90%;
-            max-width: 340px;
-            margin: 20px auto;
-            background: linear-gradient(105deg, #FBBF24, #F59E0B);
-            color: #0B132B;
-            font-size: 1.4rem;
-            font-weight: 800;
-            padding: 16px 12px;
-            border-radius: 60px;
-            border: none;
-            box-shadow: 0 8px 0 #B45309, 0 8px 24px rgba(251, 191, 36, 0.3);
-            letter-spacing: 1px;
-            transition: 0.08s linear;
-            cursor: pointer;
-        }
-        #bingoBtn:active {
-            transform: translateY(4px);
-            box-shadow: 0 4px 0 #B45309;
-        }
-
-        /* ===== TAB BAR ===== */
-        .tab-bar {
-            display: flex;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(12px);
-            border-radius: 60px;
-            margin-top: 16px;
-            padding: 4px 6px;
             gap: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            padding: 10px 0;
-            border-radius: 60px;
-            font-weight: 600;
-            font-size: 0.7rem;
-            color: #94A3B8;
-            cursor: pointer;
-            transition: background 0.2s, color 0.2s;
-        }
-        .tab-btn.active {
-            background: rgba(251, 191, 36, 0.15);
-            color: #FBBF24;
-        }
-        .tab-btn:active {
-            transform: scale(0.96);
-        }
-
-        /* ===== STAKE OPTIONS ===== */
-        .stake-page-buttons {
+        .mini-grid-75 .cell {
+            aspect-ratio: 1;
             display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin: 16px 0;
-            flex-wrap: wrap;
-        }
-        .stake-option {
-            background: rgba(30, 41, 59, 0.8);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            padding: 14px 20px;
-            border-radius: 16px;
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #F8FAFC;
-            cursor: pointer;
-            width: 100px;
-            text-align: center;
-            transition: all 0.2s;
-            position: relative;
-        }
-        .stake-option:active {
-            transform: scale(0.96);
-        }
-        .stake-option.selected {
-            border-color: #FBBF24;
-            background: rgba(251, 191, 36, 0.1);
-            color: #FBBF24;
-        }
-        .player-count-badge {
-            display: block;
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: #94A3B8;
-            margin-top: 6px;
-            background: rgba(15, 23, 42, 0.8);
-            padding: 2px 10px;
-            border-radius: 40px;
-        }
-
-        /* ===== PLAYER TABLE ===== */
-        .stake-table-wrap {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 24px;
-            padding: 14px 12px 16px;
-            margin: 8px 0 16px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .stake-table-wrap .table-title {
-            font-weight: 700;
-            font-size: 0.85rem;
-            color: #94A3B8;
-            text-align: center;
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
-        }
-        .stake-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-        .stake-table th {
-            background: rgba(255, 255, 255, 0.05);
-            color: #94A3B8;
-            font-weight: 600;
-            padding: 10px 6px;
-            text-align: center;
-            font-size: 0.7rem;
-            letter-spacing: 0.5px;
-        }
-        .stake-table td {
-            padding: 10px 6px;
-            text-align: center;
-            background: rgba(30, 41, 59, 0.4);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            font-weight: 600;
-            color: #F8FAFC;
-        }
-        .stake-table tr:last-child td {
-            border-bottom: none;
-        }
-        .stake-table .stake-amount {
-            font-weight: 800;
-            color: #FBBF24;
-        }
-        .stake-table .stake-players .count-num {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2px 10px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-        }
-        .stake-table .stake-bar-wrap {
-            width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            overflow: hidden;
-            max-width: 100px;
-            margin: 0 auto;
-        }
-        .stake-table .stake-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #FBBF24, #F59E0B);
-            border-radius: 20px;
-            transition: width 0.4s ease;
-            width: 0%;
-        }
-
-        /* ===== RULES TEXT ===== */
-        .rules-text {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 24px;
-            padding: 20px;
-            margin-top: 16px;
-            font-size: 0.85rem;
-            line-height: 1.7;
-            color: #CBD5E1;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .rules-text p {
-            margin-bottom: 8px;
-        }
-
-        .players-badge {
-            background: rgba(251, 191, 36, 0.15);
-            padding: 4px 16px;
-            border-radius: 40px;
-            color: #FBBF24;
-            font-weight: 600;
-            font-size: 0.75rem;
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
-
-        .timer-badge {
-            font-size: 1.6rem;
-            font-weight: 800;
-            font-family: 'Inter', monospace;
-            color: #FBBF24;
-            background: rgba(251, 191, 36, 0.1);
-            padding: 6px 24px;
-            border-radius: 50px;
-            letter-spacing: 2px;
-            border: 1px solid rgba(251, 191, 36, 0.2);
-            display: inline-block;
-        }
-
-        .balance-top {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
             align-items: center;
-            gap: 8px;
-            background: rgba(15, 23, 42, 0.6);
-            padding: 8px 16px;
-            border-radius: 60px;
-            margin-bottom: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .balance-top>div {
+            justify-content: center;
+            background: var(--panel-light);
+            border-radius: 4px;
+            font-size: 0.6rem;
             font-weight: 600;
-            font-size: 0.9rem;
-            color: #F8FAFC;
+            color: var(--text-muted);
+            transition: all 0.2s;
         }
-
-        .last-call-area {
-            background: linear-gradient(135deg, #1E293B, #0F172A);
-            border-radius: 24px;
-            padding: 20px;
-            margin: 16px 0 20px;
-            text-align: center;
-            box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .last-call-label {
-            font-size: 0.7rem;
-            letter-spacing: 4px;
-            font-weight: 600;
-            color: #FBBF24;
-            text-transform: uppercase;
-            background: rgba(15, 23, 42, 0.6);
-            display: inline-block;
-            padding: 4px 20px;
-            border-radius: 40px;
-        }
-        .last-call-number {
-            font-size: 3rem;
+        .mini-grid-75 .cell.active {
+            background: var(--yellow);
+            color: var(--bg);
             font-weight: 800;
-            font-family: 'Inter', monospace;
-            color: #FBBF24;
-            text-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
-            letter-spacing: 8px;
-            margin: 12px 0 8px;
+            box-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
         }
-        .called-history {
-            background: rgba(15, 23, 42, 0.8);
-            border-radius: 40px;
-            font-size: 0.75rem;
-            color: #94A3B8;
-            font-weight: 500;
-            overflow-x: auto;
-            white-space: nowrap;
-            font-family: 'Inter', monospace;
-            text-align: center;
-            margin-top: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 10px 16px;
+        .bingo-btn-wrap {
+            margin-top: auto;
+        }
+        .bingo-btn-wrap .btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.3rem;
+            border-radius: 16px;
+            letter-spacing: 1px;
         }
 
-        .prize-pool {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 20px;
-            text-align: center;
-            padding: 12px 16px;
-            margin: 8px 0 16px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .prize-pool span {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #94A3B8;
-            letter-spacing: 0.5px;
-            display: block;
-        }
-        .prize-pool div {
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #FBBF24;
-            line-height: 1.4;
-        }
-
-        /* ===== WINNER OVERLAY ===== */
+        /* ===== WINNER OVERLAY (Screenshot 1) ===== */
         .winner-modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.85);
+            background: rgba(11, 19, 43, 0.95);
             backdrop-filter: blur(20px);
             display: flex;
             align-items: center;
@@ -852,163 +588,468 @@
             opacity: 1;
         }
         .winner-card {
-            background: #1E293B;
-            border-radius: 40px;
-            padding: 32px 24px;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
             text-align: center;
-            width: 90%;
-            max-width: 360px;
-            box-shadow: 0 40px 60px -20px rgba(0, 0, 0, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
             transform: scale(0.92) translateY(12px);
             opacity: 0;
             transition: transform 0.4s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.4s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .game-over-text {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: var(--yellow);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 3px 3px 0 var(--yellow-dark), 6px 6px 0 rgba(0,0,0,0.3);
+            margin-bottom: 4px;
+            position: relative;
         }
         .winner-trophy {
             font-size: 4rem;
             margin-bottom: 8px;
-            animation: floatTrophy 1.4s infinite alternate;
+            filter: drop-shadow(0 8px 16px rgba(251, 191, 36, 0.5));
+            animation: floatTrophy 1.5s infinite alternate;
         }
         @keyframes floatTrophy {
-            0% { transform: translateY(0px); }
-            100% { transform: translateY(-10px); }
+            0% { transform: translateY(0px) scale(1); }
+            100% { transform: translateY(-8px) scale(1.05); }
         }
-        .winner-title {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #FBBF24;
-            margin-bottom: 12px;
-        }
-        .winners-avatars {
+        .winner-avatars {
             display: flex;
-            flex-wrap: wrap;
             justify-content: center;
-            gap: 8px;
-            margin: 16px 0;
-            max-height: 120px;
-            overflow-y: auto;
-            padding: 8px;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 20px;
+            gap: 30px;
+            margin-bottom: 16px;
+            position: relative;
         }
-        .winner-badge {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
-            padding: 6px 16px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            display: inline-flex;
+        .winner-avatar {
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            gap: 6px;
+            position: relative;
         }
-        .prize-amount {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 20px;
-            padding: 16px;
-            margin: 18px 0 16px;
-            border: 1px solid rgba(251, 191, 36, 0.2);
+        .winner-avatar .avatar-circle {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: 3px solid var(--yellow);
+            background: var(--panel);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
         }
-        .prize-amount .prize-label {
-            font-size: 0.7rem;
-            color: #94A3B8;
-            letter-spacing: 1px;
+        .winner-avatar .wreath {
+            position: absolute;
+            top: -5px;
+            font-size: 2.5rem;
+            color: rgba(251, 191, 36, 0.6);
         }
-        .prize-number {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #FBBF24;
-        }
-        .celebrate-btn {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            border: none;
+        .winner-avatar .wreath.left { left: -15px; }
+        .winner-avatar .wreath.right { right: -15px; }
+        .winner-list {
             width: 100%;
-            padding: 16px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #0B132B;
-            margin-top: 8px;
-            cursor: pointer;
-            transition: transform 0.1s;
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 8px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
         }
-        .celebrate-btn:active {
-            transform: scale(0.96);
+        .winner-row {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 10px;
+            margin-bottom: 4px;
+        }
+        .winner-row:last-child { margin-bottom: 0; }
+        .winner-row.rank-1 { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); }
+        .winner-row.rank-2 { background: rgba(148, 163, 184, 0.05); }
+        .winner-row.rank-3 { background: rgba(180, 83, 9, 0.05); }
+        .winner-row .rank-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: var(--bg);
+        }
+        .winner-row.rank-1 .rank-badge { background: var(--yellow); }
+        .winner-row.rank-2 .rank-badge { background: #94A3B8; }
+        .winner-row.rank-3 .rank-badge { background: #D97706; }
+        .winner-row .winner-avatar-sm {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--panel-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            margin-left: 8px;
+        }
+        .winner-row .winner-name {
+            flex: 1;
+            text-align: left;
+            margin-left: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .winner-row .winner-prize {
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: var(--yellow);
+        }
+        .winner-stats {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        .winner-stats .stat-box {
+            flex: 1;
+            background: var(--panel);
+            border-radius: 12px;
+            padding: 10px 6px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+        .winner-stats .stat-box .stat-label {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .winner-stats .stat-box .stat-value {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text);
+            margin-top: 2px;
+        }
+        .returning-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 8px;
         }
 
-        /* ===== CONFETTI ===== */
-        .confetti {
+        /* ===== MODALS ===== */
+        .modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-            overflow: hidden;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
         }
-        .confetti-piece {
-            position: absolute;
-            width: 8px;
-            height: 16px;
-            top: -20px;
-            opacity: 0.8;
-            animation: fall 4s linear forwards;
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
         }
-        @keyframes fall {
-            to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        .modal.active .modal-content {
+            transform: scale(1) translateY(0);
+            opacity: 1;
         }
-
-        /* ===== OTHER ===== */
-        .telegram-links {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.7rem;
-            color: #64748B;
+        .modal-content {
+            background: var(--panel);
+            border-radius: 24px;
+            padding: 24px 20px;
+            max-width: 92%;
+            width: 400px;
+            border: 1px solid var(--border);
+            box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.6);
+            text-align: left;
+            transform: scale(0.92) translateY(12px);
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.35s ease;
+            max-height: 92vh;
+            overflow-y: auto;
+            color: var(--text);
         }
-        .telegram-links a {
-            color: #FBBF24;
-            text-decoration: none;
+        .modal-content .bank-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 14px;
+        }
+        .modal-content .bank-header .bank-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+        }
+        .modal-content .bank-header .bank-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+        .modal-content .bank-header .bank-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .modal-content .input-group {
+            margin: 16px 0;
+        }
+        .modal-content .input-group label {
             font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: block;
+            margin-bottom: 6px;
         }
-        .telegram-links a:hover {
-            text-decoration: underline;
+        .modal-content .input-group input {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 60px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 0.95rem;
+            font-family: inherit;
+            color: var(--text);
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-
-        .mute-btn {
-            background: rgba(255, 255, 255, 0.05) !important;
+        .modal-content .input-group input:focus {
+            outline: none;
+            border-color: var(--yellow);
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
+        }
+        .modal-content .transaction-summary {
+            background: rgba(251, 191, 36, 0.05);
+            border-radius: 16px;
+            padding: 14px 16px;
+            font-size: 0.8rem;
+            color: var(--yellow);
+            margin: 14px 0;
+            text-align: center;
+            border: 1px solid rgba(251, 191, 36, 0.1);
+        }
+        .modal-content .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .modal-content .modal-buttons button {
+            flex: 1;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 700;
             border: none;
-            border-radius: 40px;
-            color: white;
-            font-size: 1rem !important;
-            padding: 4px 12px !important;
-            min-width: 44px;
+            min-height: 52px;
+            font-size: 0.95rem;
             cursor: pointer;
         }
-        .mute-btn:active {
-            transform: scale(0.96);
+        .modal-content .btn-primary {
+            background: var(--yellow);
+            color: var(--bg);
         }
-
-        .history-card {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
-            border-left: 4px solid #FBBF24;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+        .modal-content .btn-secondary {
+            background: var(--panel-light);
+            color: var(--text);
         }
-        .history-card strong {
-            color: #FBBF24;
-        }
-        .profile-stat {
-            background: rgba(15, 23, 42, 0.6);
+        .modal-content .deposit-step {
+            background: rgba(0, 0, 0, 0.15);
             border-radius: 20px;
-            padding: 18px;
-            text-align: center;
+            padding: 16px;
             margin: 14px 0;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+        }
+        .modal-content .deposit-step .step-number {
+            font-weight: 700;
+            color: var(--yellow);
+            font-size: 0.85rem;
+        }
+        .modal-content .deposit-step .step-title {
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 4px;
+            font-size: 0.9rem;
+        }
+        .modal-content .deposit-step .recipient-number {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px 18px;
+            border-radius: 60px;
+            border: 1px solid var(--border);
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+        .modal-content .deposit-step .recipient-number .number {
+            font-weight: 700;
+            font-size: 1rem;
+            font-family: 'Inter', monospace;
+            color: var(--text);
+        }
+        .modal-content .deposit-step .recipient-number .copy-btn {
+            background: var(--panel-light);
+            border: none;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.7rem;
+            color: var(--yellow);
+            cursor: pointer;
+        }
+        .modal-content .deposit-step .invoice-input input {
+            width: 100%;
+            padding: 14px 18px;
+            border-radius: 60px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.2);
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .modal-content .deposit-step .invoice-input input:focus {
+            outline: none;
+            border-color: var(--yellow);
+        }
+        .modal-content .amount-display {
+            text-align: center;
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--yellow);
+            margin: 10px 0 18px;
+        }
+        .modal-content .method-list-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 16px;
+            padding: 14px 18px;
+            margin: 10px 0;
+            border: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .modal-content .method-list-item:active {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--yellow);
+        }
+        .modal-content .method-list-item .method-icon {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+        .modal-content .method-list-item .method-info {
+            flex: 1;
+        }
+        .modal-content .method-list-item .method-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .modal-content .method-list-item .method-number {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'Inter', monospace;
+        }
+        .modal-content .method-list-item .method-select-badge {
+            background: var(--yellow);
+            color: var(--bg);
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+        .modal-content .deposit-step-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+        .modal-content .deposit-step-header .step-back {
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.1rem;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content .deposit-step-header .step-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+            flex: 1;
+        }
+        .modal-content .deposit-step-header .step-sub {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+        }
+        .modal-content .type-btn {
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 60px;
+            margin: 10px 0;
+            font-weight: 600;
+            border: 1px solid var(--border);
+            width: 100%;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .modal-content .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+        .modal-content .empty-state .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+        .modal-content .rules-text {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 20px;
+            padding: 20px;
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+        .modal-content .rules-text h3 {
+            color: var(--yellow) !important;
         }
 
+        /* ===== TOAST & INVITE OVERLAY ===== */
         .toast {
             position: fixed;
             bottom: 24px;
@@ -1028,60 +1069,18 @@
             pointer-events: none;
             backdrop-filter: blur(8px);
         }
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
         .toast.success { background: rgba(5, 150, 105, 0.9); }
         .toast.error { background: rgba(220, 38, 38, 0.9); }
         .toast.info { background: rgba(37, 99, 235, 0.9); }
 
-        .back-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 8px 22px;
-            border-radius: 40px;
-            color: #F1F5F9;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .back-btn:active {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .invite-info {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 20px;
-            padding: 14px 18px;
-            margin: 8px 0;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 0.8rem;
-            color: #CBD5E1;
-        }
-        .invite-info strong {
-            color: #FBBF24;
-        }
-        .invite-code-display {
-            background: rgba(251, 191, 36, 0.1);
-            color: #FBBF24;
-            padding: 4px 14px;
-            border-radius: 40px;
-            font-family: 'Inter', monospace;
-            font-weight: 700;
-            font-size: 0.85rem;
-            display: inline-block;
-            border: 1px solid rgba(251, 191, 36, 0.2);
-        }
-
-        /* ===== INVITE REQUIRED OVERLAY ===== */
         #inviteRequiredOverlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(11, 19, 43, 0.95);
             backdrop-filter: blur(20px);
             display: flex;
             flex-direction: column;
@@ -1092,28 +1091,13 @@
             text-align: center;
             color: white;
         }
-        #inviteRequiredOverlay.hidden {
-            display: none;
-        }
-        #inviteRequiredOverlay .overlay-icon {
-            font-size: 4.4rem;
-            margin-bottom: 16px;
-        }
-        #inviteRequiredOverlay h2 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-        #inviteRequiredOverlay p {
-            font-size: 1rem;
-            max-width: 400px;
-            margin-bottom: 24px;
-            opacity: 0.8;
-            color: #CBD5E1;
-        }
+        #inviteRequiredOverlay.hidden { display: none; }
+        #inviteRequiredOverlay .overlay-icon { font-size: 4rem; margin-bottom: 16px; }
+        #inviteRequiredOverlay h2 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+        #inviteRequiredOverlay p { font-size: 1rem; max-width: 400px; margin-bottom: 24px; opacity: 0.8; color: var(--text-muted); }
         #inviteRequiredOverlay .btn-bot {
-            background: linear-gradient(135deg, #FBBF24, #F59E0B);
-            color: #0B132B;
+            background: var(--yellow);
+            color: var(--bg);
             border: none;
             padding: 16px 40px;
             border-radius: 60px;
@@ -1122,126 +1106,87 @@
             cursor: pointer;
             box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
         }
-        #inviteRequiredOverlay .btn-bot:active {
-            transform: scale(0.96);
-        }
+        #inviteRequiredOverlay .btn-bot:active { transform: scale(0.96); }
 
-        /* ===== DASHBOARD / GAME OVER SPECIFIC ===== */
-        .game-over-header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .game-over-header h1 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #FBBF24;
-            letter-spacing: 2px;
-            text-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
-        }
-        .game-over-header .trophy-icon {
-            font-size: 3.5rem;
-            margin-bottom: 4px;
-        }
-        .winners-list {
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 20px;
-            padding: 12px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        .winner-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 12px;
-            border-radius: 12px;
-            margin-bottom: 8px;
-        }
-        .winner-row:last-child {
-            margin-bottom: 0;
-        }
-        .winner-row.top-1 {
-            background: rgba(251, 191, 36, 0.15);
-            border: 1px solid rgba(251, 191, 36, 0.3);
-        }
-        .winner-row.top-2 {
-            background: rgba(148, 163, 184, 0.1);
-        }
-        .winner-row.top-3 {
-            background: rgba(180, 83, 9, 0.1);
-        }
-        .winner-row .rank {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.8rem;
-            color: #0B132B;
-        }
-        .winner-row.top-1 .rank { background: #FBBF24; }
-        .winner-row.top-2 .rank { background: #94A3B8; }
-        .winner-row.top-3 .rank { background: #D97706; }
-        .winner-row .player-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-            margin-left: 12px;
-        }
-        .winner-row .player-info .avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-        }
-        .winner-row .player-info .name {
+        .lang-toggle {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            background: var(--panel);
+            color: var(--yellow);
+            border: 1px solid var(--border);
+            border-radius: 40px;
+            padding: 6px 14px;
             font-weight: 600;
-            font-size: 0.85rem;
-            color: #F8FAFC;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 0.7rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
-        .winner-row .prize {
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: #FBBF24;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .stats-grid .stat-item {
-            background: rgba(15, 23, 42, 0.6);
+        .lang-toggle:active { transform: scale(0.95); }
+
+        /* ===== OTHER PAGES ===== */
+        .history-card {
+            background: var(--panel);
             border-radius: 16px;
-            padding: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--yellow);
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .history-card strong { color: var(--yellow); }
+        .profile-stat {
+            background: var(--panel);
+            border-radius: 20px;
+            padding: 18px;
             text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            margin: 14px 0;
+            border: 1px solid var(--border);
         }
-        .stats-grid .stat-item .label {
-            font-size: 0.65rem;
-            color: #94A3B8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .stats-grid .stat-item .value {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #F8FAFC;
-            margin-top: 4px;
-        }
-        .returning-text {
-            text-align: center;
-            color: #94A3B8;
+        .back-btn {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 8px 20px;
+            border-radius: 40px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
             font-size: 0.8rem;
-            margin-top: 16px;
         }
+        .back-btn:active { background: var(--panel-light); }
+        .invite-info {
+            background: var(--panel);
+            border-radius: 16px;
+            padding: 14px 18px;
+            margin: 8px 0;
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .invite-info strong { color: var(--yellow); }
+        .invite-code-display {
+            background: rgba(251, 191, 36, 0.1);
+            color: var(--yellow);
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-family: 'Inter', monospace;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: inline-block;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .mute-btn {
+            background: var(--panel-light) !important;
+            border: none;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.9rem !important;
+            padding: 6px 12px !important;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .mute-btn:active { transform: scale(0.96); }
     </style>
 </head>
 <body>
@@ -1249,7 +1194,7 @@
     <div id="inviteRequiredOverlay" class="hidden">
         <div class="overlay-icon">🔑</div>
         <h2>Invite Required</h2>
-        <p>Please use an invite link <a href="https://t.me/bingomkmk0120_bot?start=GIZ5GG8" target="_blank">🚀 open</a></p>
+        <p>Please use an invite link <a href="https://t.me/bingomkmk0120_bot?start=GIZ5GG8" target="_blank" style="color:var(--yellow);">🚀 open</a></p>
         <button class="btn-bot" id="goToBotBtn">🚀 Go to Bot</button>
     </div>
 
@@ -1270,7 +1215,7 @@
             <div id="methodListContainer" style="max-height:380px; overflow-y:auto; padding:4px 0;">
                 <div class="empty-state"><div class="empty-icon">💳</div><div>Loading payment methods...</div></div>
             </div>
-            <button id="closeMethodListBtn" class="type-btn" style="margin-top:12px; justify-content:center;" data-key="cancel">Cancel</button>
+            <button id="closeMethodListBtn" class="type-btn" style="margin-top:12px;" data-key="cancel">Cancel</button>
         </div>
     </div>
 
@@ -1306,18 +1251,18 @@
                 <div class="step-number">1️⃣ Step 1:</div>
                 <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this number</div>
                 <div class="step-content">
-                    <div style="font-size:0.75rem; color:#94A3B8; margin-bottom:6px;">
-                        <span id="howToPayTrigger" style="cursor:pointer; text-decoration:underline; color:#FBBF24;" data-key="howToPay">📞 How to pay?</span>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">
+                        <span id="howToPayTrigger" style="cursor:pointer; text-decoration:underline; color:var(--yellow);" data-key="howToPay">📞 How to pay?</span>
                     </div>
                     <div class="recipient-number"><span class="number" id="paymentRecipientNumber">📞 0953677690</span><button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button></div>
-                    <div style="font-size:0.7rem; color:#94A3B8; margin-top:8px;">Open your payment app → Send Money → Paste the number → Make the transfer</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;">Open your payment app → Send Money → Paste the number → Make the transfer</div>
                 </div>
             </div>
             <div class="deposit-step">
                 <div class="step-number">2️⃣ Step 2:</div>
                 <div class="step-title" data-key="enterInvoice">Enter your Invoice Number</div>
                 <div class="step-content">
-                    <div style="font-size:0.75rem; color:#94A3B8; margin-bottom:8px;" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
                     <div class="invoice-input"><input type="text" id="paymentInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder" autocomplete="off"></div>
                 </div>
             </div>
@@ -1336,7 +1281,7 @@
                     <div class="bank-sub" id="howToPayMethod">Telebirr</div>
                 </div>
             </div>
-            <div id="howToPayContent" style="font-size:0.9rem; line-height:1.6; color:#CBD5E1; max-height:400px; overflow-y:auto; padding-right:8px;"></div>
+            <div id="howToPayContent" style="font-size:0.85rem; line-height:1.6; color:var(--text-muted); max-height:400px; overflow-y:auto; padding-right:8px;"></div>
             <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">Got it</button>
         </div>
     </div>
@@ -1358,21 +1303,21 @@
         <div class="modal-content">
             <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div>
             <div class="rules-text" style="text-align:left; max-height:400px; overflow-y:auto; padding-right:8px;">
-                <h3 style="font-size:1rem; margin-top:0; color:#FBBF24;" data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
+                <h3 style="font-size:0.95rem; margin-top:0; color:var(--yellow);" data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
                 <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
                 <p data-key="rulesWinningPatterns">✅ 1 አግድም መስመር (Row)<br>✅ 1 ቁመት መስመር (Column)<br>✅ 1 ሰያፍ መስመር (Diagonal)<br>✅ 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>💡 ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
                 <p data-key="rulesPrize">• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።<br>• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።<br>• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።</p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesDepositTitle">💰 ገንዘብ ማስገባት</h3>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesDepositTitle">💰 ገንዘብ ማስገባት</h3>
                 <p data-key="rulesDeposit">1. <strong>➕ Deposit</strong> ይጫኑ።<br>2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።<br>3. ገንዘብ ይላኩ።<br>4. <strong>Deposit ይጠይቁ</strong>።<br>5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
                 <p data-key="rulesWithdraw">1. <strong>➖ Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
                 <p data-key="rulesGameRules">✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>🏆 ቢንጎ!</strong> መጫን አለብዎት።<br>✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
-                <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesHelpTitle">📞 እርዳታ</h3>
-                <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank" style="color:#FBBF24;">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank" style="color:#FBBF24;">Dot Bingo channel</a> ይቀላቀሉ።</p>
-                <p style="margin-top:12px; font-weight:700; text-align:center; color:#FBBF24;" data-key="rulesGoodLuck">🎉 መልካም ዕድል!<br><span style="font-weight:400; color:#CBD5E1;">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
+                <h3 style="font-size:0.95rem; margin-top:16px; color:var(--yellow);" data-key="rulesHelpTitle">📞 እርዳታ</h3>
+                <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank" style="color:var(--yellow);">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank" style="color:var(--yellow);">Dot Bingo channel</a> ይቀላቀሉ።</p>
+                <p style="margin-top:12px; font-weight:700; text-align:center; color:var(--yellow);" data-key="rulesGoodLuck">🎉 መልካም ዕድል!<br><span style="font-weight:400; color:var(--text-muted);">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
             </div>
             <button id="closeRulesBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">ገባኝ</button>
         </div>
@@ -1381,12 +1326,43 @@
     <!-- ===== WINNER OVERLAY ===== -->
     <div id="winnerOverlay" class="winner-modal">
         <div class="winner-card">
-            <div class="winner-trophy">🏆✨</div>
-            <div class="winner-title" id="winTitle">BINGO!</div>
-            <div class="winner-sub" data-key="congrats" style="color:#94A3B8; font-size:0.9rem;">Congratulations</div>
-            <div class="winners-avatars" id="winListContainer"></div>
-            <div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div>
-            <button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button>
+            <div class="game-over-text">GAME OVER</div>
+            <div class="winner-trophy">🏆</div>
+            <div class="winner-sub" data-key="congrats" style="color:var(--text-muted); font-size:0.85rem; margin-bottom:12px;">Congratulations</div>
+            
+            <div class="winner-avatars">
+                <div class="winner-avatar">
+                    <div class="wreath left">🌿</div>
+                    <div class="avatar-circle">👨‍🦱</div>
+                </div>
+                <div class="winner-avatar">
+                    <div class="wreath right">🌿</div>
+                    <div class="avatar-circle">👩</div>
+                </div>
+            </div>
+
+            <div class="winner-list" id="winListContainer">
+                <!-- Winners will be populated here -->
+            </div>
+
+            <div class="winner-stats">
+                <div class="stat-box">
+                    <div class="stat-label">Total Players</div>
+                    <div class="stat-value" id="winTotalPlayers">37</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Entry Fee</div>
+                    <div class="stat-value" id="winEntryFee">20 ETB</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Prize Pool</div>
+                    <div class="stat-value" id="winPrizePool">592 ETB</div>
+                </div>
+            </div>
+
+            <div class="returning-text" id="returningText">Returning to lobby in 4s</div>
+            
+            <button class="celebrate-btn btn btn-primary" style="width:100%; margin-top:12px; font-size:1.1rem;" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button>
         </div>
     </div>
 
@@ -1394,15 +1370,31 @@
     <!--  PAGES                                                       -->
     <!-- ============================================================ -->
 
-    <!-- ===== STAKE PAGE ===== -->
+    <!-- ===== STAKE PAGE (Screenshot 4) ===== -->
     <div id="stakePage" class="page">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h2 style="font-family:'Inter', monospace; font-weight:800; color:#FBBF24; letter-spacing:1px;">DOT BINGO</h2>
-            <div class="players-badge">🎮 LOBBY</div>
+        <div class="top-bar">
+            <div class="user-info">👤 Hi, <span id="lobbyUserName">Player</span></div>
+            <div class="balance-info">💰 <span id="lobbyBalance">0</span> ETB</div>
         </div>
 
-        <div id="inviteInfoContainer" class="invite-info hidden">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div class="logo-area">
+            <div class="bingo-balls">🔵 🟡 🔴</div>
+            <h1>DOT BINGO</h1>
+        </div>
+
+        <div class="timer-section">
+            <div class="timer-ring">
+                <div class="timer-label">GAME STARTS IN</div>
+                <div class="timer-number" id="lobbyTimer">24</div>
+            </div>
+            <div class="game-info">
+                <div>Game #4821 · Waiting for players</div>
+                <div class="players">👥 <span id="playersCount">37</span> players</div>
+            </div>
+        </div>
+
+        <div id="inviteInfoContainer" class="invite-info hidden" style="margin-bottom:12px;">
+            <div class="flex-between" style="flex-wrap:wrap; gap:8px;">
                 <div>
                     <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
                     <span class="invite-code-display" id="userInviteCode">—</span>
@@ -1410,167 +1402,223 @@
             </div>
         </div>
 
-        <!-- ===== PLAYER COUNT TABLE ===== -->
-        <div class="stake-table-wrap">
-            <div class="table-title">ተጫዋቾች በውርርድ / Players by Stake</div>
-            <table class="stake-table" id="stakeTable">
-                <thead>
-                    <tr>
-                        <th>Stake (ETB)</th>
-                        <th>Players</th>
-                        <th>Popularity</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="stake-amount">10</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td>
-                    </tr>
-                    <tr>
-                        <td class="stake-amount">20</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td>
-                    </tr>
-                    <tr>
-                        <td class="stake-amount">30</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable30Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30" style="width:0%;"></div></div></td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="stake-options" id="stakeOptionsContainer">
+            <div id="stake10Btn" class="stake-btn" data-stake="10">
+                10 ETB
+                <span class="badge" id="stake10Count">👥 0</span>
+            </div>
+            <div id="stake20Btn" class="stake-btn active" data-stake="20">
+                20 ETB
+                <span class="badge" id="stake20Count">👥 0</span>
+            </div>
+            <div id="stake30Btn" class="stake-btn" data-stake="30">
+                30 ETB
+                <span class="badge" id="stake30Count">👥 0</span>
+            </div>
         </div>
 
-        <h3 style="text-align:center; margin:10px 0 6px; font-size:1rem; color:#94A3B8;" data-key="chooseStake">Choose Your Stake</h3>
-        <div class="stake-page-buttons">
-            <div style="text-align:center;"><button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="stake10Count">👥 0 players</div></div>
-            <div style="text-align:center;"><button id="stake20Btn" class="stake-option" data-stake="20">20 ETB</button><div class="player-count-badge" id="stake20Count">👥 0 players</div></div>
-            <div style="text-align:center;"><button id="stake30Btn" class="stake-option" data-stake="30">30 ETB</button><div class="player-count-badge" id="stake30Count">👥 0 players</div></div>
+        <div class="prize-entry-row">
+            <div class="box">
+                <div class="label">🏆 PRIZE POOL</div>
+                <div class="value" id="winningBalance">592 ETB</div>
+            </div>
+            <div class="box">
+                <div class="label">🎟️ ENTRY</div>
+                <div class="value" id="entryFeeDisplay">20 ETB</div>
+            </div>
         </div>
-        <div class="rules-text">
-            <p><strong data-key="entryFeeLabelShort">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
-            <p><strong data-key="prizeLabelShort">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
-            <p><strong data-key="winLabelShort">🎯 ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
-            <p><strong data-key="claimLabelShort">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው “CLAIM BINGO!”</span></p>
+
+        <div class="play-btn-wrap">
+            <button id="playBtn" class="btn btn-primary">▶ PLAY</button>
+        </div>
+
+        <div class="bottom-actions">
+            <button id="depositBtn" class="btn btn-secondary" data-key="deposit">+ Deposit</button>
+            <button id="withdrawBtn" class="btn btn-secondary" data-key="withdraw">- Withdraw</button>
+        </div>
+
+        <!-- Bottom Nav -->
+        <div class="bottom-nav">
+            <button class="nav-item active" data-page="lobby">
+                <i>🏠</i>
+                <span>Lobby</span>
+            </button>
+            <button class="nav-item" data-page="wallet">
+                <i>💰</i>
+                <span>Wallet</span>
+            </button>
+            <button class="nav-item" data-page="history">
+                <i>📜</i>
+                <span>History</span>
+            </button>
+            <button class="nav-item" data-page="profile">
+                <i>👤</i>
+                <span>Profile</span>
+            </button>
         </div>
     </div>
 
-    <!-- ===== LOBBY PAGE ===== -->
+    <!-- ===== LOBBY PAGE (Screenshot 3 - Pick Card) ===== -->
     <div id="lobbyPage" class="page hidden">
-        <!-- Top Bar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <div style="font-weight:700; font-size:1.1rem; color:#F8FAFC;" id="lobbyUserName">Hi, Player</div>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <div class="players-badge">👥 <span id="playersCount">0</span></div>
-            </div>
+        <div class="pick-card-header">
+            <button class="header-back" id="backToStakeBtn">←</button>
+            <h2>Pick Your Card</h2>
+            <div style="flex:1;"></div>
+            <div class="balance-info">💰 <span id="lobbyBalanceTop">0</span> ETB</div>
         </div>
 
-        <!-- Balance & Timer -->
-        <div class="balance-top" style="flex-direction:column; align-items:stretch; gap:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
-                <div class="timer-badge" id="lobbyTimer">30s</div>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button id="depositBtn" style="flex:1; background:#FBBF24; border:none; border-radius:40px; padding:8px; color:#0B132B; cursor:pointer; font-weight:700;"><span data-key="deposit">+Deposit</span></button>
-                <button id="withdrawBtn" style="flex:1; background:rgba(255,255,255,0.1); border:none; border-radius:40px; padding:8px; color:#F8FAFC; cursor:pointer; font-weight:700;"><span data-key="withdraw">-Withdraw</span></button>
-                <button id="backToStakeBtn" style="flex:1; background:rgba(255,255,255,0.05); border:none; border-radius:40px; padding:8px; color:#94A3B8; cursor:pointer; font-weight:600;"><span data-key="stakeBtn">↺ Stake</span></button>
-            </div>
+        <div class="pick-timer">
+            <div class="label">GAME STARTS IN</div>
+            <div class="number" id="lobbyTimerDisplay">18</div>
+            <div class="selected-text">Card #<span id="selectedNumber">42</span> selected</div>
         </div>
 
-        <!-- Card Selection -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0 8px;">
-            <span style="font-weight:600; color:#94A3B8; font-size:0.85rem;" data-key="pickCard">🎴 Pick card ID:</span>
-            <span style="font-weight:700; color:#FBBF24; font-size:0.9rem;"><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
-            <button id="randomCardBtn" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); border-radius:40px; padding:6px 16px; color:#FBBF24; cursor:pointer; font-weight:600; font-size:0.75rem;" data-key="randomCard">✨ Random Card</button>
+        <div class="legend">
+            <div class="item"><span class="dot available"></span> Available</div>
+            <div class="item"><span class="dot taken"></span> Taken</div>
+            <div class="item"><span class="dot mine"></span> Mine</div>
         </div>
+
         <div id="numberGrid" class="grid-100"></div>
-        
-        <div style="font-weight:600; color:#94A3B8; font-size:0.85rem; margin:16px 0 8px;" data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
-        <div id="lobbyCardPreview" class="card-container"></div>
 
-        <button id="rulesBtn" style="width:100%; background:rgba(255,255,255,0.05); color:#94A3B8; border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:10px; cursor:pointer; margin-top:12px; font-weight:600;" data-key="rulesBtn">📜 Game Rules</button>
-        
-        <div class="tab-bar">
-            <button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button>
-            <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
-            <button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button>
-            <button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button>
+        <div class="lock-in-btn-wrap">
+            <button id="lockInBtn" class="btn btn-primary" style="background: var(--panel-light); color: var(--text-muted);">CARD 42 LOCKED IN</button>
         </div>
-        
-        <div class="telegram-links">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
+
+        <div class="bottom-nav" style="margin-top:16px;">
+            <button class="nav-item active" data-page="lobby">
+                <i>🏠</i>
+                <span>Lobby</span>
+            </button>
+            <button class="nav-item" data-page="wallet">
+                <i>💰</i>
+                <span>Wallet</span>
+            </button>
+            <button class="nav-item" data-page="history">
+                <i>📜</i>
+                <span>History</span>
+            </button>
+            <button class="nav-item" data-page="profile">
+                <i>👤</i>
+                <span>Profile</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== GAME PAGE (Screenshot 2) ===== -->
+    <div id="gamePage" class="page hidden">
+        <div class="game-top-bar">
+            <button class="header-back" id="backToLobbyBtn" style="font-size:1rem;">✕</button>
+            <div class="game-id">Game #<strong id="gameIdDisplay">4821</strong></div>
+            <div class="ball-display">
+                <div class="letter" id="currentCallLetter">N</div>
+                <div id="currentCallNumber">45</div>
+            </div>
+            <div class="card-info">
+                <strong>Card <span id="gameCardNumber">42</span></strong>
+                <span class="away"><span id="awayCount">5</span> away!</span>
+            </div>
+        </div>
+
+        <div id="gameCard" class="card-container"></div>
+
+        <div class="called-section">
+            <div class="called-header">
+                <span>Called <span id="calledCount">14</span> of 75</span>
+                <span>B I N G O</span>
+            </div>
+            <div class="mini-grid-75" id="miniGrid75">
+                <!-- 1-75 grid will be generated by JS -->
+            </div>
+        </div>
+
+        <div class="bingo-btn-wrap">
+            <button id="bingoBtn" class="btn btn-primary" data-key="claimBingo">🏆 BINGO! 🏆</button>
+        </div>
+
+        <div class="bottom-nav" style="margin-top:16px;">
+            <button class="nav-item active" data-page="lobby">
+                <i>🏠</i>
+                <span>Lobby</span>
+            </button>
+            <button class="nav-item" data-page="wallet">
+                <i>💰</i>
+                <span>Wallet</span>
+            </button>
+            <button class="nav-item" data-page="history">
+                <i>📜</i>
+                <span>History</span>
+            </button>
+            <button class="nav-item" data-page="profile">
+                <i>👤</i>
+                <span>Profile</span>
+            </button>
+        </div>
     </div>
 
     <!-- ===== HISTORY ===== -->
     <div id="historyPage" class="page hidden">
-        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2 data-key="gameHistory" style="color:#FBBF24;">📜 Game History</h2><button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button></div>
-        <div style="color:#F8FAFC; font-weight:600;"><span data-key="totalGamesLabel">Total Games:</span> <span id="totalGamesCount" style="color:#FBBF24;">0</span></div>
-        <div id="recentGamesList" style="margin-top:16px;"></div>
+        <div class="top-bar">
+            <h2 style="color:var(--yellow); font-size:1.1rem;" data-key="gameHistory">📜 Game History</h2>
+            <button class="back-btn" id="backFromHistoryBtn" data-key="back">← Back</button>
+        </div>
+        <div style="color:var(--text); font-weight:600; font-size:0.9rem; margin-bottom:12px;">
+            <span data-key="totalGamesLabel">Total Games:</span> <span id="totalGamesCount" style="color:var(--yellow);">0</span>
+        </div>
+        <div id="recentGamesList"></div>
+        <div class="bottom-nav" style="margin-top:auto;">
+            <button class="nav-item" data-page="lobby"><i>🏠</i><span>Lobby</span></button>
+            <button class="nav-item" data-page="wallet"><i>💰</i><span>Wallet</span></button>
+            <button class="nav-item active" data-page="history"><i>📜</i><span>History</span></button>
+            <button class="nav-item" data-page="profile"><i>👤</i><span>Profile</span></button>
+        </div>
     </div>
 
     <!-- ===== WALLET ===== -->
     <div id="walletPage" class="page hidden">
-        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2 data-key="myWallet" style="color:#FBBF24;">💰 My Wallet</h2><button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button></div>
-        <div class="profile-stat"><div style="color:#94A3B8; font-size:0.85rem; margin-bottom:8px;" data-key="currentBalance">Current Balance</div><div style="font-size:2.4rem; font-weight:800; color:#FBBF24;" id="walletBalancePage">0</div><button id="depositFromWalletBtn" class="btn-primary" data-key="deposit" style="border:none; padding:10px 24px; border-radius:40px; cursor:pointer; margin:4px; font-weight:700;">+ Deposit</button><button id="withdrawFromWalletBtn" class="btn-secondary" data-key="withdraw" style="border:none; padding:10px 24px; border-radius:40px; cursor:pointer; margin:4px; font-weight:700;">- Withdraw</button></div>
+        <div class="top-bar">
+            <h2 style="color:var(--yellow); font-size:1.1rem;" data-key="myWallet">💰 My Wallet</h2>
+            <button class="back-btn" id="backFromWalletBtn" data-key="back">← Back</button>
+        </div>
+        <div class="profile-stat">
+            <div style="color:var(--text-muted); font-size:0.8rem; margin-bottom:8px;" data-key="currentBalance">Current Balance</div>
+            <div style="font-size:2.4rem; font-weight:800; color:var(--yellow);" id="walletBalancePage">0</div>
+            <div style="display:flex; gap:10px; justify-content:center; margin-top:12px;">
+                <button id="depositFromWalletBtn" class="btn btn-primary" data-key="deposit" style="padding:10px 20px; font-size:0.9rem;">+ Deposit</button>
+                <button id="withdrawFromWalletBtn" class="btn btn-secondary" data-key="withdraw" style="padding:10px 20px; font-size:0.9rem;">- Withdraw</button>
+            </div>
+        </div>
+        <div class="bottom-nav" style="margin-top:auto;">
+            <button class="nav-item" data-page="lobby"><i>🏠</i><span>Lobby</span></button>
+            <button class="nav-item active" data-page="wallet"><i>💰</i><span>Wallet</span></button>
+            <button class="nav-item" data-page="history"><i>📜</i><span>History</span></button>
+            <button class="nav-item" data-page="profile"><i>👤</i><span>Profile</span></button>
+        </div>
     </div>
 
     <!-- ===== PROFILE ===== -->
     <div id="profilePage" class="page hidden">
-        <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;"><h2 data-key="myProfile" style="color:#FBBF24;">👤 My Profile</h2><button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button></div>
-        <div class="profile-stat"><div style="color:#94A3B8; font-size:0.8rem;" data-key="usernameLabel">Username</div><div style="font-weight:700; font-size:1.1rem; margin-top:4px;"><strong id="profileUsername">Player</strong></div></div>
-        <div class="profile-stat"><div style="color:#94A3B8; font-size:0.8rem;" data-key="balanceLabel">💰 Balance</div><div style="font-weight:800; font-size:1.4rem; color:#FBBF24; margin-top:4px;" id="profileBalancePage">0</div></div>
-        <div class="profile-stat"><div style="color:#94A3B8; font-size:0.8rem;" data-key="inviteCodeLabel">🔑 Invite Code</div><div style="margin-top:6px;"><strong id="profileInviteCode" style="color:#FBBF24; font-size:1.1rem;">—</strong></div></div>
-    </div>
-
-    <!-- ===== GAME PAGE ===== -->
-    <div id="gamePage" class="page hidden">
-        <!-- Top Bar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div style="font-weight:700; font-size:0.9rem; color:#94A3B8;">Game #<span id="gameIdDisplay">...</span></div>
-            <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
+        <div class="top-bar">
+            <h2 style="color:var(--yellow); font-size:1.1rem;" data-key="myProfile">👤 My Profile</h2>
+            <button class="back-btn" id="backFromProfileBtn" data-key="back">← Back</button>
         </div>
-
-        <!-- Balance & Actions -->
-        <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
-            <div style="font-size:0.85rem;">💰 <span id="gameBalanceDisplay" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
-            <div style="display:flex; gap:6px;">
-                <button id="depositBtnGame" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); border-radius:40px; padding:4px 12px; color:#FBBF24; cursor:pointer; font-size:0.7rem;" data-key="deposit">+Deposit</button>
-                <button id="withdrawBtnGame" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:4px 12px; color:#94A3B8; cursor:pointer; font-size:0.7rem;" data-key="withdraw">-Withdraw</button>
-                <button id="muteToggleBtn" class="mute-btn" style="font-size:0.8rem !important;">🔊</button>
-            </div>
-            <button id="rulesBtnGame" style="background:rgba(255,255,255,0.05); color:#94A3B8; border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.7rem;" data-key="rulesBtn">📜 Rules</button>
+        <div class="profile-stat">
+            <div style="color:var(--text-muted); font-size:0.8rem;" data-key="usernameLabel">Username</div>
+            <div style="font-weight:700; font-size:1.1rem; margin-top:4px;"><strong id="profileUsername">Player</strong></div>
         </div>
-
-        <!-- Prize Pool -->
-        <div class="prize-pool">
-            <span data-key="prizePoolLabel">🏆 PRIZE POOL</span>
-            <div id="winningBalance">0 ETB</div>
+        <div class="profile-stat">
+            <div style="color:var(--text-muted); font-size:0.8rem;" data-key="balanceLabel">💰 Balance</div>
+            <div style="font-weight:800; font-size:1.4rem; color:var(--yellow); margin-top:4px;" id="profileBalancePage">0</div>
         </div>
-
-        <!-- Back to Lobby Button -->
-        <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
-            <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby" style="padding:10px 24px; border-radius:40px; font-weight:600;">← Back to Lobby</button>
+        <div class="profile-stat">
+            <div style="color:var(--text-muted); font-size:0.8rem;" data-key="inviteCodeLabel">🔑 Invite Code</div>
+            <div style="margin-top:6px;"><strong id="profileInviteCode" style="color:var(--yellow); font-size:1.1rem;">—</strong></div>
         </div>
-
-        <!-- Last Call Area -->
-        <div class="last-call-area">
-            <div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div>
-            <div class="last-call-number" id="currentCall">--</div>
-            <div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div>
-        </div>
-
-        <!-- Game Card -->
-        <div id="gameCard" class="card-container"></div>
-
-        <!-- Bingo Button -->
-        <button id="bingoBtn" data-key="claimBingo">🏆 BINGO! 🏆</button>
-
-        <!-- Bottom Tabs -->
-        <div class="tab-bar">
-            <button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button>
-            <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
-            <button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button>
-            <button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button>
+        <div class="bottom-nav" style="margin-top:auto;">
+            <button class="nav-item" data-page="lobby"><i>🏠</i><span>Lobby</span></button>
+            <button class="nav-item" data-page="wallet"><i>💰</i><span>Wallet</span></button>
+            <button class="nav-item" data-page="history"><i>📜</i><span>History</span></button>
+            <button class="nav-item active" data-page="profile"><i>👤</i><span>Profile</span></button>
         </div>
     </div>
 
@@ -1582,30 +1630,34 @@
         // ---------- DOM REFS ----------
         const $ = id => document.getElementById(id);
         const lobbyBalance = $('lobbyBalance');
+        const lobbyBalanceTop = $('lobbyBalanceTop');
         const lobbyTimer = $('lobbyTimer');
+        const lobbyTimerDisplay = $('lobbyTimerDisplay');
         const playersCount = $('playersCount');
         const gamePlayersCount = $('gamePlayersCount');
         const winningBalance = $('winningBalance');
-        const currentCall = $('currentCall');
-        const calledList = $('calledList');
+        const currentCallLetter = $('currentCallLetter');
+        const currentCallNumber = $('currentCallNumber');
+        const calledCount = $('calledCount');
         const selectedNumber = $('selectedNumber');
         const numberGrid = $('numberGrid');
         const stake10Count = $('stake10Count');
         const stake20Count = $('stake20Count');
         const stake30Count = $('stake30Count');
+        const miniGrid75 = $('miniGrid75');
 
         // ---------- SOCKET ----------
         const stakeSocket = io('/public');
         stakeSocket.on('playersCount', d => {
-            if (d.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${d.count} players`;
-            if (d.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${d.count} players`;
-            if (d.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${d.count} players`;
+            if (d.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${d.count}`;
+            if (d.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${d.count}`;
+            if (d.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${d.count}`;
             updateStakeTable(d.stake, d.count);
         });
         stakeSocket.on('lobbyState', s => {
-            if (s.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${s.playersCount} players`;
-            if (s.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${s.playersCount} players`;
-            if (s.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${s.playersCount} players`;
+            if (s.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${s.playersCount}`;
+            if (s.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${s.playersCount}`;
+            if (s.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${s.playersCount}`;
             updateStakeTable(s.stake, s.playersCount);
         });
 
@@ -1627,7 +1679,6 @@
         const copy = t => { if (!t) return;
             navigator.clipboard.writeText(t).then(() => showToast('✅ Copied!', 'success')).catch(() => showToast('❌ Failed',
             'error')); };
-        const scrollEnd = () => { if (calledList) calledList.scrollLeft = calledList.scrollWidth; };
         const showToast = (msg, type = 'info') => {
             const t = document.getElementById('toast') || (() => { const e = document.createElement('div');
                 e.id = 'toast';
@@ -1879,7 +1930,7 @@
         applyLang();
 
         // ============================================================
-        //  INSTANT PAGE TRANSITIONS (no CSS transitions, no delays)
+        //  INSTANT PAGE TRANSITIONS
         // ============================================================
         function switchPage(newPageId) {
             const currentPageEl = document.querySelector('.page:not(.hidden)');
@@ -1892,7 +1943,7 @@
         }
 
         // ============================================================
-        //  SMOOTH MODAL TRANSITIONS (kept for modals)
+        //  SMOOTH MODAL TRANSITIONS
         // ============================================================
         function transitionModal(closeId, openId, delay = 250) {
             const closeEl = $(closeId);
@@ -2033,7 +2084,7 @@
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
         }
 
-        // ========== DEPOSIT FLOW (Smooth Modals) ==========
+        // ========== DEPOSIT FLOW ==========
         function resetDepositState() {
             selectedAdminId = null;
             selectedAdminObj = null;
@@ -2234,16 +2285,16 @@
                     ⚠️ <strong>Important:</strong> Use the <strong>exact</strong> phone number and amount to ensure your deposit is credited automatically.
                 </p>
                 ${method === 'telebirr' ? `
-                    <h4 style="margin-top:16px; color:#FBBF24;">📱 Telebirr Specific</h4>
+                    <h4 style="margin-top:16px; color:var(--yellow);">📱 Telebirr Specific</h4>
                     <ul style="padding-left:20px;"><li>Open Telebirr app → <strong>Send Money</strong> → <strong>To Individual</strong>.</li><li>Paste the admin's number (starting with <strong>09</strong>).</li><li>After payment, you'll receive an SMS with a <strong>Transaction ID</strong> – that is your Invoice Number.</li></ul>
                 ` : method === 'cbebirr' ? `
-                    <h4 style="margin-top:16px; color:#FBBF24;">🏦 CBE Birr Specific</h4>
+                    <h4 style="margin-top:16px; color:var(--yellow);">🏦 CBE Birr Specific</h4>
                     <ul style="padding-left:20px;"><li>Open CBE Birr app → <strong>Send Money</strong>.</li><li>Enter the admin's phone number.</li><li>Your Invoice Number is the <strong>reference number</strong> shown after the transaction.</li></ul>
                 ` : method === 'mpesa' ? `
-                    <h4 style="margin-top:16px; color:#FBBF24;">📲 M-Pesa Specific</h4>
+                    <h4 style="margin-top:16px; color:var(--yellow);">📲 M-Pesa Specific</h4>
                     <ul style="padding-left:20px;"><li>Open M-Pesa → <strong>Send Money</strong>.</li><li>Enter the admin's phone number (starting with <strong>07</strong>).</li><li>Your Invoice Number is the <strong>transaction code</strong> (e.g., <code>CKU3JPX6M3</code>).</li></ul>
                 ` : ''}
-                <p style="margin-top:16px; font-size:0.85rem; color:#94A3B8;">💡 <em>If you don't see your Invoice Number, wait a few seconds for the SMS to arrive.</em></p>
+                <p style="margin-top:16px; font-size:0.85rem; color:var(--text-muted);">💡 <em>If you don't see your Invoice Number, wait a few seconds for the SMS to arrive.</em></p>
             `;
         }
 
@@ -2462,12 +2513,12 @@
             if (!cont) return;
             cont.innerHTML = '';
             if (!card || !Array.isArray(card) || !card.length) {
-                cont.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B;">🎴 Select a card number to see your Bingo card</div>';
+                cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">🎴 Select a card number to see your Bingo card</div>';
                 return;
             }
             const tbl = document.createElement('table');
             tbl.style.borderCollapse = 'separate';
-            tbl.style.borderSpacing = '8px';
+            tbl.style.borderSpacing = '6px';
             const th = document.createElement('thead'),
                 hr = document.createElement('tr');
             ['B', 'I', 'N', 'G', 'O'].forEach(l => { const th2 = document.createElement('th');
@@ -2517,6 +2568,12 @@
                             pendingSelection = i;
                             selectedCardNumber = i;
                             selectedNumber.textContent = i;
+                            const lockBtn = $('lockInBtn');
+                            if (lockBtn) {
+                                lockBtn.textContent = `CARD ${i} LOCKED IN`;
+                                lockBtn.style.background = 'var(--yellow)';
+                                lockBtn.style.color = 'var(--bg)';
+                            }
                             buildGrid();
                             socket.emit('selectCardNumber', i);
                             updateBackToLobbyVisibility();
@@ -2524,6 +2581,17 @@
                     };
                 }
                 numberGrid.appendChild(cell);
+            }
+        }
+
+        function buildMiniGrid() {
+            if (!miniGrid75) return;
+            miniGrid75.innerHTML = '';
+            for (let i = 1; i <= 75; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = i;
+                miniGrid75.appendChild(cell);
             }
         }
 
@@ -2562,6 +2630,19 @@
             updateStatsUI();
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
+            // Update lock in button
+            const lockBtn = $('lockInBtn');
+            if (lockBtn) {
+                if (selectedCardNumber) {
+                    lockBtn.textContent = `CARD ${selectedCardNumber} LOCKED IN`;
+                    lockBtn.style.background = 'var(--yellow)';
+                    lockBtn.style.color = 'var(--bg)';
+                } else {
+                    lockBtn.textContent = `CARD 42 LOCKED IN`;
+                    lockBtn.style.background = 'var(--panel-light)';
+                    lockBtn.style.color = 'var(--text-muted)';
+                }
+            }
         }
 
         function showGame() {
@@ -2576,11 +2657,15 @@
 
         function startTimer(sec) {
             let left = sec;
-            lobbyTimer.textContent = left + 's';
+            if (lobbyTimer) lobbyTimer.textContent = left + 's';
+            if (lobbyTimerDisplay) lobbyTimerDisplay.textContent = left;
             clearInterval(lobbyTimerInterval);
             lobbyTimerInterval = setInterval(() => { left--; 
-                timerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval);
-                    showGame(); } else lobbyTimer.textContent = left + 's'; }, 1000);
+                timerSeconds = left; 
+                if (lobbyTimer) lobbyTimer.textContent = left + 's';
+                if (lobbyTimerDisplay) lobbyTimerDisplay.textContent = left;
+                if (left <= 0) { clearInterval(lobbyTimerInterval);
+                    showGame(); } }, 1000);
         }
 
         function goBack() { if (currentPage === 'lobby') showLobby(timerSeconds > 0 ? timerSeconds : 30); else if (
@@ -2600,7 +2685,7 @@
             localStorage.removeItem('dot_bingo_stake');
             clearInterval(lobbyTimerInterval);
             switchPage('stakePage');
-            selectedNumber.textContent = '-';
+            if (selectedNumber) selectedNumber.textContent = '-';
             pendingSelection = null;
             pendingRandom = false;
             currentGameId = null;
@@ -2615,10 +2700,32 @@
             const winners = data.winners || [data.winner].filter(Boolean);
             const total = data.totalPrize || 0;
             const each = data.prizeEach || 0;
-            const title = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
-            $('winTitle').innerHTML = title;
-            $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">${w}</span>`).join('');
-            $('winPrize').innerHTML = each + ' <small>ETB</small>';
+            
+            // Populate winner list
+            const winListContainer = $('winListContainer');
+            if (winListContainer) {
+                winListContainer.innerHTML = winners.map((w, index) => {
+                    const rank = index + 1;
+                    let rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : 'rank-3';
+                    return `
+                        <div class="winner-row ${rankClass}">
+                            <div class="rank-badge">${rank}</div>
+                            <div class="winner-avatar-sm">👤</div>
+                            <div class="winner-name">@${w}</div>
+                            <div class="winner-prize">+${each} ETB</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Update stats
+            const winTotalPlayers = $('winTotalPlayers');
+            const winEntryFee = $('winEntryFee');
+            const winPrizePool = $('winPrizePool');
+            if (winTotalPlayers) winTotalPlayers.textContent = data.playersCount || 37;
+            if (winEntryFee) winEntryFee.textContent = (currentStake || 20) + ' ETB';
+            if (winPrizePool) winPrizePool.textContent = total + ' ETB';
+
             $('winnerOverlay').classList.add('active');
             const conf = document.createElement('div');
             conf.className = 'confetti';
@@ -2672,7 +2779,7 @@
             const div = $('recentGamesList');
             if (!div) return;
             if (!recentGames.length) { div.innerHTML =
-                    '<div class="history-card" style="text-align:center; color:#64748B;">✨ No games played yet. Join a round!</div>'; return; }
+                    '<div class="history-card" style="text-align:center; color:var(--text-muted);">✨ No games played yet. Join a round!</div>'; return; }
             div.innerHTML = recentGames.map(g => {
                 const w = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result ===
                     'Win' ? 'You' : '—');
@@ -2681,14 +2788,16 @@
                         .winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—';
                 const prize = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result ===
                     'Win' ? `${g.playerPrize} ETB` : '—');
-                return `<div class="history-card"><div><strong>🎮 Game ID:</strong> <span style="color:#F8FAFC;">${g.gameId}</span></div><div><strong>🏆 Winner(s):</strong> <span style="color:#F8FAFC;">${w}</span></div><div><strong>🎯 Last Called:</strong> <span style="color:#F8FAFC;">${last}</span></div><div><strong>💰 Total Prize:</strong> <span style="color:#FBBF24; font-weight:700;">${prize}</span></div><div style="font-size:0.7rem;color:#94A3B8; margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
+                return `<div class="history-card"><div><strong>🎮 Game ID:</strong> <span style="color:var(--text);">${g.gameId}</span></div><div><strong>🏆 Winner(s):</strong> <span style="color:var(--text);">${w}</span></div><div><strong>🎯 Last Called:</strong> <span style="color:var(--text);">${last}</span></div><div><strong>💰 Total Prize:</strong> <span style="color:var(--yellow); font-weight:700;">${prize}</span></div><div style="font-size:0.7rem;color:var(--text-muted); margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
             }).join('');
         }
 
         function syncBalance(v) { balance = v; 
-            lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($(
-                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $(
-                'gameBalanceDisplay').innerText = v; }
+            if (lobbyBalance) lobbyBalance.innerText = v;
+            if (lobbyBalanceTop) lobbyBalanceTop.innerText = v;
+            if ($('walletBalancePage')) $('walletBalancePage').innerText = v; 
+            if ($('profileBalancePage')) $('profileBalancePage').innerText = v; 
+            if ($('gameBalanceDisplay')) $('gameBalanceDisplay').innerText = v; }
 
         // ============================================================
         //  CONNECT TO GAME
@@ -2708,7 +2817,7 @@
             socket.on('lobbyState', state => {
                 if (state.stake === currentStake) {
                     selectedCardNumber = null;
-                    selectedNumber.textContent = '-';
+                    if (selectedNumber) selectedNumber.textContent = '-';
                     showLobby(state.startsIn);
                     if (state.takenNumbers) updateGrid(state.takenNumbers);
                     updateCount(state.playersCount);
@@ -2728,30 +2837,48 @@
                 updateCount(serverTaken.size);
                 if (pendingSelection && data.number === pendingSelection) {
                     selectedCardNumber = data.number;
-                    selectedNumber.textContent = data.number;
+                    if (selectedNumber) selectedNumber.textContent = data.number;
                     pendingSelection = null;
+                    const lockBtn = $('lockInBtn');
+                    if (lockBtn) {
+                        lockBtn.textContent = `CARD ${data.number} LOCKED IN`;
+                        lockBtn.style.background = 'var(--yellow)';
+                        lockBtn.style.color = 'var(--bg)';
+                    }
                     buildGrid();
                     updateBackToLobbyVisibility();
                 }
                 if (pendingRandom && data.number) {
                     selectedCardNumber = data.number;
-                    selectedNumber.textContent = data.number;
+                    if (selectedNumber) selectedNumber.textContent = data.number;
                     pendingRandom = false;
+                    const lockBtn = $('lockInBtn');
+                    if (lockBtn) {
+                        lockBtn.textContent = `CARD ${data.number} LOCKED IN`;
+                        lockBtn.style.background = 'var(--yellow)';
+                        lockBtn.style.color = 'var(--bg)';
+                    }
                     buildGrid();
                     updateBackToLobbyVisibility();
                 }
             });
             socket.on('cardSelectionFailed', msg => { alert(msg); if (pendingSelection) { pendingSelection = null;
                     if (selectedCardNumber) { selectedCardNumber = null;
-                        selectedNumber.textContent = '-';
+                        if (selectedNumber) selectedNumber.textContent = '-';
                         buildGrid();
+                        const lockBtn = $('lockInBtn');
+                        if (lockBtn) {
+                            lockBtn.textContent = `CARD 42 LOCKED IN`;
+                            lockBtn.style.background = 'var(--panel-light)';
+                            lockBtn.style.color = 'var(--text-muted)';
+                        }
                         updateBackToLobbyVisibility(); } } if (pendingRandom) pendingRandom = false; });
             socket.on('playersCount', (data) => {
                 const s = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
                 'dot_bingo_stake'));
                 if (data.stake === s) updateCount(data.count);
                 if (s && winningBalance && !isGameActive) {
-                    winningBalance.innerText = Math.floor(data.count * s * 0.8);
+                    winningBalance.innerText = Math.floor(data.count * s * 0.8) + ' ETB';
                 }
                 updateStakeTable(data.stake, data.count);
             });
@@ -2762,17 +2889,41 @@
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
                 if ($('gameIdDisplay')) $('gameIdDisplay').textContent = currentGameId.replace('GAME_', '');
+                if ($('gameCardNumber')) $('gameCardNumber').textContent = selectedCardNumber || '42';
                 updateBackToLobbyVisibility();
             });
             socket.on('numberCalled', data => {
                 if (data.stake !== currentStake) return;
                 const num = data.number;
-                currentCall.innerText = formatCall(num);
-                const full = data.calledNumbers || [];
-                const hist = full.slice(0, -1);
-                calledList.innerText = 'Called: ' + (hist.length ? hist.map(n => formatCall(n)).join(', ') :
-                    '—');
-                scrollEnd();
+                if (currentCallLetter && currentCallNumber) {
+                    let letter = 'B';
+                    if (num > 15) letter = 'I';
+                    if (num > 30) letter = 'N';
+                    if (num > 45) letter = 'G';
+                    if (num > 60) letter = 'O';
+                    currentCallLetter.textContent = letter;
+                    currentCallNumber.textContent = num;
+                }
+                if (calledCount) calledCount.textContent = data.calledNumbers.length;
+                
+                // Update mini grid
+                if (miniGrid75) {
+                    const cells = miniGrid75.children;
+                    if (data.calledNumbers) {
+                        data.calledNumbers.forEach(n => {
+                            if (cells[n - 1]) cells[n - 1].classList.add('active');
+                        });
+                    }
+                }
+
+                // Update away count
+                if (userCard.length && $('awayCount')) {
+                    let marked = 0;
+                    userCard.forEach(row => row.forEach(val => { if (markedNumbers.includes(val) || val === 'FREE') marked++; }));
+                    const totalCells = 25;
+                    $('awayCount').textContent = totalCells - marked;
+                }
+
                 speakAmharic(num);
             });
             socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length)
@@ -2780,7 +2931,17 @@
                     renderCard(userCard, 'lobbyCardPreview', false); });
             socket.on('gameEnded', data => {
                 if (data.stake !== currentStake) return;
-                if (data.winningNumber) currentCall.innerText = formatCall(data.winningNumber);
+                if (data.winningNumber) {
+                    if (currentCallLetter && currentCallNumber) {
+                        let letter = 'B';
+                        if (data.winningNumber > 15) letter = 'I';
+                        if (data.winningNumber > 30) letter = 'N';
+                        if (data.winningNumber > 45) letter = 'G';
+                        if (data.winningNumber > 60) letter = 'O';
+                        currentCallLetter.textContent = letter;
+                        currentCallNumber.textContent = data.winningNumber;
+                    }
+                }
                 showWinner(data);
                 currentGameId = null;
                 markedNumbers = [];
@@ -2808,9 +2969,7 @@
                 utterance = null; }
             unlockSpeech(); }
 
-        function updateMute() { const btn = $('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊';
-                btn.style.background = soundMuted ? 'rgba(255,255,255,0.05)' : 'rgba(251,191,36,0.15)';
-                btn.style.color = soundMuted ? '#94A3B8' : '#FBBF24'; } }
+        function updateMute() { const btn = $('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊'; } }
 
         function getLetter(n) { if (n <= 15) return "ቢ"; if (n <= 30) return "አይ"; if (n <= 45) return "ኤን"; if (n <= 60)
                 return "ጂ"; return "ኦ"; }
@@ -2863,6 +3022,7 @@
             if (!checkInviteRequired()) {
                 return;
             }
+            buildMiniGrid();
             buildGrid();
             loadStats();
             updateMute();
@@ -2877,22 +3037,47 @@
         // ============================================================
         //  EVENT BINDINGS
         // ============================================================
-        $('stake10Btn')?.addEventListener('click', () => { loadStats(); 
+        $('stake10Btn')?.addEventListener('click', () => { 
+            document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('active'));
+            $('stake10Btn').classList.add('active');
+            $('entryFeeDisplay').textContent = '10 ETB';
+            loadStats(); 
             connectToGame(10);
             showLobby(30);
-            unlockSpeech(); });
-        $('stake20Btn')?.addEventListener('click', () => { loadStats(); 
+            unlockSpeech(); 
+        });
+        $('stake20Btn')?.addEventListener('click', () => { 
+            document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('active'));
+            $('stake20Btn').classList.add('active');
+            $('entryFeeDisplay').textContent = '20 ETB';
+            loadStats(); 
             connectToGame(20);
             showLobby(30);
-            unlockSpeech(); });
-        $('stake30Btn')?.addEventListener('click', () => { loadStats(); 
+            unlockSpeech(); 
+        });
+        $('stake30Btn')?.addEventListener('click', () => { 
+            document.querySelectorAll('.stake-btn').forEach(b => b.classList.remove('active'));
+            $('stake30Btn').classList.add('active');
+            $('entryFeeDisplay').textContent = '30 ETB';
+            loadStats(); 
             connectToGame(30);
             showLobby(30);
-            unlockSpeech(); });
+            unlockSpeech(); 
+        });
+        $('playBtn')?.addEventListener('click', () => {
+            const activeStake = document.querySelector('.stake-btn.active');
+            if (activeStake) {
+                const stake = parseInt(activeStake.dataset.stake);
+                loadStats();
+                connectToGame(stake);
+                showLobby(30);
+                unlockSpeech();
+            }
+        });
         $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true;
                 socket.emit('newCardNumber');
                 selectedCardNumber = null;
-                selectedNumber.textContent = '⚡ ...';
+                if (selectedNumber) selectedNumber.textContent = '⚡ ...';
                 buildGrid();
                 updateBackToLobbyVisibility(); }
             unlockSpeech(); });
@@ -2902,23 +3087,35 @@
         $('backToStakeBtn')?.addEventListener('click', goStake);
         $('backToLobbyBtn')?.addEventListener('click', goStake);
 
-        document.querySelectorAll('.tab-btn').forEach(btn => {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(btn => {
             btn.addEventListener('click', () => {
                 resetDepositState();
                 const page = btn.dataset.page;
                 clearInterval(lobbyTimerInterval);
+                
+                // Update active state visually
+                document.querySelectorAll('.bottom-nav .nav-item').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
                 if (page === 'lobby') {
                     if (currentPage === 'lobby') showLobby(timerSeconds);
-                    else showGame();
+                    else if (currentPage === 'game') showGame();
+                    else showLobby(30);
                 } else {
                     if (currentPage === 'lobby') $('lobbyPage').classList.add('hidden');
-                    else $('gamePage').classList.add('hidden');
-                    if (page === 'history') { switchPage('historyPage'); } else if (page === 'wallet') {
+                    else if (currentPage === 'game') $('gamePage').classList.add('hidden');
+                    else if (currentPage === 'stake') $('stakePage').classList.add('hidden');
+                    
+                    if (page === 'history') { switchPage('historyPage'); } 
+                    else if (page === 'wallet') {
                         switchPage('walletPage');
-                        syncBalance(balance); } else if (page === 'profile') { switchPage('profilePage');
+                        syncBalance(balance); 
+                    } else if (page === 'profile') { 
+                        switchPage('profilePage');
                         syncBalance(balance);
                         updateStatsUI();
-                        fetchUserInviteInfo(); }
+                        fetchUserInviteInfo(); 
+                    }
                 }
                 unlockSpeech();
             });
