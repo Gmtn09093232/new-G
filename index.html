@@ -1278,8 +1278,6 @@ const copyText = t => t
         .catch(() => toast('❌ Failed', 'error'))
     : null;
 
-const raf = () => new Promise(r => requestAnimationFrame(r));
-
 /* ============================================================
    1. TRANSLATIONS
    ============================================================ */
@@ -1408,7 +1406,6 @@ const state = {
     soundMuted: localStorage.getItem('dot_bingo_sound_muted') === 'true',
     speechUnlocked: false,
     utterance: null,
-    // deposit/withdraw
     depositAdmins: [],
     methodMode: null,           // 'deposit' | 'withdraw'
     selectedMethod: null,       // { type, adminId, number }
@@ -1419,8 +1416,8 @@ const state = {
     currentPage: 'lobby'
 };
 
-let socket = null;              // game socket
-let stakeSocket = null;         // public stake counts socket
+let socket = null;
+let stakeSocket = null;
 let lobbyTimer = null;
 let amVoice = null;
 
@@ -1442,16 +1439,27 @@ function switchPage(id) {
     next.classList.remove('hidden');
 }
 
+/* ✅ FIXED: synchronous, reliable, no rAF race, no stack reorder.
+   - Applies `.active` immediately so it can never be lost.
+   - Only moves the modal in the DOM if it isn't already last.
+   - Browsers still animate the CSS transition because the class
+     change happens in a single synchronous batch. */
 function transitionModal(closeId, openId) {
     if (closeId) $(closeId)?.classList.remove('active');
     if (!openId) return;
+
     const openEl = $(openId);
-    // move to end of body so crossfade paints on top correctly
-    if (openEl.parentNode === document.body) document.body.appendChild(openEl);
-    requestAnimationFrame(() => {
-        openEl.classList.add('active');
-        unlockSpeech();
-    });
+    if (!openEl) return;
+
+    // Bring to end of body only when needed (avoids stack reordering
+    // on rapid back-and-forth navigation).
+    if (openEl.parentNode === document.body &&
+        document.body.lastElementChild !== openEl) {
+        document.body.appendChild(openEl);
+    }
+
+    openEl.classList.add('active');
+    unlockSpeech();
 }
 
 /* ============================================================
@@ -1513,7 +1521,7 @@ function checkInviteRequired() {
 }
 
 /* ============================================================
-   6. STAKE SOCKET (only alive on stake page)
+   6. STAKE SOCKET
    ============================================================ */
 const stakeCounts = { 10: 0, 20: 0, 30: 0 };
 
@@ -1693,42 +1701,58 @@ async function openWithdraw() {
     unlockSpeech();
 }
 
+/* ✅ Simplified — state.selectedMethod is already set by the caller. */
 function openWithdrawDetails(method, number) {
-    state.selectedMethod = { type: method, adminId: state.selectedMethod?.adminId, number };
     $('withdrawTitle').innerHTML = `Withdraw via ${METHOD_LABELS[method] || method}`;
     $('withdrawPhone').placeholder = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
     unlockSpeech();
 }
 
+/* ✅ FIXED: null guard + no silent TypeError. If method is lost,
+   send the user back to the picker instead of doing nothing. */
 function requestDeposit() {
-    const phone = $('depositPhone').value.trim();
-    const amount = $('depositAmount').value.trim();
-    if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
-    if (!amount || Number(amount) < 10) return toast('Minimum deposit is 10 ETB', 'error');
+    const phone  = $('depositPhone')?.value.trim()  || '';
+    const amount = $('depositAmount')?.value.trim() || '';
 
-    state.savedPhone = phone;
-    state.savedAmount = amount;
+    if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
+    if (!amount || Number(amount) < 10)  return toast('Minimum deposit is 10 ETB', 'error');
+
+    if (!state.selectedMethod) {
+        toast('Please pick a payment method again', 'info');
+        openDeposit();
+        return;
+    }
+
+    state.savedPhone   = phone;
+    state.savedAmount  = amount;
     state.pendingAmount = Number(amount);
 
     const amt = Number(amount).toFixed(2);
     $('paymentAmountDisplay').textContent = amt + ' ETB';
-    $('paymentStepAmount').textContent = amt;
-    $('paymentStepLabel').innerHTML = t('sendTo').replace('{amount}', amt);
-    $('paymentRecipient').textContent = `📞 ${safeNumber(state.selectedMethod.number)}`;
-    $('paymentMethodTitle').textContent = (METHOD_LABELS[state.selectedMethod.type] || state.selectedMethod.type) + ' P2P';
+    $('paymentStepAmount').textContent    = amt;
+    $('paymentStepLabel').innerHTML       = t('sendTo').replace('{amount}', amt);
+    $('paymentRecipient').textContent     = `📞 ${safeNumber(state.selectedMethod.number)}`;
+    $('paymentMethodTitle').textContent   =
+        (METHOD_LABELS[state.selectedMethod.type] || state.selectedMethod.type) + ' P2P';
 
-    const icon = $('paymentMethodIcon');
-    icon.innerHTML = methodIconHTML(state.selectedMethod.type);
+    $('paymentMethodIcon').innerHTML = methodIconHTML(state.selectedMethod.type);
 
     $('paymentInvoice').value = '';
     transitionModal('depositDetailsModal', 'paymentModal');
 }
 
+/* ✅ FIXED: bring how-to-pay modal to the top of the stack. */
 function openHowToPay() {
     const method = state.selectedMethod?.type || 'telebirr';
     $('howToPayMethod').textContent = METHOD_LABELS[method] || method;
     $('howToPayContent').innerHTML = getPaymentInstructions(method);
-    $('howToPayModal').classList.add('active');
+
+    const el = $('howToPayModal');
+    if (el.parentNode === document.body &&
+        document.body.lastElementChild !== el) {
+        document.body.appendChild(el);
+    }
+    el.classList.add('active');
     unlockSpeech();
 }
 
@@ -1841,7 +1865,7 @@ async function submitWithdraw() {
 /* ============================================================
    8. CARD & GRID RENDERING (incremental)
    ============================================================ */
-const cardCache = new Map();   // container → { key, cells }
+const cardCache = new Map();
 
 function renderCard(card, containerId, clickable) {
     const cont = $(containerId);
@@ -1914,7 +1938,6 @@ function renderCard(card, containerId, clickable) {
     }
 }
 
-/* 1-100 grid — built once, only classes toggle */
 const gridCells = new Array(101);
 let gridBuilt = false;
 let gridPaintQueued = false;
@@ -2172,11 +2195,9 @@ async function connectToGame(stake) {
         state.displayTaken = disp;
         scheduleGridPaint();
         updateCount(state.serverTaken.size);
-        if (d.number === state.selectedCard || d.number) {
-            if (d.number === state.selectedCard) {
-                scheduleGridPaint();
-                updateBackToLobbyVisibility();
-            }
+        if (d.number === state.selectedCard) {
+            scheduleGridPaint();
+            updateBackToLobbyVisibility();
         }
     });
 
@@ -2461,7 +2482,6 @@ async function init() {
     await authenticate();
     await fetchInvite();
 
-    // restore previous session
     const saved = parseInt(localStorage.getItem('dot_bingo_stake'), 10);
     if ([10, 20, 30].includes(saved)) {
         setTimeout(() => connectToGame(saved), 500);
