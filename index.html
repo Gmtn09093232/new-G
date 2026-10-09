@@ -6,7 +6,6 @@
     <meta name="color-scheme" content="dark" />
     <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
 
-    <!-- ✅ PERF: preconnect before any third‑party request -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://telegram.org">
@@ -15,7 +14,6 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- ✅ PERF: only the weights actually used (dropped the opsz axis) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
           rel="stylesheet" media="print" onload="this.media='all'">
     <noscript>
@@ -44,7 +42,6 @@
             align-items: center;
             justify-content: center;
         }
-        /* ✅ PERF: removed backdrop-filter (very expensive on mobile GPUs) */
         .page {
             max-width: 600px;
             width: 100%;
@@ -55,7 +52,6 @@
             box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5),
                         inset 0 1px 0 rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.05);
-            /* ✅ PERF: isolate layout/paint so page switches don't invalidate the whole document */
             contain: layout paint style;
         }
         .page.hidden { display: none; }
@@ -75,14 +71,14 @@
             z-index: 1000;
             font-size: 0.8rem;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: background 0.2s, transform 0.1s;
+            transition: background 0.15s, transform 0.1s;
         }
         .lang-toggle:active { transform: scale(0.95); }
         @media (max-width:550px) {
             .lang-toggle { top: 8px; left: 8px; padding: 6px 14px; font-size: 0.7rem; }
         }
 
-        /* ===== MODALS ===== */
+        /* ===== MODALS — FAST TRANSITIONS ===== */
         .modal {
             position: fixed;
             top: 0; left: 0;
@@ -94,14 +90,14 @@
             z-index: 2000;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.25s ease, visibility 0.25s ease;
+            /* ✅ FAST: 120 ms fade */
+            transition: opacity 0.12s ease, visibility 0.12s ease;
         }
         .modal.active { opacity: 1; visibility: visible; }
         .modal.active .modal-content {
             transform: scale(1) translateY(0);
             opacity: 1;
         }
-        /* ✅ PERF: softened blur (16px→6px) and contained the paint box */
         @supports (backdrop-filter: blur(6px)) {
             .modal.active { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
         }
@@ -114,9 +110,10 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
             text-align: left;
-            transform: scale(0.92) translateY(12px);
+            transform: scale(0.94) translateY(8px);
             opacity: 0;
-            transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.3s ease;
+            /* ✅ FAST: 160 ms pop-in, snappy ease-out */
+            transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.14s ease;
             max-height: 92vh;
             overflow-y: auto;
             color: #F1F5F9;
@@ -182,7 +179,7 @@
             font-size: 0.95rem;
             font-family: inherit;
             color: #F8FAFC;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            transition: border-color 0.15s, box-shadow 0.15s;
         }
         .input-group input:focus {
             outline: none;
@@ -211,7 +208,7 @@
             min-height: 52px;
             font-size: 1rem;
             cursor: pointer;
-            transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
+            transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
         }
         .modal-buttons button:active { transform: scale(0.96); }
         .btn-primary {
@@ -292,7 +289,7 @@
             margin: 12px 0;
             border: 1px solid rgba(255, 255, 255, 0.05);
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
         }
         .method-list-item:active {
             transform: scale(0.97);
@@ -420,7 +417,7 @@
             font-family: 'Inter', monospace;
             color: #F8FAFC;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+            transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
             cursor: pointer;
         }
         .card-container td.free {
@@ -466,7 +463,7 @@
             color: #CBD5E1;
             border: 1px solid rgba(255, 255, 255, 0.05);
             cursor: pointer;
-            transition: background 0.15s ease, color 0.15s ease;
+            transition: background 0.12s ease, color 0.12s ease;
             contain: layout style paint;
         }
         .grid-cell.taken {
@@ -523,7 +520,7 @@
             font-size: 0.7rem;
             color: #94A3B8;
             cursor: pointer;
-            transition: background 0.2s, color 0.2s;
+            transition: background 0.15s, color 0.15s;
         }
         .tab-btn.active { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
         .tab-btn:active { transform: scale(0.96); }
@@ -547,7 +544,7 @@
             cursor: pointer;
             width: 100px;
             text-align: center;
-            transition: transform 0.2s, border-color 0.2s, background 0.2s, color 0.2s;
+            transition: transform 0.15s, border-color 0.15s, background 0.15s, color 0.15s;
             position: relative;
         }
         .stake-option:active { transform: scale(0.96); }
@@ -623,10 +620,9 @@
             height: 100%;
             background: linear-gradient(90deg, #FBBF24, #F59E0B);
             border-radius: 20px;
-            /* ✅ PERF: animate transform instead of width (compositor-only) */
             transform-origin: left center;
             transform: scaleX(0);
-            transition: transform 0.4s ease;
+            transition: transform 0.3s ease;
             width: 100%;
         }
 
@@ -760,7 +756,7 @@
             z-index: 2000;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.3s ease, visibility 0.3s;
+            transition: opacity 0.2s ease, visibility 0.2s;
         }
         .winner-modal.active { opacity: 1; visibility: visible; }
         .winner-modal.active .winner-card {
@@ -778,12 +774,11 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             transform: scale(0.92) translateY(12px);
             opacity: 0;
-            transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.35s ease;
+            transition: transform 0.25s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.2s ease;
         }
         .winner-trophy {
             font-size: 4rem;
             margin-bottom: 8px;
-            /* ✅ PERF: keep animation on the compositor */
             will-change: transform;
             animation: floatTrophy 1.4s infinite alternate;
         }
@@ -861,7 +856,6 @@
         @keyframes fall {
             to { transform: translate3d(0, 100vh, 0) rotate(720deg); opacity: 0; }
         }
-        /* ✅ PERF / a11y: honour reduced-motion */
         @media (prefers-reduced-motion: reduce) {
             .confetti-piece { display: none; }
             .winner-trophy { animation: none; }
@@ -915,7 +909,7 @@
             font-size: 0.9rem;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             opacity: 0;
-            transition: transform 0.35s ease, opacity 0.35s ease;
+            transition: transform 0.25s ease, opacity 0.25s ease;
             z-index: 999;
             max-width: 90%;
             text-align: center;
@@ -1240,7 +1234,6 @@
             </div>
         </div>
 
-        <!-- ===== PLAYER COUNT TABLE ===== -->
         <div class="stake-table-wrap">
             <div class="table-title">ተጫዋቾች በውርርድ / Players by Stake</div>
             <table class="stake-table" id="stakeTable">
@@ -1287,7 +1280,6 @@
 
     <!-- ===== LOBBY PAGE ===== -->
     <div id="lobbyPage" class="page hidden">
-        <!-- Top Bar -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div style="font-weight:700; font-size:1.1rem; color:#F8FAFC;" id="lobbyUserName">Hi, Player</div>
             <div style="display:flex; align-items:center; gap:8px;">
@@ -1295,7 +1287,6 @@
             </div>
         </div>
 
-        <!-- Balance & Timer -->
         <div class="balance-top" style="flex-direction:column; align-items:stretch; gap:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
@@ -1308,26 +1299,25 @@
             </div>
         </div>
 
-        <!-- Card Selection -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0 8px;">
             <span style="font-weight:600; color:#94A3B8; font-size:0.85rem;" data-key="pickCard">🎴 Pick card ID:</span>
             <span style="font-weight:700; color:#FBBF24; font-size:0.9rem;"><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
             <button id="randomCardBtn" style="background:rgba(251,191,36,0.15); border:1px solid rgba(251,191,36,0.3); border-radius:40px; padding:6px 16px; color:#FBBF24; cursor:pointer; font-weight:600; font-size:0.75rem;" data-key="randomCard">✨ Random Card</button>
         </div>
         <div id="numberGrid" class="grid-100"></div>
-        
+
         <div style="font-weight:600; color:#94A3B8; font-size:0.85rem; margin:16px 0 8px;" data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
         <div id="lobbyCardPreview" class="card-container"></div>
 
         <button id="rulesBtn" style="width:100%; background:rgba(255,255,255,0.05); color:#94A3B8; border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:10px; cursor:pointer; margin-top:12px; font-weight:600;" data-key="rulesBtn">📜 Game Rules</button>
-        
+
         <div class="tab-bar">
             <button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button>
             <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
             <button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button>
             <button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button>
         </div>
-        
+
         <div class="telegram-links">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
@@ -1354,13 +1344,11 @@
 
     <!-- ===== GAME PAGE ===== -->
     <div id="gamePage" class="page hidden">
-        <!-- Top Bar -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="font-weight:700; font-size:0.9rem; color:#94A3B8;">Game #<span id="gameIdDisplay">...</span></div>
             <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
         </div>
 
-        <!-- Balance & Actions -->
         <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
             <div style="font-size:0.85rem;">💰 <span id="gameBalanceDisplay" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
             <div style="display:flex; gap:6px;">
@@ -1371,31 +1359,25 @@
             <button id="rulesBtnGame" style="background:rgba(255,255,255,0.05); color:#94A3B8; border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.7rem;" data-key="rulesBtn">📜 Rules</button>
         </div>
 
-        <!-- Prize Pool -->
         <div class="prize-pool">
             <span data-key="prizePoolLabel">🏆 PRIZE POOL</span>
             <div id="winningBalance">0 ETB</div>
         </div>
 
-        <!-- Back to Lobby Button -->
         <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
             <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby" style="padding:10px 24px; border-radius:40px; font-weight:600;">← Back to Lobby</button>
         </div>
 
-        <!-- Last Call Area -->
         <div class="last-call-area">
             <div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div>
             <div class="last-call-number" id="currentCall">--</div>
             <div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div>
         </div>
 
-        <!-- Game Card -->
         <div id="gameCard" class="card-container"></div>
 
-        <!-- Bingo Button -->
         <button id="bingoBtn" data-key="claimBingo">🏆 BINGO! 🏆</button>
 
-        <!-- Bottom Tabs -->
         <div class="tab-bar">
             <button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button>
             <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
@@ -1406,12 +1388,10 @@
 
     <script>
         // ============================================================
-        //  DOT BINGO – Full Frontend with INSTANT page transitions
+        //  DOT BINGO – Fast transitions + fixed deposit flow
         // ============================================================
 
         // ---------- DOM REFS (memoised) ----------
-        // ✅ PERF: memoised getElementById - hot paths used to call this
-        //         hundreds of times per event.
         const _elCache = new Map();
         const $ = id => {
             let e = _elCache.get(id);
@@ -1434,10 +1414,7 @@
         const stake20Count = $('stake20Count');
         const stake30Count = $('stake30Count');
 
-        // ---------- STAKE SOCKET (lazy, on-demand) ----------
-        // ✅ PERF: was `io('/public')` at load → a 2nd permanent WebSocket
-        //         for every visitor. Now it only exists while the stake
-        //         page is on screen.
+        // ---------- STAKE SOCKET (lazy) ----------
         let stakeSocket = null;
         const stakeCounts = { 10: 0, 20: 0, 30: 0 };
 
@@ -1466,13 +1443,11 @@
             stakeSocket = null;
         }
 
-        // ===== STAKE TABLE UPDATE =====
         function updateStakeTable(stake, count) {
             if (stake !== 10 && stake !== 20 && stake !== 30) return;
             stakeCounts[stake] = count;
             const el = $(`stakeTable${stake}Count`);
             if (el) el.innerText = count;
-            // ✅ PERF: write all three bars in one pass, no layout reads
             const maxVal = Math.max(stakeCounts[10], stakeCounts[20], stakeCounts[30], 1);
             for (const s of [10, 20, 30]) {
                 const bar = $(`stakeBar${s}`);
@@ -1487,7 +1462,6 @@
                 .then(() => showToast('✅ Copied!', 'success'))
                 .catch(() => showToast('❌ Failed', 'error'));
         };
-        // ✅ PERF: scrollLeft write moved off the paint path
         const scrollEnd = () => {
             if (!calledList) return;
             requestAnimationFrame(() => { calledList.scrollLeft = calledList.scrollWidth; });
@@ -1515,7 +1489,6 @@
 
         // ---------- STATE ----------
         let socket, userCard = [];
-        // ✅ PERF: Set instead of Array → O(1) membership in renderCard
         let markedNumbers = new Set();
         let isGameActive = false,
             lobbyTimerInterval = null,
@@ -1547,6 +1520,7 @@
         let submitting = false,
             submittingW = false;
         let withdrawMethodMap = {};
+        let methodListMode = null;   // ✅ 'deposit' | 'withdraw' | null
         let userInviteData = { invite_code: null, admin_id: null, admin_name: null };
         let isAuthenticated = false;
 
@@ -1608,7 +1582,7 @@
                 rulesTitle: "የቢንጎ ሕጎች",
                 rulesSub: "75-ኳስ ክላሲክ",
                 rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
-                rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
+                rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
                 rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
                 rulesWinningPatterns: "✅ 1 አግድም መስመር (Row)\n✅ 1 ቁመት መስመር (Column)\n✅ 1 ሰያፍ መስመር (Diagonal)\n✅ 4ቱ ማዕዘኖች (4 Corners)\n\n**💡 ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
                 rulesPrizeTitle: "🏆 የሽልማት ህግ",
@@ -1760,16 +1734,32 @@
         }
 
         // ============================================================
-        //  MODAL TRANSITIONS
+        //  ✅ FIXED MODAL TRANSITIONS
+        //  - No 250 ms dead gap (rAF instead of setTimeout)
+        //  - Correct z-order: incoming modal is moved to end of body
+        //    so back-transitions paint on top correctly.
         // ============================================================
-        function transitionModal(closeId, openId, delay = 250) {
-            const closeEl = $(closeId);
-            const openEl = $(openId);
+        function transitionModal(closeId, openId, delay = 0) {
+            const closeEl = closeId ? $(closeId) : null;
+            const openEl  = openId  ? $(openId)  : null;
+
             if (closeEl) closeEl.classList.remove('active');
-            setTimeout(() => {
-                if (openEl) openEl.classList.add('active');
+            if (!openEl) return;
+
+            // ✅ Move incoming modal to the end of <body> so it paints
+            //    ON TOP during crossfade (fixes "back" looking broken).
+            if (openEl.parentNode === document.body) {
+                document.body.appendChild(openEl);
+            }
+
+            const show = () => {
+                openEl.classList.add('active');
                 unlockSpeech();
-            }, delay);
+            };
+
+            // ✅ No dead gap: rAF shows the modal on the very next frame.
+            if (delay > 0) setTimeout(show, delay);
+            else requestAnimationFrame(show);
         }
 
         // ============================================================
@@ -1898,7 +1888,6 @@
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
         }
 
-        // ✅ PERF: shared markup builder for method icons
         function methodIconHtml(type, label) {
             const logoUrl = getMethodLogo(type);
             const fallback = getFallbackIcon(type);
@@ -1921,16 +1910,20 @@
             savedPhone = '';
             savedAmount = '';
             submitting = false;
-            const phoneInput = $('depositPlayerPhone');
-            const amountInput = $('depositAmountSimple');
+            submittingW = false;
+            methodListMode = null;      // ✅ reset mode
+            withdrawMethodMap = {};     // ✅ no stale withdraw state
+
+            const phoneInput   = $('depositPlayerPhone');
+            const amountInput  = $('depositAmountSimple');
             const invoiceInput = $('paymentInvoiceNumber');
-            if (phoneInput) phoneInput.value = '';
-            if (amountInput) amountInput.value = '';
+            if (phoneInput)   phoneInput.value = '';
+            if (amountInput)  amountInput.value = '';
             if (invoiceInput) invoiceInput.value = '';
-            ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal'].forEach(id => {
-                const el = $(id);
-                if (el) el.classList.remove('active');
-            });
+
+            ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal', 'withdrawDetailsModal']
+                .forEach(id => { const el = $(id); if (el) el.classList.remove('active'); });
+
             const confirmBtn = $('confirmPaymentBtn');
             if (confirmBtn) {
                 confirmBtn.disabled = false;
@@ -1940,6 +1933,7 @@
             }
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = '';
+
             const dmlt = $('depositMethodListTitle');
             if (dmlt) dmlt.innerHTML = lang === 'am' ? '💳 የክፍያ ዘዴ ይምረጡ' : '💳 Select Deposit Method';
             const stepLabel = $('depositMethodListStepLabel');
@@ -1950,6 +1944,9 @@
             resetDepositState();
             const admins = await loadAdmins();
             const c = $('methodListContainer');
+
+            methodListMode = 'deposit';   // ✅ tag mode
+
             if (!admins.length) {
                 if (c) c.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div><div>No payment methods available</div></div>`;
                 $('depositMethodListModal').classList.add('active');
@@ -1958,8 +1955,8 @@
             const allMethods = [];
             admins.forEach(admin => {
                 if (admin.telebirr) allMethods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr, adminId: admin.id });
-                if (admin.cbebirr) allMethods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr, adminId: admin.id });
-                if (admin.mpesa) allMethods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa, adminId: admin.id });
+                if (admin.cbebirr)  allMethods.push({ type: 'cbebirr',  label: 'CBE Birr', number: admin.cbebirr,  adminId: admin.id });
+                if (admin.mpesa)    allMethods.push({ type: 'mpesa',    label: 'M-Pesa',   number: admin.mpesa,    adminId: admin.id });
             });
             if (!allMethods.length) {
                 if (c) c.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div>No payment methods available</div></div>`;
@@ -1993,7 +1990,6 @@
                         </div>`;
             }).join('');
 
-            // ✅ PERF: one delegated listener instead of N per-item listeners
             c.onclick = e => {
                 const el = e.target.closest('.method-list-item');
                 if (!el || !c.contains(el)) return;
@@ -2006,14 +2002,18 @@
                 selectedMethodNumber = number;
                 selectedAdminId = adminId;
                 selectedAdminObj = admin;
-                transitionModal('depositMethodListModal', 'depositDetailsModal');
+                transitionModal('depositMethodListModal', 'depositDetailsModal');   // ✅ fast crossfade
                 if (savedPhone) $('depositPlayerPhone').value = savedPhone;
                 if (savedAmount) $('depositAmountSimple').value = savedAmount;
             };
         }
 
-        function closeDepositDetails() { transitionModal('depositDetailsModal', 'depositMethodListModal'); }
+        function closeDepositDetails() {
+            transitionModal('depositDetailsModal', 'depositMethodListModal');   // ✅ fast crossfade
+        }
+
         function closeMethodList() {
+            // ✅ Always just close and reset — no mode guessing.
             const m = $('depositMethodListModal');
             if (m) m.classList.remove('active');
             resetDepositState();
@@ -2049,11 +2049,11 @@
             }
             $('paymentInvoiceNumber').value = '';
             pendingAmount = Number(amount);
-            transitionModal('depositDetailsModal', 'depositPaymentModal');
+            transitionModal('depositDetailsModal', 'depositPaymentModal');   // ✅ fast crossfade
         }
 
         function closePaymentConfirm() {
-            transitionModal('depositPaymentModal', 'depositDetailsModal');
+            transitionModal('depositPaymentModal', 'depositDetailsModal');   // ✅ fast crossfade
             if (savedPhone) $('depositPlayerPhone').value = savedPhone;
             if (savedAmount) $('depositAmountSimple').value = savedAmount;
         }
@@ -2109,11 +2109,12 @@
                 const methodMap = {};
                 admins.forEach(a => {
                     if (a.telebirr && !methodMap.telebirr) methodMap.telebirr = a.id;
-                    if (a.cbebirr && !methodMap.cbebirr) methodMap.cbebirr = a.id;
-                    if (a.mpesa && !methodMap.mpesa) methodMap.mpesa = a.id;
+                    if (a.cbebirr  && !methodMap.cbebirr)  methodMap.cbebirr  = a.id;
+                    if (a.mpesa    && !methodMap.mpesa)    methodMap.mpesa    = a.id;
                 });
                 if (Object.keys(methodMap).length === 0) { showToast('No withdrawal methods available.', 'error'); return; }
                 withdrawMethodMap = methodMap;
+                methodListMode = 'withdraw';   // ✅ tag mode
                 showWithdrawMethods(methodMap);
             } catch (e) { showToast('Error loading withdrawal methods.', 'error'); console.error(e); }
         }
@@ -2158,7 +2159,8 @@
                 selectedMethodNumber = number;
                 selectedAdminId = adminId;
                 selectedAdminObj = admin;
-                $('depositMethodListModal').classList.remove('active');
+                // ✅ smooth crossfade into withdraw details
+                transitionModal('depositMethodListModal', 'withdrawDetailsModal');
                 openWithdrawDetails(admin, method, number);
             };
             $('depositMethodListModal').classList.add('active');
@@ -2177,15 +2179,15 @@
             $('withdrawReceiver').value = '';
             $('withdrawAmount').value = '';
             $('withdrawName').value = '';
-            $('withdrawDetailsModal').classList.add('active');
+            // ⚠️ Do NOT add .active here — transitionModal already handles it.
             unlockSpeech();
         }
 
         async function submitWithdraw() {
             if (submittingW) return;
-            const rec = $('withdrawReceiver').value.trim(),
-                amt = $('withdrawAmount').value.trim(),
-                name = $('withdrawName').value.trim();
+            const rec  = $('withdrawReceiver').value.trim(),
+                  amt  = $('withdrawAmount').value.trim(),
+                  name = $('withdrawName').value.trim();
             if (!name) { showToast('Full name required', 'error'); return; }
             if (!amt || isNaN(amt) || Number(amt) < 20) { showToast('Minimum withdrawal is 20 ETB', 'error'); return; }
             if (!rec.match(/^(09|07)\d{8}$/)) {
@@ -2280,14 +2282,13 @@
         // ============================================================
         //  GAME FUNCTIONS
         // ============================================================
-
         function genCard() {
             const cols = [
-                [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-                [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
-                [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45],
-                [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60],
-                [61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+                [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
+                [16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],
+                [31,32,33,34,35,36,37,38,39,40,41,42,43,44,45],
+                [46,47,48,49,50,51,52,53,54,55,56,57,58,59,60],
+                [61,62,63,64,65,66,67,68,69,70,71,72,73,74,75]
             ];
             const c = [];
             for (let col = 0; col < 5; col++) {
@@ -2304,14 +2305,8 @@
             return t;
         }
 
-        // ============================================================
-        //  ✅ PERF: INCREMENTAL CARD RENDERING
-        //  Before: full <table> (25 cells + 25 closures) rebuilt on every
-        //          `markedNumbers` / `yourCard` event.
-        //  Now:    table is built once per (card, container); only the
-        //          `marked` class is toggled afterwards.
-        // ============================================================
-        const cardRenderCache = new Map(); // container el -> { key, cells }
+        // ✅ Incremental card rendering
+        const cardRenderCache = new Map();
 
         function renderCard(card, containerId, clickable) {
             const cont = $(containerId);
@@ -2332,7 +2327,6 @@
 
             if (!entry || entry.key !== key) {
                 const frag = document.createDocumentFragment();
-
                 const tbl = document.createElement('table');
                 tbl.style.borderCollapse = 'separate';
                 tbl.style.borderSpacing = '8px';
@@ -2370,7 +2364,6 @@
                 entry = { key, cells };
                 cardRenderCache.set(cont, entry);
 
-                // ✅ one delegated listener per container, never per cell
                 if (!cont.dataset.delegated) {
                     cont.dataset.delegated = '1';
                     cont.addEventListener('click', ev => {
@@ -2385,21 +2378,13 @@
             }
 
             cont.dataset.clickable = clickable ? '1' : '0';
-
-            // ✅ only toggle the diff
             for (const [num, td] of entry.cells) {
                 const on = markedNumbers.has(num);
                 if (td.classList.contains('marked') !== on) td.classList.toggle('marked', on);
             }
         }
 
-        // ============================================================
-        //  ✅ PERF: INCREMENTAL 1-100 GRID
-        //  Before: 100 <div> + 100 onclick closures rebuilt on every
-        //          cardTaken / selection / count update.
-        //  Now:    built once, only className strings are diffed, and
-        //          one delegated click listener on the container.
-        // ============================================================
+        // ✅ Incremental 1-100 grid
         const gridCells = new Array(101);
         let gridBuilt = false;
         let gridPaintScheduled = false;
@@ -2439,7 +2424,6 @@
                 paintGrid();
             });
         }
-        // keep the old call-sites working
         const buildGrid = scheduleGridPaint;
 
         numberGrid?.addEventListener('click', e => {
@@ -2555,7 +2539,7 @@
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
             scheduleGridPaint();
-            connectStakeSocket();   // ✅ resume live stake counts
+            connectStakeSocket();
             unlockSpeech();
         }
 
@@ -2573,7 +2557,6 @@
             $('winPrize').innerHTML = each + ' <small>ETB</small>';
             $('winnerOverlay').classList.add('active');
 
-            // ✅ PERF: 60 pieces instead of 120 + compositor-friendly transform
             if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 const conf = document.createElement('div');
                 conf.className = 'confetti';
@@ -2622,8 +2605,8 @@
 
         function loadStats() {
             try {
-                totalGames = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
-                totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
+                totalGames  = parseInt(localStorage.getItem('dot_bingo_total_games') || '0');
+                totalWins   = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
                 totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0');
                 const stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
                 recentGames = stored.map(g => ({
@@ -2637,7 +2620,6 @@
             updateStatsUI();
         }
 
-        // ✅ PERF: only rebuild the history DOM when that page is visible
         let statsDirty = true;
         function updateStatsUI() {
             const tgc = $('totalGamesCount');
@@ -2687,7 +2669,7 @@
             const initData = tg.initData;
             if (!initData) { showToast('Open inside Telegram', 'error'); return; }
 
-            disconnectStakeSocket();   // ✅ no 2nd socket while playing
+            disconnectStakeSocket();
 
             if (socket) socket.disconnect();
             socket = io();
@@ -2803,7 +2785,6 @@
         }
 
         // ========== SPEECH ==========
-        // ✅ PERF: voices are fetched once and cached instead of on every call
         let amVoice = null;
         function loadVoices() {
             if (!window.speechSynthesis) return;
@@ -2892,15 +2873,15 @@
         // ========== INIT ==========
         async function init() {
             if (!checkInviteRequired()) return;
-            buildGridOnce();          // ✅ build the 100 cells exactly once
+            buildGridOnce();
             loadStats();
             updateMute();
             switchPage('stakePage');
-            connectStakeSocket();     // ✅ only now do we open the public socket
+            connectStakeSocket();
             await authenticateUser();
             await fetchUserInviteInfo();
             restoreSession();
-            console.log('✨ DOT BINGO ready – optimized build.');
+            console.log('✨ DOT BINGO ready – fast transitions build.');
         }
 
         // ============================================================
@@ -2969,18 +2950,9 @@
         $('withdrawBtn')?.addEventListener('click', openWithdrawFlow);
         $('withdrawBtnGame')?.addEventListener('click', openWithdrawFlow);
 
-        $('closeMethodListBtn')?.addEventListener('click', () => {
-            if (Object.keys(withdrawMethodMap).length > 0) {
-                $('depositMethodListModal').classList.remove('active');
-                resetDepositState();
-            } else closeMethodList();
-        });
-        $('depositMethodListBackBtn')?.addEventListener('click', () => {
-            if (Object.keys(withdrawMethodMap).length > 0) {
-                $('depositMethodListModal').classList.remove('active');
-                resetDepositState();
-            } else closeMethodList();
-        });
+        // ✅ Both buttons always mean "close the whole method picker".
+        $('closeMethodListBtn')?.addEventListener('click', closeMethodList);
+        $('depositMethodListBackBtn')?.addEventListener('click', closeMethodList);
 
         $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
         $('paymentCopyBtn')?.addEventListener('click', () => {
@@ -2990,8 +2962,10 @@
         });
         $('howToPayTrigger')?.addEventListener('click', openHowToPay);
         $('closeHowToPayBtn')?.addEventListener('click', closeHowToPay);
+
+        // ✅ Withdraw back uses fast crossfade too.
         $('backWithdrawBtn')?.addEventListener('click', () => {
-            $('withdrawDetailsModal').classList.remove('active');
+            transitionModal('withdrawDetailsModal', 'depositMethodListModal');
             openWithdrawFlow();
         });
         $('submitWithdrawBtn')?.addEventListener('click', submitWithdraw);
