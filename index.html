@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
-    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-    <script src="/socket.io/socket.io.js" defer></script>
+
+    <!-- ✅ PERF: preconnect before any third‑party request -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="dns-prefetch" href="//upload.wikimedia.org">
-    <link rel="preconnect" href="/" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
+    <link rel="preconnect" href="https://telegram.org">
+    <link rel="dns-prefetch" href="https://upload.wikimedia.org">
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- ✅ PERF: only the weights actually used (dropped the opsz axis) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+          rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    </noscript>
+
     <style>
         /* ===== RESET & BASE ===== */
         * {
@@ -34,28 +44,28 @@
             align-items: center;
             justify-content: center;
         }
-        /* Faster paint: removed backdrop-filter from .page – biggest mobile win */
+        /* ✅ PERF: removed backdrop-filter (very expensive on mobile GPUs) */
         .page {
             max-width: 600px;
             width: 100%;
             margin: 0 auto;
-            background: rgba(15, 23, 42, 0.98);
+            background: #0F172A;
             border-radius: 32px;
             padding: 20px 16px 24px;
             box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5),
                         inset 0 1px 0 rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.05);
+            /* ✅ PERF: isolate layout/paint so page switches don't invalidate the whole document */
+            contain: layout paint style;
         }
-        .page.hidden {
-            display: none;
-        }
+        .page.hidden { display: none; }
 
         /* ===== LANGUAGE TOGGLE ===== */
         .lang-toggle {
             position: fixed;
             top: 16px;
             left: 16px;
-            background: rgba(30, 41, 59, 0.9);
+            background: #1E293B;
             color: #FBBF24;
             border: 1px solid rgba(251, 191, 36, 0.3);
             border-radius: 40px;
@@ -67,25 +77,16 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
             transition: background 0.2s, transform 0.1s;
         }
-        .lang-toggle:active {
-            transform: scale(0.95);
-        }
+        .lang-toggle:active { transform: scale(0.95); }
         @media (max-width:550px) {
-            .lang-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 14px;
-                font-size: 0.7rem;
-            }
+            .lang-toggle { top: 8px; left: 8px; padding: 6px 14px; font-size: 0.7rem; }
         }
 
         /* ===== MODALS ===== */
         .modal {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7);
             display: flex;
             align-items: center;
@@ -93,15 +94,16 @@
             z-index: 2000;
             opacity: 0;
             visibility: hidden;
-            transition: opacity 0.15s ease, visibility 0.15s ease;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
         }
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .modal.active { opacity: 1; visibility: visible; }
         .modal.active .modal-content {
             transform: scale(1) translateY(0);
             opacity: 1;
+        }
+        /* ✅ PERF: softened blur (16px→6px) and contained the paint box */
+        @supports (backdrop-filter: blur(6px)) {
+            .modal.active { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
         }
         .modal-content {
             background: #1E293B;
@@ -114,16 +116,15 @@
             text-align: left;
             transform: scale(0.92) translateY(12px);
             opacity: 0;
-            transition: transform 0.2s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.2s ease;
+            transition: transform 0.3s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.3s ease;
             max-height: 92vh;
             overflow-y: auto;
             color: #F1F5F9;
+            contain: layout paint style;
+            -webkit-overflow-scrolling: touch;
         }
         @media (max-width:480px) {
-            .modal-content {
-                padding: 20px 16px;
-                width: 95%;
-            }
+            .modal-content { padding: 20px 16px; width: 95%; }
         }
 
         /* ===== MODAL COMPONENTS ===== */
@@ -147,14 +148,11 @@
             border-radius: 16px;
         }
         .bank-header .bank-icon img {
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             object-fit: contain;
             border-radius: 8px;
         }
-        .bank-header .bank-icon .fallback-icon {
-            font-size: 2rem;
-        }
+        .bank-header .bank-icon .fallback-icon { font-size: 2rem; }
         .bank-header .bank-title {
             font-weight: 700;
             font-size: 1.2rem;
@@ -167,9 +165,7 @@
             font-weight: 400;
         }
 
-        .input-group {
-            margin: 16px 0;
-        }
+        .input-group { margin: 16px 0; }
         .input-group label {
             font-weight: 600;
             font-size: 0.85rem;
@@ -205,11 +201,7 @@
             border: 1px solid rgba(251, 191, 36, 0.2);
         }
 
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
+        .modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
         .modal-buttons button {
             flex: 1;
             padding: 14px;
@@ -221,25 +213,19 @@
             cursor: pointer;
             transition: transform 0.1s, background 0.2s, box-shadow 0.2s;
         }
-        .modal-buttons button:active {
-            transform: scale(0.96);
-        }
+        .modal-buttons button:active { transform: scale(0.96); }
         .btn-primary {
             background: linear-gradient(135deg, #FBBF24, #F59E0B);
             color: #0B132B;
             box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
         }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #F59E0B, #D97706);
-        }
+        .btn-primary:hover { background: linear-gradient(135deg, #F59E0B, #D97706); }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
             color: #F1F5F9;
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.15); }
 
         .deposit-step {
             background: rgba(15, 23, 42, 0.5);
@@ -248,19 +234,9 @@
             margin: 14px 0;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .deposit-step .step-number {
-            font-weight: 700;
-            color: #FBBF24;
-            font-size: 0.9rem;
-        }
-        .deposit-step .step-title {
-            font-weight: 600;
-            color: #F8FAFC;
-            margin-top: 4px;
-        }
-        .deposit-step .step-content {
-            margin-top: 10px;
-        }
+        .deposit-step .step-number { font-weight: 700; color: #FBBF24; font-size: 0.9rem; }
+        .deposit-step .step-title { font-weight: 600; color: #F8FAFC; margin-top: 4px; }
+        .deposit-step .step-content { margin-top: 10px; }
         .deposit-step .recipient-number {
             display: flex;
             align-items: center;
@@ -296,10 +272,7 @@
             font-size: 0.95rem;
             color: #F8FAFC;
         }
-        .deposit-step .invoice-input input:focus {
-            outline: none;
-            border-color: #FBBF24;
-        }
+        .deposit-step .invoice-input input:focus { outline: none; border-color: #FBBF24; }
 
         .amount-display {
             text-align: center;
@@ -337,19 +310,11 @@
             border-radius: 16px;
         }
         .method-list-item .method-icon img {
-            max-width: 100%;
-            max-height: 100%;
+            max-width: 100%; max-height: 100%;
             object-fit: contain;
         }
-        .method-list-item .method-info {
-            flex: 1;
-            text-align: left;
-        }
-        .method-list-item .method-name {
-            font-weight: 700;
-            font-size: 1rem;
-            color: #F8FAFC;
-        }
+        .method-list-item .method-info { flex: 1; text-align: left; }
+        .method-list-item .method-name { font-weight: 700; font-size: 1rem; color: #F8FAFC; }
         .method-list-item .method-number {
             font-size: 0.8rem;
             color: #94A3B8;
@@ -385,15 +350,8 @@
             justify-content: center;
             flex-shrink: 0;
         }
-        .deposit-step-header .step-back:active {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .deposit-step-header .step-title {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: #F8FAFC;
-            flex: 1;
-        }
+        .deposit-step-header .step-back:active { background: rgba(255, 255, 255, 0.1); }
+        .deposit-step-header .step-title { font-weight: 700; font-size: 1.2rem; color: #F8FAFC; flex: 1; }
         .deposit-step-header .step-sub {
             background: rgba(255, 255, 255, 0.05);
             padding: 4px 14px;
@@ -416,20 +374,10 @@
             color: #F1F5F9;
             cursor: pointer;
         }
-        .type-btn:active {
-            transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.1);
-        }
+        .type-btn:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.1); }
 
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #64748B;
-        }
-        .empty-state .empty-icon {
-            font-size: 3.2rem;
-            margin-bottom: 12px;
-        }
+        .empty-state { text-align: center; padding: 40px 20px; color: #64748B; }
+        .empty-state .empty-icon { font-size: 3.2rem; margin-bottom: 12px; }
 
         /* ===== CARD CONTAINER ===== */
         .card-container {
@@ -442,6 +390,8 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
             overflow-x: auto;
             min-height: 200px;
+            contain: layout paint style;
+            -webkit-overflow-scrolling: touch;
         }
         .card-container table {
             border-collapse: separate;
@@ -470,7 +420,7 @@
             font-family: 'Inter', monospace;
             color: #F8FAFC;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
             cursor: pointer;
         }
         .card-container td.free {
@@ -487,19 +437,9 @@
             transform: scale(0.92);
         }
         @media (max-width:550px) {
-            .card-container td {
-                width: 48px;
-                height: 48px;
-                border-radius: 12px;
-                font-size: 0.9rem;
-            }
-            .card-container thead tr th {
-                width: 48px;
-                font-size: 1.1rem;
-            }
-            .card-container table {
-                border-spacing: 5px;
-            }
+            .card-container td { width: 48px; height: 48px; border-radius: 12px; font-size: 0.9rem; }
+            .card-container thead tr th { width: 48px; font-size: 1.1rem; }
+            .card-container table { border-spacing: 5px; }
         }
 
         /* ===== GRID 1-100 ===== */
@@ -512,7 +452,7 @@
             padding: 12px;
             border-radius: 24px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            contain: layout style paint;
+            contain: layout paint style;
         }
         .grid-cell {
             background: rgba(30, 41, 59, 0.8);
@@ -526,7 +466,8 @@
             color: #CBD5E1;
             border: 1px solid rgba(255, 255, 255, 0.05);
             cursor: pointer;
-            transition: 0.15s ease;
+            transition: background 0.15s ease, color 0.15s ease;
+            contain: layout style paint;
         }
         .grid-cell.taken {
             background: #EF4444;
@@ -560,15 +501,12 @@
             transition: 0.08s linear;
             cursor: pointer;
         }
-        #bingoBtn:active {
-            transform: translateY(4px);
-            box-shadow: 0 4px 0 #B45309;
-        }
+        #bingoBtn:active { transform: translateY(4px); box-shadow: 0 4px 0 #B45309; }
 
         /* ===== TAB BAR ===== */
         .tab-bar {
             display: flex;
-            background: rgba(15, 23, 42, 0.8);
+            background: #0F172A;
             border-radius: 60px;
             margin-top: 16px;
             padding: 4px 6px;
@@ -587,13 +525,8 @@
             cursor: pointer;
             transition: background 0.2s, color 0.2s;
         }
-        .tab-btn.active {
-            background: rgba(251, 191, 36, 0.15);
-            color: #FBBF24;
-        }
-        .tab-btn:active {
-            transform: scale(0.96);
-        }
+        .tab-btn.active { background: rgba(251, 191, 36, 0.15); color: #FBBF24; }
+        .tab-btn:active { transform: scale(0.96); }
 
         /* ===== STAKE OPTIONS ===== */
         .stake-page-buttons {
@@ -614,12 +547,10 @@
             cursor: pointer;
             width: 100px;
             text-align: center;
-            transition: all 0.2s;
+            transition: transform 0.2s, border-color 0.2s, background 0.2s, color 0.2s;
             position: relative;
         }
-        .stake-option:active {
-            transform: scale(0.96);
-        }
+        .stake-option:active { transform: scale(0.96); }
         .stake-option.selected {
             border-color: #FBBF24;
             background: rgba(251, 191, 36, 0.1);
@@ -652,11 +583,7 @@
             margin-bottom: 12px;
             letter-spacing: 0.5px;
         }
-        .stake-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
+        .stake-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .stake-table th {
             background: rgba(255, 255, 255, 0.05);
             color: #94A3B8;
@@ -674,13 +601,8 @@
             font-weight: 600;
             color: #F8FAFC;
         }
-        .stake-table tr:last-child td {
-            border-bottom: none;
-        }
-        .stake-table .stake-amount {
-            font-weight: 800;
-            color: #FBBF24;
-        }
+        .stake-table tr:last-child td { border-bottom: none; }
+        .stake-table .stake-amount { font-weight: 800; color: #FBBF24; }
         .stake-table .stake-players .count-num {
             display: inline-block;
             background: rgba(255, 255, 255, 0.05);
@@ -701,8 +623,11 @@
             height: 100%;
             background: linear-gradient(90deg, #FBBF24, #F59E0B);
             border-radius: 20px;
-            transition: width 0.4s ease;
-            width: 0%;
+            /* ✅ PERF: animate transform instead of width (compositor-only) */
+            transform-origin: left center;
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+            width: 100%;
         }
 
         /* ===== RULES TEXT ===== */
@@ -716,9 +641,7 @@
             color: #CBD5E1;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .rules-text p {
-            margin-bottom: 8px;
-        }
+        .rules-text p { margin-bottom: 8px; }
 
         .players-badge {
             background: rgba(251, 191, 36, 0.15);
@@ -755,11 +678,7 @@
             margin-bottom: 18px;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .balance-top>div {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: #F8FAFC;
-        }
+        .balance-top>div { font-weight: 600; font-size: 0.9rem; color: #F8FAFC; }
 
         .last-call-area {
             background: linear-gradient(135deg, #1E293B, #0F172A);
@@ -803,6 +722,8 @@
             margin-top: 10px;
             border: 1px solid rgba(255, 255, 255, 0.05);
             padding: 10px 16px;
+            contain: content;
+            -webkit-overflow-scrolling: touch;
         }
 
         .prize-pool {
@@ -830,10 +751,8 @@
         /* ===== WINNER OVERLAY ===== */
         .winner-modal {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85);
             display: flex;
             align-items: center;
@@ -843,10 +762,7 @@
             visibility: hidden;
             transition: opacity 0.3s ease, visibility 0.3s;
         }
-        .winner-modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        .winner-modal.active { opacity: 1; visibility: visible; }
         .winner-modal.active .winner-card {
             transform: scale(1) translateY(0);
             opacity: 1;
@@ -862,23 +778,20 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             transform: scale(0.92) translateY(12px);
             opacity: 0;
-            transition: transform 0.4s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.4s ease;
+            transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), opacity 0.35s ease;
         }
         .winner-trophy {
             font-size: 4rem;
             margin-bottom: 8px;
+            /* ✅ PERF: keep animation on the compositor */
+            will-change: transform;
             animation: floatTrophy 1.4s infinite alternate;
         }
         @keyframes floatTrophy {
-            0% { transform: translateY(0px); }
-            100% { transform: translateY(-10px); }
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(0, -10px, 0); }
         }
-        .winner-title {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #FBBF24;
-            margin-bottom: 12px;
-        }
+        .winner-title { font-size: 2rem; font-weight: 800; color: #FBBF24; margin-bottom: 12px; }
         .winners-avatars {
             display: flex;
             flex-wrap: wrap;
@@ -909,16 +822,8 @@
             margin: 18px 0 16px;
             border: 1px solid rgba(251, 191, 36, 0.2);
         }
-        .prize-amount .prize-label {
-            font-size: 0.7rem;
-            color: #94A3B8;
-            letter-spacing: 1px;
-        }
-        .prize-number {
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #FBBF24;
-        }
+        .prize-amount .prize-label { font-size: 0.7rem; color: #94A3B8; letter-spacing: 1px; }
+        .prize-number { font-size: 2.2rem; font-weight: 800; color: #FBBF24; }
         .celebrate-btn {
             background: linear-gradient(135deg, #FBBF24, #F59E0B);
             border: none;
@@ -932,20 +837,17 @@
             cursor: pointer;
             transition: transform 0.1s;
         }
-        .celebrate-btn:active {
-            transform: scale(0.96);
-        }
+        .celebrate-btn:active { transform: scale(0.96); }
 
         /* ===== CONFETTI ===== */
         .confetti {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             pointer-events: none;
             z-index: 9999;
             overflow: hidden;
+            contain: strict;
         }
         .confetti-piece {
             position: absolute;
@@ -953,27 +855,23 @@
             height: 16px;
             top: -20px;
             opacity: 0.8;
+            will-change: transform;
             animation: fall 4s linear forwards;
         }
         @keyframes fall {
-            to { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+            to { transform: translate3d(0, 100vh, 0) rotate(720deg); opacity: 0; }
+        }
+        /* ✅ PERF / a11y: honour reduced-motion */
+        @media (prefers-reduced-motion: reduce) {
+            .confetti-piece { display: none; }
+            .winner-trophy { animation: none; }
+            .modal-content, .winner-card { transition: none; }
         }
 
         /* ===== OTHER ===== */
-        .telegram-links {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.7rem;
-            color: #64748B;
-        }
-        .telegram-links a {
-            color: #FBBF24;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .telegram-links a:hover {
-            text-decoration: underline;
-        }
+        .telegram-links { text-align: center; margin-top: 20px; font-size: 0.7rem; color: #64748B; }
+        .telegram-links a { color: #FBBF24; text-decoration: none; font-weight: 600; }
+        .telegram-links a:hover { text-decoration: underline; }
 
         .mute-btn {
             background: rgba(255, 255, 255, 0.05) !important;
@@ -985,9 +883,7 @@
             min-width: 44px;
             cursor: pointer;
         }
-        .mute-btn:active {
-            transform: scale(0.96);
-        }
+        .mute-btn:active { transform: scale(0.96); }
 
         .history-card {
             background: rgba(15, 23, 42, 0.6);
@@ -997,9 +893,7 @@
             border-left: 4px solid #FBBF24;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .history-card strong {
-            color: #FBBF24;
-        }
+        .history-card strong { color: #FBBF24; }
         .profile-stat {
             background: rgba(15, 23, 42, 0.6);
             border-radius: 20px;
@@ -1021,20 +915,21 @@
             font-size: 0.9rem;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             opacity: 0;
-            transition: all 0.4s ease;
+            transition: transform 0.35s ease, opacity 0.35s ease;
             z-index: 999;
             max-width: 90%;
             text-align: center;
             pointer-events: none;
+            contain: layout style paint;
         }
         .toast.show {
             transform: translateX(-50%) translateY(0);
             opacity: 1;
             pointer-events: auto;
         }
-        .toast.success { background: rgba(5, 150, 105, 0.9); }
-        .toast.error { background: rgba(220, 38, 38, 0.9); }
-        .toast.info { background: rgba(37, 99, 235, 0.9); }
+        .toast.success { background: rgba(5, 150, 105, 0.95); }
+        .toast.error { background: rgba(220, 38, 38, 0.95); }
+        .toast.info { background: rgba(37, 99, 235, 0.95); }
 
         .back-btn {
             background: rgba(255, 255, 255, 0.05);
@@ -1045,9 +940,7 @@
             font-weight: 600;
             cursor: pointer;
         }
-        .back-btn:active {
-            background: rgba(255, 255, 255, 0.1);
-        }
+        .back-btn:active { background: rgba(255, 255, 255, 0.1); }
 
         .invite-info {
             background: rgba(15, 23, 42, 0.6);
@@ -1058,9 +951,7 @@
             font-size: 0.8rem;
             color: #CBD5E1;
         }
-        .invite-info strong {
-            color: #FBBF24;
-        }
+        .invite-info strong { color: #FBBF24; }
         .invite-code-display {
             background: rgba(251, 191, 36, 0.1);
             color: #FBBF24;
@@ -1076,10 +967,8 @@
         /* ===== INVITE REQUIRED OVERLAY ===== */
         #inviteRequiredOverlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
@@ -1090,18 +979,9 @@
             text-align: center;
             color: white;
         }
-        #inviteRequiredOverlay.hidden {
-            display: none;
-        }
-        #inviteRequiredOverlay .overlay-icon {
-            font-size: 4.4rem;
-            margin-bottom: 16px;
-        }
-        #inviteRequiredOverlay h2 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
+        #inviteRequiredOverlay.hidden { display: none; }
+        #inviteRequiredOverlay .overlay-icon { font-size: 4.4rem; margin-bottom: 16px; }
+        #inviteRequiredOverlay h2 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
         #inviteRequiredOverlay p {
             font-size: 1rem;
             max-width: 400px;
@@ -1120,15 +1000,10 @@
             cursor: pointer;
             box-shadow: 0 4px 16px rgba(251, 191, 36, 0.3);
         }
-        #inviteRequiredOverlay .btn-bot:active {
-            transform: scale(0.96);
-        }
+        #inviteRequiredOverlay .btn-bot:active { transform: scale(0.96); }
 
         /* ===== DASHBOARD / GAME OVER SPECIFIC ===== */
-        .game-over-header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
+        .game-over-header { text-align: center; margin-bottom: 20px; }
         .game-over-header h1 {
             font-size: 2.2rem;
             font-weight: 800;
@@ -1136,10 +1011,7 @@
             letter-spacing: 2px;
             text-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
         }
-        .game-over-header .trophy-icon {
-            font-size: 3.5rem;
-            margin-bottom: 4px;
-        }
+        .game-over-header .trophy-icon { font-size: 3.5rem; margin-bottom: 4px; }
         .winners-list {
             background: rgba(15, 23, 42, 0.6);
             border-radius: 20px;
@@ -1155,22 +1027,12 @@
             border-radius: 12px;
             margin-bottom: 8px;
         }
-        .winner-row:last-child {
-            margin-bottom: 0;
-        }
-        .winner-row.top-1 {
-            background: rgba(251, 191, 36, 0.15);
-            border: 1px solid rgba(251, 191, 36, 0.3);
-        }
-        .winner-row.top-2 {
-            background: rgba(148, 163, 184, 0.1);
-        }
-        .winner-row.top-3 {
-            background: rgba(180, 83, 9, 0.1);
-        }
+        .winner-row:last-child { margin-bottom: 0; }
+        .winner-row.top-1 { background: rgba(251, 191, 36, 0.15); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .winner-row.top-2 { background: rgba(148, 163, 184, 0.1); }
+        .winner-row.top-3 { background: rgba(180, 83, 9, 0.1); }
         .winner-row .rank {
-            width: 28px;
-            height: 28px;
+            width: 28px; height: 28px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1182,16 +1044,9 @@
         .winner-row.top-1 .rank { background: #FBBF24; }
         .winner-row.top-2 .rank { background: #94A3B8; }
         .winner-row.top-3 .rank { background: #D97706; }
-        .winner-row .player-info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-            margin-left: 12px;
-        }
+        .winner-row .player-info { display: flex; align-items: center; gap: 10px; flex: 1; margin-left: 12px; }
         .winner-row .player-info .avatar {
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.1);
             display: flex;
@@ -1199,22 +1054,9 @@
             justify-content: center;
             font-size: 1rem;
         }
-        .winner-row .player-info .name {
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: #F8FAFC;
-        }
-        .winner-row .prize {
-            font-weight: 700;
-            font-size: 0.9rem;
-            color: #FBBF24;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
+        .winner-row .player-info .name { font-weight: 600; font-size: 0.85rem; color: #F8FAFC; }
+        .winner-row .prize { font-weight: 700; font-size: 0.9rem; color: #FBBF24; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .stats-grid .stat-item {
             background: rgba(15, 23, 42, 0.6);
             border-radius: 16px;
@@ -1228,18 +1070,8 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .stats-grid .stat-item .value {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #F8FAFC;
-            margin-top: 4px;
-        }
-        .returning-text {
-            text-align: center;
-            color: #94A3B8;
-            font-size: 0.8rem;
-            margin-top: 16px;
-        }
+        .stats-grid .stat-item .value { font-size: 1rem; font-weight: 700; color: #F8FAFC; margin-top: 4px; }
+        .returning-text { text-align: center; color: #94A3B8; font-size: 0.8rem; margin-top: 16px; }
     </style>
 </head>
 <body>
@@ -1252,6 +1084,10 @@
     </div>
 
     <button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
+
+    <!-- ============================================================ -->
+    <!--  MODALS                                                       -->
+    <!-- ============================================================ -->
 
     <!-- ===== DEPOSIT METHOD LIST ===== -->
     <div id="depositMethodListModal" class="modal">
@@ -1353,7 +1189,7 @@
             <div class="bank-header"><span class="bank-icon">📜</span><div><div class="bank-title" data-key="rulesTitle">የቢንጎ ሕጎች</div><div class="bank-sub" data-key="rulesSub">75-ኳስ ክላሲክ</div></div></div>
             <div class="rules-text" style="text-align:left; max-height:400px; overflow-y:auto; padding-right:8px;">
                 <h3 style="font-size:1rem; margin-top:0; color:#FBBF24;" data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
-                <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
+                <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
                 <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
                 <p data-key="rulesWinningPatterns">✅ 1 አግድም መስመር (Row)<br>✅ 1 ቁመት መስመር (Column)<br>✅ 1 ሰያፍ መስመር (Diagonal)<br>✅ 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>💡 ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
                 <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
@@ -1363,7 +1199,7 @@
                 <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
                 <p data-key="rulesWithdraw">1. <strong>➖ Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
                 <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
-                <p data-key="rulesGameRules">✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>🏆 ቢንጎ!</strong> መጫን አለብዎት።<br>✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
+                <p data-key="rulesGameRules">✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>✅ ቢንጎ ሲሞሉ ቀጣይ ቁጥር ከመጠራቱ በፊት <strong>🏆 ቢንጎ!</strong> መጫን አለብዎት።<br>✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
                 <h3 style="font-size:1rem; margin-top:16px; color:#FBBF24;" data-key="rulesHelpTitle">📞 እርዳታ</h3>
                 <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank" style="color:#FBBF24;">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank" style="color:#FBBF24;">Dot Bingo channel</a> ይቀላቀሉ።</p>
                 <p style="margin-top:12px; font-weight:700; text-align:center; color:#FBBF24;" data-key="rulesGoodLuck">🎉 መልካም ዕድል!<br><span style="font-weight:400; color:#CBD5E1;">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
@@ -1380,9 +1216,13 @@
             <div class="winner-sub" data-key="congrats" style="color:#94A3B8; font-size:0.9rem;">Congratulations</div>
             <div class="winners-avatars" id="winListContainer"></div>
             <div class="prize-amount"><div class="prize-label" data-key="winningPrize">🎁 WINNING PRIZE</div><div class="prize-number" id="winPrize">0 <small>ETB</small></div></div>
-            <button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')" data-key="amazing">🎉 Amazing! 🎉</button>
+            <button class="celebrate-btn" data-key="amazing">🎉 Amazing! 🎉</button>
         </div>
     </div>
+
+    <!-- ============================================================ -->
+    <!--  PAGES                                                       -->
+    <!-- ============================================================ -->
 
     <!-- ===== STAKE PAGE ===== -->
     <div id="stakePage" class="page">
@@ -1400,6 +1240,7 @@
             </div>
         </div>
 
+        <!-- ===== PLAYER COUNT TABLE ===== -->
         <div class="stake-table-wrap">
             <div class="table-title">ተጫዋቾች በውርርድ / Players by Stake</div>
             <table class="stake-table" id="stakeTable">
@@ -1414,17 +1255,17 @@
                     <tr>
                         <td class="stake-amount">10</td>
                         <td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10"></div></div></td>
                     </tr>
                     <tr>
                         <td class="stake-amount">20</td>
                         <td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20"></div></div></td>
                     </tr>
                     <tr>
                         <td class="stake-amount">30</td>
                         <td class="stake-players"><span class="count-num" id="stakeTable30Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30" style="width:0%;"></div></div></td>
+                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30"></div></div></td>
                     </tr>
                 </tbody>
             </table>
@@ -1446,6 +1287,7 @@
 
     <!-- ===== LOBBY PAGE ===== -->
     <div id="lobbyPage" class="page hidden">
+        <!-- Top Bar -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div style="font-weight:700; font-size:1.1rem; color:#F8FAFC;" id="lobbyUserName">Hi, Player</div>
             <div style="display:flex; align-items:center; gap:8px;">
@@ -1453,6 +1295,7 @@
             </div>
         </div>
 
+        <!-- Balance & Timer -->
         <div class="balance-top" style="flex-direction:column; align-items:stretch; gap:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
@@ -1465,6 +1308,7 @@
             </div>
         </div>
 
+        <!-- Card Selection -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0 8px;">
             <span style="font-weight:600; color:#94A3B8; font-size:0.85rem;" data-key="pickCard">🎴 Pick card ID:</span>
             <span style="font-weight:700; color:#FBBF24; font-size:0.9rem;"><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
@@ -1510,11 +1354,13 @@
 
     <!-- ===== GAME PAGE ===== -->
     <div id="gamePage" class="page hidden">
+        <!-- Top Bar -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="font-weight:700; font-size:0.9rem; color:#94A3B8;">Game #<span id="gameIdDisplay">...</span></div>
             <div class="players-badge">👥 <span id="gamePlayersCount">0</span></div>
         </div>
 
+        <!-- Balance & Actions -->
         <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
             <div style="font-size:0.85rem;">💰 <span id="gameBalanceDisplay" style="color:#FBBF24; font-weight:800;">0</span> ETB</div>
             <div style="display:flex; gap:6px;">
@@ -1525,25 +1371,31 @@
             <button id="rulesBtnGame" style="background:rgba(255,255,255,0.05); color:#94A3B8; border:1px solid rgba(255,255,255,0.1); border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.7rem;" data-key="rulesBtn">📜 Rules</button>
         </div>
 
+        <!-- Prize Pool -->
         <div class="prize-pool">
             <span data-key="prizePoolLabel">🏆 PRIZE POOL</span>
             <div id="winningBalance">0 ETB</div>
         </div>
 
+        <!-- Back to Lobby Button -->
         <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
             <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby" style="padding:10px 24px; border-radius:40px; font-weight:600;">← Back to Lobby</button>
         </div>
 
+        <!-- Last Call Area -->
         <div class="last-call-area">
             <div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div>
             <div class="last-call-number" id="currentCall">--</div>
             <div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div>
         </div>
 
+        <!-- Game Card -->
         <div id="gameCard" class="card-container"></div>
 
+        <!-- Bingo Button -->
         <button id="bingoBtn" data-key="claimBingo">🏆 BINGO! 🏆</button>
 
+        <!-- Bottom Tabs -->
         <div class="tab-bar">
             <button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button>
             <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
@@ -1554,14 +1406,21 @@
 
     <script>
         // ============================================================
-        //  DOT BINGO – Optimized Frontend
-        //  All logic wrapped in DOMContentLoaded so external
-        //  scripts can be deferred (faster first paint).
+        //  DOT BINGO – Full Frontend with INSTANT page transitions
         // ============================================================
-        document.addEventListener('DOMContentLoaded', () => {
 
-        // ---------- DOM REFS (cached once) ----------
-        const $ = id => document.getElementById(id);
+        // ---------- DOM REFS (memoised) ----------
+        // ✅ PERF: memoised getElementById - hot paths used to call this
+        //         hundreds of times per event.
+        const _elCache = new Map();
+        const $ = id => {
+            let e = _elCache.get(id);
+            if (!e || !e.isConnected) {
+                e = document.getElementById(id);
+                if (e) _elCache.set(id, e);
+            }
+            return e;
+        };
         const lobbyBalance = $('lobbyBalance');
         const lobbyTimer = $('lobbyTimer');
         const playersCount = $('playersCount');
@@ -1575,54 +1434,72 @@
         const stake20Count = $('stake20Count');
         const stake30Count = $('stake30Count');
 
-        // ---------- SOCKET (WebSocket-only, no polling handshake) ----------
-        const SOCKET_OPTS = {
-            transports: ['websocket'],   // skip HTTP long-polling upgrade
-            upgrade: false,
-            reconnectionAttempts: 12,
-            reconnectionDelay: 400,
-            timeout: 8000,
-            forceNew: false,
-            multiplex: true
-        };
-        const stakeSocket = io('/public', SOCKET_OPTS);
+        // ---------- STAKE SOCKET (lazy, on-demand) ----------
+        // ✅ PERF: was `io('/public')` at load → a 2nd permanent WebSocket
+        //         for every visitor. Now it only exists while the stake
+        //         page is on screen.
+        let stakeSocket = null;
+        const stakeCounts = { 10: 0, 20: 0, 30: 0 };
 
-        stakeSocket.on('playersCount', d => {
+        function onStakePlayers(d) {
             if (d.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${d.count} players`;
             if (d.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${d.count} players`;
             if (d.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${d.count} players`;
             updateStakeTable(d.stake, d.count);
-        });
-        stakeSocket.on('lobbyState', s => {
+        }
+        function onStakeLobby(s) {
             if (s.stake === 10 && stake10Count) stake10Count.innerText = `👥 ${s.playersCount} players`;
             if (s.stake === 20 && stake20Count) stake20Count.innerText = `👥 ${s.playersCount} players`;
             if (s.stake === 30 && stake30Count) stake30Count.innerText = `👥 ${s.playersCount} players`;
             updateStakeTable(s.stake, s.playersCount);
-        });
+        }
+        function connectStakeSocket() {
+            if (stakeSocket) return;
+            stakeSocket = io('/public');
+            stakeSocket.on('playersCount', onStakePlayers);
+            stakeSocket.on('lobbyState', onStakeLobby);
+        }
+        function disconnectStakeSocket() {
+            if (!stakeSocket) return;
+            stakeSocket.removeAllListeners();
+            stakeSocket.disconnect();
+            stakeSocket = null;
+        }
 
         // ===== STAKE TABLE UPDATE =====
-        const stakeCounts = { 10: 0, 20: 0, 30: 0 };
         function updateStakeTable(stake, count) {
-            if (![10, 20, 30].includes(stake)) return;
+            if (stake !== 10 && stake !== 20 && stake !== 30) return;
             stakeCounts[stake] = count;
             const el = $(`stakeTable${stake}Count`);
             if (el) el.innerText = count;
+            // ✅ PERF: write all three bars in one pass, no layout reads
             const maxVal = Math.max(stakeCounts[10], stakeCounts[20], stakeCounts[30], 1);
-            const pct = Math.round((count / maxVal) * 100);
-            const bar = $(`stakeBar${stake}`);
-            if (bar) bar.style.width = pct + '%';
+            for (const s of [10, 20, 30]) {
+                const bar = $(`stakeBar${s}`);
+                if (bar) bar.style.transform = `scaleX(${stakeCounts[s] / maxVal})`;
+            }
         }
 
         // ---------- UTILITY ----------
-        const copy = t => { if (!t) return;
-            navigator.clipboard.writeText(t).then(() => showToast('✅ Copied!', 'success')).catch(() => showToast('❌ Failed',
-            'error')); };
-        const scrollEnd = () => { if (calledList) calledList.scrollLeft = calledList.scrollWidth; };
+        const copy = t => {
+            if (!t) return;
+            navigator.clipboard.writeText(t)
+                .then(() => showToast('✅ Copied!', 'success'))
+                .catch(() => showToast('❌ Failed', 'error'));
+        };
+        // ✅ PERF: scrollLeft write moved off the paint path
+        const scrollEnd = () => {
+            if (!calledList) return;
+            requestAnimationFrame(() => { calledList.scrollLeft = calledList.scrollWidth; });
+        };
         const showToast = (msg, type = 'info') => {
-            const t = document.getElementById('toast') || (() => { const e = document.createElement('div');
-                e.id = 'toast';
-                e.className = 'toast';
-                document.body.appendChild(e); return e; })();
+            let t = document.getElementById('toast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'toast';
+                t.className = 'toast';
+                document.body.appendChild(t);
+            }
             t.textContent = msg;
             t.className = `toast ${type}`;
             void t.offsetWidth;
@@ -1632,13 +1509,15 @@
         };
 
         // ---------- TELEGRAM ----------
-        const tg = window.Telegram?.WebApp;
-        if (tg) { tg.ready(); tg.expand(); }
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
         // ---------- STATE ----------
-        let socket, userCard = [],
-            markedNumbers = [],
-            isGameActive = false,
+        let socket, userCard = [];
+        // ✅ PERF: Set instead of Array → O(1) membership in renderCard
+        let markedNumbers = new Set();
+        let isGameActive = false,
             lobbyTimerInterval = null,
             selectedCardNumber = null;
         let selectedDepositType = null,
@@ -1729,7 +1608,7 @@
                 rulesTitle: "የቢንጎ ሕጎች",
                 rulesSub: "75-ኳስ ክላሲክ",
                 rulesHowToPlayTitle: "🎲 እንዴት እንደሚጫወቱ",
-                rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
+                rulesHowToPlay: "1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
                 rulesWinningPatternsTitle: "🏆 የማሸነፊያ ሁኔታዎች",
                 rulesWinningPatterns: "✅ 1 አግድም መስመር (Row)\n✅ 1 ቁመት መስመር (Column)\n✅ 1 ሰያፍ መስመር (Diagonal)\n✅ 4ቱ ማዕዘኖች (4 Corners)\n\n**💡 ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
                 rulesPrizeTitle: "🏆 የሽልማት ህግ",
@@ -1853,14 +1732,16 @@
                 el.innerText = (lang === 'am' ? data.am[k] : data.en[k]) || el.innerText;
             });
             langBtn.textContent = lang === 'am' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
-            if ($('depositMethodListTitle')) { $('depositMethodListTitle').innerHTML = lang === 'am' ? '💳 የክፍያ ዘዴ ይምረጡ' :
-                    '💳 Select Deposit Method'; }
+            const dmlt = $('depositMethodListTitle');
+            if (dmlt) dmlt.innerHTML = lang === 'am' ? '💳 የክፍያ ዘዴ ይምረጡ' : '💳 Select Deposit Method';
             updateInviteInfoUI();
         }
 
-        function toggleLang() { lang = lang === 'am' ? 'en' : 'am';
+        function toggleLang() {
+            lang = lang === 'am' ? 'en' : 'am';
             localStorage.setItem('dot_bingo_lang', lang);
-            applyLang(); }
+            applyLang();
+        }
         langBtn.addEventListener('click', toggleLang);
         const savedLang = localStorage.getItem('dot_bingo_lang');
         if (savedLang === 'am' || savedLang === 'en') lang = savedLang;
@@ -1879,9 +1760,9 @@
         }
 
         // ============================================================
-        //  MODAL TRANSITIONS (reduced delay = snappier)
+        //  MODAL TRANSITIONS
         // ============================================================
-        function transitionModal(closeId, openId, delay = 0) {
+        function transitionModal(closeId, openId, delay = 250) {
             const closeEl = $(closeId);
             const openEl = $(openId);
             if (closeEl) closeEl.classList.remove('active');
@@ -1892,42 +1773,24 @@
         }
 
         // ============================================================
-        //  CACHED FETCH (avoids repeated network round trips)
-        // ============================================================
-        const apiCache = new Map();
-        async function cachedFetch(url, ttl = 120000) {
-            const hit = apiCache.get(url);
-            if (hit && Date.now() - hit.t < ttl) return hit.v;
-            try {
-                const r = await fetch(url);
-                const v = await r.json();
-                apiCache.set(url, { t: Date.now(), v });
-                return v;
-            } catch (e) {
-                if (hit) return hit.v;
-                throw e;
-            }
-        }
-
-        // ============================================================
         //  INVITE INFO
         // ============================================================
         async function fetchUserInviteInfo() {
-            // Already populated by authenticateUser — only fetch if empty
-            if (userInviteData.invite_code) { updateInviteInfoUI(); return userInviteData; }
             try {
-                const data = await cachedFetch('/api/user/invite-code', 300000);
-                if (data && data.success) {
+                const response = await fetch('/api/user/invite-code');
+                const d = await response.json();
+                if (d.success) {
                     userInviteData = {
-                        invite_code: data.invite_code || null,
-                        admin_id: data.admin_id || null,
-                        admin_name: data.admin_name || null
+                        invite_code: d.invite_code || null,
+                        admin_id: d.admin_id || null,
+                        admin_name: d.admin_name || null
                     };
                     updateInviteInfoUI();
-                    return data;
+                    return d;
                 }
                 return null;
             } catch (error) {
+                console.error('Error fetching invite info:', error);
                 return null;
             }
         }
@@ -1949,22 +1812,10 @@
         }
 
         // ============================================================
-        //  AUTH (cached in sessionStorage for instant reloads)
+        //  AUTH
         // ============================================================
         async function authenticateUser() {
-            // 1. Instant paint from cache
-            try {
-                const cached = sessionStorage.getItem('dot_bingo_auth');
-                if (cached) {
-                    const c = JSON.parse(cached);
-                    if (c.ts && Date.now() - c.ts < 300000) {
-                        applyAuthData(c.data);
-                        isAuthenticated = true;
-                    }
-                }
-            } catch (e) {}
-
-            const initData = tg?.initData;
+            const initData = tg.initData;
             if (!initData) { console.warn('No initData, skipping auth'); return null; }
             try {
                 const response = await fetch('/api/telegram-miniapp-auth', {
@@ -1972,12 +1823,17 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ initData })
                 });
-                const data = await response.json();
-                if (data.success) {
-                    applyAuthData(data);
-                    try { sessionStorage.setItem('dot_bingo_auth', JSON.stringify({ ts: Date.now(), data })); } catch (e) {}
+                const d = await response.json();
+                if (d.success) {
+                    $('profileUsername').innerText = d.username || 'Player';
+                    userInviteData = {
+                        invite_code: d.invite_code || null,
+                        admin_id: d.admin_id || null,
+                        admin_name: d.admin_name || null
+                    };
+                    updateInviteInfoUI();
                     isAuthenticated = true;
-                    return data;
+                    return d;
                 }
                 return null;
             } catch (error) {
@@ -1986,22 +1842,10 @@
             }
         }
 
-        function applyAuthData(data) {
-            $('profileUsername').innerText = data.username || 'Player';
-            userInviteData = {
-                invite_code: data.invite_code || null,
-                admin_id: data.admin_id || null,
-                admin_name: data.admin_name || null
-            };
-            updateInviteInfoUI();
-        }
-
         function checkInviteRequired() {
             const urlParams = new URLSearchParams(window.location.search);
             let startParam = urlParams.get('start_param');
-            if (!startParam && tg?.initDataUnsafe) {
-                startParam = tg.initDataUnsafe.start_param;
-            }
+            if (!startParam && tg?.initDataUnsafe) startParam = tg.initDataUnsafe.start_param;
             if (!startParam && tg?.initData) {
                 try {
                     const params = new URLSearchParams(tg.initData);
@@ -2012,48 +1856,31 @@
             if (!startParam) {
                 overlay.classList.remove('hidden');
                 return false;
-            } else {
-                overlay.classList.add('hidden');
-                return true;
             }
+            overlay.classList.add('hidden');
+            return true;
         }
 
-        // ---------- DEPOSIT ACCOUNTS (prefetched + cached) ----------
+        // ---------- DEPOSIT ACCOUNTS ----------
         let depositAdmins = [];
-        let depositAdminsLoaded = false;
 
-        async function loadAdmins(force = false) {
-            if (depositAdminsLoaded && !force && depositAdmins.length) return depositAdmins;
+        async function loadAdmins() {
             try {
-                const d = await cachedFetch('/api/deposit-accounts', 180000);
-                depositAdmins = d && d.success ? d.admins || [] : [];
-                depositAdminsLoaded = true;
+                const r = await fetch('/api/deposit-accounts');
+                const d = await r.json();
+                depositAdmins = d.success ? d.admins || [] : [];
                 return depositAdmins;
             } catch (e) { depositAdmins = []; return []; }
         }
 
-        // Prefetch silently once the app is idle
-        const prefetchAdmins = () => {
-            if ('requestIdleCallback' in window) requestIdleCallback(() => loadAdmins(), { timeout: 2000 });
-            else setTimeout(() => loadAdmins(), 800);
-        };
-
-        // ========== LOGO HELPERS (no remote network requests) ==========
-        // Inline SVG data-URIs so the deposit list paints instantly.
-        const METHOD_LOGOS = {
-            telebirr: 'data:image/svg+xml;utf8,' + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#FBBF24"/><text x="24" y="32" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#0B132B" text-anchor="middle">T</text></svg>'
-            ),
-            cbebirr: 'data:image/svg+xml;utf8,' + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#1e40af"/><text x="24" y="32" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#fff" text-anchor="middle">C</text></svg>'
-            ),
-            mpesa: 'data:image/svg+xml;utf8,' + encodeURIComponent(
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#10b981"/><text x="24" y="32" font-family="Arial,sans-serif" font-size="22" font-weight="bold" fill="#fff" text-anchor="middle">M</text></svg>'
-            )
-        };
-
+        // ========== LOGO HELPERS ==========
         function getMethodLogo(type) {
-            return METHOD_LOGOS[type] || null;
+            const logos = {
+                telebirr: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Telebirr_logo.svg',
+                cbebirr: 'https://upload.wikimedia.org/wikipedia/commons/8/8c/Commercial_Bank_of_Ethiopia_logo.svg',
+                mpesa: 'https://upload.wikimedia.org/wikipedia/commons/7/7e/M-Pesa_Logo.svg'
+            };
+            return logos[type] || null;
         }
 
         function getFallbackIcon(type) {
@@ -2069,6 +1896,18 @@
             if (!n) return '📞 Contact admin';
             const d = n.replace(/\D/g, '');
             return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
+        }
+
+        // ✅ PERF: shared markup builder for method icons
+        function methodIconHtml(type, label) {
+            const logoUrl = getMethodLogo(type);
+            const fallback = getFallbackIcon(type);
+            const fallbackSpan = `<span class="fallback-icon" style="font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
+            if (!logoUrl) return fallbackSpan;
+            return `<img src="${logoUrl}" alt="${label}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         style="width:100%;height:100%;object-fit:contain;" />
+                    <span class="fallback-icon" style="display:none; font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
         }
 
         // ========== DEPOSIT FLOW ==========
@@ -2088,46 +1927,42 @@
             if (phoneInput) phoneInput.value = '';
             if (amountInput) amountInput.value = '';
             if (invoiceInput) invoiceInput.value = '';
-            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal'];
-            modals.forEach(id => { const el = $(id); if (el) el.classList.remove('active'); });
+            ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal'].forEach(id => {
+                const el = $(id);
+                if (el) el.classList.remove('active');
+            });
             const confirmBtn = $('confirmPaymentBtn');
             if (confirmBtn) {
                 confirmBtn.disabled = false;
                 const key = confirmBtn.getAttribute('data-key');
-                if (key) { confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key]; } else { confirmBtn
-                        .innerText = 'Confirm Payment →'; }
+                if (key) confirmBtn.innerText = lang === 'am' ? data.am[key] : data.en[key];
+                else confirmBtn.innerText = 'Confirm Payment →';
             }
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = '';
-            if ($('depositMethodListTitle')) { $('depositMethodListTitle').innerHTML = lang === 'am' ?
-                    '💳 የክፍያ ዘዴ ይምረጡ' : '💳 Select Deposit Method'; }
-            if ($('depositMethodListStepLabel')) $('depositMethodListStepLabel').textContent = 'Step 1/2';
+            const dmlt = $('depositMethodListTitle');
+            if (dmlt) dmlt.innerHTML = lang === 'am' ? '💳 የክፍያ ዘዴ ይምረጡ' : '💳 Select Deposit Method';
+            const stepLabel = $('depositMethodListStepLabel');
+            if (stepLabel) stepLabel.textContent = 'Step 1/2';
         }
 
         async function openDepositMethods() {
             resetDepositState();
-            // Show the modal immediately with cached data (instant feel)
-            const admins = depositAdmins.length ? depositAdmins : await loadAdmins();
+            const admins = await loadAdmins();
+            const c = $('methodListContainer');
             if (!admins.length) {
-                const c = $('methodListContainer');
-                if (c) c.innerHTML =
-                `<div class="empty-state"><div class="empty-icon">📂</div><div>No payment methods available</div></div>`;
+                if (c) c.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div><div>No payment methods available</div></div>`;
                 $('depositMethodListModal').classList.add('active');
                 return;
             }
             const allMethods = [];
             admins.forEach(admin => {
-                if (admin.telebirr) allMethods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr,
-                    adminId: admin.id });
-                if (admin.cbebirr) allMethods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr,
-                    adminId: admin.id });
-                if (admin.mpesa) allMethods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa,
-                    adminId: admin.id });
+                if (admin.telebirr) allMethods.push({ type: 'telebirr', label: 'Telebirr', number: admin.telebirr, adminId: admin.id });
+                if (admin.cbebirr) allMethods.push({ type: 'cbebirr', label: 'CBE Birr', number: admin.cbebirr, adminId: admin.id });
+                if (admin.mpesa) allMethods.push({ type: 'mpesa', label: 'M-Pesa', number: admin.mpesa, adminId: admin.id });
             });
             if (!allMethods.length) {
-                const c = $('methodListContainer');
-                if (c) c.innerHTML =
-                `<div class="empty-state"><div class="empty-icon">💳</div><div>No payment methods available</div></div>`;
+                if (c) c.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div>No payment methods available</div></div>`;
                 $('depositMethodListModal').classList.add('active');
                 return;
             }
@@ -2145,18 +1980,11 @@
             if (stepLabel) stepLabel.textContent = 'Step 1/2';
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = '';
+
             c.innerHTML = methods.map(m => {
                 const disp = getSafeNumber(m.number);
-                const logoUrl = getMethodLogo(m.type);
-                const fallback = getFallbackIcon(m.type);
-                const imgHtml = logoUrl ?
-                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" 
-                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
-                              style="width:100%;height:100%;object-fit:contain;" />
-                              <span class="fallback-icon" style="display:none; font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>` :
-                    `<span class="fallback-icon" style="font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
                 return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                            <div class="method-icon">${imgHtml}</div>
+                            <div class="method-icon">${methodIconHtml(m.type, m.label)}</div>
                             <div class="method-info">
                                 <div class="method-name">${m.label}</div>
                                 <div class="method-number">${disp}</div>
@@ -2164,41 +1992,31 @@
                             <div class="method-select-badge">Select</div>
                         </div>`;
             }).join('');
-            c.querySelectorAll('.method-list-item').forEach(el => {
-                el.addEventListener('click', () => {
-                    const method = el.dataset.method;
-                    const adminId = parseInt(el.dataset.admin);
-                    const number = el.dataset.number;
-                    const admin = depositAdmins.find(a => a.id === adminId);
-                    if (!admin) { showToast('Admin not found', 'error'); return; }
-                    selectedDepositType = method;
-                    selectedMethodNumber = number;
-                    selectedAdminId = adminId;
-                    selectedAdminObj = admin;
-                    transitionModal('depositMethodListModal', 'depositDetailsModal');
-                    if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-                    if (savedAmount) $('depositAmountSimple').value = savedAmount;
-                });
-            });
+
+            // ✅ PERF: one delegated listener instead of N per-item listeners
+            c.onclick = e => {
+                const el = e.target.closest('.method-list-item');
+                if (!el || !c.contains(el)) return;
+                const method = el.dataset.method;
+                const adminId = parseInt(el.dataset.admin);
+                const number = el.dataset.number;
+                const admin = depositAdmins.find(a => a.id === adminId);
+                if (!admin) { showToast('Admin not found', 'error'); return; }
+                selectedDepositType = method;
+                selectedMethodNumber = number;
+                selectedAdminId = adminId;
+                selectedAdminObj = admin;
+                transitionModal('depositMethodListModal', 'depositDetailsModal');
+                if (savedPhone) $('depositPlayerPhone').value = savedPhone;
+                if (savedAmount) $('depositAmountSimple').value = savedAmount;
+            };
         }
 
-        function closeDepositDetails() {
-            transitionModal('depositDetailsModal', 'depositMethodListModal');
-        }
-
-        function closeMethodList() { $('depositMethodListModal').classList.remove('active');
-            resetDepositState(); }
-
-        function openDepositDetails(admin, method, number) {
-            if (!admin || !method || !number) { showToast('Please select a valid payment method.', 'error'); return; }
-            selectedAdminObj = admin;
-            selectedAdminId = admin.id;
-            selectedDepositType = method;
-            selectedMethodNumber = number;
-            if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-            if (savedAmount) $('depositAmountSimple').value = savedAmount;
-            $('depositDetailsModal').classList.add('active');
-            unlockSpeech();
+        function closeDepositDetails() { transitionModal('depositDetailsModal', 'depositMethodListModal'); }
+        function closeMethodList() {
+            const m = $('depositMethodListModal');
+            if (m) m.classList.remove('active');
+            resetDepositState();
         }
 
         function openPaymentConfirm(phone, amount) {
@@ -2220,14 +2038,13 @@
                 const fallback = getFallbackIcon(selectedDepositType);
                 if (logoUrl) {
                     iconContainer.innerHTML = `
-                        <img src="${logoUrl}" alt="${title}" 
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
+                        <img src="${logoUrl}" alt="${title}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                              style="width:40px;height:40px;object-fit:contain;" />
                         <span class="fallback-icon" style="display:none; font-size:2rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>
                     `;
                 } else {
-                    iconContainer.innerHTML =
-                        `<span class="fallback-icon" style="font-size:2rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
+                    iconContainer.innerHTML = `<span class="fallback-icon" style="font-size:2rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
                 }
             }
             $('paymentInvoiceNumber').value = '';
@@ -2244,17 +2061,11 @@
         // ========== HOW TO PAY ==========
         function openHowToPay() {
             const method = selectedDepositType || 'telebirr';
-            const methodLabel = method.charAt(0).toUpperCase() + method.slice(1);
-            document.getElementById('howToPayMethod').textContent = methodLabel;
-            const content = document.getElementById('howToPayContent');
-            const instructions = getPaymentInstructions(method);
-            content.innerHTML = instructions;
-            const amountSpan = document.getElementById('howToPayAmount');
-            if (amountSpan) amountSpan.textContent = pendingAmount || '10';
+            document.getElementById('howToPayMethod').textContent = method.charAt(0).toUpperCase() + method.slice(1);
+            document.getElementById('howToPayContent').innerHTML = getPaymentInstructions(method);
             document.getElementById('howToPayModal').classList.add('active');
             unlockSpeech();
         }
-
         function closeHowToPay() { document.getElementById('howToPayModal').classList.remove('active'); }
 
         function getPaymentInstructions(method) {
@@ -2265,7 +2076,7 @@
                     <li>Open your ${methodLabel} app or mobile money service.</li>
                     <li>Select <strong>Send Money</strong> (or <strong>Transfer</strong>).</li>
                     <li>Enter the admin's phone number shown above.</li>
-                    <li>Enter the exact amount (<span id="howToPayAmount">${pendingAmount || '...'}</span> ETB).</li>
+                    <li>Enter the exact amount (<span>${pendingAmount || '...'}</span> ETB).</li>
                     <li>Complete the transaction and copy the <strong>Invoice Number</strong> (or the full SMS confirmation).</li>
                     <li>Paste that Invoice Number in the field below and tap <strong>Confirm Payment</strong>.</li>
                 </ol>
@@ -2290,8 +2101,11 @@
         async function openWithdrawFlow() {
             resetDepositState();
             try {
-                const admins = depositAdmins.length ? depositAdmins : await loadAdmins();
-                if (!admins.length) { showToast('No admins available', 'error'); return; }
+                const r = await fetch('/api/deposit-accounts');
+                const d = await r.json();
+                if (!d.success || !d.admins) { showToast('No admins available', 'error'); return; }
+                const admins = d.admins;
+                depositAdmins = admins;
                 const methodMap = {};
                 admins.forEach(a => {
                     if (a.telebirr && !methodMap.telebirr) methodMap.telebirr = a.id;
@@ -2305,59 +2119,48 @@
         }
 
         function showWithdrawMethods(methodMap) {
-            const c = $('methodListContainer'),
-                t = $('depositMethodListTitle');
+            const c = $('methodListContainer'), t = $('depositMethodListTitle');
             if (!c || !t) return;
             t.innerHTML = lang === 'am' ? '💸 የማውጫ ዘዴ ይምረጡ' : '💸 Select Withdrawal Method';
             const stepLabel = $('depositMethodListStepLabel');
             if (stepLabel) stepLabel.textContent = '';
             const backBtn = $('depositMethodListBackBtn');
             if (backBtn) backBtn.style.display = 'none';
-            const methodList = [];
+
             const labels = { telebirr: 'Telebirr', cbebirr: 'CBE Birr', mpesa: 'M-Pesa' };
-            for (const [type, adminId] of Object.entries(methodMap)) {
+            const methodList = [];
+            for (const type in methodMap) {
+                const adminId = methodMap[type];
                 const admin = depositAdmins.find(a => a.id === adminId);
                 if (!admin) continue;
-                const number = admin[type] || '';
-                methodList.push({ type, label: labels[type] || type, number, adminId });
+                methodList.push({ type, label: labels[type] || type, number: admin[type] || '', adminId });
             }
             if (!methodList.length) {
-                c.innerHTML =
-                `<div class="empty-state"><div class="empty-icon">💳</div><div>No withdrawal methods available</div></div>`;
+                c.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div>No withdrawal methods available</div></div>`;
                 return;
             }
-            c.innerHTML = methodList.map(m => {
-                const logoUrl = getMethodLogo(m.type);
-                const fallback = getFallbackIcon(m.type);
-                const imgHtml = logoUrl ?
-                    `<img src="${logoUrl}" alt="${m.label}" loading="lazy" 
-                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
-                              style="width:100%;height:100%;object-fit:contain;" />
-                              <span class="fallback-icon" style="display:none; font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>` :
-                    `<span class="fallback-icon" style="font-size:1.8rem; font-weight:bold; background:${fallback.color}; color:#0B132B; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
-                return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                            <div class="method-icon">${imgHtml}</div>
-                            <div class="method-info">
-                                <div class="method-name">${m.label}</div>
-                            </div>
-                            <div class="method-select-badge">Select</div>
-                        </div>`;
-            }).join('');
-            c.querySelectorAll('.method-list-item').forEach(el => {
-                el.addEventListener('click', () => {
-                    const method = el.dataset.method;
-                    const adminId = parseInt(el.dataset.admin);
-                    const number = el.dataset.number;
-                    const admin = depositAdmins.find(a => a.id === adminId);
-                    if (!admin) { showToast('Admin not found', 'error'); return; }
-                    selectedWithdrawType = method;
-                    selectedMethodNumber = number;
-                    selectedAdminId = adminId;
-                    selectedAdminObj = admin;
-                    $('depositMethodListModal').classList.remove('active');
-                    openWithdrawDetails(admin, method, number);
-                });
-            });
+            c.innerHTML = methodList.map(m => `
+                <div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
+                    <div class="method-icon">${methodIconHtml(m.type, m.label)}</div>
+                    <div class="method-info"><div class="method-name">${m.label}</div></div>
+                    <div class="method-select-badge">Select</div>
+                </div>`).join('');
+
+            c.onclick = e => {
+                const el = e.target.closest('.method-list-item');
+                if (!el || !c.contains(el)) return;
+                const method = el.dataset.method;
+                const adminId = parseInt(el.dataset.admin);
+                const number = el.dataset.number;
+                const admin = depositAdmins.find(a => a.id === adminId);
+                if (!admin) { showToast('Admin not found', 'error'); return; }
+                selectedWithdrawType = method;
+                selectedMethodNumber = number;
+                selectedAdminId = adminId;
+                selectedAdminObj = admin;
+                $('depositMethodListModal').classList.remove('active');
+                openWithdrawDetails(admin, method, number);
+            };
             $('depositMethodListModal').classList.add('active');
             unlockSpeech();
         }
@@ -2369,9 +2172,8 @@
             selectedWithdrawType = method;
             selectedMethodNumber = number;
             const title = method === 'telebirr' ? 'Telebirr' : method === 'cbebirr' ? 'CBE Birr' : 'M-Pesa';
-            const hint = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
             $('withdrawDetailsTitle').innerHTML = `Withdraw via ${title}`;
-            $('withdrawReceiver').placeholder = hint;
+            $('withdrawReceiver').placeholder = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
             $('withdrawReceiver').value = '';
             $('withdrawAmount').value = '';
             $('withdrawName').value = '';
@@ -2384,11 +2186,12 @@
             const rec = $('withdrawReceiver').value.trim(),
                 amt = $('withdrawAmount').value.trim(),
                 name = $('withdrawName').value.trim();
-            if (!name) { showToast("Full name required", 'error'); return; }
+            if (!name) { showToast('Full name required', 'error'); return; }
             if (!amt || isNaN(amt) || Number(amt) < 20) { showToast('Minimum withdrawal is 20 ETB', 'error'); return; }
-            if (!rec.match(/^(09|07)\d{8}$/)) { showToast(
-                    `Invalid ${selectedWithdrawType} number. Please enter a valid 10-digit number starting with 09 or 07.`, 'error'
-                    ); return; }
+            if (!rec.match(/^(09|07)\d{8}$/)) {
+                showToast(`Invalid ${selectedWithdrawType} number. Use a 10-digit number starting with 09 or 07.`, 'error');
+                return;
+            }
             submittingW = true;
             const btn = $('submitWithdrawBtn');
             const orig = btn.innerText;
@@ -2398,35 +2201,45 @@
                 const r = await fetch('/api/request-withdraw', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: Number(amt), phone: rec, withdrawal_type: selectedWithdrawType,
-                        name, admin_id: selectedAdminId })
+                    body: JSON.stringify({ amount: Number(amt), phone: rec, withdrawal_type: selectedWithdrawType, name, admin_id: selectedAdminId })
                 });
                 const d = await r.json();
-                if (d.success) { showToast('✅ Withdrawal request submitted!', 'success');
+                if (d.success) {
+                    showToast('✅ Withdrawal request submitted!', 'success');
                     $('withdrawDetailsModal').classList.remove('active');
-                    resetDepositState(); } else { showToast('❌ Error: ' + (d.error || 'Submission failed'), 'error'); }
-            } catch (err) { showToast('⚠️ Network error.', 'error'); } finally { submittingW = false;
+                    resetDepositState();
+                } else {
+                    showToast('❌ Error: ' + (d.error || 'Submission failed'), 'error');
+                }
+            } catch (err) {
+                showToast('⚠️ Network error.', 'error');
+            } finally {
+                submittingW = false;
                 btn.disabled = false;
                 btn.innerText = orig;
-                unlockSpeech(); }
+                unlockSpeech();
+            }
         }
 
         // ========== EVENT DELEGATION ==========
         document.addEventListener('click', e => {
-            const t = e.target.closest('#requestDepositBtn');
-            if (t) {
+            if (e.target.closest('#requestDepositBtn')) {
                 const phone = $('depositPlayerPhone').value.trim();
                 const amount = $('depositAmountSimple').value.trim();
-                if (!phone.match(/^(09|07)\d{8}$/)) { showToast(
-                        'Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.', 'error'
-                        ); return; }
-                if (!amount || isNaN(amount) || Number(amount) < 10) { showToast('Minimum deposit is 10 ETB', 'error'); return; }
+                if (!phone.match(/^(09|07)\d{8}$/)) {
+                    showToast('Invalid phone number. Use 10 digits starting with 09 or 07.', 'error');
+                    return;
+                }
+                if (!amount || isNaN(amount) || Number(amount) < 10) {
+                    showToast('Minimum deposit is 10 ETB', 'error');
+                    return;
+                }
                 openPaymentConfirm(phone, amount);
+                return;
             }
-        });
-        document.addEventListener('click', e => {
-            const t = e.target.closest('#backPaymentBtn');
-            if (t) closePaymentConfirm();
+            if (e.target.closest('#backPaymentBtn')) {
+                closePaymentConfirm();
+            }
         });
 
         $('confirmPaymentBtn')?.addEventListener('click', async function() {
@@ -2443,14 +2256,11 @@
                 const r = await fetch('/api/request-deposit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, amount: pendingAmount, payment_type: selectedDepositType,
-                        admin_id: selectedAdminId, transaction_reference: invoice })
+                    body: JSON.stringify({ phone, amount: pendingAmount, payment_type: selectedDepositType, admin_id: selectedAdminId, transaction_reference: invoice })
                 });
                 const d = await r.json();
                 if (d.success) {
-                    showToast(
-                        `✅ Deposit request submitted! Amount: ${pendingAmount} ETB — waiting for admin approval.`, 'success'
-                        );
+                    showToast(`✅ Deposit request submitted! ${pendingAmount} ETB`, 'success');
                     resetDepositState();
                     $('depositPaymentModal').classList.remove('active');
                 } else {
@@ -2494,71 +2304,108 @@
             return t;
         }
 
-        // ---- Card: build once, toggle .marked incrementally ----
-        const cardCellRefs = { lobby: {}, game: {} };
+        // ============================================================
+        //  ✅ PERF: INCREMENTAL CARD RENDERING
+        //  Before: full <table> (25 cells + 25 closures) rebuilt on every
+        //          `markedNumbers` / `yourCard` event.
+        //  Now:    table is built once per (card, container); only the
+        //          `marked` class is toggled afterwards.
+        // ============================================================
+        const cardRenderCache = new Map(); // container el -> { key, cells }
 
-        function renderCard(card, container, clickable) {
-            const cont = $(container);
+        function renderCard(card, containerId, clickable) {
+            const cont = $(containerId);
             if (!cont) return;
-            const key = container === 'gameCard' ? 'game' : 'lobby';
-            cardCellRefs[key] = {};
-            cont.innerHTML = '';
+
             if (!card || !Array.isArray(card) || !card.length) {
-                cont.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B;">🎴 Select a card number to see your Bingo card</div>';
+                if (cont.dataset.empty !== '1') {
+                    cont.innerHTML = '<div style="text-align:center;padding:20px;color:#64748B;">🎴 Select a card number to see your Bingo card</div>';
+                    cont.dataset.empty = '1';
+                    cardRenderCache.delete(cont);
+                }
                 return;
             }
-            const tbl = document.createElement('table');
-            tbl.style.borderCollapse = 'separate';
-            tbl.style.borderSpacing = '8px';
-            const th = document.createElement('thead'),
-                hr = document.createElement('tr');
-            ['B', 'I', 'N', 'G', 'O'].forEach(l => { const th2 = document.createElement('th');
-                th2.textContent = l;
-                hr.appendChild(th2); });
-            th.appendChild(hr);
-            tbl.appendChild(th);
-            const tb = document.createElement('tbody');
-            const frag = document.createDocumentFragment();
-            for (let r = 0; r < 5; r++) {
-                const tr = document.createElement('tr');
-                for (let c = 0; c < 5; c++) {
-                    const val = card[r][c],
-                        td = document.createElement('td');
-                    td.textContent = val === 'FREE' ? '★' : val;
-                    if (val === 'FREE') td.classList.add('free');
-                    else cardCellRefs[key][val] = td;
-                    if (clickable && val !== 'FREE') {
-                        td.style.cursor = 'pointer';
-                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); };
-                    }
-                    tr.appendChild(td);
+            cont.dataset.empty = '0';
+
+            const key = card.flat().join(',') + (clickable ? '|c' : '|n');
+            let entry = cardRenderCache.get(cont);
+
+            if (!entry || entry.key !== key) {
+                const frag = document.createDocumentFragment();
+
+                const tbl = document.createElement('table');
+                tbl.style.borderCollapse = 'separate';
+                tbl.style.borderSpacing = '8px';
+
+                const thead = document.createElement('thead');
+                const hr = document.createElement('tr');
+                for (const l of ['B', 'I', 'N', 'G', 'O']) {
+                    const th = document.createElement('th');
+                    th.textContent = l;
+                    hr.appendChild(th);
                 }
-                frag.appendChild(tr);
+                thead.appendChild(hr);
+                tbl.appendChild(thead);
+
+                const tb = document.createElement('tbody');
+                const cells = new Map();
+                for (let r = 0; r < 5; r++) {
+                    const tr = document.createElement('tr');
+                    for (let c = 0; c < 5; c++) {
+                        const val = card[r][c];
+                        const td = document.createElement('td');
+                        td.textContent = val === 'FREE' ? '★' : val;
+                        if (val === 'FREE') td.classList.add('free');
+                        else cells.set(val, td);
+                        tr.appendChild(td);
+                    }
+                    tb.appendChild(tr);
+                }
+                tbl.appendChild(tb);
+                frag.appendChild(tbl);
+
+                cont.textContent = '';
+                cont.appendChild(frag);
+
+                entry = { key, cells };
+                cardRenderCache.set(cont, entry);
+
+                // ✅ one delegated listener per container, never per cell
+                if (!cont.dataset.delegated) {
+                    cont.dataset.delegated = '1';
+                    cont.addEventListener('click', ev => {
+                        if (cont.dataset.clickable !== '1') return;
+                        if (!isGameActive || !socket) return;
+                        const td = ev.target.closest('td');
+                        if (!td) return;
+                        const n = Number(td.textContent);
+                        if (Number.isFinite(n)) socket.emit('markNumber', n);
+                    }, { passive: true });
+                }
             }
-            tb.appendChild(frag);
-            tbl.appendChild(tb);
-            cont.appendChild(tbl);
-            // apply current marks once
-            const set = new Set(markedNumbers);
-            Object.entries(cardCellRefs[key]).forEach(([v, td]) => {
-                if (set.has(Number(v))) td.classList.add('marked');
-            });
+
+            cont.dataset.clickable = clickable ? '1' : '0';
+
+            // ✅ only toggle the diff
+            for (const [num, td] of entry.cells) {
+                const on = markedNumbers.has(num);
+                if (td.classList.contains('marked') !== on) td.classList.toggle('marked', on);
+            }
         }
 
-        function paintCardMarks() {
-            const set = new Set(markedNumbers);
-            const key = isGameActive ? 'game' : 'lobby';
-            Object.entries(cardCellRefs[key]).forEach(([v, td]) => {
-                td.classList.toggle('marked', set.has(Number(v)));
-            });
-        }
-
-        // ---- Grid: build once, paint classes incrementally ----
+        // ============================================================
+        //  ✅ PERF: INCREMENTAL 1-100 GRID
+        //  Before: 100 <div> + 100 onclick closures rebuilt on every
+        //          cardTaken / selection / count update.
+        //  Now:    built once, only className strings are diffed, and
+        //          one delegated click listener on the container.
+        // ============================================================
         const gridCells = new Array(101);
         let gridBuilt = false;
+        let gridPaintScheduled = false;
 
-        function buildGrid() {
-            if (!numberGrid || gridBuilt) return;
+        function buildGridOnce() {
+            if (gridBuilt || !numberGrid) return;
             const frag = document.createDocumentFragment();
             for (let i = 1; i <= 100; i++) {
                 const cell = document.createElement('div');
@@ -2570,60 +2417,76 @@
             }
             numberGrid.appendChild(frag);
             gridBuilt = true;
-            paintGrid();
         }
 
         function paintGrid() {
+            if (!gridBuilt) return;
+            const own = selectedCardNumber;
             for (let i = 1; i <= 100; i++) {
                 const cell = gridCells[i];
-                if (!cell) continue;
-                const own = selectedCardNumber === i;
-                const taken = !own && displayTaken.has(i);
-                cell.classList.toggle('own-card', own);
-                cell.classList.toggle('taken', taken);
+                const cls = (own === i) ? 'grid-cell own-card'
+                    : displayTaken.has(i) ? 'grid-cell taken'
+                    : 'grid-cell';
+                if (cell.className !== cls) cell.className = cls;
             }
         }
 
-        // Single delegated listener instead of 100 per-cell handlers
-        if (numberGrid) {
-            numberGrid.addEventListener('click', e => {
-                const cell = e.target.closest('.grid-cell');
-                if (!cell || isGameActive || !socket) return;
-                const i = Number(cell.dataset.number);
-                if (displayTaken.has(i) || serverTaken.has(i)) return;
-                if (selectedCardNumber !== null && selectedCardNumber !== i) {
-                    serverTaken.delete(selectedCardNumber);
-                    displayTaken.delete(selectedCardNumber);
-                }
-                pendingSelection = i;
-                selectedCardNumber = i;
-                selectedNumber.textContent = i;
+        function scheduleGridPaint() {
+            if (gridPaintScheduled) return;
+            gridPaintScheduled = true;
+            requestAnimationFrame(() => {
+                gridPaintScheduled = false;
                 paintGrid();
-                socket.emit('selectCardNumber', i);
-                updateBackToLobbyVisibility();
             });
         }
+        // keep the old call-sites working
+        const buildGrid = scheduleGridPaint;
+
+        numberGrid?.addEventListener('click', e => {
+            const cell = e.target.closest('.grid-cell');
+            if (!cell) return;
+            if (isGameActive || !socket) return;
+            const i = Number(cell.dataset.number);
+            if (displayTaken.has(i) || serverTaken.has(i)) return;
+            if (selectedCardNumber !== null && selectedCardNumber !== i) {
+                serverTaken.delete(selectedCardNumber);
+                displayTaken.delete(selectedCardNumber);
+            }
+            pendingSelection = i;
+            selectedCardNumber = i;
+            selectedNumber.textContent = i;
+            scheduleGridPaint();
+            socket.emit('selectCardNumber', i);
+            updateBackToLobbyVisibility();
+        }, { passive: true });
 
         function updateGrid(takenArr) {
             serverTaken = new Set(takenArr);
             const disp = new Set(takenArr);
             if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
             displayTaken = disp;
-            paintGrid();
+            scheduleGridPaint();
             updateCount(serverTaken.size);
         }
 
-        function updateCount(c) { const v = c !== undefined ? c : serverTaken.size; if (playersCount) playersCount.innerText =
-                v; if (gamePlayersCount) gamePlayersCount.innerText = v; }
+        function updateCount(c) {
+            const v = c !== undefined ? c : serverTaken.size;
+            if (playersCount) playersCount.innerText = v;
+            if (gamePlayersCount) gamePlayersCount.innerText = v;
+        }
 
-        function formatCall(n) { let l = 'B'; if (n > 15) l = 'I'; if (n > 30) l = 'N'; if (n > 45) l = 'G'; if (n > 60) l =
-                'O'; return `${l}-${n}`; }
+        function formatCall(n) {
+            let l = 'B';
+            if (n > 15) l = 'I';
+            if (n > 30) l = 'N';
+            if (n > 45) l = 'G';
+            if (n > 60) l = 'O';
+            return `${l}-${n}`;
+        }
 
         function updateBackToLobbyVisibility() {
             const container = $('backToLobbyContainer');
-            if (container) {
-                container.classList.toggle('hidden', selectedCardNumber !== null);
-            }
+            if (container) container.classList.toggle('hidden', selectedCardNumber !== null);
         }
 
         function showLobby(sec) {
@@ -2631,7 +2494,7 @@
             timerSeconds = sec;
             switchPage('lobbyPage');
             isGameActive = false;
-            markedNumbers = [];
+            markedNumbers = new Set();
             if (socket) socket.emit('getBalance');
             startTimer(sec);
             if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
@@ -2654,21 +2517,30 @@
             let left = sec;
             lobbyTimer.textContent = left + 's';
             clearInterval(lobbyTimerInterval);
-            lobbyTimerInterval = setInterval(() => { left--; 
-                timerSeconds = left; if (left <= 0) { clearInterval(lobbyTimerInterval);
-                    showGame(); } else lobbyTimer.textContent = left + 's'; }, 1000);
+            lobbyTimerInterval = setInterval(() => {
+                left--;
+                timerSeconds = left;
+                if (left <= 0) {
+                    clearInterval(lobbyTimerInterval);
+                    showGame();
+                } else {
+                    lobbyTimer.textContent = left + 's';
+                }
+            }, 1000);
         }
 
-        function goBack() { if (currentPage === 'lobby') showLobby(timerSeconds > 0 ? timerSeconds : 30); else if (
-                currentPage === 'game') showGame(); else showLobby(30); }
+        function goBack() {
+            if (currentPage === 'lobby') showLobby(timerSeconds > 0 ? timerSeconds : 30);
+            else if (currentPage === 'game') showGame();
+            else showLobby(30);
+        }
 
         function goStake() {
             resetDepositState();
-            if (socket) { socket.disconnect();
-                socket = null; }
+            if (socket) { socket.disconnect(); socket = null; }
             isGameActive = false;
             userCard = [];
-            markedNumbers = [];
+            markedNumbers = new Set();
             selectedCardNumber = null;
             serverTaken.clear();
             displayTaken.clear();
@@ -2682,41 +2554,60 @@
             currentGameId = null;
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
+            scheduleGridPaint();
+            connectStakeSocket();   // ✅ resume live stake counts
             unlockSpeech();
         }
 
-        function showWinner(data) {
-            if (data.noWinner) { if (currentGameId) addRecord(false, 0, currentGameId, currentStake, [], null, 0);
-                showToast('No winner this round.', 'info'); return; }
-            const winners = data.winners || [data.winner].filter(Boolean);
-            const total = data.totalPrize || 0;
-            const each = data.prizeEach || 0;
-            const title = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
-            $('winTitle').innerHTML = title;
+        function showWinner(d) {
+            if (d.noWinner) {
+                if (currentGameId) addRecord(false, 0, currentGameId, currentStake, [], null, 0);
+                showToast('No winner this round.', 'info');
+                return;
+            }
+            const winners = d.winners || [d.winner].filter(Boolean);
+            const total = d.totalPrize || 0;
+            const each = d.prizeEach || 0;
+            $('winTitle').innerHTML = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
             $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">${w}</span>`).join('');
             $('winPrize').innerHTML = each + ' <small>ETB</small>';
             $('winnerOverlay').classList.add('active');
-            const conf = document.createElement('div');
-            conf.className = 'confetti';
-            for (let i = 0; i < 120; i++) { const p = document.createElement('div');
-                p.className = 'confetti-piece';
-                p.style.left = Math.random() * 100 + '%';
-                p.style.animationDuration = (Math.random() * 3 + 2) + 's';
-                p.style.backgroundColor = `hsl(${Math.random()*30+20},90%,60%)`;
-                conf.appendChild(p); }
-            document.body.appendChild(conf);
-            setTimeout(() => conf.remove(), 4000);
-            if (currentGameId) addRecord(true, each, currentGameId, currentStake, winners, data.winningNumber, total);
+
+            // ✅ PERF: 60 pieces instead of 120 + compositor-friendly transform
+            if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < 60; i++) {
+                    const p = document.createElement('div');
+                    p.className = 'confetti-piece';
+                    p.style.left = Math.random() * 100 + '%';
+                    p.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    p.style.backgroundColor = `hsl(${Math.random() * 30 + 20},90%,60%)`;
+                    frag.appendChild(p);
+                }
+                conf.appendChild(frag);
+                document.body.appendChild(conf);
+                setTimeout(() => conf.remove(), 4000);
+            }
+
+            if (currentGameId) addRecord(true, each, currentGameId, currentStake, winners, d.winningNumber, total);
             unlockSpeech();
         }
 
         function addRecord(win, prize, id, stake, winners, winNum, total) {
             totalGames++;
-            if (win) { totalWins++;
-                totalEarned += prize; }
-            recentGames.unshift({ gameId: id, date: new Date().toLocaleString(), result: win ? 'Win' : 'Lost', stake,
-                playerPrize: prize, totalPrize: total || 0, winnersList: winners || [], winningNumber: winNum ||
-                    null });
+            if (win) { totalWins++; totalEarned += prize; }
+            recentGames.unshift({
+                gameId: id,
+                date: new Date().toLocaleString(),
+                result: win ? 'Win' : 'Lost',
+                stake,
+                playerPrize: prize,
+                totalPrize: total || 0,
+                winnersList: winners || [],
+                winningNumber: winNum || null
+            });
             if (recentGames.length > 10) recentGames.pop();
             saveStats();
             updateStatsUI();
@@ -2735,252 +2626,307 @@
                 totalWins = parseInt(localStorage.getItem('dot_bingo_total_wins') || '0');
                 totalEarned = parseInt(localStorage.getItem('dot_bingo_total_earned') || '0');
                 const stored = JSON.parse(localStorage.getItem('dot_bingo_recent_games') || '[]');
-                recentGames = stored.map(g => ({ gameId: g.gameId, date: g.date, result: g.result, stake: g.stake,
-                    playerPrize: g.playerPrize || g.prize || 0, totalPrize: g.totalPrize || (g.prize || 0),
-                    winnersList: g.winnersList || (g.winner ? [g.winner] : []), winningNumber: g
-                        .winningNumber || null }));
+                recentGames = stored.map(g => ({
+                    gameId: g.gameId, date: g.date, result: g.result, stake: g.stake,
+                    playerPrize: g.playerPrize || g.prize || 0,
+                    totalPrize: g.totalPrize || (g.prize || 0),
+                    winnersList: g.winnersList || (g.winner ? [g.winner] : []),
+                    winningNumber: g.winningNumber || null
+                }));
             } catch (e) { recentGames = []; }
             updateStatsUI();
         }
 
+        // ✅ PERF: only rebuild the history DOM when that page is visible
+        let statsDirty = true;
         function updateStatsUI() {
-            $('totalGamesCount').innerText = totalGames;
+            const tgc = $('totalGamesCount');
+            if (tgc) tgc.innerText = totalGames;
+            const historyPage = $('historyPage');
+            if (!historyPage || historyPage.classList.contains('hidden')) {
+                statsDirty = true;
+                return;
+            }
+            statsDirty = false;
             const div = $('recentGamesList');
             if (!div) return;
-            if (!recentGames.length) { div.innerHTML =
-                    '<div class="history-card" style="text-align:center; color:#64748B;">✨ No games played yet. Join a round!</div>'; return; }
+            if (!recentGames.length) {
+                div.innerHTML = '<div class="history-card" style="text-align:center; color:#64748B;">✨ No games played yet. Join a round!</div>';
+                return;
+            }
             div.innerHTML = recentGames.map(g => {
-                const w = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result ===
-                    'Win' ? 'You' : '—');
-                const last = g.winningNumber ? (() => { let l = 'B'; if (g.winningNumber > 15) l = 'I'; if (g
-                        .winningNumber > 30) l = 'N'; if (g.winningNumber > 45) l = 'G'; if (g
-                        .winningNumber > 60) l = 'O'; return `${l}-${g.winningNumber}`; })() : '—';
-                const prize = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result ===
-                    'Win' ? `${g.playerPrize} ETB` : '—');
+                const w = (g.winnersList && g.winnersList.length) ? g.winnersList.join(', ') : (g.result === 'Win' ? 'You' : '—');
+                const last = g.winningNumber ? (() => {
+                    let l = 'B';
+                    if (g.winningNumber > 15) l = 'I';
+                    if (g.winningNumber > 30) l = 'N';
+                    if (g.winningNumber > 45) l = 'G';
+                    if (g.winningNumber > 60) l = 'O';
+                    return `${l}-${g.winningNumber}`;
+                })() : '—';
+                const prize = (g.result === 'Win' && g.totalPrize) ? `${g.totalPrize} ETB` : (g.result === 'Win' ? `${g.playerPrize} ETB` : '—');
                 return `<div class="history-card"><div><strong>🎮 Game ID:</strong> <span style="color:#F8FAFC;">${g.gameId}</span></div><div><strong>🏆 Winner(s):</strong> <span style="color:#F8FAFC;">${w}</span></div><div><strong>🎯 Last Called:</strong> <span style="color:#F8FAFC;">${last}</span></div><div><strong>💰 Total Prize:</strong> <span style="color:#FBBF24; font-weight:700;">${prize}</span></div><div style="font-size:0.7rem;color:#94A3B8; margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div></div>`;
             }).join('');
         }
 
-        function syncBalance(v) { balance = v; 
-            lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($(
-                'profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $(
-                'gameBalanceDisplay').innerText = v; }
+        function syncBalance(v) {
+            balance = v;
+            if (lobbyBalance) lobbyBalance.innerText = v;
+            const w = $('walletBalancePage'); if (w) w.innerText = v;
+            const p = $('profileBalancePage'); if (p) p.innerText = v;
+            const g = $('gameBalanceDisplay'); if (g) g.innerText = v;
+        }
 
         // ============================================================
-        //  CONNECT TO GAME (WebSocket-only socket)
+        //  CONNECT TO GAME
         // ============================================================
         async function connectToGame(stake) {
-            if (!isAuthenticated) {
-                await authenticateUser();
-            }
+            if (!isAuthenticated) await authenticateUser();
             currentStake = stake;
             localStorage.setItem('dot_bingo_stake', stake);
-            const initData = tg?.initData;
+            const initData = tg.initData;
             if (!initData) { showToast('Open inside Telegram', 'error'); return; }
+
+            disconnectStakeSocket();   // ✅ no 2nd socket while playing
+
             if (socket) socket.disconnect();
-            socket = io(SOCKET_OPTS);
+            socket = io();
+
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
             socket.on('balanceUpdate', syncBalance);
+
             socket.on('lobbyState', state => {
-                if (state.stake === currentStake) {
-                    selectedCardNumber = null;
-                    selectedNumber.textContent = '-';
-                    showLobby(state.startsIn);
-                    if (state.takenNumbers) updateGrid(state.takenNumbers);
-                    updateCount(state.playersCount);
-                    updateStakeTable(state.stake, state.playersCount);
-                }
+                if (state.stake !== currentStake) return;
+                selectedCardNumber = null;
+                selectedNumber.textContent = '-';
+                showLobby(state.startsIn);
+                if (state.takenNumbers) updateGrid(state.takenNumbers);
+                updateCount(state.playersCount);
+                updateStakeTable(state.stake, state.playersCount);
             });
-            socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true);
-                else renderCard(card, 'lobbyCardPreview', false); });
-            socket.on('cardTaken', data => {
-                if (data.stake !== currentStake) return;
-                // Optimised: server sends only the newly taken number
-                if (typeof data.number === 'number') {
-                    serverTaken.add(data.number);
-                    if (data.number !== selectedCardNumber) displayTaken.add(data.number);
-                } else if (data.takenNumbers) {
-                    serverTaken = new Set(data.takenNumbers);
-                    const disp = new Set(data.takenNumbers);
-                    if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
-                    displayTaken = disp;
-                }
-                paintGrid();
+
+            socket.on('yourCard', card => {
+                userCard = card;
+                if (isGameActive) renderCard(card, 'gameCard', true);
+                else renderCard(card, 'lobbyCardPreview', false);
+            });
+
+            socket.on('cardTaken', d => {
+                if (d.stake !== currentStake) return;
+                serverTaken = new Set(d.takenNumbers);
+                const disp = new Set(d.takenNumbers);
+                if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
+                displayTaken = disp;
+                scheduleGridPaint();
                 updateCount(serverTaken.size);
-                if (pendingSelection && data.number === pendingSelection) {
-                    selectedCardNumber = data.number;
-                    selectedNumber.textContent = data.number;
+                if (pendingSelection && d.number === pendingSelection) {
+                    selectedCardNumber = d.number;
+                    selectedNumber.textContent = d.number;
                     pendingSelection = null;
-                    paintGrid();
+                    scheduleGridPaint();
                     updateBackToLobbyVisibility();
                 }
-                if (pendingRandom && data.number) {
-                    selectedCardNumber = data.number;
-                    selectedNumber.textContent = data.number;
+                if (pendingRandom && d.number) {
+                    selectedCardNumber = d.number;
+                    selectedNumber.textContent = d.number;
                     pendingRandom = false;
-                    paintGrid();
+                    scheduleGridPaint();
                     updateBackToLobbyVisibility();
                 }
             });
-            socket.on('cardSelectionFailed', msg => { showToast(msg, 'error'); if (pendingSelection) { pendingSelection = null;
-                    if (selectedCardNumber) { selectedCardNumber = null;
+
+            socket.on('cardSelectionFailed', msg => {
+                showToast(msg, 'error');
+                if (pendingSelection) {
+                    pendingSelection = null;
+                    if (selectedCardNumber) {
+                        selectedCardNumber = null;
                         selectedNumber.textContent = '-';
-                        paintGrid();
-                        updateBackToLobbyVisibility(); } } if (pendingRandom) pendingRandom = false; });
-            socket.on('playersCount', (data) => {
-                const s = currentStake !== null ? currentStake : parseInt(localStorage.getItem(
-                'dot_bingo_stake'));
-                if (data.stake === s) updateCount(data.count);
-                if (s && winningBalance && !isGameActive) {
-                    winningBalance.innerText = Math.floor(data.count * s * 0.8);
+                        scheduleGridPaint();
+                        updateBackToLobbyVisibility();
+                    }
                 }
-                updateStakeTable(data.stake, data.count);
+                if (pendingRandom) pendingRandom = false;
             });
-            socket.on('gameStarted', data => {
-                if (data.stake !== currentStake) return;
-                if (data?.prizePool) winningBalance.innerText = data.prizePool;
-                if (data?.playersCount) updateCount(data.playersCount);
+
+            socket.on('playersCount', (d) => {
+                const s = currentStake !== null ? currentStake : parseInt(localStorage.getItem('dot_bingo_stake'));
+                if (d.stake === s) updateCount(d.count);
+                if (s && winningBalance && !isGameActive) {
+                    winningBalance.innerText = Math.floor(d.count * s * 0.8);
+                }
+                updateStakeTable(d.stake, d.count);
+            });
+
+            socket.on('gameStarted', d => {
+                if (d.stake !== currentStake) return;
+                if (d?.prizePool) winningBalance.innerText = d.prizePool;
+                if (d?.playersCount) updateCount(d.playersCount);
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
-                if ($('gameIdDisplay')) $('gameIdDisplay').textContent = currentGameId.replace('GAME_', '');
+                const gid = $('gameIdDisplay');
+                if (gid) gid.textContent = currentGameId.replace('GAME_', '');
                 updateBackToLobbyVisibility();
             });
-            socket.on('numberCalled', data => {
-                if (data.stake !== currentStake) return;
-                const num = data.number;
+
+            socket.on('numberCalled', d => {
+                if (d.stake !== currentStake) return;
+                const num = d.number;
                 currentCall.innerText = formatCall(num);
-                const full = data.calledNumbers || [];
+                const full = d.calledNumbers || [];
                 const hist = full.slice(0, -1);
-                calledList.innerText = 'Called: ' + (hist.length ? hist.map(n => formatCall(n)).join(', ') :
-                    '—');
+                calledList.innerText = 'Called: ' + (hist.length ? hist.map(formatCall).join(', ') : '—');
                 scrollEnd();
                 speakAmharic(num);
             });
-            socket.on('markedNumbers', nums => { markedNumbers = nums; paintCardMarks(); });
-            socket.on('gameEnded', data => {
-                if (data.stake !== currentStake) return;
-                if (data.winningNumber) currentCall.innerText = formatCall(data.winningNumber);
-                showWinner(data);
+
+            socket.on('markedNumbers', nums => {
+                markedNumbers = new Set(nums);
+                if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true);
+                else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            });
+
+            socket.on('gameEnded', d => {
+                if (d.stake !== currentStake) return;
+                if (d.winningNumber) currentCall.innerText = formatCall(d.winningNumber);
+                showWinner(d);
                 currentGameId = null;
-                markedNumbers = [];
+                markedNumbers = new Set();
                 if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
                 const container = $('backToLobbyContainer');
                 if (container) container.classList.add('hidden');
             });
+
             socket.on('invalidBingo', () => showToast('❌ Not a valid bingo yet!', 'error'));
-            socket.on('depositStatus', d => showToast(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` :
-                '❌ Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
-            socket.on('withdrawStatus', d => showToast(d.status === 'approved' ?
-                `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.', d.status === 'approved' ? 'success' : 'error'));
+            socket.on('depositStatus', d => showToast(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` : '❌ Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
+            socket.on('withdrawStatus', d => showToast(d.status === 'approved' ? `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.', d.status === 'approved' ? 'success' : 'error'));
         }
 
         // ========== SPEECH ==========
-        function unlockSpeech() { if (speechUnlocked) return;
-            speechUnlocked = true; const d = new SpeechSynthesisUtterance(' ');
+        // ✅ PERF: voices are fetched once and cached instead of on every call
+        let amVoice = null;
+        function loadVoices() {
+            if (!window.speechSynthesis) return;
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices.length) return;
+            amVoice = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am')) || null;
+        }
+        if (window.speechSynthesis) {
+            loadVoices();
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+
+        function unlockSpeech() {
+            if (speechUnlocked) return;
+            speechUnlocked = true;
+            const d = new SpeechSynthesisUtterance(' ');
             d.volume = 0;
             window.speechSynthesis.speak(d);
-            setTimeout(() => window.speechSynthesis.cancel(), 100); }
+            setTimeout(() => window.speechSynthesis.cancel(), 100);
+        }
 
-        function toggleMute() { soundMuted = !soundMuted;
+        function toggleMute() {
+            soundMuted = !soundMuted;
             localStorage.setItem('dot_bingo_sound_muted', soundMuted);
-            updateMute(); if (soundMuted && utterance) { window.speechSynthesis.cancel();
-                utterance = null; }
-            unlockSpeech(); }
+            updateMute();
+            if (soundMuted && utterance) {
+                window.speechSynthesis.cancel();
+                utterance = null;
+            }
+            unlockSpeech();
+        }
 
-        function updateMute() { const btn = $('muteToggleBtn'); if (btn) { btn.textContent = soundMuted ? '🔇' : '🔊';
-                btn.style.background = soundMuted ? 'rgba(255,255,255,0.05)' : 'rgba(251,191,36,0.15)';
-                btn.style.color = soundMuted ? '#94A3B8' : '#FBBF24'; } }
+        function updateMute() {
+            const btn = $('muteToggleBtn');
+            if (!btn) return;
+            btn.textContent = soundMuted ? '🔇' : '🔊';
+            btn.style.background = soundMuted ? 'rgba(255,255,255,0.05)' : 'rgba(251,191,36,0.15)';
+            btn.style.color = soundMuted ? '#94A3B8' : '#FBBF24';
+        }
 
-        function getLetter(n) { if (n <= 15) return "ቢ"; if (n <= 30) return "አይ"; if (n <= 45) return "ኤን"; if (n <= 60)
-                return "ጂ"; return "ኦ"; }
+        function getLetter(n) {
+            if (n <= 15) return "ቢ";
+            if (n <= 30) return "አይ";
+            if (n <= 45) return "ኤን";
+            if (n <= 60) return "ጂ";
+            return "ኦ";
+        }
 
         function getAmharicWord(n) {
             const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"];
             const tens = ["", "አስር", "ሃያ", "ሰላሳ", "አርባ", "ሃምሳ", "ስልሳ", "ሰባ", "ሰማንያ", "ዘጠና"];
             if (n <= 10) { if (n === 10) return "አስር"; return ones[n]; }
             if (n < 20) return "አስር " + (n === 10 ? "" : ones[n - 10]);
-            const ten = Math.floor(n / 10),
-                unit = n % 10;
+            const ten = Math.floor(n / 10), unit = n % 10;
             if (unit === 0) return tens[ten];
             return tens[ten] + " " + ones[unit];
         }
 
         function speakAmharic(n) {
             if (soundMuted || n < 1 || n > 75) return;
-            if (!speechUnlocked) { unlockSpeech();
-                setTimeout(() => speakAmharic(n), 100); return; }
+            if (!speechUnlocked) { unlockSpeech(); setTimeout(() => speakAmharic(n), 100); return; }
+            if (!window.speechSynthesis) return;
             const text = getLetter(n) + " " + getAmharicWord(n);
-            if (window.speechSynthesis) {
-                if (utterance) window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(text);
-                u.lang = 'am-ET';
-                u.rate = 0.85;
-                const voices = window.speechSynthesis.getVoices();
-                const am = voices.find(v => v.lang === 'am-ET' || v.lang.startsWith('am'));
-                if (am) u.voice = am;
-                utterance = u;
-                window.speechSynthesis.speak(u);
-            }
+            if (utterance) window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'am-ET';
+            u.rate = 0.85;
+            if (amVoice) u.voice = amVoice;
+            utterance = u;
+            window.speechSynthesis.speak(u);
         }
 
-        // ========== RESTORE SESSION (near-instant) ==========
+        // ========== RESTORE SESSION ==========
         function restoreSession() {
             const saved = localStorage.getItem('dot_bingo_stake');
-            if (saved) {
-                const s = parseInt(saved);
-                if ([10, 20, 30].includes(s)) {
-                    setTimeout(() => {
-                        if (!socket) connectToGame(s);
-                        else socket.emit('joinLobby', { stake: s });
-                    }, 0);
-                }
+            if (!saved) return;
+            const s = parseInt(saved);
+            if (s === 10 || s === 20 || s === 30) {
+                setTimeout(() => {
+                    if (!socket) connectToGame(s);
+                    else socket.emit('joinLobby', { stake: s });
+                }, 500);
             }
         }
 
         // ========== INIT ==========
         async function init() {
-            if (!checkInviteRequired()) {
-                return;
-            }
-            buildGrid();
+            if (!checkInviteRequired()) return;
+            buildGridOnce();          // ✅ build the 100 cells exactly once
             loadStats();
             updateMute();
-            // Warm the speech engine early so first call isn't delayed
-            if (window.speechSynthesis) {
-                window.speechSynthesis.getVoices();
-                window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-            }
             switchPage('stakePage');
+            connectStakeSocket();     // ✅ only now do we open the public socket
             await authenticateUser();
-            prefetchAdmins();          // background prefetch, no blocking
+            await fetchUserInviteInfo();
             restoreSession();
-            console.log('✨ DOT BINGO ready – optimized.');
+            console.log('✨ DOT BINGO ready – optimized build.');
         }
 
         // ============================================================
         //  EVENT BINDINGS
         // ============================================================
-        $('stake10Btn')?.addEventListener('click', () => { loadStats(); 
-            connectToGame(10);
-            showLobby(30);
-            unlockSpeech(); });
-        $('stake20Btn')?.addEventListener('click', () => { loadStats(); 
-            connectToGame(20);
-            showLobby(30);
-            unlockSpeech(); });
-        $('stake30Btn')?.addEventListener('click', () => { loadStats(); 
-            connectToGame(30);
-            showLobby(30);
-            unlockSpeech(); });
-        $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true;
+        $('stake10Btn')?.addEventListener('click', () => { loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
+        $('stake20Btn')?.addEventListener('click', () => { loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
+        $('stake30Btn')?.addEventListener('click', () => { loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
+
+        $('randomCardBtn')?.addEventListener('click', () => {
+            if (!isGameActive && socket) {
+                pendingRandom = true;
                 socket.emit('newCardNumber');
                 selectedCardNumber = null;
                 selectedNumber.textContent = '⚡ ...';
-                paintGrid();
-                updateBackToLobbyVisibility(); }
-            unlockSpeech(); });
-        $('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo');
-            unlockSpeech(); });
+                scheduleGridPaint();
+                updateBackToLobbyVisibility();
+            }
+            unlockSpeech();
+        });
+
+        $('bingoBtn')?.addEventListener('click', () => {
+            if (socket && isGameActive) socket.emit('claimBingo');
+            unlockSpeech();
+        });
+
         $('muteToggleBtn')?.addEventListener('click', toggleMute);
         $('backToStakeBtn')?.addEventListener('click', goStake);
         $('backToLobbyBtn')?.addEventListener('click', goStake);
@@ -2996,23 +2942,25 @@
                 } else {
                     if (currentPage === 'lobby') $('lobbyPage').classList.add('hidden');
                     else $('gamePage').classList.add('hidden');
-                    if (page === 'history') { switchPage('historyPage'); } else if (page === 'wallet') {
+                    if (page === 'history') {
+                        switchPage('historyPage');
+                        if (statsDirty) updateStatsUI();
+                    } else if (page === 'wallet') {
                         switchPage('walletPage');
-                        syncBalance(balance); } else if (page === 'profile') { switchPage('profilePage');
                         syncBalance(balance);
-                        updateStatsUI();
-                        fetchUserInviteInfo(); }
+                    } else if (page === 'profile') {
+                        switchPage('profilePage');
+                        syncBalance(balance);
+                        fetchUserInviteInfo();
+                    }
                 }
                 unlockSpeech();
             });
         });
 
-        $('backFromHistoryBtn')?.addEventListener('click', () => { resetDepositState();
-            goBack(); });
-        $('backFromWalletBtn')?.addEventListener('click', () => { resetDepositState();
-            goBack(); });
-        $('backFromProfileBtn')?.addEventListener('click', () => { resetDepositState();
-            goBack(); });
+        $('backFromHistoryBtn')?.addEventListener('click', () => { resetDepositState(); goBack(); });
+        $('backFromWalletBtn')?.addEventListener('click', () => { resetDepositState(); goBack(); });
+        $('backFromProfileBtn')?.addEventListener('click', () => { resetDepositState(); goBack(); });
 
         $('depositFromWalletBtn')?.addEventListener('click', openDepositMethods);
         $('withdrawFromWalletBtn')?.addEventListener('click', openWithdrawFlow);
@@ -3021,45 +2969,52 @@
         $('withdrawBtn')?.addEventListener('click', openWithdrawFlow);
         $('withdrawBtnGame')?.addEventListener('click', openWithdrawFlow);
 
-        $('closeMethodListBtn')?.addEventListener('click', () => { if (Object.keys(withdrawMethodMap).length > 0) { $(
-                    'depositMethodListModal').classList.remove('active');
-                resetDepositState(); } else { closeMethodList(); } });
-        $('depositMethodListBackBtn')?.addEventListener('click', () => { if (Object.keys(withdrawMethodMap).length >
-                0) { $('depositMethodListModal').classList.remove('active');
-                resetDepositState(); } else { closeMethodList(); } });
+        $('closeMethodListBtn')?.addEventListener('click', () => {
+            if (Object.keys(withdrawMethodMap).length > 0) {
+                $('depositMethodListModal').classList.remove('active');
+                resetDepositState();
+            } else closeMethodList();
+        });
+        $('depositMethodListBackBtn')?.addEventListener('click', () => {
+            if (Object.keys(withdrawMethodMap).length > 0) {
+                $('depositMethodListModal').classList.remove('active');
+                resetDepositState();
+            } else closeMethodList();
+        });
+
         $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
-        $('paymentCopyBtn')?.addEventListener('click', function() { const el = $('paymentRecipientNumber'); const raw =
-                el.textContent.replace('📞 ', '').trim(); if (raw) copy(raw); });
+        $('paymentCopyBtn')?.addEventListener('click', () => {
+            const el = $('paymentRecipientNumber');
+            const raw = el.textContent.replace('📞 ', '').trim();
+            if (raw) copy(raw);
+        });
         $('howToPayTrigger')?.addEventListener('click', openHowToPay);
         $('closeHowToPayBtn')?.addEventListener('click', closeHowToPay);
-        $('backWithdrawBtn')?.addEventListener('click', () => { $('withdrawDetailsModal').classList.remove('active');
-            openWithdrawFlow(); });
+        $('backWithdrawBtn')?.addEventListener('click', () => {
+            $('withdrawDetailsModal').classList.remove('active');
+            openWithdrawFlow();
+        });
         $('submitWithdrawBtn')?.addEventListener('click', submitWithdraw);
 
-        const rulesModal = $('rulesModal'),
-            closeRules = $('closeRulesBtn');
+        const rulesModal = $('rulesModal'), closeRules = $('closeRulesBtn');
         $('rulesBtn')?.addEventListener('click', () => rulesModal.classList.add('active'));
         $('rulesBtnGame')?.addEventListener('click', () => rulesModal.classList.add('active'));
         closeRules?.addEventListener('click', () => rulesModal.classList.remove('active'));
 
-        document.querySelector('.winner-modal .celebrate-btn')?.addEventListener('click', () => { $('winnerOverlay')
-                .classList.remove('active'); });
+        document.querySelector('.winner-modal .celebrate-btn')?.addEventListener('click', () => {
+            $('winnerOverlay').classList.remove('active');
+        });
 
         document.getElementById('goToBotBtn')?.addEventListener('click', function() {
             const botUsername = 'bingomkmk0120_bot';
-            if (tg && tg.openTelegramLink) {
-                tg.openTelegramLink(`https://t.me/${botUsername}`);
-            } else {
-                window.open(`https://t.me/${botUsername}`, '_blank');
-            }
+            if (tg && tg.openTelegramLink) tg.openTelegramLink(`https://t.me/${botUsername}`);
+            else window.open(`https://t.me/${botUsername}`, '_blank');
         });
 
         // ============================================================
         //  START
         // ============================================================
         init();
-
-        }); // end DOMContentLoaded
     </script>
 </body>
 </html>
