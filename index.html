@@ -141,6 +141,8 @@ input  { font-family: inherit; }
     display: flex;
     align-items: center;
     justify-content: center;
+    /* z-index is set dynamically in JS so the newest modal always
+       wins the stack — no DOM reordering needed. */
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
@@ -200,7 +202,6 @@ input  { font-family: inherit; }
 .btn-secondary { background: var(--bg-soft-2); color: #F1F5F9; border: 1px solid var(--border-strong); }
 .btn-secondary:hover { background: rgba(255,255,255,.15); }
 
-/* Step header (used inside method-list modal) */
 .step-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
 .step-header .back {
     width: 44px; height: 44px;
@@ -220,7 +221,6 @@ input  { font-family: inherit; }
     color: var(--text-dim);
 }
 
-/* Inputs */
 .field { margin: 16px 0; }
 .field label {
     display: block;
@@ -256,7 +256,6 @@ input  { font-family: inherit; }
     border: 1px solid rgba(251,191,36,.2);
 }
 
-/* Deposit step cards */
 .step {
     background: rgba(15,23,42,.5);
     border-radius: var(--r-xl);
@@ -301,7 +300,6 @@ input  { font-family: inherit; }
 
 .how-to-link { color: var(--accent); text-decoration: underline; cursor: pointer; font-size: .75rem; }
 
-/* Method list */
 .method-list { max-height: 380px; overflow-y: auto; padding: 4px 0; }
 .method-item {
     display: flex;
@@ -702,7 +700,7 @@ input  { font-family: inherit; }
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
+    z-index: 3000;
     opacity: 0;
     visibility: hidden;
     transition: opacity .2s ease, visibility .2s;
@@ -1407,8 +1405,8 @@ const state = {
     speechUnlocked: false,
     utterance: null,
     depositAdmins: [],
-    methodMode: null,           // 'deposit' | 'withdraw'
-    selectedMethod: null,       // { type, adminId, number }
+    methodMode: null,
+    selectedMethod: null,
     pendingAmount: 0,
     savedPhone: '',
     savedAmount: '',
@@ -1439,25 +1437,27 @@ function switchPage(id) {
     next.classList.remove('hidden');
 }
 
-/* ✅ FIXED: synchronous, reliable, no rAF race, no stack reorder.
-   - Applies `.active` immediately so it can never be lost.
-   - Only moves the modal in the DOM if it isn't already last.
-   - Browsers still animate the CSS transition because the class
-     change happens in a single synchronous batch. */
-function transitionModal(closeId, openId) {
-    if (closeId) $(closeId)?.classList.remove('active');
-    if (!openId) return;
+/* ✅ Z-INDEX BASED MODAL TRANSITIONS
+   Every time a modal opens, it gets a fresh z-index higher than any
+   modal that came before it. No DOM reordering, no rAF, no race
+   conditions — CSS stacking order is deterministic and the class
+   change is applied synchronously so it can never be lost. */
+let modalZ = 2000;
 
+function transitionModal(closeId, openId) {
+    // 1. Close the outgoing modal
+    if (closeId) {
+        const closeEl = $(closeId);
+        if (closeEl) closeEl.classList.remove('active');
+    }
+
+    // 2. Open the incoming modal — always on top of whatever is below
+    if (!openId) return;
     const openEl = $(openId);
     if (!openEl) return;
 
-    // Bring to end of body only when needed (avoids stack reordering
-    // on rapid back-and-forth navigation).
-    if (openEl.parentNode === document.body &&
-        document.body.lastElementChild !== openEl) {
-        document.body.appendChild(openEl);
-    }
-
+    modalZ++;
+    openEl.style.zIndex = String(modalZ);
     openEl.classList.add('active');
     unlockSpeech();
 }
@@ -1678,6 +1678,9 @@ async function openDeposit() {
         if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
     });
     renderMethodList(methods, 'deposit');
+    // Method list also gets a fresh z-index so it renders above other modals
+    modalZ++;
+    $('methodListModal').style.zIndex = String(modalZ);
     $('methodListModal').classList.add('active');
     unlockSpeech();
 }
@@ -1697,19 +1700,18 @@ async function openWithdraw() {
         return { type, adminId, number: admin?.[type] || '' };
     });
     renderMethodList(methods, 'withdraw');
+    modalZ++;
+    $('methodListModal').style.zIndex = String(modalZ);
     $('methodListModal').classList.add('active');
     unlockSpeech();
 }
 
-/* ✅ Simplified — state.selectedMethod is already set by the caller. */
 function openWithdrawDetails(method, number) {
     $('withdrawTitle').innerHTML = `Withdraw via ${METHOD_LABELS[method] || method}`;
     $('withdrawPhone').placeholder = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
     unlockSpeech();
 }
 
-/* ✅ FIXED: null guard + no silent TypeError. If method is lost,
-   send the user back to the picker instead of doing nothing. */
 function requestDeposit() {
     const phone  = $('depositPhone')?.value.trim()  || '';
     const amount = $('depositAmount')?.value.trim() || '';
@@ -1741,17 +1743,14 @@ function requestDeposit() {
     transitionModal('depositDetailsModal', 'paymentModal');
 }
 
-/* ✅ FIXED: bring how-to-pay modal to the top of the stack. */
 function openHowToPay() {
     const method = state.selectedMethod?.type || 'telebirr';
     $('howToPayMethod').textContent = METHOD_LABELS[method] || method;
     $('howToPayContent').innerHTML = getPaymentInstructions(method);
 
     const el = $('howToPayModal');
-    if (el.parentNode === document.body &&
-        document.body.lastElementChild !== el) {
-        document.body.appendChild(el);
-    }
+    modalZ++;
+    el.style.zIndex = String(modalZ);
     el.classList.add('active');
     unlockSpeech();
 }
@@ -2453,8 +2452,16 @@ $('paymentCopyBtn').addEventListener('click', () => {
 $('submitWithdrawBtn').addEventListener('click', submitWithdraw);
 
 // rules
-$('rulesBtn').addEventListener('click', () => $('rulesModal').classList.add('active'));
-$('rulesBtnGame').addEventListener('click', () => $('rulesModal').classList.add('active'));
+$('rulesBtn').addEventListener('click', () => {
+    modalZ++;
+    $('rulesModal').style.zIndex = String(modalZ);
+    $('rulesModal').classList.add('active');
+});
+$('rulesBtnGame').addEventListener('click', () => {
+    modalZ++;
+    $('rulesModal').style.zIndex = String(modalZ);
+    $('rulesModal').classList.add('active');
+});
 $('closeRulesBtn').addEventListener('click', () => $('rulesModal').classList.remove('active'));
 
 // winner celebrate
