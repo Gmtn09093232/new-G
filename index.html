@@ -57,10 +57,6 @@
     --r-xl: 24px;
     --r-2xl: 32px;
     --r-pill: 60px;
-
-    --t-fast: 0.12s;
-    --t-med:  0.16s;
-    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ============================================================
@@ -1519,7 +1515,7 @@ function connectStakeSocket() {
     stakeSocket = io('/public');
     stakeSocket.on('playersCount', d => updateStakeTable(d.stake, d.count));
     stakeSocket.on('lobbyState',  s => updateStakeTable(s.stake, s.playersCount));
-    stakeSocket.on('balanceUpdate', syncBalance); // Listen for balance updates on public socket
+    stakeSocket.on('balanceUpdate', syncBalance);
 }
 function disconnectStakeSocket() {
     if (!stakeSocket) return;
@@ -1783,7 +1779,6 @@ async function submitDeposit() {
     btn.disabled = true;
     btn.innerText = '⏳ Uploading...';
 
-    // Convert image to Base64
     const reader = new FileReader();
     reader.readAsDataURL(file);
     
@@ -1799,14 +1794,13 @@ async function submitDeposit() {
                     amount: state.pendingAmount,
                     payment_type: state.selectedMethod.type,
                     admin_id: state.selectedMethod.adminId,
-                    transaction_reference: base64Image // Sending image data instead of invoice text
+                    transaction_reference: base64Image
                 })
             });
             const d = await r.json();
             if (d.success) {
                 toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
                 resetDepositState();
-                // Refresh balance
                 if (socket) socket.emit('getBalance');
                 else fetchBalance();
             } else {
@@ -1860,7 +1854,6 @@ async function submitWithdraw() {
             toast('✅ Withdrawal request submitted!', 'success');
             $('withdrawModal').classList.remove('active');
             resetDepositState();
-            // Refresh balance
             if (socket) socket.emit('getBalance');
             else fetchBalance();
         } else {
@@ -1995,7 +1988,6 @@ function updateCount(c) {
 }
 
 function updateBackToLobbyVisibility() {
-    // ✅ Back to Lobby is only shown while a game is active (game page)
     $('backToLobbyContainer')?.classList.toggle('hidden', !state.isGameActive);
 }
 
@@ -2055,6 +2047,9 @@ function goStake() {
     switchPage('stakePage');
     $('selectedNumber').textContent = '-';
     $('backToLobbyContainer')?.classList.add('hidden');
+    // ✅ FIX 4: Clear both card previews when returning to stake page
+    renderCard([], 'lobbyCardPreview', false);
+    renderCard([], 'gameCard', false);
     paintGrid();
     connectStakeSocket();
     unlockSpeech();
@@ -2070,30 +2065,25 @@ function showWinner(d) {
     const each = d.prizeEach || 0;
 
     $('winTitle').innerHTML = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
-    
-    // ✅ Modified to strictly display the card number sent by the server.
+
     $('winListContainer').innerHTML = winners.map((w, index) => {
         let cardNum = null;
-        
-        // Check if server sent an array of card numbers
+
         if (Array.isArray(d.winnerCards) && d.winnerCards[index] !== undefined) {
             cardNum = d.winnerCards[index];
-        } 
-        // Check if server sent a single card number
-        else if (d.winnerCard !== undefined) {
+        } else if (Array.isArray(d.winnerCardNumbers) && d.winnerCardNumbers[index] !== undefined) {
+            cardNum = d.winnerCardNumbers[index];
+        } else if (d.winnerCard !== undefined) {
             cardNum = d.winnerCard;
-        }
-        // Check if the winner object itself contains the card number
-        else if (typeof w === 'object' && w !== null && w.card !== undefined) {
-            cardNum = w.card;
-        }
-        // Fallback: If it's the current user, use their locally selected card
-        else if (w === $('profileUsername').innerText || w === 'You' || w === tg?.initDataUnsafe?.user?.first_name) {
+        } else if (typeof w === 'object' && w !== null) {
+            if (w.card !== undefined) cardNum = w.card;
+            else if (w.cardNumber !== undefined) cardNum = w.cardNumber;
+            else if (w.number !== undefined) cardNum = w.number;
+        } else if (w === $('profileUsername').innerText || w === 'You' || w === tg?.initDataUnsafe?.user?.first_name) {
             cardNum = state.selectedCard;
         }
 
-        // If we successfully found a card number, display it. Otherwise, display the winner identifier.
-        const displayText = cardNum ? `card #${cardNum}` : w;
+        const displayText = cardNum ? `card #${cardNum}` : `card #?`;
         return `<span class="winner-badge">${displayText}</span>`;
     }).join('');
 
@@ -2169,9 +2159,8 @@ function syncBalance(v) {
     set('walletBalance', v);
     set('profileBalance', v);
     set('gameBalance', v);
-    set('stakeBalance', v); // Added this line
+    set('stakeBalance', v);
 
-    // ✅ NEW: verify stake affordability right after joining a lobby
     if (state.awaitingStakeCheck) {
         state.awaitingStakeCheck = false;
         if (state.stake && v < state.stake) {
@@ -2188,7 +2177,7 @@ async function connectToGame(stake) {
     if (!tg?.initData) return toast('Open inside Telegram', 'error');
 
     state.stake = stake;
-    state.awaitingStakeCheck = true; // ✅ NEW
+    state.awaitingStakeCheck = true;
     localStorage.setItem('dot_bingo_stake', stake);
     disconnectStakeSocket();
 
@@ -2198,7 +2187,6 @@ async function connectToGame(stake) {
     socket.on('connect', () => socket.emit('joinLobby', { stake }));
     socket.on('balanceUpdate', syncBalance);
 
-    // ✅ NEW: server-side rejection handling
     socket.on('insufficientBalance', () => {
         state.awaitingStakeCheck = false;
         toast(t('insufficientBalance'), 'error');
@@ -2207,9 +2195,14 @@ async function connectToGame(stake) {
 
     socket.on('lobbyState', s => {
         if (s.stake !== stake) return;
+        // ✅ FIX 3: Clear previous card and marks when a new lobby opens
         state.selectedCard = null;
+        state.userCard = [];
+        state.markedNumbers = new Set();
         $('selectedNumber').textContent = '-';
         showLobby(s.startsIn);
+        renderCard([], 'lobbyCardPreview', false);
+        renderCard([], 'gameCard', false);
         if (s.takenNumbers) updateGrid(s.takenNumbers);
         updateCount(s.playersCount);
     });
@@ -2275,11 +2268,23 @@ async function connectToGame(stake) {
         state.currentGameId = null;
         state.markedNumbers = new Set();
         if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
-        // ✅ keep "Back to Lobby" visible after the round ends
         updateBackToLobbyVisibility();
     });
 
     socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
+
+    // ✅ FIX 1: Handle card selection failure (e.g., insufficient balance)
+    socket.on('cardSelectionFailed', (msg) => {
+        toast('❌ ' + (msg || t('insufficientBalance')), 'error');
+        if (state.selectedCard !== null) {
+            state.serverTaken.delete(state.selectedCard);
+            state.displayTaken.delete(state.selectedCard);
+            state.selectedCard = null;
+            $('selectedNumber').textContent = '-';
+            paintGrid();
+        }
+    });
+
     socket.on('depositStatus',  d => toast(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` : '❌ Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
     socket.on('withdrawStatus', d => toast(d.status === 'approved' ? `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.', d.status === 'approved' ? 'success' : 'error'));
 }
@@ -2382,7 +2387,6 @@ document.querySelectorAll('.stake-option').forEach(btn => {
         loadStats();
         const stake = parseInt(btn.dataset.stake, 10);
 
-        // ✅ NEW: block low-balance players
         if (state.balanceLoaded && state.balance < stake) {
             toast(t('insufficientBalance'), 'error');
             return;
@@ -2398,6 +2402,13 @@ document.querySelectorAll('.stake-option').forEach(btn => {
 $('numberGrid').addEventListener('click', e => {
     const cell = e.target.closest('.grid-cell');
     if (!cell || state.isGameActive || !socket) return;
+
+    // ✅ FIX 2: Block selection when the player cannot afford the stake
+    if (state.balanceLoaded && state.stake && state.balance < state.stake) {
+        toast(t('insufficientBalance'), 'error');
+        return;
+    }
+
     const i = Number(cell.dataset.number);
     if (state.displayTaken.has(i) || state.serverTaken.has(i)) return;
     if (state.selectedCard !== null && state.selectedCard !== i) {
@@ -2498,7 +2509,6 @@ $('rulesBtn').addEventListener('click', () => {
     $('rulesModal').style.zIndex = String(modalZ);
     $('rulesModal').classList.add('active');
 });
-// Safely guarded rules button for game page (removed from HTML)
 const rulesBtnGame = $('rulesBtnGame');
 if (rulesBtnGame) {
     rulesBtnGame.addEventListener('click', () => {
@@ -2532,13 +2542,11 @@ async function init() {
     loadStats();
     updateMute();
     applyLang();
-    switchPage('stakePage'); // Always opens to the stake/lobby page
+    switchPage('stakePage');
     connectStakeSocket();
     await authenticate();
     await fetchInvite();
-    await fetchBalance(); // Ensure balance is fetched on load
-    
-    // Removed auto-join logic here so the app always opens to the lobby page.
+    await fetchBalance();
 }
 
 init();
@@ -2547,7 +2555,6 @@ init();
    15. MODERN ICON REPLACEMENT (Font Awesome Solid)
    ============================================================ */
 (function () {
-  // Mapping of emojis used in the app to Font Awesome Solid classes
   const EMOJI_MAP = {
     '🔑': 'fa-solid fa-key',
     '🚀': 'fa-solid fa-rocket',
@@ -2643,7 +2650,6 @@ init();
       replaceEmojisInTextNode(node);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const tag = node.tagName.toLowerCase();
-      // Skip scripts, styles, svgs, and already replaced icons
       if (['script', 'style', 'svg', 'path', 'i'].includes(tag)) return;
       Array.from(node.childNodes).forEach(replaceEmojisInNode);
     }
@@ -2659,7 +2665,6 @@ init();
     runReplacement();
   }
 
-  // Watch for dynamically added content (modals, toasts, game updates)
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       if (m.type === 'childList') {
