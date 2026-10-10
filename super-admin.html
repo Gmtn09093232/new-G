@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Super Admin · Dashboard</title>
+    <!-- FontAwesome CDN for solid, clean icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         /* ─── RESET ─── */
         * {
@@ -23,18 +25,15 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* ─── FAST TRANSITIONS ─── */
+        button, .btn, .tab-btn, .stat-card, .refresh-btn-header, .modal-close, .mini-pagination button {
+            transition: all 0.1s ease !important;
+        }
+
         /* ─── SCROLLBAR ─── */
-        ::-webkit-scrollbar {
-            width: 4px;
-            height: 4px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 20px;
-        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; }
 
         /* ─── HEADER ─── */
         .header {
@@ -56,1412 +55,607 @@
             flex-wrap: wrap;
             gap: 10px;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
         .header-left .logo-icon {
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             background: rgba(255, 255, 255, 0.18);
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             font-size: 20px;
             backdrop-filter: blur(4px);
             border: 1px solid rgba(255, 255, 255, 0.10);
             font-weight: 700;
         }
-        .header-left h1 {
-            font-size: 20px;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-        }
+        .header-left .logo-icon i { color: #fff; }
+        .header-left h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
         .header-left .subtitle {
-            font-size: 11px;
-            opacity: 0.80;
-            font-weight: 400;
-            margin-top: 2px;
-            letter-spacing: 0.2px;
+            font-size: 11px; opacity: 0.80; font-weight: 400;
+            margin-top: 2px; letter-spacing: 0.2px;
         }
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .header-right { display: flex; align-items: center; gap: 12px; }
         .header-right .admin-badge {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(4px);
-            padding: 6px 16px;
-            border-radius: 40px;
-            font-size: 11px;
-            font-weight: 500;
+            padding: 6px 16px; border-radius: 40px;
+            font-size: 11px; font-weight: 500;
             border: 1px solid rgba(255, 255, 255, 0.08);
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: flex; align-items: center; gap: 6px;
             letter-spacing: 0.2px;
         }
-        .header-right .admin-badge span {
-            opacity: 0.75;
-        }
+        .header-right .admin-badge span { opacity: 0.75; }
         .refresh-btn-header {
             background: rgba(255, 255, 255, 0.13);
             border: 1px solid rgba(255, 255, 255, 0.08);
             color: #fff;
-            padding: 8px 14px;
-            border-radius: 40px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: 0.2s;
+            padding: 8px 14px; border-radius: 40px;
+            cursor: pointer; font-size: 16px;
             backdrop-filter: blur(4px);
             min-height: 42px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: flex; align-items: center; gap: 6px;
             font-weight: 500;
         }
+        .refresh-btn-header i { font-size: 14px; }
         .refresh-btn-header:active {
             transform: scale(0.94);
             background: rgba(255, 255, 255, 0.25);
         }
-        .refresh-btn-header .label {
-            font-size: 12px;
-            font-weight: 500;
-            opacity: 0.85;
-        }
+        .refresh-btn-header .label { font-size: 12px; font-weight: 500; opacity: 0.85; }
         @media (max-width: 480px) {
-            .refresh-btn-header .label {
-                display: none;
-            }
-            .header-left h1 {
-                font-size: 17px;
-            }
-            .header-left .logo-icon {
-                width: 34px;
-                height: 34px;
-                font-size: 16px;
-            }
-            .header-right .admin-badge {
-                font-size: 10px;
-                padding: 4px 12px;
-            }
+            .refresh-btn-header .label { display: none; }
+            .header-left h1 { font-size: 17px; }
+            .header-left .logo-icon { width: 34px; height: 34px; font-size: 16px; }
+            .header-right .admin-badge { font-size: 10px; padding: 4px 12px; }
         }
 
         /* ─── CONTAINER ─── */
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 16px 16px 20px;
-        }
+        .container { max-width: 1280px; margin: 0 auto; padding: 16px 16px 20px; }
 
         /* ─── FILTER BAR ─── */
         .filter-bar {
-            background: #fff;
-            border-radius: 16px;
-            padding: 16px 20px;
+            background: #fff; border-radius: 16px; padding: 16px 20px;
             margin-bottom: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.02);
             border: 1px solid rgba(226, 232, 240, 0.50);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            display: flex; flex-direction: column; gap: 12px;
         }
-        .filter-bar .row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: flex-end;
-        }
-        .filter-bar .filter-group {
-            flex: 1 1 160px;
-            min-width: 140px;
-        }
+        .filter-bar .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .filter-bar .filter-group { flex: 1 1 160px; min-width: 140px; }
         .filter-bar .filter-group label {
-            display: block;
-            font-size: 11px;
-            font-weight: 600;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin-bottom: 4px;
+            display: block; font-size: 11px; font-weight: 600; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;
         }
         .filter-bar .filter-group input,
         .filter-bar .filter-group select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 14px;
-            background: #fafcff;
-            transition: 0.2s;
-            min-height: 44px;
-            color: #0b1120;
-            font-weight: 500;
-            outline: none;
+            width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0;
+            border-radius: 10px; font-size: 14px; background: #fafcff;
+            min-height: 44px; color: #0b1120; font-weight: 500; outline: none;
         }
         .filter-bar .filter-group input:focus,
         .filter-bar .filter-group select:focus {
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
-            background: #fff;
+            border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10); background: #fff;
         }
-        .filter-bar .btn-group {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+        .filter-bar .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .btn {
-            padding: 10px 22px;
-            border-radius: 10px;
-            border: none;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            touch-action: manipulation;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            transition: 0.2s;
-            letter-spacing: 0.2px;
+            padding: 10px 22px; border-radius: 10px; border: none;
+            font-weight: 600; font-size: 14px; cursor: pointer;
+            touch-action: manipulation; min-height: 44px;
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 6px; letter-spacing: 0.2px;
         }
-        .btn:active {
-            transform: scale(0.95);
-        }
-        .btn-primary {
-            background: linear-gradient(145deg, #7c3aed, #6d28d9);
-            color: #fff;
-            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25);
-        }
-        .btn-primary:active {
-            box-shadow: 0 1px 6px rgba(124, 58, 237, 0.15);
-        }
-        .btn-outline {
-            background: transparent;
-            border: 1.5px solid #e2e8f0;
-            color: #475569;
-        }
-        .btn-outline:active {
-            background: #f1f5f9;
-        }
-        .btn-success {
-            background: #10b981;
-            color: #fff;
-        }
-        .btn-success:active {
-            background: #059669;
-        }
-        .btn-danger {
-            background: #ef4444;
-            color: #fff;
-        }
-        .btn-danger:active {
-            background: #dc2626;
-        }
-        .btn-warning {
-            background: #f59e0b;
-            color: #fff;
-        }
-        .btn-warning:active {
-            background: #d97706;
-        }
-        .btn-sm {
-            padding: 6px 14px;
-            font-size: 13px;
-            min-height: 36px;
-            border-radius: 8px;
-        }
-        .btn-ghost {
-            background: transparent;
-            color: #7c3aed;
-            border: 1.5px solid #7c3aed;
-        }
-        .btn-ghost:active {
-            background: #7c3aed;
-            color: #fff;
-        }
-        .btn-xs {
-            padding: 4px 10px;
-            font-size: 11px;
-            min-height: 28px;
-            border-radius: 6px;
-        }
-        .btn-indigo {
-            background: #6366f1;
-            color: #fff;
-        }
-        .btn-indigo:active {
-            background: #4f46e5;
-        }
-        .btn-rose {
-            background: #f43f5e;
-            color: #fff;
-        }
-        .btn-rose:active {
-            background: #e11d48;
-        }
-        .btn-teal {
-            background: #14b8a6;
-            color: #fff;
-        }
-        .btn-teal:active {
-            background: #0d9488;
-        }
+        .btn:active { transform: scale(0.95); }
+        .btn i { font-size: 14px; }
+        .btn-primary { background: linear-gradient(145deg, #7c3aed, #6d28d9); color: #fff; box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25); }
+        .btn-primary:active { box-shadow: 0 1px 6px rgba(124, 58, 237, 0.15); }
+        .btn-outline { background: transparent; border: 1.5px solid #e2e8f0; color: #475569; }
+        .btn-outline:active { background: #f1f5f9; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:active { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:active { background: #dc2626; }
+        .btn-warning { background: #f59e0b; color: #fff; }
+        .btn-warning:active { background: #d97706; }
+        .btn-sm { padding: 6px 14px; font-size: 13px; min-height: 36px; border-radius: 8px; }
+        .btn-ghost { background: transparent; color: #7c3aed; border: 1.5px solid #7c3aed; }
+        .btn-ghost:active { background: #7c3aed; color: #fff; }
+        .btn-xs { padding: 4px 10px; font-size: 11px; min-height: 28px; border-radius: 6px; }
+        .btn-indigo { background: #6366f1; color: #fff; }
+        .btn-indigo:active { background: #4f46e5; }
+        .btn-rose { background: #f43f5e; color: #fff; }
+        .btn-rose:active { background: #e11d48; }
+        .btn-teal { background: #14b8a6; color: #fff; }
+        .btn-teal:active { background: #0d9488; }
 
         /* ─── STATS GRID ─── */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
         .stat-card {
-            background: #fff;
-            padding: 18px 16px;
-            border-radius: 16px;
+            background: #fff; padding: 18px 16px; border-radius: 16px;
             border: 1px solid rgba(226, 232, 240, 0.40);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            transition: 0.25s ease;
-            display: flex;
-            align-items: center;
-            gap: 14px;
+            display: flex; align-items: center; gap: 14px;
         }
-        .stat-card:hover {
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-            border-color: #e2e8f0;
-        }
+        .stat-card:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); border-color: #e2e8f0; }
         .stat-card .stat-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            flex-shrink: 0;
-            font-weight: 700;
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; flex-shrink: 0; font-weight: 700;
         }
-        .stat-card .stat-icon.blue {
-            background: #eff6ff;
-            color: #3b82f6;
-        }
-        .stat-card .stat-icon.green {
-            background: #ecfdf5;
-            color: #10b981;
-        }
-        .stat-card .stat-icon.orange {
-            background: #fffbeb;
-            color: #f59e0b;
-        }
-        .stat-card .stat-icon.purple {
-            background: #f5f3ff;
-            color: #8b5cf6;
-        }
-        .stat-card .stat-icon.red {
-            background: #fef2f2;
-            color: #ef4444;
-        }
-        .stat-card .stat-icon.indigo {
-            background: #eef2ff;
-            color: #6366f1;
-        }
-        .stat-card .stat-info {
-            flex: 1;
-            min-width: 0;
-        }
+        .stat-card .stat-icon i { color: inherit; }
+        .stat-card .stat-icon.blue { background: #eff6ff; color: #3b82f6; }
+        .stat-card .stat-icon.green { background: #ecfdf5; color: #10b981; }
+        .stat-card .stat-icon.orange { background: #fffbeb; color: #f59e0b; }
+        .stat-card .stat-icon.purple { background: #f5f3ff; color: #8b5cf6; }
+        .stat-card .stat-icon.red { background: #fef2f2; color: #ef4444; }
+        .stat-card .stat-icon.indigo { background: #eef2ff; color: #6366f1; }
+        .stat-card .stat-info { flex: 1; min-width: 0; }
         .stat-card .stat-info .label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
+            font-size: 11px; font-weight: 600; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 0.4px;
         }
         .stat-card .stat-info .value {
-            font-size: 22px;
-            font-weight: 700;
-            color: #0b1120;
-            line-height: 1.3;
-            margin-top: 1px;
-            letter-spacing: -0.3px;
+            font-size: 22px; font-weight: 700; color: #0b1120;
+            line-height: 1.3; margin-top: 1px; letter-spacing: -0.3px;
         }
-        .stat-card .stat-info .value .currency {
-            font-size: 13px;
-            font-weight: 500;
-            color: #94a3b8;
-            margin-left: 2px;
-        }
+        .stat-card .stat-info .value .currency { font-size: 13px; font-weight: 500; color: #94a3b8; margin-left: 2px; }
 
         @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-            }
-            .stat-card {
-                padding: 14px 12px;
-            }
-            .stat-card .stat-info .value {
-                font-size: 18px;
-            }
-            .stat-card .stat-icon {
-                width: 38px;
-                height: 38px;
-                font-size: 16px;
-            }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stat-card { padding: 14px 12px; }
+            .stat-card .stat-info .value { font-size: 18px; }
+            .stat-card .stat-icon { width: 38px; height: 38px; font-size: 16px; }
         }
         @media (max-width: 480px) {
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-            .stat-card {
-                padding: 12px 10px;
-                gap: 10px;
-            }
-            .stat-card .stat-info .value {
-                font-size: 16px;
-            }
-            .stat-card .stat-icon {
-                width: 34px;
-                height: 34px;
-                font-size: 14px;
-            }
-            .stat-card .stat-info .label {
-                font-size: 9px;
-            }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stat-card { padding: 12px 10px; gap: 10px; }
+            .stat-card .stat-info .value { font-size: 16px; }
+            .stat-card .stat-icon { width: 34px; height: 34px; font-size: 14px; }
+            .stat-card .stat-info .label { font-size: 9px; }
         }
-        @media (min-width: 1024px) {
-            .stats-grid {
-                grid-template-columns: repeat(6, 1fr);
-            }
-        }
+        @media (min-width: 1024px) { .stats-grid { grid-template-columns: repeat(6, 1fr); } }
 
         /* ─── TABS ─── */
         .tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 16px;
-            background: #fff;
-            padding: 4px;
-            border-radius: 14px;
+            display: flex; gap: 4px; margin-bottom: 16px;
+            background: #fff; padding: 4px; border-radius: 14px;
             border: 1px solid rgba(226, 232, 240, 0.40);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-            flex-wrap: nowrap;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; flex-wrap: nowrap;
         }
-        .tabs::-webkit-scrollbar {
-            display: none;
-        }
+        .tabs::-webkit-scrollbar { display: none; }
         .tab-btn {
-            padding: 10px 18px;
-            border: none;
-            background: transparent;
-            border-radius: 10px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-            color: #64748b;
-            transition: 0.2s;
-            white-space: nowrap;
-            flex-shrink: 0;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            touch-action: manipulation;
+            padding: 10px 18px; border: none; background: transparent;
+            border-radius: 10px; cursor: pointer; font-weight: 600;
+            font-size: 14px; color: #64748b; white-space: nowrap;
+            flex-shrink: 0; min-height: 44px; display: flex;
+            align-items: center; gap: 8px; touch-action: manipulation;
         }
-        .tab-btn:active {
-            transform: scale(0.95);
-        }
+        .tab-btn i { font-size: 16px; }
+        .tab-btn:active { transform: scale(0.95); }
         .tab-btn.active {
             background: linear-gradient(145deg, #7c3aed, #6d28d9);
-            color: #fff;
-            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25);
+            color: #fff; box-shadow: 0 2px 12px rgba(124, 58, 237, 0.25);
         }
         .tab-btn .badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            background: #ef4444;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 0 8px;
-            border-radius: 20px;
-            min-width: 20px;
-            height: 20px;
-            line-height: 20px;
-            text-align: center;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: #ef4444; color: #fff; font-size: 11px; font-weight: 700;
+            padding: 0 8px; border-radius: 20px; min-width: 20px; height: 20px;
+            line-height: 20px; text-align: center;
         }
-        .tab-btn.active .badge {
-            background: rgba(255, 255, 255, 0.25);
-            color: #fff;
-        }
+        .tab-btn.active .badge { background: rgba(255, 255, 255, 0.25); color: #fff; }
 
         /* ─── TAB CONTENT ─── */
         .tab-content {
-            background: #fff;
-            border-radius: 16px;
-            padding: 20px;
+            background: #fff; border-radius: 16px; padding: 20px;
             border: 1px solid rgba(226, 232, 240, 0.40);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-            min-height: 280px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); min-height: 280px;
         }
-        .tab-pane {
-            display: none;
-            animation: fadeSlide 0.30s ease;
-        }
-        .tab-pane.active {
-            display: block;
-        }
+        .tab-pane { display: none; animation: fadeSlide 0.15s ease; }
+        .tab-pane.active { display: block; }
         @keyframes fadeSlide {
-            from {
-                opacity: 0;
-                transform: translateY(8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .tab-pane h2 {
-            font-size: 18px;
-            font-weight: 700;
-            color: #0b1120;
-            margin-bottom: 16px;
-            letter-spacing: -0.2px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-size: 18px; font-weight: 700; color: #0b1120;
+            margin-bottom: 16px; letter-spacing: -0.2px;
+            display: flex; align-items: center; gap: 8px;
         }
-        .tab-pane h2 .sub {
-            font-size: 13px;
-            font-weight: 400;
-            color: #94a3b8;
-        }
+        .tab-pane h2 i { color: #7c3aed; }
+        .tab-pane h2 .sub { font-size: 13px; font-weight: 400; color: #94a3b8; }
 
         /* ─── TABLES ─── */
         .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin: 0 -4px;
-            padding: 0 4px;
-            border-radius: 12px;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            margin: 0 -4px; padding: 0 4px; border-radius: 12px;
         }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-            min-width: 600px;
-        }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; }
         table th {
-            background: #f8fafc;
-            text-align: left;
-            padding: 12px 14px;
-            font-weight: 600;
-            color: #475569;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            border-bottom: 2px solid #e2e8f0;
-            white-space: nowrap;
+            background: #f8fafc; text-align: left; padding: 12px 14px;
+            font-weight: 600; color: #475569; font-size: 11px;
+            text-transform: uppercase; letter-spacing: 0.4px;
+            border-bottom: 2px solid #e2e8f0; white-space: nowrap;
         }
         table td {
-            padding: 12px 14px;
-            border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle;
-            font-size: 14px;
-            color: #1e293b;
+            padding: 12px 14px; border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle; font-size: 14px; color: #1e293b;
         }
-        table tbody tr:hover {
-            background: #fafcff;
-        }
-        table tbody tr:last-child td {
-            border-bottom: none;
-        }
+        table tbody tr:hover { background: #fafcff; }
+        table tbody tr:last-child td { border-bottom: none; }
 
         /* ─── BADGES ─── */
         .status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 3px 12px;
-            border-radius: 40px;
-            font-size: 12px;
-            font-weight: 600;
-            white-space: nowrap;
-            gap: 4px;
-            letter-spacing: 0.2px;
+            display: inline-flex; align-items: center;
+            padding: 3px 12px; border-radius: 40px;
+            font-size: 12px; font-weight: 600; white-space: nowrap;
+            gap: 4px; letter-spacing: 0.2px;
         }
-        .status-badge.pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .status-badge.approved {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .status-badge.rejected {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        .status-badge.active {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .status-badge.inactive {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        .status-badge.completed {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        .status-badge.banned {
-            background: #fef2f2;
-            color: #991b1b;
-        }
+        .status-badge.pending { background: #fef3c7; color: #92400e; }
+        .status-badge.approved { background: #d1fae5; color: #065f46; }
+        .status-badge.rejected { background: #fee2e2; color: #991b1b; }
+        .status-badge.active { background: #d1fae5; color: #065f46; }
+        .status-badge.inactive { background: #fee2e2; color: #991b1b; }
+        .status-badge.completed { background: #dbeafe; color: #1e40af; }
+        .status-badge.banned { background: #fef2f2; color: #991b1b; }
 
         /* ─── ADMIN CARDS ─── */
         .admin-card {
-            background: #fafcff;
-            border-radius: 14px;
-            padding: 18px 20px;
-            margin-bottom: 14px;
-            border: 1px solid #eef2f6;
-            transition: 0.2s;
+            background: #fafcff; border-radius: 14px; padding: 18px 20px;
+            margin-bottom: 14px; border: 1px solid #eef2f6;
         }
-        .admin-card:hover {
-            border-color: #dbe4f0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-        }
+        .admin-card:hover { border-color: #dbe4f0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02); }
         .admin-card .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 8px;
+            display: flex; justify-content: space-between;
+            align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
         }
         .admin-card .admin-name {
-            font-weight: 700;
-            font-size: 16px;
-            color: #0b1120;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-weight: 700; font-size: 16px; color: #0b1120;
+            display: flex; align-items: center; gap: 8px;
         }
         .admin-card .admin-name .avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+            width: 32px; height: 32px; border-radius: 50%;
             background: linear-gradient(145deg, #7c3aed, #a855f7);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
+            color: #fff; display: flex; align-items: center;
+            justify-content: center; font-weight: 700;
+            font-size: 14px; flex-shrink: 0;
         }
-        .admin-card .admin-phone {
-            font-size: 13px;
-            color: #64748b;
-            margin-top: 2px;
-        }
+        .admin-card .admin-phone { font-size: 13px; color: #64748b; margin-top: 2px; }
         .admin-card .admin-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            font-size: 13px;
-            color: #64748b;
-            margin: 6px 0 10px;
+            display: flex; flex-wrap: wrap; gap: 12px;
+            font-size: 13px; color: #64748b; margin: 6px 0 10px;
         }
         .admin-card .admin-meta span {
-            background: #f1f5f9;
-            padding: 2px 12px;
-            border-radius: 40px;
-            font-size: 12px;
-            font-weight: 500;
+            background: #f1f5f9; padding: 2px 12px;
+            border-radius: 40px; font-size: 12px; font-weight: 500;
         }
         .admin-card .admin-stats {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 8px;
-            margin: 10px 0 12px;
+            display: grid; grid-template-columns: repeat(5, 1fr);
+            gap: 8px; margin: 10px 0 12px;
         }
         .admin-card .admin-stats .stat-item {
-            background: #fff;
-            padding: 8px 10px;
-            border-radius: 10px;
-            text-align: center;
-            border: 1px solid #eef2f6;
+            background: #fff; padding: 8px 10px; border-radius: 10px;
+            text-align: center; border: 1px solid #eef2f6;
         }
         .admin-card .admin-stats .stat-item strong {
-            display: block;
-            font-size: 16px;
-            font-weight: 700;
-            color: #0b1120;
+            display: block; font-size: 16px; font-weight: 700; color: #0b1120;
         }
         .admin-card .admin-stats .stat-item .slabel {
-            font-size: 10px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-weight: 600;
+            font-size: 10px; color: #94a3b8; text-transform: uppercase;
+            letter-spacing: 0.3px; font-weight: 600;
         }
-        .admin-card .admin-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 10px;
-        }
-        .admin-card .admin-actions .btn {
-            flex: 0 1 auto;
-            min-width: 60px;
-        }
+        .admin-card .admin-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .admin-card .admin-actions .btn { flex: 0 1 auto; min-width: 60px; }
 
         @media (max-width: 768px) {
-            .admin-card .admin-stats {
-                grid-template-columns: repeat(3, 1fr);
-            }
-            .admin-card {
-                padding: 14px 16px;
-            }
+            .admin-card .admin-stats { grid-template-columns: repeat(3, 1fr); }
+            .admin-card { padding: 14px 16px; }
         }
         @media (max-width: 480px) {
-            .admin-card .admin-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            .admin-card .admin-stats .stat-item strong {
-                font-size: 14px;
-            }
-            .admin-card .admin-actions .btn {
-                font-size: 12px;
-                padding: 6px 12px;
-                min-height: 36px;
-            }
+            .admin-card .admin-stats { grid-template-columns: repeat(2, 1fr); }
+            .admin-card .admin-stats .stat-item strong { font-size: 14px; }
+            .admin-card .admin-actions .btn { font-size: 12px; padding: 6px 12px; min-height: 36px; }
         }
 
         /* ─── LOADING / EMPTY ─── */
         .loading-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-            color: #94a3b8;
-            gap: 12px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 40px 20px; color: #94a3b8; gap: 12px;
         }
         .loading-state .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #7c3aed;
-            border-radius: 50%;
+            width: 36px; height: 36px; border: 3px solid #e2e8f0;
+            border-top-color: #7c3aed; border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
-            color: #94a3b8;
-            gap: 8px;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 40px 20px; color: #94a3b8; gap: 8px;
         }
-        .empty-state .icon {
-            font-size: 42px;
-            opacity: 0.5;
-        }
-        .empty-state .retry-btn {
-            margin-top: 12px;
-        }
+        .empty-state .icon { font-size: 42px; opacity: 0.5; }
+        .empty-state .retry-btn { margin-top: 12px; }
 
         /* ─── MODAL ─── */
         .admin-detail-modal .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.55);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            z-index: 2000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 2000; display: none; align-items: center;
+            justify-content: center; padding: 16px;
         }
-        .admin-detail-modal .modal-overlay.active {
-            display: flex;
-        }
+        .admin-detail-modal .modal-overlay.active { display: flex; }
         .admin-detail-modal .modal-content {
-            background: #fff;
-            border-radius: 24px;
-            padding: 28px;
-            max-width: 840px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
-            animation: modalIn 0.25s ease;
+            background: #fff; border-radius: 24px; padding: 28px;
+            max-width: 840px; width: 100%; max-height: 90vh;
+            overflow-y: auto; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+            animation: modalIn 0.15s ease;
         }
         @keyframes modalIn {
-            from {
-                opacity: 0;
-                transform: scale(0.96) translateY(12px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
+            from { opacity: 0; transform: scale(0.96) translateY(12px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
         .modal-content .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 14px;
-            border-bottom: 2px solid #f1f5f9;
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 20px;
+            padding-bottom: 14px; border-bottom: 2px solid #f1f5f9;
         }
         .modal-content .modal-header h2 {
-            font-size: 22px;
-            font-weight: 700;
-            color: #0b1120;
-            letter-spacing: -0.3px;
+            font-size: 22px; font-weight: 700; color: #0b1120; letter-spacing: -0.3px;
         }
         .modal-content .modal-close {
-            background: #f1f5f9;
-            border: none;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            font-size: 18px;
-            cursor: pointer;
-            color: #64748b;
-            transition: 0.15s;
-            display: flex;
-            align-items: center;
+            background: #f1f5f9; border: none; width: 36px; height: 36px;
+            border-radius: 50%; font-size: 18px; cursor: pointer;
+            color: #64748b; display: flex; align-items: center;
             justify-content: center;
         }
-        .modal-content .modal-close:active {
-            transform: scale(0.90);
-            background: #e2e8f0;
-        }
+        .modal-content .modal-close:active { transform: scale(0.90); background: #e2e8f0; }
 
         .admin-info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px 20px;
-            background: #f8fafc;
-            padding: 16px 18px;
-            border-radius: 14px;
-            margin-bottom: 16px;
-            border: 1px solid #eef2f6;
+            display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px;
+            background: #f8fafc; padding: 16px 18px; border-radius: 14px;
+            margin-bottom: 16px; border: 1px solid #eef2f6;
         }
         .admin-info-grid .item {
-            display: flex;
-            justify-content: space-between;
-            font-size: 14px;
-            padding: 4px 0;
+            display: flex; justify-content: space-between;
+            font-size: 14px; padding: 4px 0;
         }
-        .admin-info-grid .item .label {
-            color: #64748b;
-            font-weight: 500;
-        }
-        .admin-info-grid .item .value {
-            font-weight: 600;
-            color: #0b1120;
-        }
+        .admin-info-grid .item .label { color: #64748b; font-weight: 500; }
+        .admin-info-grid .item .value { font-weight: 600; color: #0b1120; }
 
         .section-card {
-            background: #fafcff;
-            border-radius: 14px;
-            padding: 14px 18px;
-            margin-bottom: 14px;
-            border-left: 4px solid #7c3aed;
-            border: 1px solid #eef2f6;
-            border-left-width: 4px;
+            background: #fafcff; border-radius: 14px; padding: 14px 18px;
+            margin-bottom: 14px; border-left: 4px solid #7c3aed;
+            border: 1px solid #eef2f6; border-left-width: 4px;
         }
-        .section-card.deposits {
-            border-left-color: #10b981;
-        }
-        .section-card.withdrawals {
-            border-left-color: #f59e0b;
-        }
-        .section-card.admin-withdrawals {
-            border-left-color: #ef4444;
-        }
-        .section-card.earnings {
-            border-left-color: #8b5cf6;
-        }
-        .section-card.adjustments {
-            border-left-color: #3b82f6;
-        }
-        .section-card.players {
-            border-left-color: #6366f1;
-        }
+        .section-card.deposits { border-left-color: #10b981; }
+        .section-card.withdrawals { border-left-color: #f59e0b; }
+        .section-card.admin-withdrawals { border-left-color: #ef4444; }
+        .section-card.earnings { border-left-color: #8b5cf6; }
+        .section-card.adjustments { border-left-color: #3b82f6; }
+        .section-card.players { border-left-color: #6366f1; }
         .section-card .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 8px;
         }
         .section-card .section-header h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #0b1120;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 14px; font-weight: 600; color: #0b1120;
+            display: flex; align-items: center; gap: 6px;
         }
         .section-card .section-header .total {
-            font-size: 13px;
-            font-weight: 700;
-            color: #7c3aed;
-            background: #f1f5f9;
-            padding: 2px 14px;
-            border-radius: 40px;
+            font-size: 13px; font-weight: 700; color: #7c3aed;
+            background: #f1f5f9; padding: 2px 14px; border-radius: 40px;
         }
-        .section-card .section-body {
-            font-size: 13px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
+        .section-card .section-body { font-size: 13px; max-height: 200px; overflow-y: auto; }
         .section-card .section-body .row-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px solid #f1f5f9;
-            gap: 12px;
+            display: flex; justify-content: space-between;
+            padding: 5px 0; border-bottom: 1px solid #f1f5f9; gap: 12px;
         }
-        .section-card .section-body .row-item:last-child {
-            border-bottom: none;
-        }
-        .section-card .section-body .row-item .left {
-            color: #475569;
-            font-size: 13px;
-        }
-        .section-card .section-body .row-item .right {
-            font-weight: 500;
-            color: #0b1120;
-            text-align: right;
-            flex-shrink: 0;
-        }
+        .section-card .section-body .row-item:last-child { border-bottom: none; }
+        .section-card .section-body .row-item .left { color: #475569; font-size: 13px; }
+        .section-card .section-body .row-item .right { font-weight: 500; color: #0b1120; text-align: right; flex-shrink: 0; }
         .section-card .section-body .player-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-            border-bottom: 1px solid #f1f5f9;
-            gap: 8px;
-            align-items: center;
-            font-size: 13px;
+            display: flex; justify-content: space-between;
+            padding: 5px 0; border-bottom: 1px solid #f1f5f9;
+            gap: 8px; align-items: center; font-size: 13px;
         }
-        .section-card .section-body .player-row:last-child {
-            border-bottom: none;
-        }
-        .section-card .section-body .player-row .info {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-        }
-        .section-card .section-body .player-row .info .name {
-            font-weight: 600;
-            color: #0b1120;
-        }
-        .section-card .section-body .player-row .info .phone {
-            font-size: 12px;
-            color: #94a3b8;
-        }
+        .section-card .section-body .player-row:last-child { border-bottom: none; }
+        .section-card .section-body .player-row .info { display: flex; flex-direction: column; gap: 1px; }
+        .section-card .section-body .player-row .info .name { font-weight: 600; color: #0b1120; }
+        .section-card .section-body .player-row .info .phone { font-size: 12px; color: #94a3b8; }
         .section-card .section-body .player-row .details {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-shrink: 0;
+            display: flex; align-items: center; gap: 12px; flex-shrink: 0;
         }
-        .section-card .section-body .player-row .details .bal {
-            font-weight: 600;
-            color: #0b1120;
-            font-size: 13px;
-        }
+        .section-card .section-body .player-row .details .bal { font-weight: 600; color: #0b1120; font-size: 13px; }
 
         .modal-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 2px solid #f1f5f9;
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-top: 16px; padding-top: 16px; border-top: 2px solid #f1f5f9;
         }
-        .modal-actions .btn {
-            flex: 1;
-            min-width: 70px;
-            justify-content: center;
-        }
+        .modal-actions .btn { flex: 1; min-width: 70px; justify-content: center; }
 
         @media (max-width: 640px) {
-            .admin-detail-modal .modal-content {
-                padding: 18px;
-                border-radius: 18px;
-            }
-            .admin-info-grid {
-                grid-template-columns: 1fr;
-                gap: 2px;
-                padding: 12px 14px;
-            }
-            .admin-info-grid .item {
-                font-size: 13px;
-            }
-            .section-card .section-body {
-                max-height: 120px;
-            }
-            .modal-actions .btn {
-                flex: 1 1 100%;
-            }
-            .modal-content .modal-header h2 {
-                font-size: 18px;
-            }
-            .section-card .section-body .player-row {
-                flex-wrap: wrap;
-            }
-            .section-card .section-body .player-row .details {
-                width: 100%;
-                justify-content: flex-start;
-                gap: 8px;
-            }
+            .admin-detail-modal .modal-content { padding: 18px; border-radius: 18px; }
+            .admin-info-grid { grid-template-columns: 1fr; gap: 2px; padding: 12px 14px; }
+            .admin-info-grid .item { font-size: 13px; }
+            .section-card .section-body { max-height: 120px; }
+            .modal-actions .btn { flex: 1 1 100%; }
+            .modal-content .modal-header h2 { font-size: 18px; }
+            .section-card .section-body .player-row { flex-wrap: wrap; }
+            .section-card .section-body .player-row .details { width: 100%; justify-content: flex-start; gap: 8px; }
         }
 
         /* ─── TOAST ─── */
         .toast {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
+            position: fixed; bottom: 24px; left: 50%;
             transform: translateX(-50%) translateY(80px);
-            background: #0b1120;
-            color: #fff;
-            padding: 14px 24px;
-            border-radius: 14px;
-            font-size: 14px;
-            font-weight: 500;
+            background: #0b1120; color: #fff; padding: 14px 24px;
+            border-radius: 14px; font-size: 14px; font-weight: 500;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.20);
-            z-index: 3000;
-            opacity: 0;
-            transition: 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-            pointer-events: none;
-            max-width: 92%;
-            text-align: center;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 3000; opacity: 0;
+            transition: 0.15s ease;
+            pointer-events: none; max-width: 92%; text-align: center;
+            backdrop-filter: blur(4px); border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        .toast.success {
-            background: #065f46;
-        }
-        .toast.error {
-            background: #991b1b;
-        }
-        .toast.info {
-            background: #1e3a5f;
-        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #065f46; }
+        .toast.error { background: #991b1b; }
+        .toast.info { background: #1e3a5f; }
 
         /* ─── RESPONSIVE TWEAKS ─── */
         @media (max-width: 640px) {
-            .filter-bar .row {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .filter-bar .filter-group {
-                flex: 1 1 auto;
-                min-width: unset;
-            }
-            .filter-bar .btn-group {
-                flex-wrap: wrap;
-            }
-            .filter-bar .btn-group .btn {
-                flex: 1 1 auto;
-            }
-            .tab-btn {
-                font-size: 13px;
-                padding: 8px 14px;
-                min-height: 38px;
-            }
-            .tab-content {
-                padding: 14px;
-            }
-            table {
-                font-size: 13px;
-                min-width: 460px;
-            }
-            table th,
-            table td {
-                padding: 10px 10px;
-            }
-            .header {
-                padding: 12px 16px;
-            }
-            .container {
-                padding: 12px 12px 16px;
-            }
+            .filter-bar .row { flex-direction: column; align-items: stretch; }
+            .filter-bar .filter-group { flex: 1 1 auto; min-width: unset; }
+            .filter-bar .btn-group { flex-wrap: wrap; }
+            .filter-bar .btn-group .btn { flex: 1 1 auto; }
+            .tab-btn { font-size: 13px; padding: 8px 14px; min-height: 38px; }
+            .tab-content { padding: 14px; }
+            table { font-size: 13px; min-width: 460px; }
+            table th, table td { padding: 10px 10px; }
+            .header { padding: 12px 16px; }
+            .container { padding: 12px 12px 16px; }
         }
-
         @media (min-width: 768px) {
-            .filter-bar {
-                flex-direction: row;
-                align-items: center;
-                flex-wrap: wrap;
-            }
-            .filter-bar .row {
-                flex: 1;
-            }
+            .filter-bar { flex-direction: row; align-items: center; flex-wrap: wrap; }
+            .filter-bar .row { flex: 1; }
         }
 
-        /* mini pagination for players */
+        /* mini pagination */
         .mini-pagination {
-            display: flex;
-            gap: 4px;
-            align-items: center;
-            margin-top: 8px;
-            flex-wrap: wrap;
+            display: flex; gap: 4px; align-items: center;
+            margin-top: 8px; flex-wrap: wrap;
         }
         .mini-pagination button {
-            background: #f1f5f9;
-            border: none;
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #475569;
-            cursor: pointer;
-            min-height: 32px;
-            transition: 0.15s;
+            background: #f1f5f9; border: none; padding: 4px 12px;
+            border-radius: 6px; font-size: 12px; font-weight: 600;
+            color: #475569; cursor: pointer; min-height: 32px;
         }
-        .mini-pagination button:active {
-            transform: scale(0.94);
-        }
-        .mini-pagination button.active-page {
-            background: #7c3aed;
-            color: #fff;
-        }
-        .mini-pagination button:disabled {
-            opacity: 0.4;
-            pointer-events: none;
-        }
-        .mini-pagination span {
-            font-size: 13px;
-            color: #94a3b8;
-            padding: 0 4px;
-        }
+        .mini-pagination button:active { transform: scale(0.94); }
+        .mini-pagination button.active-page { background: #7c3aed; color: #fff; }
+        .mini-pagination button:disabled { opacity: 0.4; pointer-events: none; }
+        .mini-pagination span { font-size: 13px; color: #94a3b8; padding: 0 4px; }
 
         .player-note {
-            font-size: 12px;
-            color: #94a3b8;
-            background: #f8fafc;
-            padding: 8px 14px;
-            border-radius: 8px;
-            margin: 6px 0 10px;
+            font-size: 12px; color: #94a3b8; background: #f8fafc;
+            padding: 8px 14px; border-radius: 8px; margin: 6px 0 10px;
             border: 1px dashed #e2e8f0;
         }
-        .player-note strong {
-            color: #475569;
-        }
+        .player-note strong { color: #475569; }
 
         /* search bar */
-        .search-bar {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 16px;
+        .search-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .search-bar input, .search-bar select {
+            flex: 1 1 180px; padding: 10px 14px; border: 1.5px solid #e2e8f0;
+            border-radius: 10px; font-size: 14px; min-height: 44px;
+            background: #fafcff; outline: none;
         }
-        .search-bar input,
-        .search-bar select {
-            flex: 1 1 180px;
-            padding: 10px 14px;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 14px;
-            min-height: 44px;
-            background: #fafcff;
-            outline: none;
-            transition: 0.2s;
+        .search-bar input:focus, .search-bar select:focus {
+            border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
         }
-        .search-bar input:focus,
-        .search-bar select:focus {
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
-        }
-        .search-bar .btn {
-            flex-shrink: 0;
-        }
+        .search-bar .btn { flex-shrink: 0; }
 
         /* ─── ANALYSIS SPECIFIC STYLES ─── */
-        .analysis-toggle {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .analysis-toggle .btn {
-            min-width: 100px;
-        }
-
+        .analysis-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+        .analysis-toggle .btn { min-width: 100px; }
         .chart-container {
-            margin-top: 20px;
-            background: #f8fafc;
-            border-radius: 14px;
-            padding: 16px 20px;
-            border: 1px solid #eef2f6;
+            margin-top: 20px; background: #f8fafc; border-radius: 14px;
+            padding: 16px 20px; border: 1px solid #eef2f6;
         }
         .chart-container h4 {
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #0b1120;
+            font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #0b1120;
         }
-        .chart-bar-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 8px;
-        }
+        .chart-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
         .chart-bar-label {
-            width: 100px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #475569;
-            flex-shrink: 0;
-            text-align: right;
+            width: 100px; font-size: 13px; font-weight: 500;
+            color: #475569; flex-shrink: 0; text-align: right;
         }
         .chart-bar-track {
-            flex: 1;
-            height: 28px;
-            background: #eef2f6;
-            border-radius: 6px;
-            overflow: hidden;
-            display: flex;
-            position: relative;
+            flex: 1; height: 28px; background: #eef2f6; border-radius: 6px;
+            overflow: hidden; display: flex; position: relative;
         }
         .chart-bar-segment {
-            height: 100%;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            font-weight: 600;
-            color: #fff;
-            white-space: nowrap;
-            padding: 0 4px;
-            min-width: 20px;
+            height: 100%; transition: width 0.15s ease;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 600; color: #fff;
+            white-space: nowrap; padding: 0 4px; min-width: 20px;
         }
         .chart-bar-total {
-            font-size: 13px;
-            font-weight: 600;
-            color: #0b1120;
-            width: 80px;
-            text-align: left;
-            flex-shrink: 0;
+            font-size: 13px; font-weight: 600; color: #0b1120;
+            width: 80px; text-align: left; flex-shrink: 0;
         }
         .chart-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e2e8f0;
+            display: flex; flex-wrap: wrap; gap: 16px;
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;
         }
         .chart-legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            color: #475569;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: #475569;
         }
-        .chart-legend-item .color-box {
-            width: 16px;
-            height: 16px;
-            border-radius: 4px;
-        }
+        .chart-legend-item .color-box { width: 16px; height: 16px; border-radius: 4px; }
 
         .analysis-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin-bottom: 16px;
         }
         .analysis-summary .stat-box {
-            background: #f8fafc;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #eef2f6;
-            text-align: center;
+            background: #f8fafc; padding: 12px; border-radius: 10px;
+            border: 1px solid #eef2f6; text-align: center;
         }
-        .analysis-summary .stat-box .num {
-            font-size: 20px;
-            font-weight: 700;
-            color: #0b1120;
-        }
+        .analysis-summary .stat-box .num { font-size: 20px; font-weight: 700; color: #0b1120; }
         .analysis-summary .stat-box .lbl {
-            font-size: 11px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            font-weight: 600;
+            font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;
         }
 
         @media (max-width: 640px) {
-            .chart-bar-label {
-                width: 70px;
-                font-size: 11px;
-            }
-            .chart-bar-total {
-                width: 60px;
-                font-size: 12px;
-            }
-            .chart-bar-track {
-                height: 22px;
-            }
-            .chart-bar-segment {
-                font-size: 8px;
-                min-width: 14px;
-            }
-            .analysis-summary {
-                grid-template-columns: 1fr 1fr;
-            }
+            .chart-bar-label { width: 70px; font-size: 11px; }
+            .chart-bar-total { width: 60px; font-size: 12px; }
+            .chart-bar-track { height: 22px; }
+            .chart-bar-segment { font-size: 8px; min-width: 14px; }
+            .analysis-summary { grid-template-columns: 1fr 1fr; }
         }
 
         /* ─── DELETE CONFIRM OVERLAY ─── */
         .delete-confirm-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            z-index: 4000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            z-index: 4000; display: none; align-items: center;
+            justify-content: center; padding: 20px;
         }
-        .delete-confirm-overlay.active {
-            display: flex;
-        }
+        .delete-confirm-overlay.active { display: flex; }
         .delete-confirm-box {
-            background: #fff;
-            border-radius: 20px;
-            padding: 32px 28px;
-            max-width: 420px;
-            width: 100%;
-            text-align: center;
+            background: #fff; border-radius: 20px; padding: 32px 28px;
+            max-width: 420px; width: 100%; text-align: center;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
-            animation: modalIn 0.2s ease;
+            animation: modalIn 0.15s ease;
         }
-        .delete-confirm-box .icon {
-            font-size: 48px;
-            margin-bottom: 12px;
-        }
-        .delete-confirm-box h3 {
-            font-size: 20px;
-            color: #0b1120;
-            margin-bottom: 6px;
-        }
-        .delete-confirm-box p {
-            color: #64748b;
-            font-size: 14px;
-            margin-bottom: 20px;
-            line-height: 1.5;
-        }
-        .delete-confirm-box .btn-group {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .delete-confirm-box .btn-group .btn {
-            min-width: 100px;
-        }
+        .delete-confirm-box .icon { font-size: 48px; margin-bottom: 12px; color: #ef4444; }
+        .delete-confirm-box h3 { font-size: 20px; color: #0b1120; margin-bottom: 6px; }
+        .delete-confirm-box p { color: #64748b; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+        .delete-confirm-box .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .delete-confirm-box .btn-group .btn { min-width: 100px; }
 
         /* ─── TRANSFER OVERLAY ─── */
         .transfer-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            z-index: 4001;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+            z-index: 4001; display: none; align-items: center;
+            justify-content: center; padding: 20px;
         }
-        .transfer-overlay.active {
-            display: flex;
-        }
+        .transfer-overlay.active { display: flex; }
         .transfer-box {
-            background: #fff;
-            border-radius: 20px;
-            padding: 32px 28px;
-            max-width: 460px;
-            width: 100%;
-            text-align: left;
+            background: #fff; border-radius: 20px; padding: 32px 28px;
+            max-width: 460px; width: 100%; text-align: left;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
-            animation: modalIn 0.2s ease;
+            animation: modalIn 0.15s ease;
         }
-        .transfer-box h3 {
-            font-size: 20px;
-            color: #0b1120;
-            margin-bottom: 4px;
-        }
-        .transfer-box p {
-            color: #64748b;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-        .transfer-box label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: #475569;
-            margin-bottom: 4px;
-        }
+        .transfer-box h3 { font-size: 20px; color: #0b1120; margin-bottom: 4px; }
+        .transfer-box p { color: #64748b; font-size: 14px; margin-bottom: 16px; }
+        .transfer-box label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; }
         .transfer-box select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 14px;
-            background: #fafcff;
-            min-height: 44px;
-            outline: none;
-            transition: 0.2s;
-            margin-bottom: 16px;
+            width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0;
+            border-radius: 10px; font-size: 14px; background: #fafcff;
+            min-height: 44px; outline: none; margin-bottom: 16px;
         }
-        .transfer-box select:focus {
-            border-color: #7c3aed;
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10);
-            background: #fff;
-        }
-        .transfer-box .btn-group {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            flex-wrap: wrap;
-        }
-        .transfer-box .btn-group .btn {
-            min-width: 80px;
-        }
+        .transfer-box select:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.10); background: #fff; }
+        .transfer-box .btn-group { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+        .transfer-box .btn-group .btn { min-width: 80px; }
     </style>
 </head>
 <body>
@@ -1470,7 +664,7 @@
     <header class="header">
         <div class="header-content">
             <div class="header-left">
-                <div class="logo-icon">SA</div>
+                <div class="logo-icon"><i class="fas fa-shield-alt"></i></div>
                 <div>
                     <h1>Super Admin</h1>
                     <div class="subtitle">Platform oversight &amp; admin management</div>
@@ -1481,7 +675,7 @@
                     <span>Secret Access</span>
                 </div>
                 <button class="refresh-btn-header" onclick="refreshAll()">
-                    <span>↻</span>
+                    <i class="fas fa-sync-alt"></i>
                     <span class="label">Refresh</span>
                 </button>
             </div>
@@ -1506,8 +700,8 @@
                     <select id="filterAdmin"><option value="all">All Admins</option></select>
                 </div>
                 <div class="btn-group">
-                    <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
-                    <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+                    <button class="btn btn-primary" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply</button>
+                    <button class="btn btn-outline" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
                 </div>
             </div>
         </div>
@@ -1515,27 +709,27 @@
         <!-- ─── STATS ─── -->
         <div class="stats-grid" id="statsGrid">
             <div class="stat-card">
-                <div class="stat-icon blue">U</div>
+                <div class="stat-icon blue"><i class="fas fa-users"></i></div>
                 <div class="stat-info"><div class="label">Users</div><div class="value" id="statUsers">-</div></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon green">A</div>
+                <div class="stat-icon green"><i class="fas fa-user-shield"></i></div>
                 <div class="stat-info"><div class="label">Admins</div><div class="value" id="statAdmins">-</div></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon green">D</div>
+                <div class="stat-icon green"><i class="fas fa-wallet"></i></div>
                 <div class="stat-info"><div class="label">Deposits</div><div class="value" id="statDeposits">-</div></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon orange">W</div>
+                <div class="stat-icon orange"><i class="fas fa-hand-holding-usd"></i></div>
                 <div class="stat-info"><div class="label">Withdrawals</div><div class="value" id="statWithdrawals">-</div></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon purple">P</div>
+                <div class="stat-icon purple"><i class="fas fa-chart-pie"></i></div>
                 <div class="stat-info"><div class="label">House Profit</div><div class="value" id="statHouseProfit">-</div></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon red">P</div>
+                <div class="stat-icon red"><i class="fas fa-hourglass-half"></i></div>
                 <div class="stat-info"><div class="label">Pending Admin With.</div><div class="value" id="statPendingWithdrawals">-</div></div>
             </div>
         </div>
@@ -1543,16 +737,16 @@
         <!-- ─── TABS ─── -->
         <div class="tabs" id="tabContainer">
             <button class="tab-btn active" data-tab="admins" onclick="switchTab('admins')">
-                Admins <span class="badge" id="adminBadge">0</span>
+                <i class="fas fa-users-cog"></i> Admins <span class="badge" id="adminBadge">0</span>
             </button>
             <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">
-                Withdrawals <span class="badge" id="withdrawalBadge">0</span>
+                <i class="fas fa-money-bill-wave"></i> Withdrawals <span class="badge" id="withdrawalBadge">0</span>
             </button>
             <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
-                Platform
+                <i class="fas fa-chart-line"></i> Platform
             </button>
             <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
-                Players <span class="badge" id="globalPlayersBadge">0</span>
+                <i class="fas fa-user-friends"></i> Players <span class="badge" id="globalPlayersBadge">0</span>
             </button>
         </div>
 
@@ -1561,14 +755,14 @@
 
             <!-- ADMINS -->
             <div class="tab-pane active" id="tab-admins">
-                <h2>All Admins <span class="sub">— manage and monitor</span></h2>
+                <h2><i class="fas fa-users-cog"></i> All Admins <span class="sub">— manage and monitor</span></h2>
                 <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
             </div>
 
             <!-- WITHDRAWALS -->
             <div class="tab-pane" id="tab-withdrawals">
-                <h2>Admin Withdrawals <span class="sub">— requests from admins</span></h2>
-                <div class="withdrawal-filter-group" id="withdrawalFilterGroup">
+                <h2><i class="fas fa-money-bill-wave"></i> Admin Withdrawals <span class="sub">— requests from admins</span></h2>
+                <div class="withdrawal-filter-group" id="withdrawalFilterGroup" style="margin-bottom:16px;">
                     <button class="btn btn-primary btn-sm" data-status="pending" onclick="setWithdrawalFilter('pending')">Pending</button>
                     <button class="btn btn-outline btn-sm" data-status="approved" onclick="setWithdrawalFilter('approved')">Approved</button>
                     <button class="btn btn-outline btn-sm" data-status="rejected" onclick="setWithdrawalFilter('rejected')">Rejected</button>
@@ -1579,7 +773,7 @@
 
             <!-- PLATFORM -->
             <div class="tab-pane" id="tab-platform">
-                <h2>Platform <span class="sub">— overview &amp; analysis</span></h2>
+                <h2><i class="fas fa-chart-line"></i> Platform <span class="sub">— overview &amp; analysis</span></h2>
 
                 <div class="analysis-toggle">
                     <button class="btn btn-primary btn-sm" id="platformOverviewBtn" onclick="showPlatformView('overview')">Overview</button>
@@ -1592,7 +786,7 @@
 
                 <div id="platformAnalysis" style="display:none;">
                     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
-                        <button class="btn btn-primary" onclick="fetchAnalysis()">📊 Load Analysis</button>
+                        <button class="btn btn-primary" onclick="fetchAnalysis()"><i class="fas fa-chart-bar"></i> Load Analysis</button>
                         <span style="font-size:13px; color:#94a3b8;">Uses the date and admin filters above.</span>
                     </div>
                     <div id="analysisResults">
@@ -1603,16 +797,16 @@
 
             <!-- PLAYERS -->
             <div class="tab-pane" id="tab-players">
-                <h2>All Players <span class="sub">— all registered users</span></h2>
+                <h2><i class="fas fa-user-friends"></i> All Players <span class="sub">— all registered users</span></h2>
                 <div class="search-bar">
                     <input type="text" id="globalPlayerSearch" placeholder="Search by username, handle, or ID..." />
                     <select id="playerAdminFilter">
                         <option value="all">All Admins</option>
                     </select>
-                    <button class="btn btn-primary" onclick="filterGlobalPlayers()">Search</button>
-                    <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()">Reset</button>
-                    <button class="btn btn-success" onclick="sendBulkMessage()">📨 Send to Selected</button>
-                    <button class="btn btn-teal" onclick="transferSelectedPlayers('global')">↗️ Transfer Selected</button>
+                    <button class="btn btn-primary" onclick="filterGlobalPlayers()"><i class="fas fa-search"></i> Search</button>
+                    <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()"><i class="fas fa-times"></i> Reset</button>
+                    <button class="btn btn-success" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                    <button class="btn btn-teal" onclick="transferSelectedPlayers('global')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
                 </div>
                 <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
@@ -1629,7 +823,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 id="modalTitle">Admin Details</h2>
-                    <button class="modal-close" onclick="closeModal()">✕</button>
+                    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
                 </div>
                 <div id="modalBody"><div class="loading-state"><div class="spinner"></div><span>Loading…</span></div></div>
             </div>
@@ -1639,12 +833,12 @@
     <!-- ─── DELETE CONFIRM OVERLAY ─── -->
     <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
         <div class="delete-confirm-box">
-            <div class="icon">⚠️</div>
+            <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
             <h3>Delete Player</h3>
             <p id="deleteConfirmMessage">Are you sure you want to delete this player?</p>
             <div class="btn-group">
                 <button class="btn btn-outline" onclick="cancelDelete()">Cancel</button>
-                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">Delete</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()"><i class="fas fa-trash-alt"></i> Delete</button>
             </div>
         </div>
     </div>
@@ -1658,7 +852,7 @@
             <select id="transferAdminSelect"></select>
             <div class="btn-group">
                 <button class="btn btn-outline" onclick="cancelTransfer()">Cancel</button>
-                <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()">Transfer</button>
+                <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()"><i class="fas fa-exchange-alt"></i> Transfer</button>
             </div>
         </div>
     </div>
@@ -1723,19 +917,10 @@
         let allAdmins = [];
 
         // ─── DELETE STATE ───
-        let deletePending = {
-            telegramId: null,
-            username: null,
-            adminId: null,
-            source: null
-        };
+        let deletePending = { telegramId: null, username: null, adminId: null, source: null };
 
         // ─── TRANSFER STATE ───
-        let transferPending = {
-            players: [], // array of { id, name }
-            source: null,
-            currentAdminId: null
-        };
+        let transferPending = { players: [], source: null, currentAdminId: null };
 
         // ─── TOAST ───
         function showToast(message, type = 'info') {
@@ -1874,7 +1059,7 @@
                 `;
             } catch (err) {
                 container.innerHTML =
-                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1927,7 +1112,7 @@
 
                 if (allAdmins.length === 0) {
                     container.innerHTML =
-                        `<div class="empty-state"><div class="icon">👤</div><p>No admins found</p></div>`;
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>No admins found</p></div>`;
                     return;
                 }
 
@@ -1949,7 +1134,7 @@
                                     <span>Code: ${admin.invite_code || 'N/A'}</span>
                                     <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
                                     <span>${(admin.commission_rate * 100)}% commission</span>
-                                    <span>👥 ${admin.stats.playerCount || 0} players</span>
+                                    <span><i class="fas fa-users"></i> ${admin.stats.playerCount || 0} players</span>
                                 </div>
                             </div>
                         </div>
@@ -1961,20 +1146,20 @@
                             <div class="stat-item"><strong>${admin.stats.totalPendingEarnings.toFixed(0)}</strong><span class="slabel">Pending</span></div>
                         </div>
                         <div class="admin-actions">
-                            <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})">View</button>
-                            <button class="btn btn-warning btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})">Rate</button>
+                            <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})"><i class="fas fa-eye"></i> View</button>
+                            <button class="btn btn-warning btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})"><i class="fas fa-percent"></i> Rate</button>
                             <button class="btn ${admin.is_active ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
-                                ${admin.is_active ? 'Deactivate' : 'Activate'}
+                                <i class="fas ${admin.is_active ? 'fa-user-slash' : 'fa-user-check'}"></i> ${admin.is_active ? 'Deactivate' : 'Activate'}
                             </button>
-                            <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})">Reduce</button>
-                            <button class="btn btn-indigo btn-sm" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')">👥 Players</button>
+                            <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})"><i class="fas fa-minus-circle"></i> Reduce</button>
+                            <button class="btn btn-indigo btn-sm" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')"><i class="fas fa-users"></i> Players</button>
                         </div>
                     </div>
                 `}).join('');
 
             } catch (err) {
                 container.innerHTML =
-                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -2065,7 +1250,6 @@
         // ─── TRANSFER PLAYER (single and bulk) ───
         function showTransferDialog(players, source, currentAdminId) {
             if (!Array.isArray(players)) {
-                // Single player passed as object
                 players = [players];
             }
             if (players.length === 0) {
@@ -2085,7 +1269,6 @@
                     ? `Transfer player "${players[0].name}" to which admin?`
                     : `Transfer ${count} players (${names}) to which admin?`;
 
-            // Populate dropdown, exclude current admin if we know it
             const select = document.getElementById('transferAdminSelect');
             select.innerHTML = '';
             allAdmins.forEach(admin => {
@@ -2122,7 +1305,6 @@
             document.getElementById('transferOverlay').classList.remove('active');
 
             try {
-                // Use bulk endpoint
                 const telegramIds = players.map(p => p.id);
                 const url = apiUrl('/super-admin/transfer-players');
                 const res = await fetch(url, {
@@ -2174,7 +1356,6 @@
 
             let currentAdminId = null;
             if (source === 'modal') {
-                // current admin is the one whose modal is open
                 currentAdminId = currentPlayersAdminId;
             }
 
@@ -2221,7 +1402,7 @@
                 if (currentPlayersTotal === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="icon">👤</div>
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
                             <p>No registered players found for this admin.</p>
                             <div style="margin-top:12px;">
                                 <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
@@ -2244,9 +1425,9 @@
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
-                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'modal', ${adminId})">↗️ Transfer</button>
-                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')">🗑 Delete</button>
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'modal', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')"><i class="fas fa-trash-alt"></i> Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -2274,15 +1455,15 @@
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
                         <div>
-                            <strong>👥 ${currentPlayersTotal} players</strong>
+                            <strong><i class="fas fa-users"></i> ${currentPlayersTotal} players</strong>
                             <span style="color:#94a3b8;font-size:13px;">— showing ${(page-1)*ADMIN_PLAYERS_PER_PAGE + 1}–${Math.min(page*ADMIN_PLAYERS_PER_PAGE, currentPlayersTotal)}</span>
                             <label style="margin-left:16px;font-size:13px;font-weight:500;">
                                 <input type="checkbox" id="selectAllModalPlayers" onchange="toggleAllModalPlayers()" /> Select All
                             </label>
                         </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                            <button class="btn btn-success btn-sm" onclick="sendBulkMessage()">📨 Send to Selected</button>
-                            <button class="btn btn-teal btn-sm" onclick="transferSelectedPlayers('modal')">↗️ Transfer Selected</button>
+                            <button class="btn btn-success btn-sm" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                            <button class="btn btn-teal btn-sm" onclick="transferSelectedPlayers('modal')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
                             <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
                         </div>
                     </div>
@@ -2315,7 +1496,7 @@
             } catch (err) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="icon">❌</div>
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
                         <p style="color:#ef4444;font-weight:600;">${escapeHtml(err.message)}</p>
                         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
                             <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
@@ -2405,7 +1586,7 @@
                     </div>
 
                     <div style="margin-bottom:12px;">
-                        <button class="btn btn-indigo btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">👥 View All Players (${stats.players})</button>
+                        <button class="btn btn-indigo btn-sm" onclick="loadAdminPlayers(${adminId}, 1)"><i class="fas fa-users"></i> View All Players (${stats.players})</button>
                     </div>
 
                     <div class="section-card deposits">
@@ -2434,17 +1615,17 @@
                     </div>
 
                     <div class="modal-actions">
-                        <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)">Deactivate</button>
-                        <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)">Activate</button>
-                        <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})">Set Commission</button>
-                        <button class="btn btn-indigo" onclick="loadAdminPlayers(${a.id}, 1)">👥 Players</button>
+                        <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)"><i class="fas fa-user-slash"></i> Deactivate</button>
+                        <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)"><i class="fas fa-user-check"></i> Activate</button>
+                        <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})"><i class="fas fa-percent"></i> Set Commission</button>
+                        <button class="btn btn-indigo" onclick="loadAdminPlayers(${a.id}, 1)"><i class="fas fa-users"></i> Players</button>
                         <button class="btn btn-outline" onclick="closeModal()">Close</button>
                     </div>
                 `;
 
             } catch (err) {
                 body.innerHTML =
-                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -2471,7 +1652,7 @@
 
                 if (data.requests.length === 0) {
                     container.innerHTML =
-                        `<div class="empty-state"><div class="icon">✅</div><p>No withdrawal requests found</p></div>`;
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawal requests found</p></div>`;
                     return;
                 }
 
@@ -2492,8 +1673,8 @@
                                     ${showActions ? `
                                         <td>
                                             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                                                <button class="btn btn-success btn-sm" onclick="processAdminWithdrawal(${req.id},'approve')">Approve</button>
-                                                <button class="btn btn-danger btn-sm" onclick="processAdminWithdrawal(${req.id},'reject')">Reject</button>
+                                                <button class="btn btn-success btn-sm" onclick="processAdminWithdrawal(${req.id},'approve')"><i class="fas fa-check"></i> Approve</button>
+                                                <button class="btn btn-danger btn-sm" onclick="processAdminWithdrawal(${req.id},'reject')"><i class="fas fa-times"></i> Reject</button>
                                             </div>
                                         </td>
                                     ` : ''}
@@ -2504,7 +1685,7 @@
                 `;
             } catch (err) {
                 container.innerHTML =
-                    `<div class="empty-state"><div class="icon">❌</div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#ef4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -2657,9 +1838,9 @@
                 if (globalPlayersTotal === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="icon">👤</div>
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
                             <p>No players found.</p>
-                            <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()">⟳ Retry</button>
+                            <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
                         </div>
                     `;
                     return;
@@ -2679,9 +1860,9 @@
                         <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
                         <td>
                             <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')">📨 Send</button>
-                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'global', ${adminId})">↗️ Transfer</button>
-                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')">🗑 Delete</button>
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'global', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')"><i class="fas fa-trash-alt"></i> Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -2708,7 +1889,7 @@
 
                 container.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                        <div><strong>👥 ${globalPlayersTotal} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</span></div>
+                        <div><strong><i class="fas fa-users"></i> ${globalPlayersTotal} players</strong> <span style="color:#94a3b8;font-size:13px;">— showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</span></div>
                         <div>
                             <label style="font-size:13px;font-weight:500;margin-right:12px;">
                                 <input type="checkbox" id="selectAllGlobalPlayers" onchange="toggleAllGlobalPlayers()" /> Select All
@@ -2738,9 +1919,9 @@
             } catch (err) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="icon">❌</div>
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
                         <p style="color:#ef4444;font-weight:600;">${escapeHtml(err.message)}</p>
-                        <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()">⟳ Retry</button>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
                     </div>
                 `;
             }
@@ -2851,7 +2032,7 @@
                 if (rows.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="icon">📊</div>
+                            <div class="icon"><i class="fas fa-chart-bar"></i></div>
                             <p>No data found for the selected filters.</p>
                         </div>
                     `;
@@ -2971,9 +2152,9 @@
             } catch (err) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="icon">❌</div>
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
                         <p style="color:#ef4444;">${escapeHtml(err.message)}</p>
-                        <button class="btn btn-primary btn-sm retry-btn" onclick="fetchAnalysis()">⟳ Retry</button>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="fetchAnalysis()"><i class="fas fa-sync-alt"></i> Retry</button>
                     </div>
                 `;
             }
