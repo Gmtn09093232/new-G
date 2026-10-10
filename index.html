@@ -1640,12 +1640,24 @@ async function openDeposit() {
     resetDepositState();
     state.methodMode = 'deposit';
     const admins = await loadAdmins();
-    const methods = [];
+    
+    // Use a Map to ensure we only get ONE button per method type (deduplication)
+    const methodMap = new Map();
+    
     admins.forEach(a => {
-        if (a.telebirr) methods.push({ type: 'telebirr', number: a.telebirr, adminId: a.id });
-        if (a.cbebirr)  methods.push({ type: 'cbebirr',  number: a.cbebirr,  adminId: a.id });
-        if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
+        if (a.telebirr && !methodMap.has('telebirr')) {
+            methodMap.set('telebirr', { type: 'telebirr', number: a.telebirr, adminId: a.id });
+        }
+        if (a.cbebirr && !methodMap.has('cbebirr')) {
+            methodMap.set('cbebirr', { type: 'cbebirr', number: a.cbebirr, adminId: a.id });
+        }
+        if (a.mpesa && !methodMap.has('mpesa')) {
+            methodMap.set('mpesa', { type: 'mpesa', number: a.mpesa, adminId: a.id });
+        }
     });
+
+    const methods = Array.from(methodMap.values());
+    
     renderMethodList(methods, 'deposit');
     
     modalZ++;
