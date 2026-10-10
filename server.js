@@ -1832,10 +1832,18 @@ async function endGameWithWinners(stake) {
     });
 
     const winnerNames = game.winners.map(w => w.username);
+
+    // ✅ NEW: Build winnerCards array mapping each winner to their card number
+    const winnerCards = game.winners.map(w => {
+      const player = game.players.find(p => p.telegramId === w.telegramId);
+      return player ? player.cardNumber : null;
+    });
+
     io.to(`stake_${stake}`).emit('gameEnded', {
       stake,
       winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
       winners: winnerNames,
+      winnerCards: winnerCards,  // ✅ Send card numbers
       prizeEach: finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
