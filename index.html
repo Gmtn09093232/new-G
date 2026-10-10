@@ -966,10 +966,13 @@ input  { font-family: inherit; }
 
         <div class="step">
             <div class="num">2️⃣ Step 2:</div>
-            <div class="head" data-key="enterInvoice">Enter your Invoice Number</div>
+            <div class="head" data-key="enterInvoice">Upload Payment Screenshot</div>
             <div class="body">
-                <div class="hint-lg" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
-                <div class="field" style="margin:0;"><input type="text" id="paymentInvoice" placeholder="e.g. CKU3JPX6M3/SMS" data-key="invoicePlaceholder" autocomplete="off"></div>
+                <div class="hint-lg" data-key="invoiceHint">After completing the transfer, take a screenshot of the receipt and upload it below.</div>
+                <div class="field" style="margin:0;">
+                    <input type="file" id="paymentProof" accept="image/*" style="padding: 12px; border-radius: 12px; width: 100%; border: 1px solid var(--border-strong); background: var(--bg-input); color: var(--text);">
+                    <img id="proofPreview" style="display:none; width:100%; border-radius:12px; margin-top:10px; max-height:200px; object-fit:contain;" alt="Screenshot Preview">
+                </div>
             </div>
         </div>
 
@@ -1280,9 +1283,10 @@ const I18N = {
         depositHint:"⚠️ ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
         sendPayment:"ክፍያ ወደ ታችኛው ቁጥር ይላኩ", selectMethod:"💳 የክፍያ ዘዴ ይምረጡ",
         confirmPayment:"Confirm Payment →", copy:"Copy", howToPay:"📞 How to pay?", howToPayTitle:"How to Pay",
-        enterInvoice:"Enter your Invoice Number",
-        invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"↺ ውርርድ",
+        enterInvoice:"የክፍያ ፎቶ ያስገቡ",
+        invoiceHint:"ክፍያውን ከፈጸሙ በኋላ የክፍያ ማረጋገጫ ፎቶ (Screenshot) ከታች ያስገቡ።",
+        invoicePlaceholder:"",
+        chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"↺ ውርርድ",
         pickCard:"🎴 የካርድ መለያ ይምረጡ:", selected:"የተመረጠው:", randomCard:"✨ በዘፈቀደ ካርድ",
         yourCardPreview:"🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
         gameTab:"🎮 ጨዋታ", historyTab:"📜 ታሪክ", walletTab:"💰 ቦርሳ", profileTab:"👤 መገለጫ",
@@ -1326,9 +1330,10 @@ const I18N = {
         depositHint:"⚠️ After sending payment, admin will verify your deposit using your phone number.",
         sendPayment:"Send payment to the selected method", selectMethod:"💳 Select Deposit Method",
         confirmPayment:"Confirm Payment →", copy:"Copy", howToPay:"📞 How to pay?", howToPayTitle:"How to Pay",
-        enterInvoice:"Enter your Invoice Number",
-        invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"↺ Stake",
+        enterInvoice:"Upload Payment Screenshot",
+        invoiceHint:"After completing the transfer, take a screenshot of the receipt and upload it below.",
+        invoicePlaceholder:"",
+        chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"↺ Stake",
         pickCard:"🎴 Pick card ID:", selected:"Selected:", randomCard:"✨ Random Card",
         yourCardPreview:"🎴 Your Bingo Card Preview",
         gameTab:"🎮 Game", historyTab:"📜 History", walletTab:"💰 Wallet", profileTab:"👤 Profile",
@@ -1656,8 +1661,11 @@ function resetDepositState() {
     state.submitting = false;
     state.methodMode = null;
 
-    ['depositPhone', 'depositAmount', 'paymentInvoice', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
+    ['depositPhone', 'depositAmount', 'paymentProof', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
         .forEach(id => { const el = $(id); if (el) el.value = ''; });
+
+    const preview = $('proofPreview');
+    if (preview) { preview.src = ''; preview.style.display = 'none'; }
 
     ['depositDetailsModal', 'methodListModal', 'howToPayModal', 'withdrawModal']
         .forEach(id => $(id)?.classList.remove('active'));
@@ -1768,11 +1776,12 @@ async function submitDeposit() {
 
     const phone  = $('depositPhone')?.value.trim()  || '';
     const amount = $('depositAmount')?.value.trim() || '';
-    const invoice = $('paymentInvoice')?.value.trim() || '';
+    const fileInput = $('paymentProof');
+    const file = fileInput?.files[0];
 
     if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
     if (!amount || Number(amount) < 10)  return toast('Minimum deposit is 10 ETB', 'error');
-    if (!invoice) return toast('Please paste your Invoice Number', 'error');
+    if (!file) return toast('Please upload a payment screenshot', 'error');
 
     if (!state.selectedMethod) {
         toast('Please pick a payment method again', 'info');
@@ -1788,34 +1797,49 @@ async function submitDeposit() {
     const btn = $('confirmPaymentBtn');
     const orig = btn.innerText;
     btn.disabled = true;
-    btn.innerText = '⏳ Sending...';
+    btn.innerText = '⏳ Uploading...';
 
-    try {
-        const r = await fetch('/api/request-deposit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phone: state.savedPhone,
-                amount: state.pendingAmount,
-                payment_type: state.selectedMethod.type,
-                admin_id: state.selectedMethod.adminId,
-                transaction_reference: invoice
-            })
-        });
-        const d = await r.json();
-        if (d.success) {
-            toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
-            resetDepositState();
-        } else {
-            toast('❌ ' + (d.error || 'Submission failed'), 'error');
+    // Convert image to Base64
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    reader.onload = async () => {
+        const base64Image = reader.result;
+
+        try {
+            const r = await fetch('/api/request-deposit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: state.savedPhone,
+                    amount: state.pendingAmount,
+                    payment_type: state.selectedMethod.type,
+                    admin_id: state.selectedMethod.adminId,
+                    transaction_reference: base64Image // Sending image data instead of invoice text
+                })
+            });
+            const d = await r.json();
+            if (d.success) {
+                toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
+                resetDepositState();
+            } else {
+                toast('❌ ' + (d.error || 'Submission failed'), 'error');
+            }
+        } catch {
+            toast('⚠️ Network error', 'error');
+        } finally {
+            state.submitting = false;
+            btn.disabled = false;
+            btn.innerText = orig;
         }
-    } catch {
-        toast('⚠️ Network error', 'error');
-    } finally {
+    };
+
+    reader.onerror = () => {
+        toast('⚠️ Error reading image file', 'error');
         state.submitting = false;
         btn.disabled = false;
         btn.innerText = orig;
-    }
+    };
 }
 
 async function submitWithdraw() {
@@ -2440,6 +2464,23 @@ $('closeHowToPayBtn').addEventListener('click', () => $('howToPayModal').classLi
 $('paymentCopyBtn').addEventListener('click', () => {
     const raw = $('paymentRecipient').textContent.replace('📞 ', '').trim();
     copyText(raw);
+});
+
+// Image Preview for Deposit Proof
+$('paymentProof').addEventListener('change', function() {
+    const file = this.files[0];
+    const preview = $('proofPreview');
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+        preview.src = '';
+    }
 });
 
 // withdraw submit
