@@ -141,8 +141,6 @@ input  { font-family: inherit; }
     display: flex;
     align-items: center;
     justify-content: center;
-    /* z-index is set dynamically in JS so the newest modal always
-       wins the stack — no DOM reordering needed. */
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
@@ -910,23 +908,8 @@ input  { font-family: inherit; }
 
 <!-- ============ MODALS ============ -->
 
-<!-- Method picker (deposit OR withdraw) -->
-<div id="methodListModal" class="modal">
-    <div class="modal-content" style="max-width:400px;">
-        <div class="step-header">
-            <button class="back" id="methodListBackBtn">←</button>
-            <span class="title" id="methodListTitle" data-key="selectMethod">💳 Select Deposit Method</span>
-            <span class="badge" id="methodListStepLabel">Step 1/2</span>
-        </div>
-        <div id="methodListContainer" class="method-list">
-            <div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>
-        </div>
-        <button id="methodListCancelBtn" class="cancel-btn" data-key="cancel">Cancel</button>
-    </div>
-</div>
-
-<!-- Deposit details -->
-<div id="depositDetailsModal" class="modal">
+<!-- Unified Deposit Modal -->
+<div id="depositModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
             <span class="icon">💸</span>
@@ -935,54 +918,50 @@ input  { font-family: inherit; }
                 <div class="sub" data-key="sendPayment">Send payment to the selected method</div>
             </div>
         </div>
-        <div class="field"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label>
-            <input type="tel" id="depositPhone" placeholder="09xxxxxxxx" autocomplete="off"></div>
-        <div class="field"><label data-key="amountLabel">💰 Amount (ETB)</label>
-            <input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off"></div>
-        <div class="notice" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
-        <div class="modal-buttons">
-            <button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button>
-            <button id="depositDetailsBackBtn" class="btn-secondary" data-key="back">← Back</button>
-        </div>
-    </div>
-</div>
 
-<!-- Payment confirmation -->
-<div id="paymentModal" class="modal">
-    <div class="modal-content" style="max-width:420px;">
-        <div class="modal-header">
-            <span class="icon" id="paymentMethodIcon">📱</span>
-            <div>
-                <div class="title" id="paymentMethodTitle">Telebirr P2P</div>
-                <div class="sub">Ethiopia - ETB</div>
-            </div>
+        <div class="field">
+            <label data-key="yourPhone">📞 Your Phone Number (for verification)</label>
+            <input type="tel" id="depositPhone" placeholder="09xxxxxxxx" autocomplete="off">
         </div>
-        <div class="amount-big" id="paymentAmountDisplay">0.00 ETB</div>
+        <div class="field">
+            <label data-key="amountLabel">💰 Amount (ETB)</label>
+            <input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off">
+        </div>
 
-        <div class="step">
-            <div class="num">1️⃣ Step 1:</div>
-            <div class="head" id="paymentStepLabel">Send <span id="paymentStepAmount">0.00</span> ETB to this number</div>
-            <div class="body">
-                <div class="hint"><span id="howToPayTrigger" class="how-to-link" data-key="howToPay">📞 How to pay?</span></div>
-                <div class="recipient">
-                    <span class="number mono" id="paymentRecipient">📞 0953677690</span>
-                    <button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button>
+        <div class="field">
+            <label>💳 Payment Method</label>
+            <div id="depositMethodsContainer" class="stake-buttons" style="margin:8px 0; justify-content:flex-start;"></div>
+        </div>
+
+        <div id="depositPaymentInstructions" class="hidden">
+            <div class="step">
+                <div class="num">1️⃣ Step 1:</div>
+                <div class="head">Send <span id="unifiedAmountDisplay">0.00</span> ETB to this number</div>
+                <div class="body">
+                    <div class="recipient">
+                        <span class="number mono" id="unifiedRecipient">📞 ---</span>
+                        <button class="copy-btn" id="unifiedCopyBtn">Copy</button>
+                    </div>
                 </div>
-                <div class="micro">Open your payment app → Send Money → Paste the number → Make the transfer</div>
+            </div>
+            <div class="step">
+                <div class="num">2️⃣ Step 2:</div>
+                <div class="head" data-key="enterInvoice">Enter your Invoice Number</div>
+                <div class="body">
+                    <div class="hint-lg" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
+                    <div class="field" style="margin:0;">
+                        <input type="text" id="unifiedInvoice" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder" autocomplete="off">
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="step">
-            <div class="num">2️⃣ Step 2:</div>
-            <div class="head" data-key="enterInvoice">Enter your Invoice Number</div>
-            <div class="body">
-                <div class="hint-lg" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
-                <div class="field" style="margin:0;"><input type="text" id="paymentInvoice" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder" autocomplete="off"></div>
-            </div>
-        </div>
+        <div class="notice" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
 
-        <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
-        <button id="paymentBackBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
+        <div class="modal-buttons">
+            <button id="unifiedConfirmBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button>
+            <button id="unifiedBackBtn" class="btn-secondary" data-key="back">← Back</button>
+        </div>
     </div>
 </div>
 
@@ -1437,21 +1416,14 @@ function switchPage(id) {
     next.classList.remove('hidden');
 }
 
-/* ✅ Z-INDEX BASED MODAL TRANSITIONS
-   Every time a modal opens, it gets a fresh z-index higher than any
-   modal that came before it. No DOM reordering, no rAF, no race
-   conditions — CSS stacking order is deterministic and the class
-   change is applied synchronously so it can never be lost. */
 let modalZ = 2000;
 
 function transitionModal(closeId, openId) {
-    // 1. Close the outgoing modal
     if (closeId) {
         const closeEl = $(closeId);
         if (closeEl) closeEl.classList.remove('active');
     }
 
-    // 2. Open the incoming modal — always on top of whatever is below
     if (!openId) return;
     const openEl = $(openId);
     if (!openEl) return;
@@ -1553,7 +1525,7 @@ function disconnectStakeSocket() {
 }
 
 /* ============================================================
-   7. DEPOSIT / WITHDRAW — unified method picker
+   7. DEPOSIT / WITHDRAW
    ============================================================ */
 const METHOD_LOGOS = {
     telebirr: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Telebirr_logo.svg',
@@ -1585,54 +1557,55 @@ function methodIconHTML(type) {
 }
 
 function renderMethodList(methods, mode) {
-    const container = $('methodListContainer');
-    const title = $('methodListTitle');
-    const step = $('methodListStepLabel');
-    const backBtn = $('methodListBackBtn');
+    const container = $('depositMethodsContainer');
     if (!container) return;
 
-    title.innerHTML = t(mode === 'deposit' ? 'selectMethod' : 'selectWithdraw');
-    step.textContent = mode === 'deposit' ? 'Step 1/2' : '';
-    backBtn.style.display = '';
-
     if (!methods.length) {
-        container.innerHTML = `<div class="empty-state"><div class="ico">💳</div><div>No methods available</div></div>`;
+        container.innerHTML = `<div style="color:var(--text-dim); font-size:.8rem;">No methods available</div>`;
         return;
     }
 
     container.innerHTML = methods.map(m => {
         const label = METHOD_LABELS[m.type] || m.type;
-        const disp = mode === 'deposit' ? `<div class="num">${safeNumber(m.number)}</div>` : '';
-        return `<div class="method-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                    <div class="ico">${methodIconHTML(m.type)}</div>
-                    <div class="info">
-                        <div class="name">${label}</div>
-                        ${disp}
-                    </div>
-                    <div class="badge">Select</div>
-                </div>`;
+        const isSelected = state.selectedMethod && state.selectedMethod.type === m.type;
+        return `<button class="stake-option ${isSelected ? 'selected' : ''}" 
+                        data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}"
+                        style="width:auto; padding:10px 16px; font-size:.85rem; border-radius:var(--r-pill);">
+                    ${label}
+                </button>`;
     }).join('');
 
     container.onclick = e => {
-        const el = e.target.closest('.method-item');
-        if (!el) return;
-        const method = el.dataset.method;
-        const adminId = parseInt(el.dataset.admin, 10);
-        const number = el.dataset.number;
+        const btn = e.target.closest('.stake-option');
+        if (!btn) return;
+        const method = btn.dataset.method;
+        const adminId = parseInt(btn.dataset.admin, 10);
+        const number = btn.dataset.number;
         const admin = state.depositAdmins.find(a => a.id === adminId);
         if (!admin) return toast('Admin not found', 'error');
 
         state.selectedMethod = { type: method, adminId, number };
+        
+        // Update UI selection
+        container.querySelectorAll('.stake-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
 
-        if (mode === 'deposit') {
-            if (state.savedPhone) $('depositPhone').value = state.savedPhone;
-            if (state.savedAmount) $('depositAmount').value = state.savedAmount;
-            transitionModal('methodListModal', 'depositDetailsModal');
-        } else {
-            openWithdrawDetails(method, number);
-            transitionModal('methodListModal', 'withdrawModal');
-        }
+        // Update instructions
+        updateUnifiedInstructions();
     };
+}
+
+function updateUnifiedInstructions() {
+    const instructions = $('depositPaymentInstructions');
+    if (!state.selectedMethod) {
+        instructions?.classList.add('hidden');
+        return;
+    }
+    
+    const amount = parseFloat($('depositAmount').value) || 0;
+    $('unifiedAmountDisplay').textContent = amount.toFixed(2);
+    $('unifiedRecipient').textContent = `📞 ${safeNumber(state.selectedMethod.number)}`;
+    instructions?.classList.remove('hidden');
 }
 
 function resetDepositState() {
@@ -1643,19 +1616,15 @@ function resetDepositState() {
     state.submitting = false;
     state.methodMode = null;
 
-    ['depositPhone', 'depositAmount', 'paymentInvoice', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
+    ['depositPhone', 'depositAmount', 'unifiedInvoice', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
         .forEach(id => { const el = $(id); if (el) el.value = ''; });
 
-    ['paymentModal', 'depositDetailsModal', 'methodListModal', 'howToPayModal', 'withdrawModal']
-        .forEach(id => $(id)?.classList.remove('active'));
-
-    const btn = $('confirmPaymentBtn');
-    if (btn) { btn.disabled = false; btn.innerText = t('confirmPayment'); }
-}
-
-function closeMethodList() {
-    $('methodListModal')?.classList.remove('active');
-    resetDepositState();
+    ['depositModal', 'howToPayModal', 'withdrawModal'].forEach(id => $(id)?.classList.remove('active'));
+    
+    $('depositPaymentInstructions')?.classList.add('hidden');
+    
+    const btn = $('unifiedConfirmBtn');
+    if (btn) { btn.disabled = false; btn.innerText = t('requestDeposit'); }
 }
 
 async function loadAdmins() {
@@ -1678,10 +1647,10 @@ async function openDeposit() {
         if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
     });
     renderMethodList(methods, 'deposit');
-    // Method list also gets a fresh z-index so it renders above other modals
+    
     modalZ++;
-    $('methodListModal').style.zIndex = String(modalZ);
-    $('methodListModal').classList.add('active');
+    $('depositModal').style.zIndex = String(modalZ);
+    $('depositModal').classList.add('active');
     unlockSpeech();
 }
 
@@ -1701,46 +1670,9 @@ async function openWithdraw() {
     });
     renderMethodList(methods, 'withdraw');
     modalZ++;
-    $('methodListModal').style.zIndex = String(modalZ);
-    $('methodListModal').classList.add('active');
+    $('depositModal').style.zIndex = String(modalZ);
+    $('depositModal').classList.add('active');
     unlockSpeech();
-}
-
-function openWithdrawDetails(method, number) {
-    $('withdrawTitle').innerHTML = `Withdraw via ${METHOD_LABELS[method] || method}`;
-    $('withdrawPhone').placeholder = method === 'mpesa' ? '07xxxxxxxx' : '09xxxxxxxx';
-    unlockSpeech();
-}
-
-function requestDeposit() {
-    const phone  = $('depositPhone')?.value.trim()  || '';
-    const amount = $('depositAmount')?.value.trim() || '';
-
-    if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
-    if (!amount || Number(amount) < 10)  return toast('Minimum deposit is 10 ETB', 'error');
-
-    if (!state.selectedMethod) {
-        toast('Please pick a payment method again', 'info');
-        openDeposit();
-        return;
-    }
-
-    state.savedPhone   = phone;
-    state.savedAmount  = amount;
-    state.pendingAmount = Number(amount);
-
-    const amt = Number(amount).toFixed(2);
-    $('paymentAmountDisplay').textContent = amt + ' ETB';
-    $('paymentStepAmount').textContent    = amt;
-    $('paymentStepLabel').innerHTML       = t('sendTo').replace('{amount}', amt);
-    $('paymentRecipient').textContent     = `📞 ${safeNumber(state.selectedMethod.number)}`;
-    $('paymentMethodTitle').textContent   =
-        (METHOD_LABELS[state.selectedMethod.type] || state.selectedMethod.type) + ' P2P';
-
-    $('paymentMethodIcon').innerHTML = methodIconHTML(state.selectedMethod.type);
-
-    $('paymentInvoice').value = '';
-    transitionModal('depositDetailsModal', 'paymentModal');
 }
 
 function openHowToPay() {
@@ -1782,11 +1714,17 @@ function getPaymentInstructions(method) {
 
 async function submitDeposit() {
     if (state.submitting) return;
-    const invoice = $('paymentInvoice').value.trim();
+    const phone = $('depositPhone').value.trim();
+    const amount = $('depositAmount').value.trim();
+    const invoice = $('unifiedInvoice').value.trim();
+
+    if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
+    if (!amount || Number(amount) < 10)  return toast('Minimum deposit is 10 ETB', 'error');
+    if (!state.selectedMethod) return toast('Please select a payment method', 'error');
     if (!invoice) return toast('Please paste your Invoice Number', 'error');
 
     state.submitting = true;
-    const btn = $('confirmPaymentBtn');
+    const btn = $('unifiedConfirmBtn');
     const orig = btn.innerText;
     btn.disabled = true;
     btn.innerText = '⏳ Sending...';
@@ -1796,8 +1734,8 @@ async function submitDeposit() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                phone: state.savedPhone,
-                amount: state.pendingAmount,
+                phone: phone,
+                amount: Number(amount),
                 payment_type: state.selectedMethod.type,
                 admin_id: state.selectedMethod.adminId,
                 transaction_reference: invoice
@@ -1805,7 +1743,7 @@ async function submitDeposit() {
         });
         const d = await r.json();
         if (d.success) {
-            toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
+            toast(`✅ Deposit request sent: ${Number(amount).toFixed(2)} ETB`, 'success');
             resetDepositState();
         } else {
             toast('❌ ' + (d.error || 'Submission failed'), 'error');
@@ -1827,6 +1765,7 @@ async function submitWithdraw() {
     if (!name) return toast('Full name required', 'error');
     if (!amount || Number(amount) < 20) return toast('Minimum withdrawal is 20 ETB', 'error');
     if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
+    if (!state.selectedMethod) return toast('Please select a withdrawal method', 'error');
 
     const btn = $('submitWithdrawBtn');
     const orig = btn.innerText;
@@ -2424,32 +2363,34 @@ document.addEventListener('click', e => {
     }
 });
 
-// deposit / withdraw cancel & back
-$('methodListCancelBtn').addEventListener('click', closeMethodList);
-$('methodListBackBtn').addEventListener('click', closeMethodList);
-$('depositDetailsBackBtn').addEventListener('click', () => transitionModal('depositDetailsModal', 'methodListModal'));
-$('paymentBackBtn').addEventListener('click', () => {
-    transitionModal('paymentModal', 'depositDetailsModal');
-    if (state.savedPhone) $('depositPhone').value = state.savedPhone;
-    if (state.savedAmount) $('depositAmount').value = state.savedAmount;
-});
-$('withdrawBackBtn').addEventListener('click', () => {
-    transitionModal('withdrawModal', 'methodListModal');
-    openWithdraw();
+// unified deposit back
+$('unifiedBackBtn').addEventListener('click', () => {
+    $('depositModal').classList.remove('active');
+    resetDepositState();
 });
 
-// deposit request / confirm
-$('requestDepositBtn').addEventListener('click', requestDeposit);
-$('confirmPaymentBtn').addEventListener('click', submitDeposit);
-$('howToPayTrigger').addEventListener('click', openHowToPay);
-$('closeHowToPayBtn').addEventListener('click', () => $('howToPayModal').classList.remove('active'));
-$('paymentCopyBtn').addEventListener('click', () => {
-    const raw = $('paymentRecipient').textContent.replace('📞 ', '').trim();
+// unified deposit confirm
+$('unifiedConfirmBtn').addEventListener('click', submitDeposit);
+
+// amount input change to update instructions
+$('depositAmount').addEventListener('input', updateUnifiedInstructions);
+
+// copy button
+$('unifiedCopyBtn').addEventListener('click', () => {
+    const raw = $('unifiedRecipient').textContent.replace('📞 ', '').trim();
     copyText(raw);
 });
 
-// withdraw submit
+// how to pay
+$('howToPayTrigger').addEventListener('click', openHowToPay);
+$('closeHowToPayBtn').addEventListener('click', () => $('howToPayModal').classList.remove('active'));
+
+// withdraw submit & back
 $('submitWithdrawBtn').addEventListener('click', submitWithdraw);
+$('withdrawBackBtn').addEventListener('click', () => {
+    $('withdrawModal').classList.remove('active');
+    resetDepositState();
+});
 
 // rules
 $('rulesBtn').addEventListener('click', () => {
