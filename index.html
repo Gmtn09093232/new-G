@@ -1196,28 +1196,29 @@ input  { font-family: inherit; }
 
 <!-- ============ GAME PAGE ============ -->
 <div id="gamePage" class="page hidden">
+    <!-- Modified Top Header: Game ID + Back to Lobby + Players Count -->
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div style="font-weight:700; font-size:.9rem; color:var(--text-dim);">Game #<span id="gameIdDisplay">...</span></div>
-        <div class="badge-pill">👥 <span id="gamePlayersCount">0</span></div>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <button class="btn-ghost" style="padding:4px 10px; font-size:.7rem;" data-action="goStake" data-key="backToLobby">← Back to Lobby</button>
+            <div class="badge-pill">👥 <span id="gamePlayersCount">0</span></div>
+        </div>
     </div>
 
+    <!-- Modified Balance Bar: Removed Rules and Sound buttons -->
     <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
         <div style="font-size:.85rem;">💰 <span id="gameBalance" style="color:var(--accent); font-weight:800;">0</span> ETB</div>
         <div style="display:flex; gap:6px;">
             <button class="btn-ghost" style="padding:4px 12px; color:var(--accent); border-color:var(--accent-line); font-size:.7rem;" data-action="deposit" data-key="deposit">+Deposit</button>
             <button class="btn-ghost" style="padding:4px 12px; font-size:.7rem;" data-action="withdraw" data-key="withdraw">-Withdraw</button>
-            <button id="muteToggleBtn" class="mute-btn">🔊</button>
         </div>
-        <button id="rulesBtnGame" class="btn-ghost" style="padding:4px 12px; font-size:.7rem;" data-key="rulesBtn">📜 Rules</button>
     </div>
+
+    <!-- Removed original #backToLobbyContainer location -->
 
     <div class="prize-pool">
         <span class="label" data-key="prizePoolLabel">🏆 PRIZE POOL</span>
         <div class="value" id="winningBalance">0 ETB</div>
-    </div>
-
-    <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
-        <button class="btn-secondary" style="padding:10px 24px; border-radius:40px; font-weight:600;" data-action="goStake" data-key="backToLobby">← Back to Lobby</button>
     </div>
 
     <div class="last-call">
@@ -2014,10 +2015,6 @@ function updateCount(c) {
     if ($('gamePlayersCount')) $('gamePlayersCount').innerText = v;
 }
 
-function updateBackToLobbyVisibility() {
-    $('backToLobbyContainer')?.classList.toggle('hidden', state.selectedCard !== null);
-}
-
 function showLobby(sec) {
     state.currentPage = 'lobby';
     state.timerSeconds = sec;
@@ -2028,7 +2025,6 @@ function showLobby(sec) {
     startTimer(sec);
     if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
     updateStats();
-    $('backToLobbyContainer')?.classList.add('hidden');
 }
 
 function showGame() {
@@ -2038,7 +2034,6 @@ function showGame() {
     clearInterval(lobbyTimer);
     socket?.emit('getBalance');
     if (state.userCard.length) renderCard(state.userCard, 'gameCard', true);
-    updateBackToLobbyVisibility();
 }
 
 function startTimer(sec) {
@@ -2072,7 +2067,6 @@ function goStake() {
     clearInterval(lobbyTimer);
     switchPage('stakePage');
     $('selectedNumber').textContent = '-';
-    $('backToLobbyContainer')?.classList.add('hidden');
     scheduleGridPaint();
     connectStakeSocket();
     unlockSpeech();
@@ -2088,7 +2082,8 @@ function showWinner(d) {
     const each = d.prizeEach || 0;
 
     $('winTitle').innerHTML = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
-    $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">${w}</span>`).join('');
+    // Display card number instead of name
+    $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">🎴 Card #${w}</span>`).join('');
     $('winPrize').innerHTML = each + ' <small>ETB</small>';
     $('winnerOverlay').classList.add('active');
 
@@ -2219,7 +2214,6 @@ async function connectToGame(stake) {
         updateCount(state.serverTaken.size);
         if (d.number === state.selectedCard) {
             scheduleGridPaint();
-            updateBackToLobbyVisibility();
         }
     });
 
@@ -2267,7 +2261,6 @@ async function connectToGame(stake) {
         state.currentGameId = null;
         state.markedNumbers = new Set();
         if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
-        $('backToLobbyContainer')?.classList.add('hidden');
     });
 
     socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
@@ -2303,25 +2296,6 @@ function unlockSpeech() {
     u.volume = 0;
     speechSynthesis.speak(u);
     setTimeout(() => speechSynthesis.cancel(), 100);
-}
-
-function toggleMute() {
-    state.soundMuted = !state.soundMuted;
-    localStorage.setItem('dot_bingo_sound_muted', state.soundMuted);
-    updateMute();
-    if (state.soundMuted && state.utterance) {
-        speechSynthesis.cancel();
-        state.utterance = null;
-    }
-    unlockSpeech();
-}
-
-function updateMute() {
-    const btn = $('muteToggleBtn');
-    if (!btn) return;
-    btn.textContent = state.soundMuted ? '🔇' : '🔊';
-    btn.style.background = state.soundMuted ? 'var(--bg-soft)' : 'var(--accent-soft)';
-    btn.style.color = state.soundMuted ? 'var(--text-dim)' : 'var(--accent)';
 }
 
 const AM_LETTERS = n => n <= 15 ? "ቢ" : n <= 30 ? "አይ" : n <= 45 ? "ኤን" : n <= 60 ? "ጂ" : "ኦ";
@@ -2385,7 +2359,6 @@ $('randomCardBtn').addEventListener('click', () => {
     state.selectedCard = null;
     $('selectedNumber').textContent = '⚡ ...';
     scheduleGridPaint();
-    updateBackToLobbyVisibility();
     unlockSpeech();
 });
 
@@ -2403,7 +2376,6 @@ $('numberGrid').addEventListener('click', e => {
     $('selectedNumber').textContent = i;
     scheduleGridPaint();
     socket.emit('selectCardNumber', i);
-    updateBackToLobbyVisibility();
 }, { passive: true });
 
 // bingo claim
@@ -2411,9 +2383,6 @@ $('bingoBtn').addEventListener('click', () => {
     if (socket && state.isGameActive) socket.emit('claimBingo');
     unlockSpeech();
 });
-
-// mute
-$('muteToggleBtn').addEventListener('click', toggleMute);
 
 // tab bar
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -2492,11 +2461,6 @@ $('rulesBtn').addEventListener('click', () => {
     $('rulesModal').style.zIndex = String(modalZ);
     $('rulesModal').classList.add('active');
 });
-$('rulesBtnGame').addEventListener('click', () => {
-    modalZ++;
-    $('rulesModal').style.zIndex = String(modalZ);
-    $('rulesModal').classList.add('active');
-});
 $('closeRulesBtn').addEventListener('click', () => $('rulesModal').classList.remove('active'));
 
 // winner celebrate
@@ -2517,7 +2481,6 @@ async function init() {
     if (!checkInviteRequired()) return;
     buildGridOnce();
     loadStats();
-    updateMute();
     applyLang();
     switchPage('stakePage');
     connectStakeSocket();
