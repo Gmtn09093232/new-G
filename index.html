@@ -1075,9 +1075,16 @@ input  { font-family: inherit; }
         <div class="badge-pill">🎮 LOBBY</div>
     </div>
 
-    <div id="inviteInfoContainer" class="invite-info hidden">
-        <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
-        <span class="invite-code mono" id="userInviteCode">—</span>
+    <!-- ✅ MODIFIED: Added Deposit and Withdraw buttons next to the Invite Code -->
+    <div id="inviteInfoContainer" class="invite-info" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px;">
+        <div>
+            <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
+            <span class="invite-code mono" id="userInviteCode">—</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+            <button class="btn-primary" style="padding: 6px 14px; border-radius: 40px; font-size: 0.75rem; min-height: 34px; height: auto;" data-action="deposit" data-key="deposit">+Deposit</button>
+            <button class="btn-secondary" style="padding: 6px 14px; border-radius: 40px; font-size: 0.75rem; min-height: 34px; height: auto;" data-action="withdraw" data-key="withdraw">-Withdraw</button>
+        </div>
     </div>
 
     <div class="stake-table-wrap">
@@ -1493,15 +1500,12 @@ async function fetchInvite() {
 
 function setInviteCode(code) {
     userInvite.code = code || null;
-    const container = $('inviteInfoContainer');
     const codeEl = $('userInviteCode');
     const profileCode = $('profileInviteCode');
     if (code) {
-        container?.classList.remove('hidden');
         if (codeEl) codeEl.textContent = code;
         if (profileCode) profileCode.textContent = code;
     } else {
-        container?.classList.add('hidden');
         if (profileCode) profileCode.textContent = '—';
     }
 }
@@ -2576,15 +2580,12 @@ async function init() {
     loadStats();
     updateMute();
     applyLang();
-    switchPage('stakePage');
+    switchPage('stakePage'); // Always opens to the stake/lobby page
     connectStakeSocket();
     await authenticate();
     await fetchInvite();
-
-    const saved = parseInt(localStorage.getItem('dot_bingo_stake'), 10);
-    if ([10, 20, 30].includes(saved)) {
-        setTimeout(() => connectToGame(saved), 500);
-    }
+    
+    // Removed auto-join logic here so the app always opens to the lobby page.
 }
 
 init();
