@@ -1075,11 +1075,14 @@ input  { font-family: inherit; }
         <div class="badge-pill">🎮 LOBBY</div>
     </div>
 
-    <!-- ✅ MODIFIED: Added Deposit and Withdraw buttons next to the Invite Code -->
-    <div id="inviteInfoContainer" class="invite-info" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px;">
+    <!-- ✅ MODIFIED: Added Balance, Removed Withdraw Button -->
+    <div id="inviteInfoContainer" class="invite-info" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
         <div>
             <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
             <span class="invite-code mono" id="userInviteCode">—</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--accent); font-size: 0.9rem;">
+            💰 <span data-key="bal">BAL</span> <span id="stakeBalance">0</span> ETB
         </div>
         <div style="display: flex; gap: 6px;">
             <button class="btn-primary" style="padding: 6px 14px; border-radius: 40px; font-size: 0.75rem; min-height: 34px; height: auto;" data-action="deposit" data-key="deposit">+Deposit</button>
@@ -1406,8 +1409,8 @@ const state = {
     selectedCard: null,
     isGameActive: false,
     balance: 0,
-    balanceLoaded: false,        // ✅ NEW
-    awaitingStakeCheck: false,   // ✅ NEW
+    balanceLoaded: false,
+    awaitingStakeCheck: false,
     totalGames: 0,
     recentGames: [],
     currentGameId: null,
@@ -1484,6 +1487,7 @@ async function authenticate() {
         if (d.success) {
             $('profileUsername').innerText = d.username || 'Player';
             setInviteCode(d.invite_code);
+            if (d.balance !== undefined) syncBalance(d.balance);
         }
         return d;
     } catch (e) { console.error('Auth error:', e); return null; }
@@ -1495,6 +1499,14 @@ async function fetchInvite() {
         const d = await r.json();
         if (d.success) setInviteCode(d.invite_code);
     } catch (e) { console.error(e); }
+}
+
+async function fetchBalance() {
+    try {
+        const r = await fetch('/api/user/balance');
+        const d = await r.json();
+        if (d.success) syncBalance(d.balance);
+    } catch (e) { console.error('Balance fetch error:', e); }
 }
 
 function setInviteCode(code) {
@@ -1545,6 +1557,7 @@ function connectStakeSocket() {
     stakeSocket = io('/public');
     stakeSocket.on('playersCount', d => updateStakeTable(d.stake, d.count));
     stakeSocket.on('lobbyState',  s => updateStakeTable(s.stake, s.playersCount));
+    stakeSocket.on('balanceUpdate', syncBalance); // Listen for balance updates on public socket
 }
 function disconnectStakeSocket() {
     if (!stakeSocket) return;
@@ -1831,6 +1844,9 @@ async function submitDeposit() {
             if (d.success) {
                 toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
                 resetDepositState();
+                // Refresh balance
+                if (socket) socket.emit('getBalance');
+                else fetchBalance();
             } else {
                 toast('❌ ' + (d.error || 'Submission failed'), 'error');
             }
@@ -1882,6 +1898,9 @@ async function submitWithdraw() {
             toast('✅ Withdrawal request submitted!', 'success');
             $('withdrawModal').classList.remove('active');
             resetDepositState();
+            // Refresh balance
+            if (socket) socket.emit('getBalance');
+            else fetchBalance();
         } else {
             toast('❌ ' + (d.error || 'Submission failed'), 'error');
         }
@@ -2204,6 +2223,7 @@ function syncBalance(v) {
     set('walletBalance', v);
     set('profileBalance', v);
     set('gameBalance', v);
+    set('stakeBalance', v); // Added this line
 
     // ✅ NEW: verify stake affordability right after joining a lobby
     if (state.awaitingStakeCheck) {
@@ -2583,6 +2603,7 @@ async function init() {
     connectStakeSocket();
     await authenticate();
     await fetchInvite();
+    await fetchBalance(); // Ensure balance is fetched on load
     
     // Removed auto-join logic here so the app always opens to the lobby page.
 }
