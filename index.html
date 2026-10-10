@@ -2122,7 +2122,9 @@ function showWinner(d) {
     // ✅ Modified to display card number instead of player name
     $('winListContainer').innerHTML = winners.map((w, index) => {
         let cardNum = null;
-        if (d.winnerCards && d.winnerCards[index]) {
+        
+        // Try to extract card number from various possible server payloads
+        if (d.winnerCards && Array.isArray(d.winnerCards) && d.winnerCards[index]) {
             cardNum = d.winnerCards[index];
         } else if (d.winnerCard) {
             cardNum = d.winnerCard;
@@ -2130,7 +2132,8 @@ function showWinner(d) {
             cardNum = state.selectedCard;
         }
         
-        const displayText = cardNum ? `card #${cardNum}` : w;
+        // Strictly display card number format, fallback to '?' if unknown
+        const displayText = cardNum ? `card #${cardNum}` : `card #?`;
         return `<span class="winner-badge">${displayText}</span>`;
     }).join('');
 
