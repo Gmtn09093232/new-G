@@ -1227,6 +1227,11 @@ input  { font-family: inherit; }
 
     <button id="bingoBtn" data-key="claimBingo">🏆 BINGO! 🏆</button>
 
+    <!-- ✅ NEW: Back to Lobby (game page only) -->
+    <div id="backToLobbyContainer" class="hidden" style="margin-top:4px;">
+        <button class="btn-ghost" style="width:100%;" data-action="goStake" data-key="backToLobby">← Back to Lobby</button>
+    </div>
+
     <div class="tab-bar">
         <button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button>
         <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
@@ -1320,6 +1325,7 @@ const I18N = {
         winningPrize:"🎁 የሽልማት ገንዘብ", amazing:"🎉 ደስ ያለኝ! 🎉",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back to Lobby",
+        insufficientBalance:"የማይበቃ ቀሪ ሂሳብ! እባክዎ መጀመሪያ ገንዘብ ያስገቡ።",
     },
     en: {
         deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"✔ Request Deposit", back:"← Back", cancel:"Cancel",
@@ -1367,6 +1373,7 @@ const I18N = {
         winningPrize:"🎁 WINNING PRIZE", amazing:"🎉 Amazing! 🎉",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back to Lobby",
+        insufficientBalance:"Insufficient balance! Please deposit first.",
     }
 };
 
@@ -1393,6 +1400,8 @@ const state = {
     selectedCard: null,
     isGameActive: false,
     balance: 0,
+    balanceLoaded: false,        // ✅ NEW
+    awaitingStakeCheck: false,   // ✅ NEW
     totalGames: 0,
     recentGames: [],
     currentGameId: null,
@@ -2012,7 +2021,8 @@ function updateCount(c) {
 }
 
 function updateBackToLobbyVisibility() {
-    $('backToLobbyContainer')?.classList.toggle('hidden', state.selectedCard !== null);
+    // ✅ Back to Lobby is only shown while a game is active (game page)
+    $('backToLobbyContainer')?.classList.toggle('hidden', !state.isGameActive);
 }
 
 function showLobby(sec) {
@@ -2065,6 +2075,7 @@ function goStake() {
     state.displayTaken = new Set();
     state.isGameActive = false;
     state.currentGameId = null;
+    state.awaitingStakeCheck = false;
     localStorage.removeItem('dot_bingo_stake');
     clearInterval(lobbyTimer);
     switchPage('stakePage');
@@ -2184,11 +2195,21 @@ function updateStats() {
 
 function syncBalance(v) {
     state.balance = v;
+    state.balanceLoaded = true;
     const set = (id, val) => { const el = $(id); if (el) el.innerText = val; };
     set('lobbyBalance', v);
     set('walletBalance', v);
     set('profileBalance', v);
     set('gameBalance', v);
+
+    // ✅ NEW: verify stake affordability right after joining a lobby
+    if (state.awaitingStakeCheck) {
+        state.awaitingStakeCheck = false;
+        if (state.stake && v < state.stake) {
+            toast(t('insufficientBalance'), 'error');
+            goStake();
+        }
+    }
 }
 
 /* ============================================================
@@ -2198,6 +2219,7 @@ async function connectToGame(stake) {
     if (!tg?.initData) return toast('Open inside Telegram', 'error');
 
     state.stake = stake;
+    state.awaitingStakeCheck = true; // ✅ NEW
     localStorage.setItem('dot_bingo_stake', stake);
     disconnectStakeSocket();
 
@@ -2206,6 +2228,13 @@ async function connectToGame(stake) {
 
     socket.on('connect', () => socket.emit('joinLobby', { stake }));
     socket.on('balanceUpdate', syncBalance);
+
+    // ✅ NEW: server-side rejection handling
+    socket.on('insufficientBalance', () => {
+        state.awaitingStakeCheck = false;
+        toast(t('insufficientBalance'), 'error');
+        goStake();
+    });
 
     socket.on('lobbyState', s => {
         if (s.stake !== stake) return;
@@ -2279,7 +2308,8 @@ async function connectToGame(stake) {
         state.currentGameId = null;
         state.markedNumbers = new Set();
         if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
-        $('backToLobbyContainer')?.classList.add('hidden');
+        // ✅ keep "Back to Lobby" visible after the round ends
+        updateBackToLobbyVisibility();
     });
 
     socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
@@ -2384,6 +2414,13 @@ document.querySelectorAll('.stake-option').forEach(btn => {
     btn.addEventListener('click', () => {
         loadStats();
         const stake = parseInt(btn.dataset.stake, 10);
+
+        // ✅ NEW: block low-balance players
+        if (state.balanceLoaded && state.balance < stake) {
+            toast(t('insufficientBalance'), 'error');
+            return;
+        }
+
         connectToGame(stake);
         showLobby(30);
         unlockSpeech();
