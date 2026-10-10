@@ -11,6 +11,9 @@
 <link rel="preconnect" href="https://telegram.org">
 <link rel="dns-prefetch" href="https://upload.wikimedia.org">
 
+<!-- ✅ Font Awesome for Modern Solid Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 
@@ -89,6 +92,13 @@ input  { font-family: inherit; }
 .hidden { display: none !important; }
 .mono   { font-family: 'Inter', monospace; }
 
+/* Font Awesome Icon Alignment */
+.fa-solid, .fa-regular, .fa-brands {
+    display: inline-block;
+    vertical-align: -0.125em;
+    line-height: 1;
+}
+
 /* ============================================================
    3. PAGE SHELL
    ============================================================ */
@@ -141,8 +151,6 @@ input  { font-family: inherit; }
     display: flex;
     align-items: center;
     justify-content: center;
-    /* z-index is set dynamically in JS so the newest modal always
-       wins the stack — no DOM reordering needed. */
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
@@ -1423,21 +1431,14 @@ function switchPage(id) {
     next.classList.remove('hidden');
 }
 
-/* ✅ Z-INDEX BASED MODAL TRANSITIONS
-   Every time a modal opens, it gets a fresh z-index higher than any
-   modal that came before it. No DOM reordering, no rAF, no race
-   conditions — CSS stacking order is deterministic and the class
-   change is applied synchronously so it can never be lost. */
 let modalZ = 2000;
 
 function transitionModal(closeId, openId) {
-    // 1. Close the outgoing modal
     if (closeId) {
         const closeEl = $(closeId);
         if (closeEl) closeEl.classList.remove('active');
     }
 
-    // 2. Open the incoming modal — always on top of whatever is below
     if (!openId) return;
     const openEl = $(openId);
     if (!openEl) return;
@@ -1622,7 +1623,6 @@ function renderMethodList(methods, mode) {
     };
 }
 
-/* ✅ Populate the payment info inside the combined deposit modal */
 function populateDepositInfo() {
     const m = state.selectedMethod;
     if (!m) return;
@@ -1634,7 +1634,6 @@ function populateDepositInfo() {
     updatePaymentAmountDisplay();
 }
 
-/* ✅ Live amount display (big number + step label + pendingAmount) */
 function updatePaymentAmountDisplay() {
     const raw = $('depositAmount')?.value.trim() || '';
     const num = raw ? Number(raw) : 0;
@@ -1694,7 +1693,6 @@ async function openDeposit() {
         if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
     });
     renderMethodList(methods, 'deposit');
-    // Method list also gets a fresh z-index so it renders above other modals
     modalZ++;
     $('methodListModal').style.zIndex = String(modalZ);
     $('methodListModal').classList.add('active');
@@ -1765,7 +1763,6 @@ function getPaymentInstructions(method) {
     `;
 }
 
-/* ✅ Single-step deposit submission (combined modal) */
 async function submitDeposit() {
     if (state.submitting) return;
 
@@ -2493,6 +2490,140 @@ async function init() {
 }
 
 init();
+
+/* ============================================================
+   15. MODERN ICON REPLACEMENT (Font Awesome Solid)
+   ============================================================ */
+(function () {
+  // Mapping of emojis used in the app to Font Awesome Solid classes
+  const EMOJI_MAP = {
+    '🔑': 'fa-solid fa-key',
+    '🚀': 'fa-solid fa-rocket',
+    '💳': 'fa-solid fa-credit-card',
+    '💸': 'fa-solid fa-money-bill-transfer',
+    '🏧': 'fa-solid fa-building-columns',
+    '📞': 'fa-solid fa-phone',
+    '💰': 'fa-solid fa-wallet',
+    '⚠️': 'fa-solid fa-triangle-exclamation',
+    '⚠': 'fa-solid fa-triangle-exclamation',
+    '✔': 'fa-solid fa-check',
+    '✔️': 'fa-solid fa-check',
+    '📖': 'fa-solid fa-book-open',
+    '📌': 'fa-solid fa-thumbtack',
+    '⏳': 'fa-solid fa-hourglass-half',
+    '✅': 'fa-solid fa-circle-check',
+    '❌': 'fa-solid fa-circle-xmark',
+    '⏱️': 'fa-solid fa-stopwatch',
+    '⏱': 'fa-solid fa-stopwatch',
+    '👤': 'fa-solid fa-user',
+    '📜': 'fa-solid fa-scroll',
+    '🎲': 'fa-solid fa-dice',
+    '🏆': 'fa-solid fa-trophy',
+    '💡': 'fa-solid fa-lightbulb',
+    '⚖️': 'fa-solid fa-scale-balanced',
+    '⚖': 'fa-solid fa-scale-balanced',
+    '🎉': 'fa-solid fa-champagne-glasses',
+    '➕': 'fa-solid fa-plus',
+    '➖': 'fa-solid fa-minus',
+    '✨': 'fa-solid fa-wand-magic-sparkles',
+    '🎁': 'fa-solid fa-gift',
+    '🎮': 'fa-solid fa-gamepad',
+    '👥': 'fa-solid fa-users',
+    '🎯': 'fa-solid fa-bullseye',
+    '🎴': 'fa-solid fa-layer-group',
+    '📢': 'fa-solid fa-bullhorn',
+    '🔇': 'fa-solid fa-volume-xmark',
+    '🔊': 'fa-solid fa-volume-high',
+    '1️⃣': 'fa-solid fa-1',
+    '2️⃣': 'fa-solid fa-2',
+    '←': 'fa-solid fa-arrow-left',
+    '→': 'fa-solid fa-arrow-right',
+    '↺': 'fa-solid fa-rotate-left',
+    '📱': 'fa-solid fa-mobile-screen',
+    '🏦': 'fa-solid fa-building-columns',
+    '📲': 'fa-solid fa-mobile-screen-button',
+    '📊': 'fa-solid fa-chart-simple',
+    '📋': 'fa-solid fa-clipboard',
+    '📍': 'fa-solid fa-location-dot',
+    '🔒': 'fa-solid fa-lock',
+    '🔓': 'fa-solid fa-lock-open',
+    '⚙️': 'fa-solid fa-gear',
+    '🔔': 'fa-solid fa-bell',
+    '💬': 'fa-solid fa-comment',
+    '📧': 'fa-solid fa-envelope',
+    '📩': 'fa-solid fa-envelope-open',
+    '📤': 'fa-solid fa-upload',
+    '📥': 'fa-solid fa-download',
+    '📦': 'fa-solid fa-box',
+    '📄': 'fa-solid fa-file-lines',
+    '📈': 'fa-solid fa-arrow-trend-up',
+    '📉': 'fa-solid fa-arrow-trend-down',
+    '🗑️': 'fa-solid fa-trash-can',
+    '🔨': 'fa-solid fa-hammer',
+    '🔧': 'fa-solid fa-wrench',
+    '🛡️': 'fa-solid fa-shield-halved',
+    '★': 'fa-solid fa-star',
+    '🕐': 'fa-solid fa-clock-rotate-left'
+  };
+
+  const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const emojiKeys = Object.keys(EMOJI_MAP).sort((a, b) => b.length - a.length);
+  const emojiRegex = new RegExp('(' + emojiKeys.map(escapeRegExp).join('|') + ')', 'g');
+
+  function replaceEmojisInTextNode(textNode) {
+    const text = textNode.nodeValue;
+    if (!text || !emojiRegex.test(text)) return;
+
+    const html = text.replace(emojiRegex, (match) => {
+      const iconClass = EMOJI_MAP[match];
+      return `<i class="${iconClass}"></i>`;
+    });
+
+    const temp = document.createElement('span');
+    temp.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    while (temp.firstChild) frag.appendChild(temp.firstChild);
+    textNode.parentNode.replaceChild(frag, textNode);
+  }
+
+  function replaceEmojisInNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      replaceEmojisInTextNode(node);
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const tag = node.tagName.toLowerCase();
+      // Skip scripts, styles, svgs, and already replaced icons
+      if (['script', 'style', 'svg', 'path', 'i'].includes(tag)) return;
+      Array.from(node.childNodes).forEach(replaceEmojisInNode);
+    }
+  }
+
+  function runReplacement() {
+    replaceEmojisInNode(document.body);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', runReplacement);
+  } else {
+    runReplacement();
+  }
+
+  // Watch for dynamically added content (modals, toasts, game updates)
+  const observer = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === 'childList') {
+        m.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
+            replaceEmojisInNode(node);
+          }
+        });
+      } else if (m.type === 'characterData') {
+        replaceEmojisInTextNode(m.target);
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+})();
 </script>
 </body>
 </html>
