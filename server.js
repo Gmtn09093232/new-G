@@ -2,6 +2,7 @@
 //  server.js – Full Bingo Server
 //             with invite tracking (invite_code, admin_name)
 //             & FORCE INVITE ONLY (no invite → no account)
+//             & Base64 Screenshot Upload Support
 // ================================================================
 
 require('dotenv').config();
@@ -80,7 +81,8 @@ const upload = multer({
   }
 });
 
-app.use(express.json());
+// 🔥 UPDATED: Increased JSON limit to handle Base64 image strings from the frontend
+app.use(express.json({ limit: '10mb' }));
 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'bingo_mega_secret',
@@ -1932,7 +1934,9 @@ app.get('/admin/bot-history', (req, res) => {
 app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
-// ---------- Player deposit endpoints ----------
+// ============================================================
+//  🔥 UPDATED: Player deposit endpoints – Supports Base64 Image
+// ============================================================
 const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1945,19 +1949,27 @@ const handleDepositRequest = async (req, res) => {
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
+  // Check if the incoming reference is a Base64 image from the updated frontend
+  const isBase64Image = transaction_reference && transaction_reference.startsWith('data:image/');
+
   if (!photoFile && !transaction_reference) {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
   let extractedTxn = null;
-  if (transaction_reference) {
+  let photoUrl = null;
+
+  if (isBase64Image) {
+    // It's a Base64 image from the frontend, save it directly
+    photoUrl = transaction_reference;
+  } else if (transaction_reference) {
+    // It's a text transaction reference, extract the number
     extractedTxn = extractTransactionNumber(transaction_reference);
     if (!extractedTxn) {
       return res.status(400).json({ error: 'Could not extract a valid transaction number from the provided text. Please paste the full SMS or the transaction number.' });
     }
-  }
 
-  if (extractedTxn) {
+    // Check for duplicate text transaction numbers
     const { data: existing, error: dupErr } = await supabase
       .from('deposit_requests')
       .select('id')
@@ -1989,7 +2001,7 @@ const handleDepositRequest = async (req, res) => {
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    let photoUrl = null;
+    // Handle multer file upload if present (backward compatibility)
     if (photoFile) {
       const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
       const fileName = `${uuidv4()}.${fileExt}`;
@@ -2015,15 +2027,7 @@ const handleDepositRequest = async (req, res) => {
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
-        let errorMsg = 'Failed to upload photo proof';
-        if (uploadError.message.includes('bucket not found')) {
-          errorMsg = 'Storage bucket not configured. Please contact admin.';
-        } else if (uploadError.message.includes('permission')) {
-          errorMsg = 'Permission denied. Check Supabase storage policies.';
-        } else if (uploadError.message.includes('duplicate')) {
-          errorMsg = 'File already exists. Please rename and retry.';
-        }
-        return res.status(500).json({ error: errorMsg, details: uploadError.message });
+        return res.status(500).json({ error: 'Failed to upload photo proof', details: uploadError.message });
       }
 
       const { data: publicUrlData } = supabase.storage
@@ -2032,6 +2036,7 @@ const handleDepositRequest = async (req, res) => {
       photoUrl = publicUrlData?.publicUrl || null;
     }
 
+    // Insert into database: save text reference in transaction_reference, image in proof_photo_url
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -2039,8 +2044,8 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: extractedTxn,
-      proof_photo_url: photoUrl,
+      transaction_reference: extractedTxn, // Will be null if it's an image
+      proof_photo_url: photoUrl,           // Holds the Base64 string or Supabase URL
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
     }).select().single();
