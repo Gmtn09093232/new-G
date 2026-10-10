@@ -1245,7 +1245,7 @@
         </div>
     </div>
 
-    <!-- Proof Modal (kept for backward compatibility) -->
+    <!-- Proof Modal -->
     <div id="proofModal" class="modal" onclick="if(event.target===this) closeProofModal()">
         <div class="modal-content" style="position:relative; max-width:600px; background:transparent; padding:0; border-radius:16px; overflow:hidden;">
             <button class="close-btn" onclick="closeProofModal()"><i class="fas fa-times"></i></button>
@@ -1600,6 +1600,7 @@
                     let cbePhone = null;
                     const fullText = req.transaction_reference || '';
                     const paymentType = req.payment_type || '';
+                    let isImage = fullText.startsWith('data:image/');
 
                     function extractCbeData(text) {
                         let tid = null;
@@ -1611,27 +1612,37 @@
                         return { tid, ph };
                     }
 
-                    if (paymentType === 'cbebirr') {
-                        const cbeData = extractCbeData(fullText);
-                        if (cbeData.tid) {
-                            txnRef = cbeData.tid;
-                            cbePhone = cbeData.ph;
+                    if (!isImage) {
+                        if (paymentType === 'cbebirr') {
+                            const cbeData = extractCbeData(fullText);
+                            if (cbeData.tid) {
+                                txnRef = cbeData.tid;
+                                cbePhone = cbeData.ph;
+                            } else {
+                                const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
+                                if (fallbackMatch) txnRef = fallbackMatch[1];
+                            }
                         } else {
-                            const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
-                            if (fallbackMatch) txnRef = fallbackMatch[1];
-                        }
-                    } else {
-                        const txnMatch = fullText.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
-                        if (txnMatch && txnMatch[1]) {
-                            txnRef = txnMatch[1];
-                        } else {
-                            const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
-                            if (fallbackMatch) txnRef = fallbackMatch[1];
+                            const txnMatch = fullText.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
+                            if (txnMatch && txnMatch[1]) {
+                                txnRef = txnMatch[1];
+                            } else {
+                                const fallbackMatch = fullText.match(/\b([A-Z0-9]{8,15})\b/);
+                                if (fallbackMatch) txnRef = fallbackMatch[1];
+                            }
                         }
                     }
 
-                    let receiptLink = null;
-                    if (txnRef) {
+                    let receiptDisplay = '';
+                    if (isImage) {
+                        receiptDisplay = `
+                          <div style="display:flex; align-items:center; gap:8px;">
+                            <img src="${fullText}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; cursor:pointer;" onclick="viewProof('${fullText}')" alt="Proof">
+                            <button class="link-btn" onclick="viewProof('${fullText}')"><i class="fas fa-image"></i> View Screenshot</button>
+                          </div>
+                        `;
+                    } else if (txnRef) {
+                        let receiptLink = null;
                         if (paymentType === 'cbebirr') {
                             let phoneParam = cbePhone ? cbePhone : '';
                             if (phoneParam && phoneParam.startsWith('09')) {
@@ -1641,12 +1652,7 @@
                         } else {
                             receiptLink = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
                         }
-                    }
 
-                    const formattedDate = new Date(req.created_at).toLocaleString();
-
-                    let receiptDisplay = '';
-                    if (txnRef) {
                         receiptDisplay = `
                           <div class="txn-ref-wrap">
                             <span class="txn-ref">${escapeHtml(txnRef)}</span>
@@ -1658,6 +1664,8 @@
                     } else {
                         receiptDisplay = `<span style="color:#94a3b8;font-size:11px;">—</span>`;
                     }
+
+                    const formattedDate = new Date(req.created_at).toLocaleString();
 
                     return `
                     <tr>
