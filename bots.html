@@ -59,6 +59,17 @@
       cursor: pointer;
     }
     .reset-all-btn:hover { background: #d35400; }
+    /* NEW: zero / stop button */
+    .zero-all-btn {
+      background: #c0392b;
+      color: #fff;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .zero-all-btn:hover { background: #96281b; }
     .stats-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -120,6 +131,17 @@
       font-size: 0.8rem;
     }
     .btn-set:hover { background: #27ae60; }
+    /* NEW: per-bot zero button */
+    .btn-zero {
+      background: #c0392b;
+      border: none;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .btn-zero:hover { background: #96281b; }
     .balance-input {
       width: 70px;
       padding: 4px;
@@ -155,6 +177,8 @@
       <button onclick="fetchStats()">Apply Filter</button>
       <button class="refresh-btn" onclick="fetchStats()">↻ Refresh</button>
       <button class="reset-all-btn" onclick="resetAllBalances()">Reset All Balances to 1000</button>
+      <!-- NEW BUTTON -->
+      <button class="zero-all-btn" onclick="zeroAllBalances()">⛔ Zero All Balances (Stop Bots)</button>
     </div>
     <div id="statsDisplay">
       <div class="stats-grid" id="summaryStats">
@@ -246,7 +270,6 @@
   async function resetAllBalances() {
     if (!confirm('Reset all bot balances to 1000 ETB?')) return;
     try {
-      // Get current bot list from the table (or we can fetch fresh)
       const statusData = await fetchJSON(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`);
       const bots = statusData.bots;
       for (const bot of bots) {
@@ -256,6 +279,37 @@
       fetchStats();
     } catch (err) {
       showMessage('Error resetting balances: ' + err.message, 'error');
+    }
+  }
+
+  /* NEW: zero every bot's balance so they can no longer pay the entry fee */
+  async function zeroAllBalances() {
+    if (!confirm('Set ALL bot balances to 0 ETB?\n\nThis will STOP all bots from playing until you reset their balance again.')) return;
+    try {
+      const statusData = await fetchJSON(`/admin/bots-status?secret=${encodeURIComponent(ADMIN_SECRET)}`);
+      const bots = statusData.bots;
+      let failed = 0;
+      for (const bot of bots) {
+        try {
+          const resp = await fetch('/admin/bot-reset-balance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret: ADMIN_SECRET, botId: bot.id, newBalance: 0 })
+          });
+          const data = await resp.json();
+          if (!data.success) failed++;
+        } catch (e) {
+          failed++;
+        }
+      }
+      if (failed === 0) {
+        showMessage(`⛔ All ${bots.length} bot balances set to 0 — bots stopped.`, 'success');
+      } else {
+        showMessage(`⚠️ Done with ${failed} failure(s). Check console.`, 'error');
+      }
+      fetchStats();
+    } catch (err) {
+      showMessage('Error zeroing balances: ' + err.message, 'error');
     }
   }
 
@@ -325,6 +379,7 @@
           <div class="actions-cell">
             <input type="number" class="balance-input" id="bal_${botId}" value="${stats.balance || 0}" step="1" min="0">
             <button class="btn-set" onclick="resetBalance('${botId}', parseFloat(document.getElementById('bal_${botId}').value))">Set</button>
+            <button class="btn-zero" onclick="resetBalance('${botId}', 0)">Zero</button>
             <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
               ${inGame ? 'Force Win' : 'Not in Game'}
             </button>
