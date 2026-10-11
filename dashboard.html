@@ -42,7 +42,7 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        button, .btn, .tab-btn, .stat-card, .logout-btn, .adjust-btn, .copy-btn-icon, .nav-item {
+        button, .btn, .tab-btn, .stat-card, .logout-btn, .adjust-btn, .copy-btn-icon, .nav-item, .rule-accordion summary {
             transition: all 0.15s ease !important;
         }
 
@@ -139,6 +139,17 @@
             gap: 16px;
             box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+        .commission-bar .updated-indicator {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         .commission-bar .item {
             display: flex;
@@ -147,7 +158,7 @@
         }
         .commission-bar .label {
             font-size: 13px;
-            color: rgba(255, 255, 255, 0.8);
+            color: rgba(255, 255, 255, 0.9);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -179,6 +190,7 @@
             gap: 4px;
             position: relative;
             overflow: hidden;
+            height: 100px;
         }
         .stat-card:hover {
             background: var(--bg-card-hover);
@@ -195,30 +207,37 @@
             gap: 6px;
         }
         .stat-card .value {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             color: var(--text-primary);
             margin-top: 4px;
+            z-index: 2;
         }
         .stat-card .value.green { color: var(--success); }
         .stat-card .value.blue { color: #60A5FA; }
         .stat-card .value.orange { color: var(--warning); }
         .stat-card .value.red { color: var(--danger); }
         .stat-card .value.purple { color: var(--purple); }
-        .stat-card .sub {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-top: 2px;
+        
+        /* Mini Sparkline Graphs */
+        .sparkline {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            opacity: 0.6;
+            z-index: 1;
         }
 
         @media (min-width: 600px) {
             .stats-grid { grid-template-columns: repeat(3, 1fr); }
-            .commission-bar { flex-direction: row; justify-content: space-between; padding: 24px; }
+            .commission-bar { flex-direction: row; justify-content: space-between; padding: 24px; align-items: center; }
             .commission-bar .item { flex-direction: column; align-items: flex-start; gap: 4px; }
             .commission-bar .amount { font-size: 22px; }
         }
 
-        /* ---------- BOTTOM NAVIGATION (MOBILE APP STYLE) ---------- */
+        /* ---------- BOTTOM NAVIGATION ---------- */
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -249,16 +268,12 @@
             border-radius: var(--radius-md);
             flex: 1;
         }
-        .nav-item i {
-            font-size: 18px;
-        }
+        .nav-item i { font-size: 18px; }
         .nav-item.active {
             color: var(--primary-blue);
             background: rgba(37, 99, 235, 0.1);
         }
-        .nav-item:active {
-            transform: scale(0.92);
-        }
+        .nav-item:active { transform: scale(0.92); }
 
         /* ---------- PAGES ---------- */
         .page { display: none; animation: fadeIn 0.3s ease; }
@@ -268,7 +283,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ---------- SUB-TABS (SEGMENTED CONTROL) ---------- */
+        /* ---------- SUB-TABS ---------- */
         .tabs {
             display: flex;
             background: var(--bg-card);
@@ -312,26 +327,41 @@
             border-radius: 10px;
             font-weight: 700;
         }
-        .tab-btn.active .badge {
-            background: rgba(255, 255, 255, 0.3);
-        }
+        .tab-btn.active .badge { background: rgba(255, 255, 255, 0.3); }
 
         /* ---------- TAB CONTENT ---------- */
-        .tab-content {
-            min-height: 300px;
-        }
+        .tab-content { min-height: 300px; }
         .tab-pane { display: none; }
         .tab-pane.active { display: block; animation: fadeIn 0.2s ease; }
-        .tab-pane h2 {
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .section-header h2 {
             font-size: 18px;
             font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .tab-pane h2 i { color: var(--primary-blue); }
+        .section-header h2 i { color: var(--primary-blue); }
+        .section-header .filter-icon {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .section-header .filter-icon:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 
         /* ---------- FILTER BAR ---------- */
         .filter-bar {
@@ -345,98 +375,57 @@
             border: 1px solid var(--border-color);
             align-items: flex-end;
         }
-        .filter-bar .input-group {
-            flex: 1;
-            min-width: 120px;
-        }
+        .filter-bar .input-group { flex: 1; min-width: 120px; }
         .filter-bar .input-group label {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 11px; font-weight: 600; color: var(--text-secondary);
+            margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px;
         }
-        .filter-bar .input-group select {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            font-size: 13px;
-            background: var(--bg-input);
-            color: var(--text-primary);
-            min-height: 44px;
-            appearance: none;
+        .filter-bar .input-group select, .filter-bar .input-group input {
+            width: 100%; padding: 10px 14px; border: 1px solid var(--border-color);
+            border-radius: var(--radius-md); font-size: 13px; background: var(--bg-input);
+            color: var(--text-primary); min-height: 44px; appearance: none;
         }
-        .filter-bar .input-group select:focus {
-            outline: none;
-            border-color: var(--primary-blue);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        .filter-bar .input-group select:focus, .filter-bar .input-group input:focus {
+            outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         }
 
-        /* ---------- TABLES TO CARDS (MOBILE STYLE) ---------- */
-        .table-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        thead {
-            display: none; /* Hide table headers on mobile */
-        }
+        .showing-text { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+
+        /* ---------- TABLES TO CARDS ---------- */
+        .table-wrapper { display: flex; flex-direction: column; gap: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        thead { display: none; }
         tr {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            padding: 16px;
-            gap: 10px;
-            margin-bottom: 12px;
+            display: flex; flex-direction: column; background: var(--bg-card);
+            border: 1px solid var(--border-color); border-radius: var(--radius-md);
+            padding: 16px; gap: 10px; margin-bottom: 12px;
         }
         td {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0;
-            border: none;
-            font-size: 13px;
-            color: var(--text-primary);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0; border: none; font-size: 13px; color: var(--text-primary);
         }
         td::before {
-            content: attr(data-label);
-            font-weight: 600;
-            color: var(--text-secondary);
-            font-size: 12px;
-            margin-right: 16px;
+            content: attr(data-label); font-weight: 600; color: var(--text-secondary);
+            font-size: 12px; margin-right: 16px;
         }
-        .user-cell {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
+        
+        /* Avatars & User Cells */
+        .user-cell { display: flex; flex-direction: row; align-items: center; gap: 10px; }
+        .avatar {
+            width: 36px; height: 36px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-weight: 700;
+            font-size: 14px; color: white; flex-shrink: 0;
         }
-        .user-cell .name {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-        .user-cell .id {
-            font-size: 11px;
-            color: var(--text-secondary);
-        }
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-            width: 100%;
-        }
-        .action-buttons .btn {
-            flex: 1;
-        }
+        .avatar.blue { background: #3B82F6; }
+        .avatar.green { background: #10B981; }
+        .avatar.purple { background: #8B5CF6; }
+        .avatar.orange { background: #F59E0B; }
+        .user-info { display: flex; flex-direction: column; }
+        .user-info .name { font-weight: 600; color: var(--text-primary); font-size: 14px; }
+        .user-info .id { font-size: 11px; color: var(--text-secondary); }
+
+        .action-buttons { display: flex; gap: 8px; justify-content: flex-end; width: 100%; }
+        .action-buttons .btn { flex: 1; }
 
         @media (min-width: 768px) {
             thead { display: table-header-group; }
@@ -455,34 +444,20 @@
 
         /* ---------- BADGES & BUTTONS ---------- */
         .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            white-space: nowrap;
-            text-transform: capitalize;
+            display: inline-block; padding: 4px 12px; border-radius: 20px;
+            font-size: 11px; font-weight: 600; white-space: nowrap; text-transform: capitalize;
         }
         .status-badge.pending { background: rgba(245, 158, 11, 0.2); color: #FDE047; }
-        .status-badge.approved { background: rgba(16, 185, 129, 0.2); color: #A7F3D0; }
+        .status-badge.approved { background: rgba(16, 185, 129, 0.2); color: #A7F3D0; display: flex; align-items: center; gap: 4px; }
         .status-badge.rejected { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
-        .status-badge.telebirr { background: rgba(37, 99, 235, 0.2); color: #93C5FD; }
-        .status-badge.cbebirr { background: rgba(139, 92, 246, 0.2); color: #C4B5FD; }
-        .status-badge.mpesa { background: rgba(16, 185, 129, 0.2); color: #A7F3D0; }
+        .status-badge.telebirr { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; } /* Red */
+        .status-badge.cbebirr { background: rgba(37, 99, 235, 0.2); color: #93C5FD; } /* Blue */
+        .status-badge.mpesa { background: rgba(245, 158, 11, 0.2); color: #FDE047; } /* Orange */
 
         .btn {
-            padding: 10px 18px;
-            border: none;
-            border-radius: var(--radius-md);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            color: white;
+            padding: 10px 18px; border: none; border-radius: var(--radius-md);
+            font-size: 13px; font-weight: 600; cursor: pointer; min-height: 44px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: white;
         }
         .btn:active { transform: scale(0.96); }
         .btn-sm { padding: 8px 12px; font-size: 12px; min-height: 36px; }
@@ -500,84 +475,46 @@
         .btn-outline:hover { background: rgba(37, 99, 235, 0.1); }
 
         .link-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            background: rgba(37, 99, 235, 0.15);
-            color: #60A5FA;
-            font-size: 11px;
-            text-decoration: none;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
+            display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+            border-radius: 6px; background: rgba(37, 99, 235, 0.15); color: #60A5FA;
+            font-size: 11px; text-decoration: none; font-weight: 600; border: none; cursor: pointer;
         }
         .link-btn:hover { background: rgba(37, 99, 235, 0.25); }
 
         .adjust-btn {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--warning);
-            border: none;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+            background: rgba(245, 158, 11, 0.15); color: var(--warning); border: none;
+            padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600;
+            cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
         }
         .adjust-btn:hover { background: rgba(245, 158, 11, 0.25); }
         .adjust-btn:active { transform: scale(0.94); }
 
         .copy-btn-icon {
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            font-size: 14px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: var(--text-secondary);
+            background: transparent; border: none; cursor: pointer;
+            font-size: 14px; padding: 4px 8px; border-radius: 4px; color: var(--text-secondary);
         }
         .copy-btn-icon:hover { background: var(--border-color); color: var(--text-primary); }
         .copy-btn-icon:active { transform: scale(0.9); }
 
         /* ---------- PROFILE PAGE ---------- */
         .profile-card {
-            background: var(--bg-card);
-            border-radius: var(--radius-lg);
-            padding: 24px;
-            border: 1px solid var(--border-color);
+            background: var(--bg-card); border-radius: var(--radius-lg);
+            padding: 24px; border: 1px solid var(--border-color);
         }
         .profile-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
+            display: flex; flex-direction: column; align-items: center;
+            gap: 12px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);
         }
         .profile-avatar {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #1E3A8A, #2563EB);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-            color: white;
-            box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
+            width: 80px; height: 80px; background: linear-gradient(135deg, #1E3A8A, #2563EB);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 32px; color: white; box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
         }
         .profile-name { font-size: 20px; font-weight: 700; color: var(--text-primary); }
-        .profile-phone { font-size: 14px; color: var(--text-secondary); }
+        .profile-phone { font-size: 14px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
 
         .profile-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 14px 0;
+            display: flex; justify-content: space-between; padding: 14px 0;
             border-bottom: 1px solid var(--border-color);
         }
         .profile-row:last-child { border-bottom: none; }
@@ -586,21 +523,19 @@
         .profile-row .value.highlight { color: #60A5FA; }
 
         .payment-numbers {
-            background: var(--bg-input);
-            padding: 16px;
-            border-radius: var(--radius-md);
-            margin-top: 16px;
-            border: 1px solid var(--border-color);
+            background: var(--bg-input); padding: 16px; border-radius: var(--radius-md);
+            margin-top: 16px; border: 1px solid var(--border-color);
         }
         .payment-numbers h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
         .payment-numbers p { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
         .payment-numbers div {
             font-size: 13px; padding: 8px 0; display: flex; justify-content: space-between;
-            border-bottom: 1px solid var(--border-color); color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color); color: var(--text-secondary); align-items: center;
         }
         .payment-numbers div:last-child { border-bottom: none; }
-        .payment-numbers strong { color: var(--text-primary); }
-        .payment-numbers span { color: #60A5FA; font-weight: 600; font-family: monospace; }
+        .payment-numbers strong { color: var(--text-primary); display: flex; align-items: center; gap: 6px;}
+        .payment-numbers span { color: #60A5FA; font-weight: 600; font-family: monospace; display: flex; align-items: center; gap: 6px;}
+        .verified-badge { color: var(--success); font-size: 12px; }
 
         .withdraw-form {
             display: flex; flex-direction: column; gap: 16px;
@@ -634,28 +569,54 @@
             border-bottom: 1px solid var(--border-color); padding-bottom: 12px;
         }
         .rules-col h3 i { color: var(--primary-blue); }
-        .rule-section { margin-bottom: 20px; }
-        .rule-section h4 {
-            font-size: 14px; font-weight: 700; color: var(--text-primary);
-            margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+        
+        .rule-alert-banner {
+            background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(37, 99, 235, 0.3);
+            border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;
+            display: flex; align-items: flex-start; gap: 12px; color: #93C5FD; font-size: 13px;
         }
-        .rule-section h4 i { color: var(--primary-blue); font-size: 12px; }
-        .rule-section ul { list-style: none; padding-left: 4px; font-size: 13px; line-height: 1.8; color: var(--text-secondary); }
-        .rule-section ul li { padding: 4px 0 4px 20px; position: relative; }
-        .rule-section ul li::before {
-            content: "•"; position: absolute; left: 4px;
-            color: var(--primary-blue); font-weight: 700; font-size: 16px;
+        .rule-alert-banner i { font-size: 18px; margin-top: 2px; }
+
+        .rule-warning-card {
+            background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;
         }
-        .rule-section .highlight {
-            background: rgba(245, 158, 11, 0.2); padding: 2px 8px; border-radius: 4px;
-            font-weight: 600; color: #FDE047;
+        .rule-warning-card .header {
+            display: flex; align-items: center; gap: 10px; color: #FDE047; font-weight: 700;
+            font-size: 14px; margin-bottom: 8px; background: transparent; border: none; padding: 0; position: static;
         }
-        .rule-section .limit-box {
-            background: var(--bg-input); border-radius: var(--radius-md); padding: 14px 16px;
-            margin-top: 8px; border-left: 3px solid var(--danger); font-size: 13px;
-            color: var(--text-secondary);
+        .rule-warning-card .body {
+            font-size: 13px; color: var(--text-secondary); line-height: 1.6;
         }
-        .rule-section .limit-box strong { color: var(--text-primary); }
+        .rule-warning-card .body strong { color: var(--text-primary); font-size: 16px; display: block; margin-top: 4px;}
+
+        /* Accordion */
+        .rule-accordion {
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 0;
+        }
+        .rule-accordion:last-child { border-bottom: none; }
+        .rule-accordion summary {
+            font-size: 14px; font-weight: 600; color: var(--text-primary);
+            cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center;
+            padding: 4px 0;
+        }
+        .rule-accordion summary::-webkit-details-marker { display: none; }
+        .rule-accordion summary::after {
+            content: "\f078"; font-family: "Font Awesome 6 Free"; font-weight: 900;
+            font-size: 12px; color: var(--text-secondary); transition: transform 0.2s;
+        }
+        .rule-accordion[open] summary::after { transform: rotate(180deg); }
+        .rule-accordion .accordion-content {
+            padding-top: 12px; font-size: 13px; color: var(--text-secondary); line-height: 1.7;
+        }
+        .rule-accordion .accordion-content ul { list-style: none; padding-left: 0; }
+        .rule-accordion .accordion-content li { padding: 4px 0 4px 20px; position: relative; }
+        .rule-accordion .accordion-content li::before {
+            content: "•"; position: absolute; left: 4px; color: var(--primary-blue); font-weight: 700; font-size: 16px;
+        }
+
+        .rules-footer { margin-top: 24px; font-size: 12px; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); padding-top: 16px; }
 
         /* ---------- MODALS ---------- */
         .modal {
@@ -775,8 +736,9 @@
 
         <!-- ===== LIVE COMMISSION BAR ===== -->
         <div class="commission-bar" id="commissionBar">
+            <div class="updated-indicator"><i class="fas fa-sync-alt"></i> Updated just now</div>
             <div class="item">
-                <span class="label"><i class="fas fa-wallet"></i> Pending Commission</span>
+                <span class="label"><i class="fas fa-clock"></i> Pending Commission</span>
                 <span class="amount pending" id="pendingCommission">Loading...</span>
             </div>
             <div class="item">
@@ -784,24 +746,48 @@
                 <span class="amount earned" id="totalCommissionEarned">Loading...</span>
             </div>
             <div class="item">
-                <span class="label"><i class="fas fa-percent"></i> Rate</span>
+                <span class="label"><i class="fas fa-chart-pie"></i> Rate</span>
                 <span class="amount rate" id="commissionRateDisplay">Loading...</span>
             </div>
         </div>
 
         <!-- ========================================================= -->
-        <!-- PAGE 1: GAME                                              -->
+        <!-- PAGE 1: GAME (DASHBOARD)                                  -->
         <!-- ========================================================= -->
         <div class="page active" id="page-game">
 
-            <!-- Stats Grid -->
+            <!-- Stats Grid with Sparklines -->
             <div class="stats-grid" id="statsGrid">
-                <div class="stat-card"><div class="label"><i class="fas fa-wallet"></i> Deposits</div><div class="value green" id="statDeposits">-</div><div class="sub">Total</div></div>
-                <div class="stat-card"><div class="label"><i class="fas fa-chart-line"></i> Today</div><div class="value orange" id="statTodayDeposits">-</div><div class="sub">Today's deposits</div></div>
-                <div class="stat-card"><div class="label"><i class="fas fa-hourglass-half"></i> Pending Dep.</div><div class="value red" id="statPendingDeposits">-</div><div class="sub">Awaiting approval</div></div>
-                <div class="stat-card"><div class="label"><i class="fas fa-university"></i> Withdrawals</div><div class="value orange" id="statWithdrawals">-</div><div class="sub">Total</div></div>
-                <div class="stat-card"><div class="label"><i class="fas fa-hourglass-half"></i> Pending With.</div><div class="value red" id="statPendingWithdrawals">-</div><div class="sub">Awaiting approval</div></div>
-                <div class="stat-card"><div class="label"><i class="fas fa-users"></i> Players</div><div class="value blue" id="statPlayers">-</div><div class="sub">Assigned to you</div></div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-wallet"></i> Deposits</div>
+                    <div class="value green" id="statDeposits">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 Q20,15 40,20 T80,10 T100,5" fill="none" stroke="#10B981" stroke-width="2"/></svg>
+                </div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-calendar-alt"></i> Today</div>
+                    <div class="value orange" id="statTodayDeposits">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 Q30,25 50,15 T80,20 T100,10" fill="none" stroke="#F59E0B" stroke-width="2"/></svg>
+                </div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-clock"></i> Pending Dep.</div>
+                    <div class="value red" id="statPendingDeposits">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,15 Q25,20 50,10 T80,15 T100,5" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
+                </div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-download"></i> Withdrawals</div>
+                    <div class="value orange" id="statWithdrawals">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,10 Q20,5 40,15 T80,10 T100,20" fill="none" stroke="#F59E0B" stroke-width="2"/></svg>
+                </div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-clock"></i> Pending With.</div>
+                    <div class="value purple" id="statPendingWithdrawals">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 Q30,10 50,20 T80,15 T100,25" fill="none" stroke="#8B5CF6" stroke-width="2"/></svg>
+                </div>
+                <div class="stat-card">
+                    <div class="label"><i class="fas fa-users"></i> Players</div>
+                    <div class="value blue" id="statPlayers">-</div>
+                    <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 Q20,20 40,22 T80,15 T100,10" fill="none" stroke="#3B82F6" stroke-width="2"/></svg>
+                </div>
             </div>
 
             <!-- Sub-tabs -->
@@ -816,12 +802,15 @@
 
                 <!-- DEPOSITS -->
                 <div class="tab-pane active" id="tab-deposits">
-                    <h2><i class="fas fa-wallet"></i> Deposits</h2>
-                    <div class="filter-bar">
+                    <div class="section-header">
+                        <h2><i class="fas fa-wallet"></i> Deposits Management</h2>
+                        <button class="filter-icon" onclick="toggleFilter('depositFilter')"><i class="fas fa-filter"></i></button>
+                    </div>
+                    <div class="filter-bar" id="depositFilter">
                         <div class="input-group">
                             <label>Method</label>
                             <select id="depositMethod">
-                                <option value="all">All</option>
+                                <option value="all">All Methods</option>
                                 <option value="telebirr">Telebirr</option>
                                 <option value="cbebirr">CBE</option>
                                 <option value="mpesa">M-Pesa</option>
@@ -831,24 +820,28 @@
                             <label>Status</label>
                             <select id="depositStatus">
                                 <option value="pending">Pending</option>
-                                <option value="all">All</option>
+                                <option value="all">All Status</option>
                                 <option value="approved">Approved</option>
                                 <option value="rejected">Rejected</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary" onclick="applyDepositFilters()"><i class="fas fa-search"></i> Filter</button>
+                        <button class="btn btn-primary" onclick="applyDepositFilters()" style="width:100%; margin-top: 8px;"><i class="fas fa-search"></i> Apply Filters</button>
                     </div>
+                    <div class="showing-text" id="depositShowingText">Showing 0 deposits</div>
                     <div id="depositsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading deposits...</p></div></div>
                 </div>
 
                 <!-- WITHDRAWALS -->
                 <div class="tab-pane" id="tab-withdrawals">
-                    <h2><i class="fas fa-university"></i> Withdrawals</h2>
-                    <div class="filter-bar">
+                    <div class="section-header">
+                        <h2><i class="fas fa-university"></i> Withdrawals</h2>
+                        <button class="filter-icon" onclick="toggleFilter('withdrawFilter')"><i class="fas fa-filter"></i></button>
+                    </div>
+                    <div class="filter-bar" id="withdrawFilter">
                         <div class="input-group">
                             <label>Method</label>
                             <select id="withdrawMethod">
-                                <option value="all">All</option>
+                                <option value="all">All Methods</option>
                                 <option value="telebirr">Telebirr</option>
                                 <option value="cbebirr">CBE</option>
                                 <option value="mpesa">M-Pesa</option>
@@ -858,28 +851,36 @@
                             <label>Status</label>
                             <select id="withdrawStatus">
                                 <option value="pending">Pending</option>
-                                <option value="all">All</option>
+                                <option value="all">All Status</option>
                                 <option value="approved">Approved</option>
                                 <option value="rejected">Rejected</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary" onclick="applyWithdrawFilters()"><i class="fas fa-search"></i> Filter</button>
+                        <button class="btn btn-primary" onclick="applyWithdrawFilters()" style="width:100%; margin-top: 8px;"><i class="fas fa-search"></i> Apply Filters</button>
                     </div>
+                    <div class="showing-text" id="withdrawShowingText">Showing 0 withdrawals</div>
                     <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading withdrawals...</p></div></div>
                 </div>
 
                 <!-- PLAYERS -->
                 <div class="tab-pane" id="tab-players">
-                    <h2><i class="fas fa-users"></i> Your Players</h2>
-                    <div style="margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px;">
-                        <button class="btn btn-primary" onclick="openImportModal()" style="flex:1;"><i class="fas fa-file-import"></i> Import Players</button>
+                    <div class="section-header">
+                        <h2><i class="fas fa-users"></i> Players</h2>
+                        <button class="filter-icon" onclick="toggleFilter('playerFilter')"><i class="fas fa-filter"></i></button>
                     </div>
-                    <div class="filter-bar" style="padding: 12px;">
+                    
+                    <div style="margin-bottom:16px; display:flex; flex-wrap:wrap; gap:10px;">
+                        <button class="btn btn-outline" onclick="openImportModal()" style="flex:1;"><i class="fas fa-file-import"></i> Import Players</button>
+                        <button class="btn btn-primary" onclick="openAddPlayerModal()" style="flex:1;"><i class="fas fa-plus"></i> Add Player</button>
+                    </div>
+
+                    <div class="filter-bar" id="playerFilter">
                         <div class="input-group" style="flex:1; min-width:100%;">
                             <label>Search Player</label>
-                            <input type="text" id="playerSearchInput" placeholder="Telegram ID or @username..." oninput="filterPlayers()" style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-input); color:var(--text-primary); min-height:44px;">
+                            <input type="text" id="playerSearchInput" placeholder="Search by username or Telegram ID..." oninput="filterPlayers()">
                         </div>
                     </div>
+                    <div class="showing-text" id="playerShowingText">Showing 0 players</div>
                     <div id="playersList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading players...</p></div></div>
                 </div>
 
@@ -895,7 +896,7 @@
                 <div class="profile-header">
                     <div class="profile-avatar"><i class="fas fa-user-shield"></i></div>
                     <div class="profile-name" id="profileName">Admin User</div>
-                    <div class="profile-phone" id="profilePhone">+251 91 234 5678</div>
+                    <div class="profile-phone" id="profilePhone"><i class="fas fa-phone"></i> +251 91 234 5678</div>
                 </div>
 
                 <div class="profile-row">
@@ -915,19 +916,33 @@
                 <div class="payment-numbers">
                     <h3><i class="fas fa-mobile-alt"></i> Payment Numbers</h3>
                     <p>Your registered accounts for receiving payments.</p>
-                    <div><strong><i class="fas fa-phone" style="color:#F59E0B; margin-right:6px;"></i> Telebirr</strong> <span id="profileTelebirr">Not set</span></div>
-                    <div><strong><i class="fas fa-university" style="color:#3B82F6; margin-right:6px;"></i> CBE Birr</strong> <span id="profileCbe">Not set</span></div>
-                    <div><strong><i class="fas fa-mobile-alt" style="color:#10B981; margin-right:6px;"></i> M-Pesa</strong> <span id="profileMpesa">Not set</span></div>
+                    <div>
+                        <strong><i class="fas fa-phone" style="color:#F59E0B;"></i> Telebirr</strong> 
+                        <span id="profileTelebirr">Not set <i class="fas fa-check-circle verified-badge"></i></span>
+                    </div>
+                    <div>
+                        <strong><i class="fas fa-university" style="color:#3B82F6;"></i> CBE</strong> 
+                        <span id="profileCbe">Not set <i class="fas fa-check-circle verified-badge"></i></span>
+                    </div>
+                    <div>
+                        <strong><i class="fas fa-mobile-alt" style="color:#10B981;"></i> M-Pesa</strong> 
+                        <span id="profileMpesa">Not set <i class="fas fa-check-circle verified-badge"></i></span>
+                    </div>
                 </div>
 
                 <!-- Invite Link -->
                 <div style="margin-top: 16px; background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border:1px solid var(--border-color);">
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;"><i class="fas fa-link"></i> Invite Link</div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;"><i class="fas fa-link"></i> Invite Link</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">Share your invite link and earn more.</div>
                     <div style="word-break: break-all; font-size: 13px; margin-bottom: 12px; color:#60A5FA;" id="profileInviteLink">Loading...</div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn btn-outline btn-sm" onclick="copyInviteLink()"><i class="fas fa-copy"></i> Copy Link</button>
                         <button class="btn btn-outline btn-sm" onclick="copyInviteCode()"><i class="fas fa-copy"></i> Copy Code</button>
                         <span style="font-size: 14px; font-weight: 600; padding: 6px 16px; background: var(--bg-card); border-radius: 8px; border:1px solid var(--border-color); color:#F8FAFC;" id="profileInviteCode">-</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px; display: flex; align-items: flex-start; gap: 6px;">
+                        <i class="fas fa-info-circle" style="margin-top:2px;"></i>
+                        <span>Invite agents and earn commission on their earnings.<br>Your invite code: <strong id="profileInviteCodeText" style="color:#60A5FA;">ADMIN123</strong></span>
                     </div>
                 </div>
 
@@ -937,16 +952,16 @@
                 </h3>
                 <div class="withdraw-form">
                     <div class="input-group">
-                        <label>Amount (ETB)</label>
-                        <input type="number" id="withdrawEarningsAmount" placeholder="Min 10" min="10">
+                        <label>Amount (ETB) <i class="fas fa-info-circle"></i></label>
+                        <input type="number" id="withdrawEarningsAmount" placeholder="Enter amount" min="10">
                     </div>
                     <div class="input-group">
-                        <label><i class="fas fa-phone"></i> Phone Number</label>
-                        <input type="text" id="withdrawEarningsPhone" placeholder="09xxxxxxxx">
+                        <label>Phone Number</label>
+                        <input type="text" id="withdrawEarningsPhone" placeholder="+251 91 234 5678">
                     </div>
                     <div class="input-group">
-                        <label><i class="fas fa-user"></i> Receiver Name</label>
-                        <input type="text" id="withdrawEarningsName" placeholder="Full name">
+                        <label>Account Name</label>
+                        <input type="text" id="withdrawEarningsName" placeholder="Admin User">
                     </div>
                     <div class="input-group">
                         <label>Payment Method</label>
@@ -957,6 +972,9 @@
                         </select>
                     </div>
                     <button class="btn btn-primary" onclick="requestAdminWithdrawal()" style="width:100%; font-size:15px;"><i class="fas fa-paper-plane"></i> Request Withdrawal</button>
+                    <div style="text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                        <i class="fas fa-shield-alt"></i> Withdrawals are processed within 24-48 hours.
+                    </div>
                 </div>
                 <div id="withdrawStatus" style="margin-top:12px; font-size:13px; text-align:center; color: var(--text-secondary);"></div>
             </div>
@@ -970,146 +988,90 @@
             <div class="rules-grid">
                 <!-- ENGLISH -->
                 <div class="rules-col">
-                    <h3><i class="fas fa-flag"></i> English</h3>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 1. Admin Account & Access</h4>
-                        <ul>
-                            <li>Register with valid phone and 4+ digit PIN.</li>
-                            <li>Login using phone + PIN. Only active admins can log in.</li>
-                            <li>Super Admin can activate or deactivate your account.</li>
-                        </ul>
+                    <h3><i class="fas fa-flag"></i> Rules & Guidelines</h3>
+                    
+                    <div class="rule-alert-banner">
+                        <i class="fas fa-info-circle"></i>
+                        <div>Please read follow the rules and guidelines below.<br><span style="font-size:11px; opacity:0.8;">አባክዎን ከዚህ በታች ያሉት ህጎች እና መመሪያዎች ያንብቡ እና ይከተሉ።</span></div>
                     </div>
 
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 2. Dashboard – Permissions</h4>
-                        <ul>
-                            <li><strong>Players:</strong> View your assigned players and their balances.</li>
-                            <li><strong>Deposits:</strong> Approve or reject deposit requests with photo proof.</li>
-                            <li><strong>Withdrawals:</strong> Approve or reject player withdrawal requests.</li>
-                            <li><strong>Earnings:</strong> Earn 40% commission on house profit from your players.</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Deposit Holding Limit (Critical)</h4>
-                        <ul>
-                            <li>Your total approved deposits <strong>must never exceed 1500 ETB</strong>.</li>
-                            <li>If approval would exceed the limit, the system blocks it.</li>
-                            <li>Request a withdrawal to the Super Admin to reduce your holding balance.</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 3. Admin Withdrawals</h4>
-                        <ul>
-                            <li>Request withdrawal of your <strong>pending commission</strong> (available balance).</li>
-                            <li>Provide amount, phone, method, and receiver name.</li>
-                            <li>Super Admin approves or rejects your request.</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 4. Game Participation</h4>
-                        <ul>
-                            <li>Admins can play as normal players using their Telegram account.</li>
-                            <li>Playing balance is separate from commission earnings.</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 5. Profile & Payment Methods</h4>
-                        <ul>
-                            <li>Each admin has a unique invite code for players.</li>
-                            <li>Payment numbers (Telebirr, CBE, M-Pesa) are shown to players for deposits.</li>
-                        </ul>
-                    </div>
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 6. Code of Conduct</h4>
-                        <ul>
-                            <li>Do not impersonate players or manipulate games.</li>
-                            <li>Review deposit proofs honestly – fake approvals are a violation.</li>
-                            <li>Report suspicious activity to the Super Admin.</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 7. Key Limits</h4>
-                        <div class="limit-box">
-                            <strong>Deposit holding balance:</strong> 1500 ETB max<br>
-                            <strong>Commission rate:</strong> 40%<br>
+                    <div class="rule-warning-card">
+                        <div class="header">
+                            <i class="fas fa-exclamation-triangle"></i> IMPORTANT DEPOSIT LIMIT
+                        </div>
+                        <div class="body">
+                            Maximum deposit per transaction<br>
+                            <strong>1500 ETB</strong>
+                            <span style="font-size:12px; color:var(--text-secondary);">1500 ብር</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- AMHARIC -->
-                <div class="rules-col">
-                    <h3><i class="fas fa-flag"></i> አማርኛ</h3>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 1. የአድሚን መመዝገብያ</h4>
-                        <ul>
-                            <li>በስልክ ቁጥር እና ቢያንስ 4 አሃዝ ፒን ይመዝገቡ።</li>
-                            <li>በስልክ ቁጥር + ፒን ይግቡ።</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 2. ዳሽቦርድ – ፈቃዶች</h4>
-                        <ul>
-                            <li><strong>ተጫዋቾች፦</strong> የተመደቡልዎትን ተጫዋቾች እና ሂሳባቸውን ይመልከቱ።</li>
-                            <li><strong>ተቀማጭ(deposit)፦</strong> በፎቶ (screenshot) ማስረጃ deposit ያጽድቁ።</li>
-                            <li><strong>መውጫዎች፦</strong> የተጫዋቾችን መውጫ ጥያቄ ያጽድቁ።</li>
-                            <li><strong>ገቢ፦</strong> ከተጫዋቾችዎ በሚገኝ የቤቱ ትርፍ ላይ 40% ኮሚሽን ያገኛሉ።</li>
-                        </ul>
-                    </div>
-                    <div class="rule-section">
-                        <h4><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> የተቀማጭ መጠን ገደብ (ወሳኝ)</h4>
-                        <ul>
-                            <li>የጸደቁ(approved) ተቀማጭ <strong>ከ1500 ብር መብለጥ የለበትም</strong>።</li>
-                            <li>1500 የሚበልጥ ገንዘብ ለማጽደቅ (approve) ሲሞከር ሲስተሙ ያግደወት።</li>
-                            <li>የጸደቁ(approved) ተቀማጭ ሂሳብዎን ለመቀነስ ለሱፐር አድሚን ያሳውቁ <a href="https://t.me/Dotbingogame" target="_blank" style="color:#60A5FA;text-decoration:none;">@Dotbingogame</a></li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 3. ገንዘብ መውጫ</h4>
-                        <ul>
-                            <li><strong>Pending ላይ ያለ ኮሚሽን</strong> ለSuper Admin withdrawal ይጠይቁ።</li>
-                            <li>መጠን፣ ስልክ ቁጥር፣ ዘዴ እና ተቀባይ ስም ያቅርቡ።</li>
-                            <li>ሱፐር አድሚን ጥያቄዎን ያጸድቃል።</li>
-                        </ul>
-                    </div>
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 4. በጨዋታ መሳተፍ</h4>
-                        <ul>
-                            <li>አድሚኖች በቴሌግራም መለያቸው እንደ ተጫዋች መጫወት ይችላሉ።</li>
-                            <li>የጨዋታ ሂሳቡ ከኮሚሽን ገቢ የተለየ ነው።</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 5. ፕሮፋይል እና የክፍያ ዘዴዎች</h4>
-                        <ul>
-                            <li>እያንዳንዱ አድሚን ለተጫዋቾች ልዩ የግብዣ ኮድ አለው።</li>
-                            <li>የክፍያ ዘዴወች (ቴሌብር፣ ሲቢኢ፣ ኤም-ፔሳ) ለተጫዋቸው ይታያሉ።</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 6. የስነምግባር ደንቦች</h4>
-                        <ul>
-                            <li>የተቀማጭ ማስረጃዎችን በሐቀኝነት ይገምግሙ።</li>
-                            <li>አጠራጣሪ እንቅስቃሴ ለሱፐር አድሚን ሪፖርት ያድርጉ።</li>
-                        </ul>
-                    </div>
-
-                    <div class="rule-section">
-                        <h4><i class="fas fa-chevron-right"></i> 7. ዋና ዋና ገደቦች</h4>
-                        <div class="limit-box">
-                            <strong>የተቀማጭ ሂሳብ ገደብ፦</strong> ከፍተኛ 1500 ብር<br>
-                            <strong>ኮሚሽን መጠን፦</strong> 40%<br>
+                    <details class="rule-accordion" open>
+                        <summary>1. Deposit Rules / የተቀማጭ ህጎች</summary>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>Users can deposit up to 1500 ETB per transaction.</li>
+                                <li>Deposits below 50 ETB are not accepted.</li>
+                                <li>Only approved payment methods are allowed.</li>
+                            </ul>
+                            <div style="margin-top:8px; padding:10px; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--primary-blue); font-size:12px;">
+                                <strong>Amharic:</strong><br>
+                                ተቀማጭዎች በአንድ ግብይት እስከ 1500 ብር መቀመጥ ይችላሉ።<br>
+                                ከ 50 ብር በታች ያሉ ተቀማጭ ገንዘቦች አይቀበሉም።
+                            </div>
                         </div>
+                    </details>
+
+                    <details class="rule-accordion">
+                        <summary>2. Commission Rules / የኮሚሽን ህጎች</summary>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>The commission rate is 40% on every successful transaction.</li>
+                                <li>Commission is calculated from the total transaction amount and deducted automatically.</li>
+                            </ul>
+                            <div style="margin-top:8px; padding:10px; background:var(--bg-input); border-radius:6px; border-left:3px solid var(--primary-blue); font-size:12px;">
+                                <strong>Amharic:</strong><br>
+                                40% በእያንዳንዱ ተሳካ ግብይት ላይ ይተገበራል።<br>
+                                ኮሚሽን ከጠቅላላው የግብይት መጠን ተሰልቶ በራሱ ይቀነሳል።
+                            </div>
+                        </div>
+                    </details>
+
+                    <details class="rule-accordion">
+                        <summary>3. User Conduct Rules / የተጠቃሚ ባህሪ ህጎች</summary>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>Admins can play as normal players using their Telegram account.</li>
+                                <li>Playing balance is separate from commission earnings.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="rule-accordion">
+                        <summary>4. Transaction Rules / የግብይት ህጎች</summary>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>Request withdrawal of your pending commission (available balance).</li>
+                                <li>Provide amount, phone, method, and receiver name.</li>
+                                <li>Super Admin approves or rejects your request.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="rule-accordion">
+                        <summary>5. Violation & Penalty / ጥሰት እና ቅጣት</summary>
+                        <div class="accordion-content">
+                            <ul>
+                                <li>Do not impersonate players or manipulate games.</li>
+                                <li>Review deposit proofs honestly – fake approvals are a violation.</li>
+                                <li>Report suspicious activity to the Super Admin.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <div class="rules-footer">
+                        <i class="fas fa-info-circle"></i> These rules and guidelines may be updated from time to time.<br>
+                        Last updated: May 20, 2024 | ማዘመኛ: 20/05/2024
                     </div>
                 </div>
             </div>
@@ -1117,11 +1079,11 @@
 
     </div><!-- end container -->
 
-    <!-- ===== BOTTOM NAVIGATION (MOBILE APP STYLE) ===== -->
+    <!-- ===== BOTTOM NAVIGATION ===== -->
     <nav class="bottom-nav">
         <button class="nav-item active" data-page="game" onclick="switchPage('game')">
-            <i class="fas fa-gamepad"></i>
-            <span>Game</span>
+            <i class="fas fa-home"></i>
+            <span>Dashboard</span>
         </button>
         <button class="nav-item" data-page="profile" onclick="switchPage('profile')">
             <i class="fas fa-user"></i>
@@ -1138,6 +1100,28 @@
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- Add Player Modal -->
+    <div id="addPlayerModal" class="modal" onclick="if(event.target===this) closeAddPlayerModal()">
+        <div class="modal-content">
+            <div class="bank-header">
+                <i class="fas fa-user-plus"></i>
+                <div>
+                    <div class="bank-title">Add Player</div>
+                    <div class="bank-sub">Enter Telegram ID or @username</div>
+                </div>
+                <button class="close-btn" onclick="closeAddPlayerModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="input-group">
+                <input type="text" id="addPlayerInput" placeholder="e.g. 123456789 or @john_doe" style="width:100%; padding:14px 16px; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-input); color:var(--text-primary); font-size:15px; min-height:48px;">
+            </div>
+            <div id="addPlayerStatus" style="margin-top:12px; font-size:13px; text-align:center;"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="submitAddPlayer()"><i class="fas fa-check"></i> Add Player</button>
+                <button class="btn btn-secondary" onclick="closeAddPlayerModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Import Modal -->
     <div id="importModal" class="modal">
@@ -1220,7 +1204,7 @@
 
     <script>
         // ============================================================
-        //  ADMIN DASHBOARD – Mobile App Redesign (Blue-Black Theme)
+        //  ADMIN DASHBOARD – Complete Mobile App Redesign
         // ============================================================
 
         const BOT_USERNAME = 'bingomkmk0120_bot';
@@ -1301,6 +1285,16 @@
             const activeBtn = container.querySelector('.tab-btn.active');
             if (activeBtn) {
                 activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        }
+
+        // ---------- TOGGLE FILTER ----------
+        function toggleFilter(id) {
+            const el = document.getElementById(id);
+            if (el.style.display === 'none') {
+                el.style.display = 'flex';
+            } else {
+                el.style.display = 'none';
             }
         }
 
@@ -1409,12 +1403,6 @@
 
         function applyDepositFilters() { loadDeposits(); }
 
-        function resetDepositFilters() {
-            document.getElementById('depositMethod').value = 'all';
-            document.getElementById('depositStatus').value = 'pending';
-            loadDeposits();
-        }
-
         function getWithdrawFilters() {
             return {
                 method: document.getElementById('withdrawMethod').value,
@@ -1423,12 +1411,6 @@
         }
 
         function applyWithdrawFilters() { loadWithdrawals(); }
-
-        function resetWithdrawFilters() {
-            document.getElementById('withdrawMethod').value = 'all';
-            document.getElementById('withdrawStatus').value = 'pending';
-            loadWithdrawals();
-        }
 
         // ---------- PROOF MODAL ----------
         function viewProof(url) {
@@ -1523,10 +1505,7 @@
                     row.style.display = 'none';
                 }
             });
-            const countEl = document.querySelector('#playersList p');
-            if (countEl) {
-                countEl.textContent = `Showing ${visibleCount} of ${rows.length} players`;
-            }
+            document.getElementById('playerShowingText').textContent = `Showing ${visibleCount} of ${rows.length} players`;
         }
 
         // ---------- LOAD DEPOSITS ----------
@@ -1542,6 +1521,9 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to load deposits');
                 const data = await res.json();
+                
+                document.getElementById('depositShowingText').textContent = `Showing ${data.requests.length} deposits`;
+
                 if (data.requests.length === 0) {
                     container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No deposits found</p></div>`;
                     return;
@@ -1621,13 +1603,23 @@
                     }
 
                     const formattedDate = new Date(req.created_at).toLocaleString();
+                    const initials = req.username ? req.username.substring(0, 2).toUpperCase() : '??';
+                    const avatarColor = paymentType === 'telebirr' ? 'blue' : paymentType === 'cbebirr' ? 'purple' : 'orange';
 
                     return `
                     <tr>
-                      <td data-label="User"><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
+                      <td data-label="User">
+                        <div class="user-cell">
+                          <div class="avatar ${avatarColor}">${initials}</div>
+                          <div class="user-info">
+                            <span class="name">${escapeHtml(req.username)}</span>
+                            <span class="id">ID: ${req.telegram_id}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td data-label="Amount"><strong>${req.amount} ETB</strong></td>
                       <td data-label="Payment"><span class="status-badge ${paymentType}">${paymentType}</span></td>
-                      <td data-label="Status"><span class="status-badge ${req.status}">${req.status}</span></td>
+                      <td data-label="Status"><span class="status-badge ${req.status}">${req.status === 'approved' ? '<i class="fas fa-check-circle"></i> ' : ''}${req.status}</span></td>
                       <td data-label="Receipt">${receiptDisplay}</td>
                       <td data-label="Date">${formattedDate}</td>
                       <td data-label="Actions">
@@ -1671,6 +1663,9 @@
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to load withdrawals');
                 const data = await res.json();
+                
+                document.getElementById('withdrawShowingText').textContent = `Showing ${data.requests.length} withdrawals`;
+
                 if (data.requests.length === 0) {
                     container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawals found</p></div>`;
                     return;
@@ -1681,9 +1676,20 @@
                   <thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th><th>Type</th><th>Status</th><th>Date & Time</th><th>Actions</th></tr></thead>
                   <tbody>${data.requests.map(req => {
                     const formattedDate = new Date(req.created_at).toLocaleString();
+                    const initials = req.username ? req.username.substring(0, 2).toUpperCase() : '??';
+                    const avatarColor = req.withdrawal_type === 'telebirr' ? 'blue' : req.withdrawal_type === 'cbebirr' ? 'purple' : 'orange';
+
                     return `
                     <tr>
-                      <td data-label="User"><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
+                      <td data-label="User">
+                        <div class="user-cell">
+                          <div class="avatar ${avatarColor}">${initials}</div>
+                          <div class="user-info">
+                            <span class="name">${escapeHtml(req.username)}</span>
+                            <span class="id">ID: ${req.telegram_id}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td data-label="Amount"><strong>${req.amount} ETB</strong></td>
                       <td data-label="Phone">${req.phone_number || 'N/A'}</td>
                       <td data-label="Receiver">${req.receiver_name || 'N/A'}</td>
@@ -1716,6 +1722,9 @@
                 if (!res.ok) throw new Error('Failed to load players');
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
+                
+                document.getElementById('playerShowingText').textContent = `Showing ${data.players.length} players`;
+
                 if (data.players.length === 0) {
                     container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-users"></i></div><p>No players assigned yet</p></div>`;
                     document.getElementById('playerSearchInput').value = '';
@@ -1725,19 +1734,32 @@
               <div class="table-wrapper">
                 <table>
                   <thead><tr><th>Player</th><th>Balance</th><th>First Deposit</th><th>Actions</th></tr></thead>
-                  <tbody>${data.players.map(p => `
+                  <tbody>${data.players.map((p, index) => {
+                    const colors = ['blue', 'green', 'purple', 'orange'];
+                    const avatarColor = colors[index % colors.length];
+                    const initials = p.username ? p.username.substring(0, 2).toUpperCase() : '??';
+                    const firstDeposit = p.first_deposit_amount > 0 ? `<span style="color:var(--success); font-weight:600;">Yes</span><br><span style="font-size:11px; color:var(--text-secondary);">${new Date(p.first_deposit_date).toLocaleDateString()}</span>` : '<span style="color:var(--text-secondary);">No</span>';
+
+                    return `
                     <tr>
-                      <td data-label="Player"><div class="user-cell"><span class="name">${escapeHtml(p.username)}</span><span class="id">${p.telegram_id}</span></div></td>
+                      <td data-label="Player">
+                        <div class="user-cell">
+                          <div class="avatar ${avatarColor}">${initials}</div>
+                          <div class="user-info">
+                            <span class="name">${escapeHtml(p.username)}</span>
+                            <span class="id">Telegram ID: ${p.telegram_id}</span>
+                          </div>
+                        </div>
+                      </td>
                       <td data-label="Balance"><strong>${p.balance.toFixed(0)} ETB</strong></td>
-                      <td data-label="First Deposit">${p.first_deposit_amount > 0 ? p.first_deposit_amount + ' ETB' : '—'}</td>
+                      <td data-label="First Deposit">${firstDeposit}</td>
                       <td data-label="Actions">
                         <button class="adjust-btn" onclick="openBalanceModal('${p.telegram_id}', '${escapeHtml(p.username)}', ${p.balance})"><i class="fas fa-balance-scale"></i> Adjust Balance</button>
                       </td>
                     </tr>
-                  `).join('')}</tbody>
+                  `}).join('')}</tbody>
                 </table>
               </div>
-              <p style="margin-top:12px;color:var(--text-secondary);font-size:12px;text-align:center;">Total: <strong>${data.count}</strong> players</p>
             `;
                 const searchInput = document.getElementById('playerSearchInput');
                 if (searchInput.value.trim() !== '') {
@@ -1756,10 +1778,12 @@
                     const s = await sessionRes.json();
                     if (s.success && s.admin) {
                         document.getElementById('profileName').textContent = s.admin.name;
-                        document.getElementById('profilePhone').textContent = s.admin.phone;
-                        document.getElementById('profileTelebirr').textContent = s.admin.telebirr_number || 'Not set';
-                        document.getElementById('profileCbe').textContent = s.admin.cbebirr_number || 'Not set';
-                        document.getElementById('profileMpesa').textContent = s.admin.mpesa_number || 'Not set';
+                        document.getElementById('profilePhone').innerHTML = `<i class="fas fa-phone"></i> ${s.admin.phone}`;
+                        
+                        const formatPhone = (num) => num ? num : 'Not set';
+                        document.getElementById('profileTelebirr').innerHTML = `${formatPhone(s.admin.telebirr_number)} <i class="fas fa-check-circle verified-badge"></i>`;
+                        document.getElementById('profileCbe').innerHTML = `${formatPhone(s.admin.cbebirr_number)} <i class="fas fa-check-circle verified-badge"></i>`;
+                        document.getElementById('profileMpesa').innerHTML = `${formatPhone(s.admin.mpesa_number)} <i class="fas fa-check-circle verified-badge"></i>`;
                     }
                 }
 
@@ -1768,6 +1792,7 @@
                 if (inviteData.success) {
                     document.getElementById('profileInviteLink').textContent = inviteData.admin.invite_link;
                     document.getElementById('profileInviteCode').textContent = inviteData.admin.invite_code;
+                    document.getElementById('profileInviteCodeText').textContent = inviteData.admin.invite_code;
                     window._inviteCode = inviteData.admin.invite_code;
                     window._inviteLink = inviteData.admin.invite_link;
                 } else {
@@ -1775,6 +1800,7 @@
                     const link = `https://t.me/${BOT_USERNAME}?start=${code}`;
                     document.getElementById('profileInviteLink').textContent = link;
                     document.getElementById('profileInviteCode').textContent = code;
+                    document.getElementById('profileInviteCodeText').textContent = code;
                     window._inviteCode = code;
                     window._inviteLink = link;
                 }
@@ -1854,8 +1880,8 @@
                 showToast('❌ Enter a valid amount (min 10 ETB)', 'error');
                 return;
             }
-            if (!phone.match(/^(09|07)\d{8}$/)) {
-                showToast('❌ Enter a valid phone (09xxxxxxxx)', 'error');
+            if (!phone.match(/^(09|07|\+251)\d{8,9}$/)) {
+                showToast('❌ Enter a valid phone number', 'error');
                 return;
             }
             if (!name) {
@@ -1889,7 +1915,86 @@
             }
         }
 
-        // ---------- ADD PLAYER (via Import Modal) ----------
+        // ---------- ADD PLAYER MODAL ----------
+        function openAddPlayerModal() {
+            document.getElementById('addPlayerModal').classList.add('active');
+            document.getElementById('addPlayerInput').value = '';
+            document.getElementById('addPlayerStatus').innerHTML = '';
+        }
+
+        function closeAddPlayerModal() {
+            document.getElementById('addPlayerModal').classList.remove('active');
+        }
+
+        async function submitAddPlayer() {
+            const input = document.getElementById('addPlayerInput');
+            const statusDiv = document.getElementById('addPlayerStatus');
+            const identifier = input.value.trim();
+
+            if (!identifier) {
+                statusDiv.innerHTML = '<span style="color:#EF4444;">Please enter a Telegram ID or @username.</span>';
+                return;
+            }
+
+            statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Checking...</span>';
+            input.disabled = true;
+
+            try {
+                const response = await fetch('/admin/import-players', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramIds: [identifier], overwrite: false })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const result = data.results[0];
+                    if (result.success) {
+                        const msg = result.created ? 'created' : 'updated';
+                        statusDiv.innerHTML = `<span style="color:#10B981;">✅ Player ${result.telegramId} ${msg} successfully!</span>`;
+                        input.value = '';
+                        setTimeout(() => {
+                            closeAddPlayerModal();
+                            loadPlayers();
+                        }, 1500);
+                    } else {
+                        if (result.error && result.error.includes('Already assigned')) {
+                            if (confirm(`This player is already assigned to another admin. Do you want to reassign?`)) {
+                                const overwriteRes = await fetch('/admin/import-players', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ telegramIds: [identifier], overwrite: true })
+                                });
+                                const overwriteData = await overwriteRes.json();
+                                if (overwriteData.success && overwriteData.results[0].success) {
+                                    statusDiv.innerHTML = `<span style="color:#10B981;">✅ Player ${overwriteData.results[0].telegramId} reassigned to you!</span>`;
+                                    input.value = '';
+                                    setTimeout(() => {
+                                        closeAddPlayerModal();
+                                        loadPlayers();
+                                    }, 1500);
+                                } else {
+                                    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ Failed to reassign: ${overwriteData.error}</span>`;
+                                }
+                            } else {
+                                statusDiv.innerHTML = '<span style="color:#F59E0B;">Cancelled.</span>';
+                            }
+                        } else {
+                            statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${result.error || 'Failed to add player'}</span>`;
+                        }
+                    }
+                } else {
+                    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${data.error}</span>`;
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `<span style="color:#EF4444;">❌ Network error: ${err.message}</span>`;
+            } finally {
+                input.disabled = false;
+            }
+        }
+
+        // ---------- IMPORT MODAL ----------
         function openImportModal() {
             document.getElementById('importModal').classList.add('active');
             document.getElementById('importTextarea').value = '';
@@ -2019,7 +2124,7 @@
             switchPage('game');
             startAutoRefresh();
             connectAdminWebSocket();
-            console.log('✅ Dashboard initialized (Mobile App Style)');
+            console.log('✅ Dashboard initialized (Complete Mobile App Style)');
         }
 
         document.addEventListener('keydown', (e) => {
