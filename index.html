@@ -149,6 +149,8 @@ input  { font-family: inherit; }
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
+    /* ✅ Faster modal open */
+    transition: opacity 0.05s ease, visibility 0.05s ease;
 }
 .modal.active { opacity: 1; visibility: visible; }
 @supports (backdrop-filter: blur(6px)) { .modal.active { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); } }
@@ -163,6 +165,8 @@ input  { font-family: inherit; }
     box-shadow: 0 30px 60px -20px rgba(0,0,0,.5);
     transform: scale(.94) translateY(8px);
     opacity: 0;
+    /* ✅ Faster modal content open */
+    transition: transform 0.05s ease, opacity 0.05s ease;
     max-height: 92vh;
     overflow-y: auto;
     color: #F1F5F9;
@@ -1034,17 +1038,21 @@ input  { font-family: inherit; }
         <div class="badge-pill">🎮 LOBBY</div>
     </div>
 
-    <!-- ✅ MODIFIED: Added Balance, Removed Withdraw Button -->
-    <div id="inviteInfoContainer" class="invite-info" style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
-        <div>
-            <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
-            <span class="invite-code mono" id="userInviteCode">—</span>
+    <!-- ✅ MODIFIED: Restructured to place Deposit button in red circle position -->
+    <div id="inviteInfoContainer" class="invite-info" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+        <!-- Row 1: Invite Code & Balance -->
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div>
+                <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
+                <span class="invite-code mono" id="userInviteCode">—</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--accent); font-size: 0.9rem;">
+                💰 <span data-key="bal">BAL</span> <span id="stakeBalance">0</span> ETB
+            </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: var(--accent); font-size: 0.9rem;">
-            💰 <span data-key="bal">BAL</span> <span id="stakeBalance">0</span> ETB
-        </div>
-        <div style="display: flex; gap: 6px;">
-            <button class="btn-primary" style="padding: 6px 14px; border-radius: 40px; font-size: 0.75rem; min-height: 34px; height: auto;" data-action="deposit" data-key="deposit">+Deposit</button>
+        <!-- Row 2: Deposit button moved to the requested position -->
+        <div style="display: flex; justify-content: flex-end; width: 100%;">
+            <button class="btn-primary" style="padding: 8px 24px; border-radius: 40px; font-size: 0.85rem;" data-action="deposit" data-key="deposit">+Deposit</button>
         </div>
     </div>
 
@@ -2047,7 +2055,6 @@ function goStake() {
     switchPage('stakePage');
     $('selectedNumber').textContent = '-';
     $('backToLobbyContainer')?.classList.add('hidden');
-    // ✅ FIX 4: Clear both card previews when returning to stake page
     renderCard([], 'lobbyCardPreview', false);
     renderCard([], 'gameCard', false);
     paintGrid();
@@ -2195,7 +2202,6 @@ async function connectToGame(stake) {
 
     socket.on('lobbyState', s => {
         if (s.stake !== stake) return;
-        // ✅ FIX 3: Clear previous card and marks when a new lobby opens
         state.selectedCard = null;
         state.userCard = [];
         state.markedNumbers = new Set();
@@ -2273,7 +2279,6 @@ async function connectToGame(stake) {
 
     socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
 
-    // ✅ FIX 1: Handle card selection failure (e.g., insufficient balance)
     socket.on('cardSelectionFailed', (msg) => {
         toast('❌ ' + (msg || t('insufficientBalance')), 'error');
         if (state.selectedCard !== null) {
@@ -2403,7 +2408,6 @@ $('numberGrid').addEventListener('click', e => {
     const cell = e.target.closest('.grid-cell');
     if (!cell || state.isGameActive || !socket) return;
 
-    // ✅ FIX 2: Block selection when the player cannot afford the stake
     if (state.balanceLoaded && state.stake && state.balance < state.stake) {
         toast(t('insufficientBalance'), 'error');
         return;
