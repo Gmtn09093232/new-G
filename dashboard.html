@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Admin Dashboard</title>
-    <!-- FontAwesome CDN for solid, clean icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        /* ---------- THEME VARIABLES ---------- */
+        :root {
+            --bg-app: #0B1120;
+            --bg-card: #1A2332;
+            --bg-card-hover: #1E293B;
+            --bg-input: #111827;
+            --border-color: #2D3748;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --primary-blue: #2563EB;
+            --primary-blue-hover: #1D4ED8;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --purple: #8B5CF6;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+        }
+
         /* ---------- RESET & BASE ---------- */
         * {
             margin: 0;
@@ -16,779 +35,738 @@
         }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f5f7fb;
+            background: var(--bg-app);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding-bottom: 80px;
-            color: #1e293b;
+            padding-bottom: 90px; /* Space for bottom nav */
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* ---------- GLOBAL FAST TRANSITIONS ---------- */
-        button, .btn, .tab-btn, .stat-card, .logout-btn, .adjust-btn, .copy-btn-icon {
-            transition: all 0.1s ease !important;
+        button, .btn, .tab-btn, .stat-card, .logout-btn, .adjust-btn, .copy-btn-icon, .nav-item {
+            transition: all 0.15s ease !important;
         }
 
         /* ---------- HEADER ---------- */
         .header {
-            background: #ffffff;
-            border-bottom: 1px solid #eef2f6;
-            padding: 14px 24px;
+            background: rgba(11, 17, 32, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(45, 55, 72, 0.5);
+            padding: 16px 20px;
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-        }
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
         }
         .header-left {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 16px;
         }
-        .header-left .logo {
-            font-size: 22px;
+        .menu-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 20px;
+            cursor: pointer;
+            display: none;
+        }
+        .header-title {
+            font-size: 20px;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--text-primary);
             letter-spacing: -0.5px;
-        }
-        .header-left .logo span {
-            color: #2563eb;
-        }
-        .header-left .subtitle {
-            font-size: 12px;
-            color: #94a3b8;
-            font-weight: 400;
-            background: #f1f4f9;
-            padding: 4px 14px;
-            border-radius: 40px;
-            display: inline-block;
         }
         .header-right {
             display: flex;
             align-items: center;
             gap: 16px;
-            flex-wrap: wrap;
         }
-        .header-right .admin-info {
-            font-size: 13px;
-            color: #334155;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px 14px;
-            background: #f8fafc;
-            padding: 6px 16px;
-            border-radius: 40px;
-            border: 1px solid #eef2f6;
+        .notification-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            position: relative;
+            cursor: pointer;
         }
-        .header-right .admin-info span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .header-right .admin-info i {
-            color: #1e293b;
-        }
-        .header-right .admin-info .badge-role {
-            background: #2563eb;
-            color: white;
-            font-size: 10px;
-            padding: 1px 10px;
-            border-radius: 40px;
-            font-weight: 500;
+        .notification-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 8px;
+            background: var(--danger);
+            border-radius: 50%;
+            border: 2px solid var(--bg-app);
         }
         .logout-btn {
-            background: #f1f4f9;
-            color: #1e293b;
-            border: 1px solid #e2e8f0;
-            padding: 8px 18px;
-            border-radius: 40px;
-            cursor: pointer;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: var(--radius-xl);
             font-weight: 600;
             font-size: 13px;
-            min-height: 44px;
             display: flex;
             align-items: center;
             gap: 6px;
+            cursor: pointer;
         }
         .logout-btn:hover {
-            background: #fee2e2;
-            border-color: #fca5a5;
-            color: #dc2626;
-        }
-        .logout-btn:active {
-            transform: scale(0.96);
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
         }
 
         /* ---------- CONTAINER ---------- */
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
-            padding: 20px 20px 30px;
-        }
-
-        /* ---------- STATS GRID ---------- */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 14px;
-            margin-bottom: 24px;
-        }
-        .stat-card {
-            background: white;
-            padding: 18px 20px;
-            border-radius: 16px;
-            border: 1px solid #eef2f6;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-            text-align: left;
-            display: flex;
-            flex-direction: column;
-        }
-        .stat-card:hover {
-            border-color: #dbe7f7;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .stat-card .label {
-            font-size: 12px;
-            color: #94a3b8;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .stat-card .label i {
-            color: #1e293b;
-        }
-        .stat-card .value {
-            font-size: 26px;
-            font-weight: 700;
-            line-height: 1.2;
-            color: #0f172a;
-        }
-        .stat-card .value.green { color: #059669; }
-        .stat-card .value.blue { color: #2563eb; }
-        .stat-card .value.orange { color: #d97706; }
-        .stat-card .value.red { color: #dc2626; }
-        .stat-card .value.purple { color: #7c3aed; }
-        .stat-card .sub {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 4px;
-        }
-
-        @media (max-width: 600px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-            .stat-card { padding: 14px 16px; }
-            .stat-card .value { font-size: 20px; }
-        }
-        @media (min-width: 768px) {
-            .stats-grid { grid-template-columns: repeat(4, 1fr); }
-            .stat-card .value { font-size: 30px; }
+            padding: 20px 16px;
         }
 
         /* ---------- COMMISSION BAR ---------- */
         .commission-bar {
-            background: linear-gradient(135deg, #f0f7ff 0%, #e8f0fe 100%);
-            border-radius: 16px;
-            padding: 16px 24px;
+            background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+            border-radius: var(--radius-lg);
+            padding: 20px;
             margin-bottom: 24px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 14px;
-            border: 1px solid #dbe7f7;
+            flex-direction: column;
+            gap: 16px;
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .commission-bar .item {
             display: flex;
-            align-items: baseline;
-            gap: 8px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
         }
         .commission-bar .label {
-            font-weight: 500;
             font-size: 13px;
-            color: #475569;
+            color: rgba(255, 255, 255, 0.8);
             display: flex;
             align-items: center;
-            gap: 6px;
-        }
-        .commission-bar .label i {
-            color: #1e293b;
+            gap: 8px;
+            font-weight: 500;
         }
         .commission-bar .amount {
+            font-size: 18px;
             font-weight: 700;
-            font-size: 20px;
-            color: #0f172a;
+            color: #FFFFFF;
         }
-        .commission-bar .amount.pending { color: #d97706; }
-        .commission-bar .amount.earned { color: #059669; }
-        .commission-bar .amount.rate { color: #2563eb; }
-        
-        @media (max-width: 480px) {
-            .commission-bar { flex-direction: column; align-items: stretch; text-align: center; padding: 16px; }
-            .commission-bar .item { justify-content: center; }
-            .commission-bar .amount { font-size: 18px; }
-        }
+        .commission-bar .amount.pending { color: #FDE047; }
+        .commission-bar .amount.earned { color: #A7F3D0; }
+        .commission-bar .amount.rate { color: #BFDBFE; }
 
-        /* ---------- MAIN NAV ---------- */
-        .main-nav {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 20px;
-            background: white;
-            padding: 4px;
-            border-radius: 14px;
-            border: 1px solid #eef2f6;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        /* ---------- STATS GRID ---------- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
         }
-        .main-nav button {
-            flex: 1;
-            padding: 12px 16px;
-            border: none;
-            background: transparent;
-            border-radius: 10px;
+        .stat-card {
+            background: var(--bg-card);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card:hover {
+            background: var(--bg-card-hover);
+            border-color: #3B82F6;
+        }
+        .stat-card .label {
+            font-size: 11px;
+            color: var(--text-secondary);
             font-weight: 600;
-            font-size: 14px;
-            color: #64748b;
-            cursor: pointer;
-            min-height: 48px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
-        .main-nav button i {
-            font-size: 16px;
+        .stat-card .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-top: 4px;
         }
-        .main-nav button:active {
-            transform: scale(0.96);
+        .stat-card .value.green { color: var(--success); }
+        .stat-card .value.blue { color: #60A5FA; }
+        .stat-card .value.orange { color: var(--warning); }
+        .stat-card .value.red { color: var(--danger); }
+        .stat-card .value.purple { color: var(--purple); }
+        .stat-card .sub {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
         }
-        .main-nav button.active {
-            background: #2563eb;
-            color: white;
-            box-shadow: 0 2px 12px rgba(37, 99, 235, 0.25);
+
+        @media (min-width: 600px) {
+            .stats-grid { grid-template-columns: repeat(3, 1fr); }
+            .commission-bar { flex-direction: row; justify-content: space-between; padding: 24px; }
+            .commission-bar .item { flex-direction: column; align-items: flex-start; gap: 4px; }
+            .commission-bar .amount { font-size: 22px; }
         }
-        @media (max-width: 480px) {
-            .main-nav button { font-size: 12px; padding: 10px 6px; flex: 1 1 30%; }
-            .main-nav button i { font-size: 14px; }
+
+        /* ---------- BOTTOM NAVIGATION (MOBILE APP STYLE) ---------- */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px 0 env(safe-area-inset-bottom, 10px) 0;
+            z-index: 1000;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 500;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            flex: 1;
+        }
+        .nav-item i {
+            font-size: 18px;
+        }
+        .nav-item.active {
+            color: var(--primary-blue);
+            background: rgba(37, 99, 235, 0.1);
+        }
+        .nav-item:active {
+            transform: scale(0.92);
         }
 
         /* ---------- PAGES ---------- */
-        .page { display: none; animation: fadeIn 0.2s ease; }
+        .page { display: none; animation: fadeIn 0.3s ease; }
         .page.active { display: block; }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* ---------- SUB-TABS ---------- */
+        /* ---------- SUB-TABS (SEGMENTED CONTROL) ---------- */
         .tabs {
             display: flex;
-            gap: 4px;
-            margin-bottom: 16px;
-            background: white;
-            padding: 4px;
-            border-radius: 14px;
-            border: 1px solid #eef2f6;
+            background: var(--bg-card);
+            padding: 6px;
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
             overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-            flex-wrap: nowrap;
+            gap: 4px;
         }
         .tabs::-webkit-scrollbar { display: none; }
         .tab-btn {
-            padding: 10px 18px;
+            flex: 1;
+            padding: 10px 16px;
             border: none;
             background: transparent;
-            border-radius: 10px;
-            cursor: pointer;
+            border-radius: var(--radius-lg);
             font-weight: 600;
             font-size: 13px;
-            color: #64748b;
+            color: var(--text-secondary);
+            cursor: pointer;
             white-space: nowrap;
-            flex-shrink: 0;
-            min-height: 44px;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
+            min-height: 44px;
         }
         .tab-btn i { font-size: 14px; }
-        .tab-btn:active { transform: scale(0.96); }
         .tab-btn.active {
-            background: #2563eb;
+            background: var(--primary-blue);
             color: white;
-            box-shadow: 0 2px 12px rgba(37, 99, 235, 0.2);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
         }
         .tab-btn .badge {
-            display: inline-block;
-            background: #ef4444;
+            background: var(--danger);
             color: white;
             font-size: 10px;
-            padding: 0 8px;
-            border-radius: 40px;
-            min-width: 20px;
-            text-align: center;
-            line-height: 18px;
-            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 700;
         }
-        .tab-btn.active .badge { background: rgba(255, 255, 255, 0.25); }
-        @media (max-width: 480px) {
-            .tab-btn { font-size: 12px; padding: 8px 14px; min-height: 40px; }
+        .tab-btn.active .badge {
+            background: rgba(255, 255, 255, 0.3);
         }
 
         /* ---------- TAB CONTENT ---------- */
         .tab-content {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            border: 1px solid #eef2f6;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
             min-height: 300px;
         }
         .tab-pane { display: none; }
-        .tab-pane.active { display: block; animation: fadeIn 0.15s ease; }
+        .tab-pane.active { display: block; animation: fadeIn 0.2s ease; }
         .tab-pane h2 {
             font-size: 18px;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--text-primary);
             margin-bottom: 16px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
-        .tab-pane h2 i { color: #1e293b; }
+        .tab-pane h2 i { color: var(--primary-blue); }
 
         /* ---------- FILTER BAR ---------- */
         .filter-bar {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: var(--bg-card);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
             align-items: flex-end;
-            background: #f8fafc;
-            padding: 14px 16px;
-            border-radius: 12px;
-            border: 1px solid #eef2f6;
         }
-        .filter-bar .input-group { flex: 1; min-width: 130px; }
+        .filter-bar .input-group {
+            flex: 1;
+            min-width: 120px;
+        }
         .filter-bar .input-group label {
-            font-size: 11px; font-weight: 600; color: #64748b;
-            margin-bottom: 4px; display: block; text-transform: uppercase;
-            letter-spacing: 0.3px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .filter-bar .input-group input,
         .filter-bar .input-group select {
-            width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0;
-            border-radius: 10px; font-size: 13px; background: white;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            background: var(--bg-input);
+            color: var(--text-primary);
             min-height: 44px;
+            appearance: none;
         }
-        .filter-bar .input-group input:focus,
         .filter-bar .input-group select:focus {
-            outline: none; border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-        }
-        .filter-bar .btn { min-height: 44px; padding: 8px 20px; font-size: 13px; }
-        @media (max-width: 480px) {
-            .filter-bar .input-group { min-width: 100%; flex: 0 0 100%; }
-            .filter-bar .btn { flex: 1; justify-content: center; }
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         }
 
-        /* ---------- TABLES ---------- */
+        /* ---------- TABLES TO CARDS (MOBILE STYLE) ---------- */
         .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin: 0 -4px; padding: 0 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         table {
-            width: 100%; border-collapse: collapse; font-size: 13px; min-width: 650px;
+            width: 100%;
+            border-collapse: collapse;
         }
-        table th {
-            background: #f8fafc; text-align: left; padding: 12px 14px;
-            font-weight: 600; color: #475569; border-bottom: 2px solid #eef2f6;
-            font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
+        thead {
+            display: none; /* Hide table headers on mobile */
         }
-        table td {
-            padding: 12px 14px; border-bottom: 1px solid #f1f5f9;
-            vertical-align: middle; font-size: 13px; color: #1e293b;
+        tr {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
-        table tr:hover td { background: #fafbfc; }
-        .user-cell { display: flex; flex-direction: column; }
-        .user-cell .name { font-weight: 500; color: #0f172a; font-size: 13px; }
-        .user-cell .id { font-size: 11px; color: #94a3b8; }
+        td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0;
+            border: none;
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+        td::before {
+            content: attr(data-label);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-right: 16px;
+        }
+        .user-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .user-cell .name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .user-cell .id {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .action-buttons .btn {
+            flex: 1;
+        }
 
-        /* ---------- BADGES ---------- */
+        @media (min-width: 768px) {
+            thead { display: table-header-group; }
+            tbody { display: table-row-group; }
+            table { display: table; }
+            tr { display: table-row; padding: 0; margin: 0; border: none; border-radius: 0; background: transparent; }
+            th { display: table-cell; background: var(--bg-card); text-align: left; padding: 14px 16px; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+            td { display: table-cell; padding: 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-card); }
+            tr:hover td { background: var(--bg-card-hover); }
+            td::before { display: none; }
+            .user-cell { align-items: flex-start; }
+            .action-buttons { width: auto; }
+            .action-buttons .btn { flex: none; }
+            .table-wrapper { background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); overflow: hidden; }
+        }
+
+        /* ---------- BADGES & BUTTONS ---------- */
         .status-badge {
-            display: inline-block; padding: 3px 14px; border-radius: 40px;
-            font-size: 11px; font-weight: 500; white-space: nowrap;
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+            text-transform: capitalize;
         }
-        .status-badge.pending { background: #fef3c7; color: #92400e; }
-        .status-badge.approved { background: #d1fae5; color: #065f46; }
-        .status-badge.rejected { background: #fee2e2; color: #991b1b; }
-        .status-badge.paid { background: #dbeafe; color: #1e40af; }
-        .status-badge.telebirr { background: #e0f2fe; color: #0369a1; }
-        .status-badge.cbebirr { background: #fef3c7; color: #92400e; }
-        .status-badge.mpesa { background: #e0f2fe; color: #0369a1; }
+        .status-badge.pending { background: rgba(245, 158, 11, 0.2); color: #FDE047; }
+        .status-badge.approved { background: rgba(16, 185, 129, 0.2); color: #A7F3D0; }
+        .status-badge.rejected { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+        .status-badge.telebirr { background: rgba(37, 99, 235, 0.2); color: #93C5FD; }
+        .status-badge.cbebirr { background: rgba(139, 92, 246, 0.2); color: #C4B5FD; }
+        .status-badge.mpesa { background: rgba(16, 185, 129, 0.2); color: #A7F3D0; }
 
-        /* ---------- BUTTONS ---------- */
         .btn {
-            padding: 8px 18px; border: none; border-radius: 10px;
-            font-size: 13px; font-weight: 600; cursor: pointer;
-            min-height: 44px; min-width: 48px;
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: white;
         }
-        .btn i { font-size: 14px; }
         .btn:active { transform: scale(0.96); }
-        .btn-sm { padding: 5px 14px; font-size: 12px; min-height: 36px; min-width: 36px; }
-        .btn-success { background: #059669; color: white; }
-        .btn-success:hover { background: #047857; }
-        .btn-danger { background: #dc2626; color: white; }
-        .btn-danger:hover { background: #b91c1c; }
-        .btn-primary { background: #2563eb; color: white; }
-        .btn-primary:hover { background: #1d4ed8; }
-        .btn-outline { background: transparent; color: #2563eb; border: 1.5px solid #2563eb; }
-        .btn-outline:hover { background: #eff6ff; }
-        .btn-warning { background: #d97706; color: white; }
-        .btn-warning:hover { background: #b45309; }
-        .btn-secondary { background: #f1f4f9; color: #1e293b; border: 1px solid #e2e8f0; }
-        .btn-secondary:hover { background: #e2e8f0; }
-        
-        .action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+        .btn-sm { padding: 8px 12px; font-size: 12px; min-height: 36px; }
+        .btn-primary { background: var(--primary-blue); }
+        .btn-primary:hover { background: var(--primary-blue-hover); }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #DC2626; }
+        .btn-warning { background: var(--warning); }
+        .btn-warning:hover { background: #D97706; }
+        .btn-secondary { background: var(--bg-card-hover); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background: var(--border-color); }
+        .btn-outline { background: transparent; color: var(--primary-blue); border: 1px solid var(--primary-blue); }
+        .btn-outline:hover { background: rgba(37, 99, 235, 0.1); }
+
         .link-btn {
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 4px 12px; border-radius: 6px; background: #e0f2fe;
-            color: #0369a1; font-size: 11px; text-decoration: none;
-            font-weight: 500; border: none; cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(37, 99, 235, 0.15);
+            color: #60A5FA;
+            font-size: 11px;
+            text-decoration: none;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
         }
-        .link-btn:hover { background: #bae6fd; }
-        .link-btn i { font-size: 12px; }
+        .link-btn:hover { background: rgba(37, 99, 235, 0.25); }
 
         .adjust-btn {
-            background: #d97706; color: white; border: none;
-            padding: 4px 14px; border-radius: 6px; font-size: 11px;
-            font-weight: 500; cursor: pointer; min-height: 32px;
-            display: inline-flex; align-items: center; gap: 4px;
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
-        .adjust-btn:hover { background: #b45309; }
+        .adjust-btn:hover { background: rgba(245, 158, 11, 0.25); }
         .adjust-btn:active { transform: scale(0.94); }
-        .adjust-btn i { font-size: 12px; }
 
         .copy-btn-icon {
-            background: transparent; border: none; cursor: pointer;
-            font-size: 14px; padding: 2px 6px; border-radius: 4px;
-            color: #64748b;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: var(--text-secondary);
         }
-        .copy-btn-icon:hover { background: #e2e8f0; color: #0f172a; }
+        .copy-btn-icon:hover { background: var(--border-color); color: var(--text-primary); }
         .copy-btn-icon:active { transform: scale(0.9); }
-
-        @media (max-width: 480px) {
-            .btn { min-height: 40px; font-size: 12px; padding: 6px 14px; }
-            .btn-sm { min-height: 34px; font-size: 11px; padding: 4px 10px; }
-        }
 
         /* ---------- PROFILE PAGE ---------- */
         .profile-card {
-            background: white; border-radius: 16px; padding: 24px;
-            border: 1px solid #eef2f6; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            border: 1px solid var(--border-color);
         }
-        .profile-card .row {
-            display: flex; justify-content: space-between; padding: 12px 0;
-            border-bottom: 1px solid #f1f5f9; flex-wrap: wrap; gap: 6px;
+        .profile-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
         }
-        .profile-card .row:last-child { border-bottom: none; }
-        .profile-card .label { font-weight: 500; color: #64748b; font-size: 14px; display: flex; align-items: center; gap: 6px; }
-        .profile-card .label i { color: #1e293b; width: 16px; text-align: center; }
-        .profile-card .value { font-weight: 600; color: #0f172a; font-size: 14px; }
-        .profile-card .value .highlight { color: #2563eb; }
-        
-        .profile-actions { margin-top: 24px; }
-        .profile-actions h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .profile-actions h3 i { color: #1e293b; }
-        .profile-actions .withdraw-form {
-            display: flex; flex-direction: column; gap: 12px;
-            background: #f8fafc; padding: 18px; border-radius: 12px; border: 1px solid #eef2f6;
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #1E3A8A, #2563EB);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            box-shadow: 0 8px 16px rgba(37, 99, 235, 0.3);
         }
-        .profile-actions .withdraw-form .row { display: flex; gap: 12px; flex-wrap: wrap; }
-        .profile-actions .withdraw-form .input-group { flex: 1; min-width: 130px; }
-        .profile-actions .withdraw-form .input-group label {
-            font-size: 12px; font-weight: 600; color: #475569;
-            margin-bottom: 4px; display: block;
+        .profile-name { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+        .profile-phone { font-size: 14px; color: var(--text-secondary); }
+
+        .profile-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-color);
         }
-        .profile-actions .withdraw-form .input-group input,
-        .profile-actions .withdraw-form .input-group select {
-            width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0;
-            border-radius: 10px; font-size: 14px; background: white; min-height: 48px;
-        }
-        .profile-actions .withdraw-form .input-group input:focus,
-        .profile-actions .withdraw-form .input-group select:focus {
-            outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-        }
-        .profile-actions .withdraw-form .btn { width: 100%; padding: 12px; min-height: 48px; font-size: 15px; }
-        
-        @media (max-width: 480px) {
-            .profile-actions .withdraw-form .row { flex-direction: column; }
-            .profile-actions .withdraw-form .input-group { min-width: 100%; }
-        }
+        .profile-row:last-child { border-bottom: none; }
+        .profile-row .label { font-size: 14px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+        .profile-row .value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .profile-row .value.highlight { color: #60A5FA; }
 
         .payment-numbers {
-            background: #f8fafc; padding: 16px 20px; border-radius: 12px;
-            margin-top: 16px; border: 1px solid #eef2f6;
+            background: var(--bg-input);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            margin-top: 16px;
+            border: 1px solid var(--border-color);
         }
-        .payment-numbers h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
-        .payment-numbers h3 i { color: #1e293b; }
-        .payment-numbers p { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+        .payment-numbers h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+        .payment-numbers p { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
         .payment-numbers div {
-            font-size: 13px; padding: 6px 0; display: flex; justify-content: space-between;
-            border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 4px;
+            font-size: 13px; padding: 8px 0; display: flex; justify-content: space-between;
+            border-bottom: 1px solid var(--border-color); color: var(--text-secondary);
         }
         .payment-numbers div:last-child { border-bottom: none; }
-        .payment-numbers strong { color: #1e293b; }
-        .payment-numbers span { color: #0f172a; font-weight: 500; font-family: monospace; font-size: 13px; }
+        .payment-numbers strong { color: var(--text-primary); }
+        .payment-numbers span { color: #60A5FA; font-weight: 600; font-family: monospace; }
+
+        .withdraw-form {
+            display: flex; flex-direction: column; gap: 16px;
+            background: var(--bg-input); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+            margin-top: 20px;
+        }
+        .withdraw-form .input-group label {
+            font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            margin-bottom: 6px; display: block;
+        }
+        .withdraw-form .input-group input,
+        .withdraw-form .input-group select {
+            width: 100%; padding: 12px 16px; border: 1px solid var(--border-color);
+            border-radius: var(--radius-md); font-size: 14px; background: var(--bg-card); color: var(--text-primary);
+            min-height: 48px;
+        }
+        .withdraw-form .input-group input:focus,
+        .withdraw-form .input-group select:focus {
+            outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
 
         /* ---------- RULES PAGE ---------- */
-        .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .rules-grid { display: flex; flex-direction: column; gap: 20px; }
         .rules-col {
-            background: #f8fafc; border-radius: 12px; padding: 20px;
-            border: 1px solid #eef2f6; min-height: 200px;
+            background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px;
+            border: 1px solid var(--border-color);
         }
         .rules-col h3 {
-            font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 14px;
+            font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 16px;
             display: flex; align-items: center; gap: 10px;
-            border-bottom: 2px solid #2563eb; padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 12px;
         }
-        .rules-col h3 i { color: #1e293b; font-size: 20px; }
-        .rules-col .rule-section { margin-bottom: 16px; }
-        .rules-col .rule-section h4 {
-            font-size: 14px; font-weight: 700; color: #1e293b;
-            margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+        .rules-col h3 i { color: var(--primary-blue); }
+        .rule-section { margin-bottom: 20px; }
+        .rule-section h4 {
+            font-size: 14px; font-weight: 700; color: var(--text-primary);
+            margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
         }
-        .rules-col .rule-section h4 i { color: #1e293b; font-size: 12px; }
-        .rules-col .rule-section ul { list-style: none; padding-left: 4px; font-size: 13px; line-height: 1.7; color: #475569; }
-        .rules-col .rule-section ul li { padding: 3px 0 3px 22px; position: relative; }
-        .rules-col .rule-section ul li::before {
+        .rule-section h4 i { color: var(--primary-blue); font-size: 12px; }
+        .rule-section ul { list-style: none; padding-left: 4px; font-size: 13px; line-height: 1.8; color: var(--text-secondary); }
+        .rule-section ul li { padding: 4px 0 4px 20px; position: relative; }
+        .rule-section ul li::before {
             content: "•"; position: absolute; left: 4px;
-            color: #2563eb; font-weight: 700;
+            color: var(--primary-blue); font-weight: 700; font-size: 16px;
         }
-        .rules-col .rule-section .highlight {
-            background: #fef3c7; padding: 1px 6px; border-radius: 4px;
-            font-weight: 600; color: #92400e;
+        .rule-section .highlight {
+            background: rgba(245, 158, 11, 0.2); padding: 2px 8px; border-radius: 4px;
+            font-weight: 600; color: #FDE047;
         }
-        .rules-col .rule-section .limit-box {
-            background: white; border-radius: 8px; padding: 12px 16px;
-            margin-top: 6px; border-left: 3px solid #dc2626; font-size: 13px;
+        .rule-section .limit-box {
+            background: var(--bg-input); border-radius: var(--radius-md); padding: 14px 16px;
+            margin-top: 8px; border-left: 3px solid var(--danger); font-size: 13px;
+            color: var(--text-secondary);
         }
-        .rules-col .rule-section .limit-box strong { color: #0f172a; }
-        @media (max-width: 768px) {
-            .rules-grid { grid-template-columns: 1fr; gap: 16px; }
-            .rules-col { padding: 16px; }
-            .rules-col h3 { font-size: 16px; }
-            .rules-col .rule-section ul { font-size: 12px; }
-        }
-
-        /* ---------- EMPTY & LOADING ---------- */
-        .empty-state { text-align: center; padding: 40px 16px; color: #94a3b8; }
-        .empty-state .icon { font-size: 40px; margin-bottom: 10px; color: #cbd5e1; }
-        .empty-state p { font-size: 14px; }
-        .loading { text-align: center; padding: 40px 16px; color: #94a3b8; }
-        .spinner {
-            display: inline-block; width: 30px; height: 30px;
-            border: 3px solid #e2e8f0; border-top: 3px solid #2563eb;
-            border-radius: 50%; animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* ---------- TOAST ---------- */
-        .toast {
-            position: fixed; bottom: 24px; left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            padding: 14px 28px; border-radius: 14px; color: white;
-            font-weight: 500; font-size: 14px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-            opacity: 0; transition: all 0.2s ease; z-index: 999;
-            max-width: 90%; text-align: center; pointer-events: none;
-        }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
-        .toast.success { background: #059669; }
-        .toast.error { background: #dc2626; }
-        .toast.info { background: #2563eb; }
-        @media (max-width: 480px) {
-            .toast { font-size: 13px; padding: 12px 20px; bottom: 16px; max-width: 95%; }
-        }
-
-        /* ---------- REFRESH BUTTON ---------- */
-        .refresh-btn {
-            position: fixed; bottom: 24px; right: 24px;
-            background: #2563eb; color: white; border: none;
-            padding: 14px; border-radius: 50%; cursor: pointer;
-            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.35);
-            font-size: 18px; z-index: 50; width: 56px; height: 56px;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .refresh-btn:hover { background: #1d4ed8; transform: scale(1.04); }
-        .refresh-btn:active { transform: scale(0.88); box-shadow: 0 2px 12px rgba(37, 99, 235, 0.25); }
-        @media (max-width: 480px) {
-            .refresh-btn { width: 48px; height: 48px; font-size: 16px; bottom: 16px; right: 16px; }
-        }
+        .rule-section .limit-box strong { color: var(--text-primary); }
 
         /* ---------- MODALS ---------- */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(8px);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 2000; visibility: hidden; opacity: 0; transition: 0.15s ease;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px);
+            display: flex; align-items: flex-end; justify-content: center;
+            z-index: 2000; visibility: hidden; opacity: 0; transition: 0.2s ease;
         }
         .modal.active { visibility: visible; opacity: 1; }
         .modal-content {
-            background: white; border-radius: 24px; padding: 28px 32px;
-            max-width: 520px; width: 92%; max-height: 90vh; overflow-y: auto;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+            background: var(--bg-card); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 28px 24px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid var(--border-color); border-bottom: none;
         }
+        .modal.active .modal-content { transform: translateY(0); }
+        
+        @media (min-width: 768px) {
+            .modal { align-items: center; }
+            .modal-content { border-radius: var(--radius-xl); transform: scale(0.95); border-bottom: 1px solid var(--border-color); }
+            .modal.active .modal-content { transform: scale(1); }
+        }
+
         .modal-content .bank-header {
             display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
-            border-bottom: 2px solid #f1f5f9; padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 16px;
         }
-        .modal-content .bank-header i { font-size: 28px; color: #1e293b; }
-        .modal-content .bank-title { font-size: 20px; font-weight: 700; color: #0f172a; }
-        .modal-content .bank-sub { font-size: 14px; color: #94a3b8; }
+        .modal-content .bank-header i { font-size: 24px; color: var(--primary-blue); }
+        .modal-content .bank-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+        .modal-content .bank-sub { font-size: 13px; color: var(--text-secondary); }
         .modal-content textarea {
-            width: 100%; padding: 12px 16px; border-radius: 12px;
-            border: 1px solid #e2e8f0; font-family: monospace;
-            min-height: 150px; font-size: 14px; transition: border-color 0.1s;
+            width: 100%; padding: 14px 16px; border-radius: var(--radius-md);
+            border: 1px solid var(--border-color); font-family: monospace;
+            min-height: 150px; font-size: 14px; background: var(--bg-input); color: var(--text-primary);
+            resize: vertical;
         }
         .modal-content textarea:focus {
-            outline: none; border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+            outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
         }
-        .modal-content .modal-buttons { display: flex; gap: 12px; margin-top: 20px; }
+        .modal-content .modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
         .modal-content .modal-buttons button {
-            flex: 1; padding: 12px; border-radius: 12px; font-weight: 700;
+            flex: 1; padding: 14px; border-radius: var(--radius-md); font-weight: 700;
             border: none; min-height: 48px; font-size: 14px; cursor: pointer;
         }
-        .modal-content .modal-buttons button:active { transform: scale(0.96); }
-        .import-status {
-            margin-top: 14px; font-size: 13px; max-height: 200px; overflow-y: auto;
-            background: #f8fafc; padding: 10px 14px; border-radius: 10px;
-            border: 1px solid #eef2f6; display: none;
-        }
 
-        /* Balance adjust modal */
-        #balanceModal .modal-content { max-width: 440px; }
-        #balanceModal .input-group { margin-bottom: 16px; }
-        #balanceModal .input-group label {
-            display: block; font-weight: 600; font-size: 13px;
-            color: #475569; margin-bottom: 4px;
-        }
-        #balanceModal .input-group input,
-        #balanceModal .input-group select {
-            width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0;
-            border-radius: 10px; font-size: 15px; background: white;
-            min-height: 48px; transition: border-color 0.1s;
-        }
-        #balanceModal .input-group input:focus,
-        #balanceModal .input-group select:focus {
-            outline: none; border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-        }
-        #balanceModal .player-info {
-            background: #f8fafc; padding: 14px 16px; border-radius: 10px;
-            margin-bottom: 18px; font-size: 14px; border: 1px solid #eef2f6;
-        }
-        #balanceModal .player-info strong { color: #0f172a; }
-
-        /* Proof modal */
-        #proofModal .modal-content {
-            max-width: 600px; background: transparent; padding: 0;
-            border-radius: 16px; overflow: hidden;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
-        }
-        #proofModal img { width: 100%; height: auto; display: block; max-height: 80vh; object-fit: contain; }
-        #proofModal .close-btn {
-            position: absolute; top: 16px; right: 16px;
-            background: rgba(0, 0, 0, 0.6); color: white; border: none;
-            width: 44px; height: 44px; border-radius: 50%; font-size: 22px;
-            cursor: pointer; z-index: 10; display: flex; align-items: center;
-            justify-content: center; transition: 0.1s;
-        }
-        #proofModal .close-btn:hover { background: rgba(0, 0, 0, 0.8); }
-        #proofModal .close-btn:active { transform: scale(0.9); }
-
-        /* Player search */
-        .player-search { margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
-        .player-search input {
-            flex: 1; padding: 10px 16px; border: 1px solid #e2e8f0;
-            border-radius: 10px; font-size: 14px; min-height: 44px; background: white;
-        }
-        .player-search input:focus {
-            outline: none; border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-        }
-        .player-search .btn { min-height: 44px; }
-        @media (max-width: 480px) {
-            .player-search input { min-width: 100%; }
-        }
-
-        /* Add player row */
-        .add-player-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-        .add-player-row input {
-            flex: 1; min-width: 160px; padding: 10px 16px;
-            border: 1px solid #e2e8f0; border-radius: 10px;
-            font-size: 14px; min-height: 48px; background: white;
-        }
-        .add-player-row input:focus {
-            outline: none; border-color: #2563eb;
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
-        }
-        .add-player-row .btn { min-height: 48px; }
-        @media (max-width: 480px) {
-            .add-player-row input { min-width: 100%; }
-        }
-
-        /* close button in modals */
         .close-btn {
             background: transparent; border: none; font-size: 24px;
-            cursor: pointer; color: #64748b; padding: 4px 8px;
+            cursor: pointer; color: var(--text-secondary); padding: 4px 8px;
             border-radius: 8px; transition: 0.1s;
         }
-        .close-btn:hover { background: #f1f5f9; }
+        .close-btn:hover { background: var(--border-color); color: var(--text-primary); }
 
-        .txn-ref {
-            font-family: monospace; font-weight: 600; font-size: 13px;
-            background: #f1f5f9; padding: 2px 10px; border-radius: 6px;
-            display: inline-block; margin-right: 4px;
+        /* ---------- TOAST ---------- */
+        .toast {
+            position: fixed; bottom: 100px; left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 24px; border-radius: var(--radius-xl); color: white;
+            font-weight: 600; font-size: 14px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 999;
+            max-width: 90%; text-align: center; pointer-events: none;
+            display: flex; align-items: center; gap: 8px;
         }
-        .txn-ref-wrap { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-        .txn-ref-wrap .cbe-detail {
-            font-family: monospace; font-weight: 500; font-size: 12px;
-            background: #fef3c7; padding: 1px 8px; border-radius: 4px;
-            display: inline-block; color: #92400e;
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--primary-blue); }
+
+        /* ---------- REFRESH BUTTON ---------- */
+        .refresh-btn {
+            position: fixed; bottom: 100px; right: 20px;
+            background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color);
+            padding: 14px; border-radius: 50%; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            font-size: 18px; z-index: 50; width: 50px; height: 50px;
+            display: flex; align-items: center; justify-content: center;
         }
-        .txn-ref-wrap .cbe-detail.phone { background: #e0f2fe; color: #0369a1; }
+        .refresh-btn:hover { background: var(--border-color); }
+        .refresh-btn:active { transform: scale(0.88); }
+
+        /* ---------- EMPTY & LOADING ---------- */
+        .empty-state { text-align: center; padding: 40px 16px; color: var(--text-secondary); }
+        .empty-state .icon { font-size: 40px; margin-bottom: 12px; color: var(--border-color); }
+        .loading { text-align: center; padding: 40px 16px; color: var(--text-secondary); }
+        .spinner {
+            display: inline-block; width: 30px; height: 30px;
+            border: 3px solid var(--border-color); border-top: 3px solid var(--primary-blue);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .txn-ref { font-family: monospace; font-weight: 600; font-size: 12px; background: var(--bg-input); padding: 4px 10px; border-radius: 6px; display: inline-block; color: #60A5FA; border: 1px solid var(--border-color); }
+        .txn-ref-wrap { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .cbe-detail { font-family: monospace; font-weight: 500; font-size: 11px; background: rgba(139, 92, 246, 0.2); padding: 2px 8px; border-radius: 4px; color: #C4B5FD; display: inline-block; }
+        .cbe-detail.phone { background: rgba(37, 99, 235, 0.2); color: #93C5FD; }
     </style>
 </head>
 <body>
 
     <!-- ===== HEADER ===== -->
     <header class="header">
-        <div class="header-content">
-            <div class="header-left">
-                <div class="logo">Admin<span>Hub</span></div>
-                <div class="subtitle">✦ if deposits balance ≥ 1500 ETB contact <a href="https://t.me/Dotbingogame" target="_blank" style="color:#2563eb;text-decoration:none;">@Dotbingogame</a></div>
-            </div>
-            <div class="header-right">
-                <div class="admin-info" id="adminInfo">
-                    <span><i class="fas fa-user"></i> Loading...</span>
-                    <span><i class="fas fa-phone"></i> Loading...</span>
-                </div>
-                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-            </div>
+        <div class="header-left">
+            <button class="menu-btn"><i class="fas fa-bars"></i></button>
+            <div class="header-title">Game Admin</div>
+        </div>
+        <div class="header-right">
+            <button class="notification-btn">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge"></span>
+            </button>
+            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </header>
 
@@ -809,13 +787,6 @@
                 <span class="label"><i class="fas fa-percent"></i> Rate</span>
                 <span class="amount rate" id="commissionRateDisplay">Loading...</span>
             </div>
-        </div>
-
-        <!-- ===== MAIN NAV ===== -->
-        <div class="main-nav" id="mainNav">
-            <button class="active" data-page="game" onclick="switchPage('game')"><i class="fas fa-gamepad"></i> Game</button>
-            <button data-page="profile" onclick="switchPage('profile')"><i class="fas fa-user"></i> Profile</button>
-            <button data-page="rules" onclick="switchPage('rules')"><i class="fas fa-scroll"></i> Rules</button>
         </div>
 
         <!-- ========================================================= -->
@@ -866,7 +837,6 @@
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="applyDepositFilters()"><i class="fas fa-search"></i> Filter</button>
-                        <button class="btn btn-secondary" onclick="resetDepositFilters()"><i class="fas fa-undo"></i> Reset</button>
                     </div>
                     <div id="depositsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading deposits...</p></div></div>
                 </div>
@@ -894,7 +864,6 @@
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="applyWithdrawFilters()"><i class="fas fa-search"></i> Filter</button>
-                        <button class="btn btn-secondary" onclick="resetWithdrawFilters()"><i class="fas fa-undo"></i> Reset</button>
                     </div>
                     <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading withdrawals...</p></div></div>
                 </div>
@@ -903,21 +872,14 @@
                 <div class="tab-pane" id="tab-players">
                     <h2><i class="fas fa-users"></i> Your Players</h2>
                     <div style="margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px;">
-                        <button class="btn btn-primary" onclick="openImportModal()" style="flex:1; min-height:44px;"><i class="fas fa-file-import"></i> Import Players</button>
-                        <span style="font-size:12px; color:#94a3b8; align-self:center;">(Paste list or CSV)</span>
+                        <button class="btn btn-primary" onclick="openImportModal()" style="flex:1;"><i class="fas fa-file-import"></i> Import Players</button>
                     </div>
-                    <div class="add-player-row">
-                        <input type="text" id="addPlayerInput" placeholder="Enter Telegram ID or @username">
-                        <button class="btn btn-primary" onclick="addPlayer()"><i class="fas fa-plus"></i> Add Player</button>
+                    <div class="filter-bar" style="padding: 12px;">
+                        <div class="input-group" style="flex:1; min-width:100%;">
+                            <label>Search Player</label>
+                            <input type="text" id="playerSearchInput" placeholder="Telegram ID or @username..." oninput="filterPlayers()" style="width:100%; padding:10px 14px; border:1px solid var(--border-color); border-radius:var(--radius-md); background:var(--bg-input); color:var(--text-primary); min-height:44px;">
+                        </div>
                     </div>
-                    <div id="addPlayerStatus" style="font-size:13px; margin-bottom:12px;"></div>
-
-                    <!-- Search bar -->
-                    <div class="player-search">
-                        <input type="text" id="playerSearchInput" placeholder="Search by username or Telegram ID..." oninput="filterPlayers()">
-                        <button class="btn btn-secondary" onclick="document.getElementById('playerSearchInput').value=''; filterPlayers();"><i class="fas fa-times"></i> Clear</button>
-                    </div>
-
                     <div id="playersList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading players...</p></div></div>
                 </div>
 
@@ -930,79 +892,73 @@
         <div class="page" id="page-profile">
 
             <div class="profile-card">
-                <div class="row">
-                    <span class="label"><i class="fas fa-user"></i> Admin</span>
-                    <span class="value" id="profileName">-</span>
+                <div class="profile-header">
+                    <div class="profile-avatar"><i class="fas fa-user-shield"></i></div>
+                    <div class="profile-name" id="profileName">Admin User</div>
+                    <div class="profile-phone" id="profilePhone">+251 91 234 5678</div>
                 </div>
-                <div class="row">
-                    <span class="label"><i class="fas fa-phone"></i> Phone</span>
-                    <span class="value" id="profilePhone">-</span>
-                </div>
-                <div class="row">
+
+                <div class="profile-row">
                     <span class="label"><i class="fas fa-wallet"></i> Available Balance</span>
                     <span class="value highlight" id="profileAvailableBalance">-</span>
                 </div>
-                <div class="row">
+                <div class="profile-row">
                     <span class="label"><i class="fas fa-chart-line"></i> Total Earned</span>
                     <span class="value highlight" id="profileTotalEarned">-</span>
                 </div>
-                <div class="row">
+                <div class="profile-row">
                     <span class="label"><i class="fas fa-percent"></i> Commission Rate</span>
                     <span class="value" id="profileCommissionRate">-</span>
                 </div>
 
                 <!-- Payment Numbers -->
                 <div class="payment-numbers">
-                    <h3><i class="fas fa-mobile-alt"></i> Your Payment Numbers</h3>
-                    <p>Players assigned to you will use these numbers.</p>
-                    <div><strong>Telebirr</strong> <span id="profileTelebirr">Not set</span></div>
-                    <div><strong>CBE Birr</strong> <span id="profileCbe">Not set</span></div>
-                    <div><strong>M-Pesa</strong> <span id="profileMpesa">Not set</span></div>
+                    <h3><i class="fas fa-mobile-alt"></i> Payment Numbers</h3>
+                    <p>Your registered accounts for receiving payments.</p>
+                    <div><strong><i class="fas fa-phone" style="color:#F59E0B; margin-right:6px;"></i> Telebirr</strong> <span id="profileTelebirr">Not set</span></div>
+                    <div><strong><i class="fas fa-university" style="color:#3B82F6; margin-right:6px;"></i> CBE Birr</strong> <span id="profileCbe">Not set</span></div>
+                    <div><strong><i class="fas fa-mobile-alt" style="color:#10B981; margin-right:6px;"></i> M-Pesa</strong> <span id="profileMpesa">Not set</span></div>
                 </div>
 
-                <!-- Invite -->
-                <div style="margin-top: 18px; background: #f8fafc; padding: 16px 20px; border-radius: 12px; border:1px solid #eef2f6;">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;"><i class="fas fa-link"></i> Your Invite Link</div>
-                    <div style="word-break: break-all; font-size: 14px; margin-bottom: 10px;" id="profileInviteLink">Loading...</div>
+                <!-- Invite Link -->
+                <div style="margin-top: 16px; background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border:1px solid var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;"><i class="fas fa-link"></i> Invite Link</div>
+                    <div style="word-break: break-all; font-size: 13px; margin-bottom: 12px; color:#60A5FA;" id="profileInviteLink">Loading...</div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="btn btn-primary btn-sm" onclick="copyInviteLink()"><i class="fas fa-copy"></i> Copy Link</button>
+                        <button class="btn btn-outline btn-sm" onclick="copyInviteLink()"><i class="fas fa-copy"></i> Copy Link</button>
                         <button class="btn btn-outline btn-sm" onclick="copyInviteCode()"><i class="fas fa-copy"></i> Copy Code</button>
-                        <span style="font-size: 14px; font-weight: 600; padding: 6px 16px; background: white; border-radius: 8px; border:1px solid #e2e8f0;" id="profileInviteCode">-</span>
+                        <span style="font-size: 14px; font-weight: 600; padding: 6px 16px; background: var(--bg-card); border-radius: 8px; border:1px solid var(--border-color); color:#F8FAFC;" id="profileInviteCode">-</span>
                     </div>
                 </div>
 
                 <!-- Request Withdrawal -->
-                <div class="profile-actions">
-                    <h3><i class="fas fa-paper-plane"></i> Request Withdrawal</h3>
-                    <div class="withdraw-form">
-                        <div class="row">
-                            <div class="input-group">
-                                <label>Amount (ETB)</label>
-                                <input type="number" id="withdrawEarningsAmount" placeholder="Min 10" min="10">
-                            </div>
-                            <div class="input-group">
-                                <label><i class="fas fa-phone"></i> Phone</label>
-                                <input type="text" id="withdrawEarningsPhone" placeholder="09xxxxxxxx">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="input-group">
-                                <label><i class="fas fa-user"></i> Receiver Name</label>
-                                <input type="text" id="withdrawEarningsName" placeholder="Full name">
-                            </div>
-                            <div class="input-group" style="flex:0 0 auto;min-width:130px;">
-                                <label>Method</label>
-                                <select id="withdrawEarningsMethod">
-                                    <option value="telebirr">Telebirr</option>
-                                    <option value="cbebirr">CBE</option>
-                                    <option value="mpesa">M-Pesa</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary" onclick="requestAdminWithdrawal()" style="width:100%;min-height:48px;font-size:15px;"><i class="fas fa-paper-plane"></i> Request</button>
+                <h3 style="font-size: 16px; font-weight: 700; margin-top: 24px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                    <i class="fas fa-paper-plane" style="color: var(--primary-blue);"></i> Request Withdrawal
+                </h3>
+                <div class="withdraw-form">
+                    <div class="input-group">
+                        <label>Amount (ETB)</label>
+                        <input type="number" id="withdrawEarningsAmount" placeholder="Min 10" min="10">
                     </div>
-                    <div id="withdrawStatus" style="margin-top:10px;font-size:13px;text-align:center;"></div>
+                    <div class="input-group">
+                        <label><i class="fas fa-phone"></i> Phone Number</label>
+                        <input type="text" id="withdrawEarningsPhone" placeholder="09xxxxxxxx">
+                    </div>
+                    <div class="input-group">
+                        <label><i class="fas fa-user"></i> Receiver Name</label>
+                        <input type="text" id="withdrawEarningsName" placeholder="Full name">
+                    </div>
+                    <div class="input-group">
+                        <label>Payment Method</label>
+                        <select id="withdrawEarningsMethod">
+                            <option value="telebirr">Telebirr</option>
+                            <option value="cbebirr">CBE</option>
+                            <option value="mpesa">M-Pesa</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="requestAdminWithdrawal()" style="width:100%; font-size:15px;"><i class="fas fa-paper-plane"></i> Request Withdrawal</button>
                 </div>
+                <div id="withdrawStatus" style="margin-top:12px; font-size:13px; text-align:center; color: var(--text-secondary);"></div>
             </div>
 
         </div><!-- end page-profile -->
@@ -1011,164 +967,171 @@
         <!-- PAGE 3: RULES                                             -->
         <!-- ========================================================= -->
         <div class="page" id="page-rules">
-            <div style="background: white; border-radius: 16px; padding: 24px; border:1px solid #eef2f6; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                <h2 style="font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-                    <span><i class="fas fa-scroll"></i> Admin Rules & Guidelines</span>
-                    <span style="font-size: 14px; font-weight: 400; color: #94a3b8;">(English / አማርኛ)</span>
-                </h2>
+            <div class="rules-grid">
+                <!-- ENGLISH -->
+                <div class="rules-col">
+                    <h3><i class="fas fa-flag"></i> English</h3>
 
-                <div class="rules-grid">
-
-                    <!-- ENGLISH -->
-                    <div class="rules-col">
-                        <h3><i class="fas fa-flag"></i> English</h3>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 1. Admin Account & Access</h4>
-                            <ul>
-                                <li>Register with valid phone and 4+ digit PIN.</li>
-                                <li>Login using phone + PIN. Only active admins can log in.</li>
-                                <li>Super Admin can activate or deactivate your account.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 2. Dashboard – Permissions</h4>
-                            <ul>
-                                <li><strong>Players:</strong> View your assigned players and their balances.</li>
-                                <li><strong>Deposits:</strong> Approve or reject deposit requests with photo proof.</li>
-                                <li><strong>Withdrawals:</strong> Approve or reject player withdrawal requests.</li>
-                                <li><strong>Earnings:</strong> Earn 40% commission on house profit from your players.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-exclamation-triangle"></i> Deposit Holding Limit (Critical)</h4>
-                            <ul>
-                                <li>Your total approved deposits <strong>must never exceed 1500 ETB</strong>.</li>
-                                <li>If approval would exceed the limit, the system blocks it.</li>
-                                <li>Request a withdrawal to the Super Admin to reduce your holding balance.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 3. Admin Withdrawals</h4>
-                            <ul>
-                                <li>Request withdrawal of your <strong>pending commission</strong> (available balance).</li>
-                                <li>Provide amount, phone, method, and receiver name.</li>
-                                <li>Super Admin approves or rejects your request.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 4. Game Participation</h4>
-                            <ul>
-                                <li>Admins can play as normal players using their Telegram account.</li>
-                                <li>Playing balance is separate from commission earnings.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 5. Profile & Payment Methods</h4>
-                            <ul>
-                                <li>Each admin has a unique invite code for players.</li>
-                                <li>Payment numbers (Telebirr, CBE, M-Pesa) are shown to players for deposits.</li>
-                            </ul>
-                        </div>
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 6. Code of Conduct</h4>
-                            <ul>
-                                <li>Do not impersonate players or manipulate games.</li>
-                                <li>Review deposit proofs honestly – fake approvals are a violation.</li>
-                                <li>Report suspicious activity to the Super Admin.</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 7. Key Limits</h4>
-                            <div class="limit-box">
-                                <strong>Deposit holding balance:</strong> 1500 ETB max<br>
-                                <strong>Commission rate:</strong> 40%<br>
-                            </div>
-                        </div>
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 1. Admin Account & Access</h4>
+                        <ul>
+                            <li>Register with valid phone and 4+ digit PIN.</li>
+                            <li>Login using phone + PIN. Only active admins can log in.</li>
+                            <li>Super Admin can activate or deactivate your account.</li>
+                        </ul>
                     </div>
 
-                    <!-- AMHARIC -->
-                    <div class="rules-col">
-                        <h3><i class="fas fa-flag"></i> አማርኛ</h3>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 1. የአድሚን መመዝገብያ</h4>
-                            <ul>
-                                <li>በስልክ ቁጥር እና ቢያንስ 4 አሃዝ ፒን ይመዝገቡ።</li>
-                                <li>በስልክ ቁጥር + ፒን ይግቡ።</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 2. ዳሽቦርድ – ፈቃዶች</h4>
-                            <ul>
-                                <li><strong>ተጫዋቾች፦</strong> የተመደቡልዎትን ተጫዋቾች እና ሂሳባቸውን ይመልከቱ።</li>
-                                <li><strong>ተቀማጭ(deposit)፦</strong> በፎቶ (screenshot) ማስረጃ deposit ያጽድቁ።</li>
-                                <li><strong>መውጫዎች፦</strong> የተጫዋቾችን መውጫ ጥያቄ ያጽድቁ።</li>
-                                <li><strong>ገቢ፦</strong> ከተጫዋቾችዎ በሚገኝ የቤቱ ትርፍ ላይ 40% ኮሚሽን ያገኛሉ።</li>
-                            </ul>
-                        </div>
-                        <div class="rule-section">
-                            <h4><i class="fas fa-exclamation-triangle"></i> የተቀማጭ መጠን ገደብ (ወሳኝ)</h4>
-                            <ul>
-                                <li>የጸደቁ(approved) ተቀማጭ <strong>ከ1500 ብር መብለጥ የለበትም</strong>።</li>
-                                <li>1500 የሚበልጥ ገንዘብ ለማጽደቅ (approve) ሲሞከር ሲስተሙ ያግደወት።</li>
-                                <li>የጸደቁ(approved) ተቀማጭ ሂሳብዎን ለመቀነስ ለሱፐር አድሚን ያሳውቁ <a href="https://t.me/Dotbingogame" target="_blank" style="color:#2563eb;text-decoration:none;">@Dotbingogame</a></li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 3. ገንዘብ መውጫ</h4>
-                            <ul>
-                                <li><strong>Pending ላይ ያለ ኮሚሽን</strong> ለSuper Admin withdrawal ይጠይቁ።</li>
-                                <li>መጠን፣ ስልክ ቁጥር፣ ዘዴ እና ተቀባይ ስም ያቅርቡ።</li>
-                                <li>ሱፐር አድሚን ጥያቄዎን ያጸድቃል።</li>
-                            </ul>
-                        </div>
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 4. በጨዋታ መሳተፍ</h4>
-                            <ul>
-                                <li>አድሚኖች በቴሌግራም መለያቸው እንደ ተጫዋች መጫወት ይችላሉ።</li>
-                                <li>የጨዋታ ሂሳቡ ከኮሚሽን ገቢ የተለየ ነው።</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 5. ፕሮፋይል እና የክፍያ ዘዴዎች</h4>
-                            <ul>
-                                <li>እያንዳንዱ አድሚን ለተጫዋቾች ልዩ የግብዣ ኮድ አለው።</li>
-                                <li>የክፍያ ዘዴወች (ቴሌብር፣ ሲቢኢ፣ ኤም-ፔሳ) ለተጫዋቸው ይታያሉ።</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 6. የስነምግባር ደንቦች</h4>
-                            <ul>
-                                <li>የተቀማጭ ማስረጃዎችን በሐቀኝነት ይገምግሙ።</li>
-                                <li>አጠራጣሪ እንቅስቃሴ ለሱፐር አድሚን ሪፖርት ያድርጉ።</li>
-                            </ul>
-                        </div>
-
-                        <div class="rule-section">
-                            <h4><i class="fas fa-chevron-right"></i> 7. ዋና ዋና ገደቦች</h4>
-                            <div class="limit-box">
-                                <strong>የተቀማጭ ሂሳብ ገደብ፦</strong> ከፍተኛ 1500 ብር<br>
-                                <strong>ኮሚሽን መጠን፦</strong> 40%<br>
-                            </div>
-                        </div>
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 2. Dashboard – Permissions</h4>
+                        <ul>
+                            <li><strong>Players:</strong> View your assigned players and their balances.</li>
+                            <li><strong>Deposits:</strong> Approve or reject deposit requests with photo proof.</li>
+                            <li><strong>Withdrawals:</strong> Approve or reject player withdrawal requests.</li>
+                            <li><strong>Earnings:</strong> Earn 40% commission on house profit from your players.</li>
+                        </ul>
                     </div>
 
-                </div><!-- end rules-grid -->
+                    <div class="rule-section">
+                        <h4><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> Deposit Holding Limit (Critical)</h4>
+                        <ul>
+                            <li>Your total approved deposits <strong>must never exceed 1500 ETB</strong>.</li>
+                            <li>If approval would exceed the limit, the system blocks it.</li>
+                            <li>Request a withdrawal to the Super Admin to reduce your holding balance.</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 3. Admin Withdrawals</h4>
+                        <ul>
+                            <li>Request withdrawal of your <strong>pending commission</strong> (available balance).</li>
+                            <li>Provide amount, phone, method, and receiver name.</li>
+                            <li>Super Admin approves or rejects your request.</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 4. Game Participation</h4>
+                        <ul>
+                            <li>Admins can play as normal players using their Telegram account.</li>
+                            <li>Playing balance is separate from commission earnings.</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 5. Profile & Payment Methods</h4>
+                        <ul>
+                            <li>Each admin has a unique invite code for players.</li>
+                            <li>Payment numbers (Telebirr, CBE, M-Pesa) are shown to players for deposits.</li>
+                        </ul>
+                    </div>
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 6. Code of Conduct</h4>
+                        <ul>
+                            <li>Do not impersonate players or manipulate games.</li>
+                            <li>Review deposit proofs honestly – fake approvals are a violation.</li>
+                            <li>Report suspicious activity to the Super Admin.</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 7. Key Limits</h4>
+                        <div class="limit-box">
+                            <strong>Deposit holding balance:</strong> 1500 ETB max<br>
+                            <strong>Commission rate:</strong> 40%<br>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AMHARIC -->
+                <div class="rules-col">
+                    <h3><i class="fas fa-flag"></i> አማርኛ</h3>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 1. የአድሚን መመዝገብያ</h4>
+                        <ul>
+                            <li>በስልክ ቁጥር እና ቢያንስ 4 አሃዝ ፒን ይመዝገቡ።</li>
+                            <li>በስልክ ቁጥር + ፒን ይግቡ።</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 2. ዳሽቦርድ – ፈቃዶች</h4>
+                        <ul>
+                            <li><strong>ተጫዋቾች፦</strong> የተመደቡልዎትን ተጫዋቾች እና ሂሳባቸውን ይመልከቱ።</li>
+                            <li><strong>ተቀማጭ(deposit)፦</strong> በፎቶ (screenshot) ማስረጃ deposit ያጽድቁ።</li>
+                            <li><strong>መውጫዎች፦</strong> የተጫዋቾችን መውጫ ጥያቄ ያጽድቁ።</li>
+                            <li><strong>ገቢ፦</strong> ከተጫዋቾችዎ በሚገኝ የቤቱ ትርፍ ላይ 40% ኮሚሽን ያገኛሉ።</li>
+                        </ul>
+                    </div>
+                    <div class="rule-section">
+                        <h4><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i> የተቀማጭ መጠን ገደብ (ወሳኝ)</h4>
+                        <ul>
+                            <li>የጸደቁ(approved) ተቀማጭ <strong>ከ1500 ብር መብለጥ የለበትም</strong>።</li>
+                            <li>1500 የሚበልጥ ገንዘብ ለማጽደቅ (approve) ሲሞከር ሲስተሙ ያግደወት።</li>
+                            <li>የጸደቁ(approved) ተቀማጭ ሂሳብዎን ለመቀነስ ለሱፐር አድሚን ያሳውቁ <a href="https://t.me/Dotbingogame" target="_blank" style="color:#60A5FA;text-decoration:none;">@Dotbingogame</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 3. ገንዘብ መውጫ</h4>
+                        <ul>
+                            <li><strong>Pending ላይ ያለ ኮሚሽን</strong> ለSuper Admin withdrawal ይጠይቁ።</li>
+                            <li>መጠን፣ ስልክ ቁጥር፣ ዘዴ እና ተቀባይ ስም ያቅርቡ።</li>
+                            <li>ሱፐር አድሚን ጥያቄዎን ያጸድቃል።</li>
+                        </ul>
+                    </div>
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 4. በጨዋታ መሳተፍ</h4>
+                        <ul>
+                            <li>አድሚኖች በቴሌግራም መለያቸው እንደ ተጫዋች መጫወት ይችላሉ።</li>
+                            <li>የጨዋታ ሂሳቡ ከኮሚሽን ገቢ የተለየ ነው።</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 5. ፕሮፋይል እና የክፍያ ዘዴዎች</h4>
+                        <ul>
+                            <li>እያንዳንዱ አድሚን ለተጫዋቾች ልዩ የግብዣ ኮድ አለው።</li>
+                            <li>የክፍያ ዘዴወች (ቴሌብር፣ ሲቢኢ፣ ኤም-ፔሳ) ለተጫዋቸው ይታያሉ።</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 6. የስነምግባር ደንቦች</h4>
+                        <ul>
+                            <li>የተቀማጭ ማስረጃዎችን በሐቀኝነት ይገምግሙ።</li>
+                            <li>አጠራጣሪ እንቅስቃሴ ለሱፐር አድሚን ሪፖርት ያድርጉ።</li>
+                        </ul>
+                    </div>
+
+                    <div class="rule-section">
+                        <h4><i class="fas fa-chevron-right"></i> 7. ዋና ዋና ገደቦች</h4>
+                        <div class="limit-box">
+                            <strong>የተቀማጭ ሂሳብ ገደብ፦</strong> ከፍተኛ 1500 ብር<br>
+                            <strong>ኮሚሽን መጠን፦</strong> 40%<br>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div><!-- end page-rules -->
 
     </div><!-- end container -->
+
+    <!-- ===== BOTTOM NAVIGATION (MOBILE APP STYLE) ===== -->
+    <nav class="bottom-nav">
+        <button class="nav-item active" data-page="game" onclick="switchPage('game')">
+            <i class="fas fa-gamepad"></i>
+            <span>Game</span>
+        </button>
+        <button class="nav-item" data-page="profile" onclick="switchPage('profile')">
+            <i class="fas fa-user"></i>
+            <span>Profile</span>
+        </button>
+        <button class="nav-item" data-page="rules" onclick="switchPage('rules')">
+            <i class="fas fa-scroll"></i>
+            <span>Rules</span>
+        </button>
+    </nav>
 
     <!-- Refresh Button -->
     <button class="refresh-btn" onclick="refreshAll()" title="Refresh all data"><i class="fas fa-sync-alt"></i></button>
@@ -1190,19 +1153,19 @@
             <div class="input-group">
                 <textarea id="importTextarea" placeholder="Enter Telegram IDs or @usernames, one per line&#10;Example:&#10;123456789&#10;@john_doe"></textarea>
             </div>
-            <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;">
-                <label style="font-size:13px; cursor:pointer; background:#f1f4f9; padding:8px 16px; border-radius:10px; display:flex; align-items:center; gap:6px; border:1px solid #e2e8f0;">
+            <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; color: var(--text-secondary); font-size: 13px;">
+                <label style="cursor:pointer; background:var(--bg-input); padding:10px 16px; border-radius:var(--radius-md); display:flex; align-items:center; gap:8px; border:1px solid var(--border-color);">
                     <i class="fas fa-file-csv"></i> Upload CSV file
                     <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;" onchange="handleFileUpload(event)">
                 </label>
-                <label style="font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" id="importOverwrite"> Overwrite existing assignments
+                <label style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="importOverwrite"> Overwrite existing
                 </label>
             </div>
-            <div id="importStatus" class="import-status"></div>
+            <div id="importStatus" class="import-status" style="margin-top: 16px; font-size: 13px; max-height: 200px; overflow-y: auto; background: var(--bg-input); padding: 12px; border-radius: var(--radius-md); display: none; border: 1px solid var(--border-color);"></div>
             <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="submitImport()" style="flex:1;"><i class="fas fa-check"></i> Import</button>
-                <button class="btn btn-secondary" onclick="closeImportModal()" style="flex:1;">Cancel</button>
+                <button class="btn btn-primary" onclick="submitImport()"><i class="fas fa-check"></i> Import</button>
+                <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
             </div>
         </div>
     </div>
@@ -1219,46 +1182,45 @@
                 <button class="close-btn" onclick="closeBalanceModal()"><i class="fas fa-times"></i></button>
             </div>
 
-            <div class="player-info" id="balancePlayerInfo">
-                <strong>Player:</strong> <span id="balancePlayerName">—</span> (ID: <span id="balancePlayerId">—</span>)<br>
-                <strong>Current Balance:</strong> <span id="balanceCurrentBalance">—</span> ETB
+            <div class="player-info" id="balancePlayerInfo" style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); margin-bottom: 20px; font-size: 14px; border: 1px solid var(--border-color); color: var(--text-secondary);">
+                <strong>Player:</strong> <span id="balancePlayerName" style="color: var(--text-primary);">—</span> (ID: <span id="balancePlayerId">—</span>)<br>
+                <strong>Current Balance:</strong> <span id="balanceCurrentBalance" style="color: #60A5FA;">—</span> ETB
             </div>
 
-            <div class="input-group">
-                <label for="balanceOperation">Operation</label>
-                <select id="balanceOperation">
-                    <option value="add"><i class="fas fa-plus"></i> Add</option>
-                    <option value="subtract"><i class="fas fa-minus"></i> Subtract</option>
+            <div class="input-group" style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Operation</label>
+                <select id="balanceOperation" style="width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 15px; background: var(--bg-input); color: var(--text-primary); min-height: 48px;">
+                    <option value="add">➕ Add</option>
+                    <option value="subtract">➖ Subtract</option>
                 </select>
             </div>
 
-            <div class="input-group">
-                <label for="balanceAmount">Amount (ETB)</label>
-                <input type="number" id="balanceAmount" placeholder="Enter amount" min="1" step="0.01">
+            <div class="input-group" style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: 600; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Amount (ETB)</label>
+                <input type="number" id="balanceAmount" placeholder="Enter amount" min="1" step="0.01" style="width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 15px; background: var(--bg-input); color: var(--text-primary); min-height: 48px;">
             </div>
 
             <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="submitBalanceAdjust()" style="flex:2;"><i class="fas fa-save"></i> Update Balance</button>
-                <button class="btn btn-secondary" onclick="closeBalanceModal()" style="flex:1;">Cancel</button>
+                <button class="btn btn-primary" onclick="submitBalanceAdjust()"><i class="fas fa-save"></i> Update Balance</button>
+                <button class="btn btn-secondary" onclick="closeBalanceModal()">Cancel</button>
             </div>
-            <div id="balanceStatus" style="margin-top:14px; font-size:13px; text-align:center;"></div>
+            <div id="balanceStatus" style="margin-top:16px; font-size:13px; text-align:center;"></div>
         </div>
     </div>
 
     <!-- Proof Modal -->
     <div id="proofModal" class="modal" onclick="if(event.target===this) closeProofModal()">
-        <div class="modal-content" style="position:relative; max-width:600px; background:transparent; padding:0; border-radius:16px; overflow:hidden;">
-            <button class="close-btn" onclick="closeProofModal()"><i class="fas fa-times"></i></button>
-            <img id="proofImage" src="" alt="Payment Proof">
+        <div class="modal-content" style="position:relative; max-width:600px; background:transparent; padding:0; border-radius:16px; overflow:hidden; border: none;">
+            <button class="close-btn" onclick="closeProofModal()" style="position: absolute; top: 16px; right: 16px; background: rgba(0,0,0,0.6); color: white; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; z-index: 10; display: flex; align-items: center; justify-content: center;"><i class="fas fa-times"></i></button>
+            <img id="proofImage" src="" alt="Payment Proof" style="width: 100%; height: auto; display: block; max-height: 80vh; object-fit: contain;">
         </div>
     </div>
 
-    <!-- Socket.IO client -->
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
         // ============================================================
-        //  ADMIN DASHBOARD – Clean redesign with FontAwesome icons
+        //  ADMIN DASHBOARD – Mobile App Redesign (Blue-Black Theme)
         // ============================================================
 
         const BOT_USERNAME = 'bingomkmk0120_bot';
@@ -1295,7 +1257,7 @@
         // ---------- TOAST ----------
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
-            toast.textContent = message;
+            toast.innerHTML = message;
             toast.className = `toast ${type}`;
             void toast.offsetWidth;
             toast.classList.add('show');
@@ -1306,7 +1268,7 @@
         // ---------- PAGE SWITCH ----------
         function switchPage(page) {
             currentPage = page;
-            document.querySelectorAll('.main-nav button').forEach(btn =>
+            document.querySelectorAll('.nav-item').forEach(btn =>
                 btn.classList.toggle('active', btn.dataset.page === page)
             );
             document.querySelectorAll('.page').forEach(p =>
@@ -1319,8 +1281,6 @@
                 else if (currentTab === 'players') loadPlayers();
             } else if (page === 'profile') {
                 loadProfile();
-            } else if (page === 'rules') {
-                // static
             }
         }
 
@@ -1353,10 +1313,7 @@
                 if (!data.success) throw new Error(data.error);
 
                 const admin = data.admin;
-                document.getElementById('adminInfo').innerHTML = `
-                    <span><i class="fas fa-user"></i> ${admin.name}</span>
-                    <span><i class="fas fa-phone"></i> ${admin.phone}</span>
-                `;
+                document.querySelector('.header-title').textContent = `Game Admin - ${admin.name}`;
 
                 document.getElementById('statPlayers').textContent = data.stats.playerCount;
                 document.getElementById('statDeposits').textContent = `${data.stats.depositBalance.toFixed(0)} ETB`;
@@ -1371,7 +1328,7 @@
 
                 return data;
             } catch (err) {
-                showToast('Error loading stats: ' + err.message, 'error');
+                showToast('❌ Error loading stats: ' + err.message, 'error');
                 return null;
             }
         }
@@ -1515,12 +1472,12 @@
             const amount = parseFloat(amountInput.value.trim());
 
             if (isNaN(amount) || amount <= 0) {
-                document.getElementById('balanceStatus').innerHTML = '<span style="color:#dc2626;">Please enter a valid positive amount.</span>';
+                document.getElementById('balanceStatus').innerHTML = '<span style="color:#EF4444;">Please enter a valid positive amount.</span>';
                 return;
             }
 
             const statusDiv = document.getElementById('balanceStatus');
-            statusDiv.innerHTML = '<span style="color:#2563eb;">⏳ Updating balance...</span>';
+            statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Updating balance...</span>';
 
             try {
                 const response = await fetch('/admin/update-player-balance', {
@@ -1536,16 +1493,15 @@
                 const data = await response.json();
                 if (data.success) {
                     const newBalance = data.newBalance;
-                    showToast(`✅ Balance ${operation === 'add' ? 'added' : 'subtracted'}! New balance: ${newBalance.toFixed(0)} ETB`,
-                        'success');
+                    showToast(`✅ Balance updated! New: ${newBalance.toFixed(0)} ETB`, 'success');
                     closeBalanceModal();
                     loadPlayers();
                     loadStats();
                 } else {
-                    statusDiv.innerHTML = `<span style="color:#dc2626;">❌ ${data.error || 'Failed to update balance'}</span>`;
+                    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${data.error || 'Failed to update balance'}</span>`;
                 }
             } catch (err) {
-                statusDiv.innerHTML = `<span style="color:#dc2626;">❌ Network error: ${err.message}</span>`;
+                statusDiv.innerHTML = `<span style="color:#EF4444;">❌ Network error: ${err.message}</span>`;
                 showToast('❌ Error updating balance', 'error');
             }
         }
@@ -1587,8 +1543,7 @@
                 if (!res.ok) throw new Error('Failed to load deposits');
                 const data = await res.json();
                 if (data.requests.length === 0) {
-                    container.innerHTML =
-                        `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No deposits found</p></div>`;
+                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No deposits found</p></div>`;
                     return;
                 }
                 container.innerHTML = `
@@ -1638,7 +1593,7 @@
                         receiptDisplay = `
                           <div style="display:flex; align-items:center; gap:8px;">
                             <img src="${fullText}" style="width:40px; height:40px; object-fit:cover; border-radius:6px; cursor:pointer;" onclick="viewProof('${fullText}')" alt="Proof">
-                            <button class="link-btn" onclick="viewProof('${fullText}')"><i class="fas fa-image"></i> View Screenshot</button>
+                            <button class="link-btn" onclick="viewProof('${fullText}')"><i class="fas fa-image"></i> View</button>
                           </div>
                         `;
                     } else if (txnRef) {
@@ -1657,29 +1612,29 @@
                           <div class="txn-ref-wrap">
                             <span class="txn-ref">${escapeHtml(txnRef)}</span>
                             ${cbePhone ? `<span class="cbe-detail phone"><i class="fas fa-phone"></i> ${escapeHtml(cbePhone)}</span>` : ''}
-                            <button class="copy-btn-icon" onclick="copyToClipboard('${escapeHtml(txnRef)}')" title="Copy transaction number"><i class="fas fa-copy"></i></button>
+                            <button class="copy-btn-icon" onclick="copyToClipboard('${escapeHtml(txnRef)}')" title="Copy"><i class="fas fa-copy"></i></button>
                             ${receiptLink ? `<a href="${receiptLink}" target="_blank" class="link-btn"><i class="fas fa-search"></i> View</a>` : ''}
                           </div>
                         `;
                     } else {
-                        receiptDisplay = `<span style="color:#94a3b8;font-size:11px;">—</span>`;
+                        receiptDisplay = `<span style="color:var(--text-secondary);font-size:11px;">—</span>`;
                     }
 
                     const formattedDate = new Date(req.created_at).toLocaleString();
 
                     return `
                     <tr>
-                      <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
-                      <td><strong>${req.amount} ETB</strong></td>
-                      <td><span class="status-badge ${paymentType}">${paymentType}</span></td>
-                      <td><span class="status-badge ${req.status}">${req.status}</span></td>
-                      <td>${receiptDisplay}</td>
-                      <td>${formattedDate}</td>
-                      <td>
+                      <td data-label="User"><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
+                      <td data-label="Amount"><strong>${req.amount} ETB</strong></td>
+                      <td data-label="Payment"><span class="status-badge ${paymentType}">${paymentType}</span></td>
+                      <td data-label="Status"><span class="status-badge ${req.status}">${req.status}</span></td>
+                      <td data-label="Receipt">${receiptDisplay}</td>
+                      <td data-label="Date">${formattedDate}</td>
+                      <td data-label="Actions">
                         ${req.status === 'pending' ? `
                           <div class="action-buttons">
-                            <button class="btn btn-success btn-sm" onclick="processDeposit(${req.id},'approve')"><i class="fas fa-check"></i></button>
-                            <button class="btn btn-danger btn-sm" onclick="processDeposit(${req.id},'reject')"><i class="fas fa-times"></i></button>
+                            <button class="btn btn-success btn-sm" onclick="processDeposit(${req.id},'approve')"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-danger btn-sm" onclick="processDeposit(${req.id},'reject')"><i class="fas fa-times"></i> Reject</button>
                           </div>
                         ` : '—'}
                       </td>
@@ -1689,8 +1644,7 @@
               </div>
             `;
             } catch (err) {
-                container.innerHTML =
-                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#dc2626;">${escapeHtml(err.message)}</p></div>`;
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1718,8 +1672,7 @@
                 if (!res.ok) throw new Error('Failed to load withdrawals');
                 const data = await res.json();
                 if (data.requests.length === 0) {
-                    container.innerHTML =
-                        `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawals found</p></div>`;
+                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawals found</p></div>`;
                     return;
                 }
                 container.innerHTML = `
@@ -1730,18 +1683,18 @@
                     const formattedDate = new Date(req.created_at).toLocaleString();
                     return `
                     <tr>
-                      <td><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
-                      <td><strong>${req.amount} ETB</strong></td>
-                      <td>${req.phone_number || 'N/A'}</td>
-                      <td>${req.receiver_name || 'N/A'}</td>
-                      <td><span class="status-badge ${req.withdrawal_type}">${req.withdrawal_type}</span></td>
-                      <td><span class="status-badge ${req.status}">${req.status}</span></td>
-                      <td>${formattedDate}</td>
-                      <td>
+                      <td data-label="User"><div class="user-cell"><span class="name">${escapeHtml(req.username)}</span><span class="id">${req.telegram_id}</span></div></td>
+                      <td data-label="Amount"><strong>${req.amount} ETB</strong></td>
+                      <td data-label="Phone">${req.phone_number || 'N/A'}</td>
+                      <td data-label="Receiver">${req.receiver_name || 'N/A'}</td>
+                      <td data-label="Type"><span class="status-badge ${req.withdrawal_type}">${req.withdrawal_type}</span></td>
+                      <td data-label="Status"><span class="status-badge ${req.status}">${req.status}</span></td>
+                      <td data-label="Date">${formattedDate}</td>
+                      <td data-label="Actions">
                         ${req.status === 'pending' ? `
                           <div class="action-buttons">
-                            <button class="btn btn-success btn-sm" onclick="processWithdrawal(${req.id},'approve')"><i class="fas fa-check"></i></button>
-                            <button class="btn btn-danger btn-sm" onclick="processWithdrawal(${req.id},'reject')"><i class="fas fa-times"></i></button>
+                            <button class="btn btn-success btn-sm" onclick="processWithdrawal(${req.id},'approve')"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-danger btn-sm" onclick="processWithdrawal(${req.id},'reject')"><i class="fas fa-times"></i> Reject</button>
                           </div>
                         ` : '—'}
                       </td>
@@ -1751,8 +1704,7 @@
               </div>
             `;
             } catch (err) {
-                container.innerHTML =
-                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#dc2626;">${escapeHtml(err.message)}</p></div>`;
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1765,8 +1717,7 @@
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
                 if (data.players.length === 0) {
-                    container.innerHTML =
-                        `<div class="empty-state"><div class="icon"><i class="fas fa-users"></i></div><p>No players assigned yet</p></div>`;
+                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-users"></i></div><p>No players assigned yet</p></div>`;
                     document.getElementById('playerSearchInput').value = '';
                     return;
                 }
@@ -1776,25 +1727,24 @@
                   <thead><tr><th>Player</th><th>Balance</th><th>First Deposit</th><th>Actions</th></tr></thead>
                   <tbody>${data.players.map(p => `
                     <tr>
-                      <td><div class="user-cell"><span class="name">${escapeHtml(p.username)}</span><span class="id">${p.telegram_id}</span></div></td>
-                      <td><strong>${p.balance.toFixed(0)} ETB</strong></td>
-                      <td>${p.first_deposit_amount > 0 ? p.first_deposit_amount + ' ETB' : '—'}</td>
-                      <td>
-                        <button class="adjust-btn" onclick="openBalanceModal('${p.telegram_id}', '${escapeHtml(p.username)}', ${p.balance})"><i class="fas fa-balance-scale"></i> Adjust</button>
+                      <td data-label="Player"><div class="user-cell"><span class="name">${escapeHtml(p.username)}</span><span class="id">${p.telegram_id}</span></div></td>
+                      <td data-label="Balance"><strong>${p.balance.toFixed(0)} ETB</strong></td>
+                      <td data-label="First Deposit">${p.first_deposit_amount > 0 ? p.first_deposit_amount + ' ETB' : '—'}</td>
+                      <td data-label="Actions">
+                        <button class="adjust-btn" onclick="openBalanceModal('${p.telegram_id}', '${escapeHtml(p.username)}', ${p.balance})"><i class="fas fa-balance-scale"></i> Adjust Balance</button>
                       </td>
                     </tr>
                   `).join('')}</tbody>
                 </table>
               </div>
-              <p style="margin-top:10px;color:#94a3b8;font-size:12px;">Total: <strong>${data.count}</strong> players</p>
+              <p style="margin-top:12px;color:var(--text-secondary);font-size:12px;text-align:center;">Total: <strong>${data.count}</strong> players</p>
             `;
                 const searchInput = document.getElementById('playerSearchInput');
                 if (searchInput.value.trim() !== '') {
                     filterPlayers();
                 }
             } catch (err) {
-                container.innerHTML =
-                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#dc2626;">${escapeHtml(err.message)}</p></div>`;
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
             }
         }
 
@@ -1939,72 +1889,7 @@
             }
         }
 
-        // ---------- ADD PLAYER ----------
-        async function addPlayer() {
-            const input = document.getElementById('addPlayerInput');
-            const statusDiv = document.getElementById('addPlayerStatus');
-            const identifier = input.value.trim();
-
-            if (!identifier) {
-                statusDiv.innerHTML = '<span style="color:#dc2626;">Please enter a Telegram ID or @username.</span>';
-                return;
-            }
-
-            statusDiv.innerHTML = '<span style="color:#2563eb;">⏳ Checking...</span>';
-            input.disabled = true;
-
-            try {
-                const response = await fetch('/admin/import-players', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ telegramIds: [identifier], overwrite: false })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const result = data.results[0];
-                    if (result.success) {
-                        const msg = result.created ? 'created' : 'updated';
-                        statusDiv.innerHTML = `<span style="color:#059669;">✅ Player ${result.telegramId} ${msg} successfully!</span>`;
-                        input.value = '';
-                        loadPlayers();
-                    } else {
-                        if (result.error && result.error.includes('Already assigned')) {
-                            if (confirm(`This player is already assigned to another admin. Do you want to reassign?`)) {
-                                const overwriteRes = await fetch('/admin/import-players', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ telegramIds: [identifier], overwrite: true })
-                                });
-                                const overwriteData = await overwriteRes.json();
-                                if (overwriteData.success && overwriteData.results[0].success) {
-                                    statusDiv.innerHTML =
-                                        `<span style="color:#059669;">✅ Player ${overwriteData.results[0].telegramId} reassigned to you!</span>`;
-                                    input.value = '';
-                                    loadPlayers();
-                                } else {
-                                    statusDiv.innerHTML =
-                                        `<span style="color:#dc2626;">❌ Failed to reassign: ${overwriteData.error}</span>`;
-                                }
-                            } else {
-                                statusDiv.innerHTML = '<span style="color:#d97706;">Cancelled.</span>';
-                            }
-                        } else {
-                            statusDiv.innerHTML = `<span style="color:#dc2626;">❌ ${result.error || 'Failed to add player'}</span>`;
-                        }
-                    }
-                } else {
-                    statusDiv.innerHTML = `<span style="color:#dc2626;">❌ ${data.error}</span>`;
-                }
-            } catch (err) {
-                statusDiv.innerHTML = `<span style="color:#dc2626;">❌ Network error: ${err.message}</span>`;
-            } finally {
-                input.disabled = false;
-            }
-        }
-
-        // ---------- IMPORT MODAL ----------
+        // ---------- ADD PLAYER (via Import Modal) ----------
         function openImportModal() {
             document.getElementById('importModal').classList.add('active');
             document.getElementById('importTextarea').value = '';
@@ -2042,7 +1927,7 @@
             }
 
             statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '<span style="color:#2563eb;">⏳ Importing...</span>';
+            statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Importing...</span>';
 
             try {
                 const response = await fetch('/admin/import-players', {
@@ -2058,26 +1943,24 @@
                     const added = results.filter(r => r.success && r.created).length;
                     const updated = results.filter(r => r.success && r.updated).length;
                     const failed = results.filter(r => !r.success).length;
-                    let html =
-                        `<div style="font-weight:600;">✅ ${added} added, ${updated} updated${failed > 0 ? `, ${failed} failed` : ''}</div>`;
+                    let html = `<div style="font-weight:600;">✅ ${added} added, ${updated} updated${failed > 0 ? `, ${failed} failed` : ''}</div>`;
                     if (results.length > 0) {
                         html += '<ul style="list-style:none;padding:0;margin-top:8px;font-size:12px;">';
                         results.forEach(r => {
                             const icon = r.success ? (r.created ? '<i class="fas fa-plus"></i>' : '<i class="fas fa-sync"></i>') : '<i class="fas fa-times"></i>';
-                            const color = r.success ? (r.created ? '#059669' : '#d97706') : '#dc2626';
+                            const color = r.success ? (r.created ? '#10B981' : '#F59E0B') : '#EF4444';
                             const msg = r.error || (r.created ? 'Created' : 'Updated');
-                            html +=
-                                `<li style="padding:3px 0;border-bottom:1px solid #f0f0f0;color:${color};">${icon} ${r.telegramId} – ${msg}</li>`;
+                            html += `<li style="padding:6px 0;border-bottom:1px solid var(--border-color);color:${color};">${icon} ${r.telegramId} – ${msg}</li>`;
                         });
                         html += '</ul>';
                     }
                     statusDiv.innerHTML = html;
                     loadPlayers();
                 } else {
-                    statusDiv.innerHTML = `<span style="color:#dc2626;">❌ ${data.error}</span>`;
+                    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${data.error}</span>`;
                 }
             } catch (err) {
-                statusDiv.innerHTML = `<span style="color:#dc2626;">❌ Network error: ${err.message}</span>`;
+                statusDiv.innerHTML = `<span style="color:#EF4444;">❌ Network error: ${err.message}</span>`;
             }
         }
 
@@ -2121,8 +2004,7 @@
 
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                if (refreshInterval) { clearInterval(refreshInterval);
-                    refreshInterval = null; }
+                if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
             } else {
                 startAutoRefresh();
                 refreshAll();
@@ -2137,12 +2019,11 @@
             switchPage('game');
             startAutoRefresh();
             connectAdminWebSocket();
-            console.log('✅ Dashboard initialized (FontAwesome icons)');
+            console.log('✅ Dashboard initialized (Mobile App Style)');
         }
 
         document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'r') { e.preventDefault();
-                refreshAll(); }
+            if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
         });
 
         document.addEventListener('touchstart', function() {}, { passive: true });
