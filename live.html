@@ -340,12 +340,10 @@
                 <p>Play. Win. Together.</p>
             </div>
             <div class="header-actions">
-                <!-- Bell Icon -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
                 </svg>
-                <!-- Menu Icon -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="1"></circle>
                     <circle cx="12" cy="5" r="1"></circle>
@@ -390,7 +388,7 @@
             </div>
 
             <!-- PLAYERS VIEW (Admin Registered Users) -->
-            <div id="players-view" class="admin-section">
+            <div id="players-view" class="admin-section hidden">
                 <div class="room-header">
                     <div class="room-title-group">
                         <h2>Registered Users</h2>
@@ -405,7 +403,7 @@
             </div>
 
             <!-- BALANCES VIEW (Admin Total Balance) -->
-            <div id="balances-view" class="admin-section">
+            <div id="balances-view" class="admin-section hidden">
                 <div class="total-balance-card">
                     <div class="total-balance-label">Total Balance (All users)</div>
                     <div class="total-balance-value" id="totalBalanceSum">0</div>
@@ -484,7 +482,10 @@
                 const targetId = item.dataset.target;
                 document.getElementById(targetId).classList.remove('hidden');
                 
-                if (targetId === 'players-view') socket.emit('admin:getAllRegisteredPlayers');
+                // Fetch fresh registered players data when viewing Players or Balances
+                if (targetId === 'players-view' || targetId === 'balances-view') {
+                    socket.emit('admin:getAllRegisteredPlayers');
+                }
             });
         });
 
@@ -503,12 +504,18 @@
         });
 
         socket.on('admin:playersList', (data) => {
-            updateLiveView(activeStake, data.players, data.gameStatus);
+            // Ensure we handle both direct arrays and wrapped objects safely
+            const players = Array.isArray(data) ? data : (data.players || []);
+            const gameStatus = data.gameStatus || {};
+            updateLiveView(activeStake, players, gameStatus);
         });
 
         socket.on('admin:allRegisteredPlayers', (data) => {
-            updateRegisteredView(data.users);
-            updateBalancesView(data.users);
+            console.log('Received registered players data:', data);
+            // Safety check: ensure we extract the array properly
+            const users = Array.isArray(data) ? data : (data.users || []);
+            updateRegisteredView(users);
+            updateBalancesView(users);
         });
 
         // --- Rendering Logic ---
@@ -532,16 +539,17 @@
             return avatarColors[Math.abs(hash) % avatarColors.length];
         }
 
-        function createPlayerListItem(handle, id, badgeText, badgeClass = 'card-badge') {
-            const initial = handle ? handle.charAt(0).toUpperCase() : '?';
-            const color = getAvatarStyle(handle);
+        // Fixed: Accepts pre-formatted handleText and subText to avoid "unknown" issues
+        function createPlayerListItem(handleText, subText, badgeText, badgeClass = 'card-badge') {
+            const initial = handleText ? handleText.replace('@', '').charAt(0).toUpperCase() : '?';
+            const color = getAvatarStyle(handleText);
             
             return `
                 <li class="player-item">
                     <div class="avatar" style="background: ${color.bg}; color: ${color.text};">${initial}</div>
                     <div class="player-info">
-                        <span class="player-handle">@${handle}</span>
-                        <span class="player-id">${id}</span>
+                        <span class="player-handle">${handleText}</span>
+                        <span class="player-id">${subText}</span>
                     </div>
                     <div class="player-action">
                         <span class="${badgeClass}">${badgeText}</span>
@@ -554,7 +562,7 @@
         }
 
         function updateLiveView(stake, allPlayers, gameStatus) {
-            const stakePlayers = (allPlayers || []).filter(p => p.stake === stake);
+            const stakePlayers = (allPlayers || []).filter(p => String(p.stake) === String(stake));
             const tbody = document.getElementById('livePlayerList');
             const countEl = document.getElementById('roomPlayerCount');
             const statusEl = document.getElementById('roomStatus');
@@ -577,58 +585,65 @@
 
             let html = '';
             stakePlayers.forEach(p => {
-                const handle = escapeHtml(p.telegram_handle || 'unknown');
-                const telegramId = escapeHtml(p.telegramId);
+                // FIXED: Fallback to username if telegram_handle is null/undefined to prevent "unknown"
+                const handleText = p.telegram_handle ? `@${escapeHtml(p.telegram_handle)}` : (escapeHtml(p.username) || 'Anonymous User');
+                const subText = escapeHtml(p.telegramId);
                 const cardNum = p.cardNumber;
-                html += createPlayerListItem(handle, telegramId, `#${cardNum}`);
+                html += createPlayerListItem(handleText, subText, `#${cardNum}`);
             });
             tbody.innerHTML = html;
         }
 
         function updateRegisteredView(users) {
+            if (!Array.isArray(users)) users = []; // Safety check
+            
             const tbody = document.getElementById('registeredPlayerList');
-            document.getElementById('registeredCount').innerText = users ? users.length : 0;
+            document.getElementById('registeredCount').innerText = users.length;
 
-            if (!users || users.length === 0) {
+            if (users.length === 0) {
                 tbody.innerHTML = '<div class="empty-state">📭 No registered users found.</div>';
                 return;
             }
 
-            const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
+            // FIXED: Ensure numeric sorting for balances
+            const sorted = [...users].sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
             let html = '';
             sorted.forEach(user => {
-                const handle = escapeHtml(user.telegram_handle || 'unknown');
-                const telegramId = escapeHtml(user.telegramId);
-                const balance = user.balance ?? 0;
+                const handleText = user.telegram_handle ? `@${escapeHtml(user.telegram_handle)}` : (escapeHtml(user.username) || 'Anonymous User');
+                const subText = escapeHtml(user.telegramId);
+                const balance = Number(user.balance ?? 0);
                 const formattedBalance = balance.toLocaleString();
                 
-                // Using card-badge style for balance here
                 let badgeStyle = 'card-badge';
                 if (balance < 0) badgeStyle += ' style="background:#fee2e2; color:#dc2626;"';
                 
-                html += createPlayerListItem(handle, telegramId, formattedBalance, badgeStyle);
+                html += createPlayerListItem(handleText, subText, formattedBalance, badgeStyle);
             });
             tbody.innerHTML = html;
         }
 
         function updateBalancesView(users) {
+            if (!Array.isArray(users)) users = []; // Safety check
+            
             const tbody = document.getElementById('balancePlayerList');
             let totalBalance = 0;
-            if (users && users.length > 0) {
-                totalBalance = users.reduce((sum, user) => sum + (user.balance || 0), 0);
+            if (users.length > 0) {
+                // FIXED: Cast to Number to prevent string concatenation bugs
+                totalBalance = users.reduce((sum, user) => sum + Number(user.balance || 0), 0);
             }
             document.getElementById('totalBalanceSum').innerText = totalBalance.toLocaleString();
 
-            if (!users || users.length === 0) {
+            if (users.length === 0) {
                 tbody.innerHTML = '<div class="empty-state">No data available.</div>';
                 return;
             }
 
-            const sorted = [...users].sort((a, b) => (b.balance || 0) - (a.balance || 0));
+            // FIXED: Ensure numeric sorting for balances
+            const sorted = [...users].sort((a, b) => Number(b.balance || 0) - Number(a.balance || 0));
             let html = '';
             sorted.forEach(user => {
-                const handle = escapeHtml(user.telegram_handle || 'unknown');
-                const balance = user.balance ?? 0;
+                const handleText = user.telegram_handle ? `@${escapeHtml(user.telegram_handle)}` : (escapeHtml(user.username) || 'Anonymous User');
+                const balance = Number(user.balance ?? 0);
                 const formattedBalance = balance.toLocaleString();
                 
                 let colorStyle = 'color: #64748b;'; // zero
@@ -638,7 +653,7 @@
                 html += `
                     <li class="player-item">
                         <div class="player-info" style="flex-direction: row; justify-content: space-between; align-items: center;">
-                            <span class="player-handle" style="font-weight: 500;">@${handle}</span>
+                            <span class="player-handle" style="font-weight: 500;">${handleText}</span>
                             <span style="font-weight: 700; font-size: 0.9rem; ${colorStyle}">${formattedBalance} ETB</span>
                         </div>
                     </li>
