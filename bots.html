@@ -4,213 +4,360 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bot Performance Stats</title>
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    * { box-sizing: border-box; }
+    :root {
+      --bg-color: #0b0e14;
+      --card-bg: #151a25;
+      --card-bg-light: #1c2331;
+      --text-primary: #ffffff;
+      --text-secondary: #8b9bb4;
+      --accent-gold: #f0b90b;
+      --accent-blue: #2962ff;
+      --accent-green: #0ecb81;
+      --accent-red: #f6465d;
+      --border-color: #262f40;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #1a1a2e;
-      color: #eee;
-      padding: 20px;
-      margin: 0;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
-    h1 { text-align: center; color: #f39c12; }
-    .card {
-      background: #16213e;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-    }
-    .filter-form {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-color);
+      color: var(--text-primary);
       display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
+      justify-content: center;
+      padding: 20px 0;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px; /* Mobile app width */
+      background: var(--bg-color);
+      padding: 0 16px 100px 16px;
+      position: relative;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
       align-items: center;
-      margin-bottom: 15px;
+      justify-content: space-between;
+      padding: 20px 0;
+      margin-bottom: 10px;
     }
-    .filter-form label { color: #ddd; }
-    .filter-form input[type="date"] {
-      padding: 6px;
-      border-radius: 4px;
-      border: 1px solid #2a3a5e;
-      background: #1a1a2e;
-      color: #fff;
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.5rem;
+      font-weight: 700;
     }
-    .filter-form button {
-      background: #3498db;
-      border: none;
-      color: #fff;
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
+    .header-title i { color: var(--accent-gold); font-size: 1.8rem; }
+    .header-actions { display: flex; gap: 16px; color: var(--text-secondary); font-size: 1.2rem; cursor: pointer; }
+    .header-actions i:hover { color: var(--text-primary); }
+
+    /* Message */
+    .message {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: none;
+      font-size: 0.9rem;
     }
-    .filter-form button:hover { background: #2980b9; }
-    .refresh-btn {
-      background: #f39c12;
-    }
-    .refresh-btn:hover { background: #e67e22; }
-    .reset-all-btn {
-      background: #e67e22;
-      color: #fff;
-      border: none;
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .reset-all-btn:hover { background: #d35400; }
-    /* NEW: zero / stop button */
-    .zero-all-btn {
-      background: #c0392b;
-      color: #fff;
-      border: none;
-      padding: 6px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .zero-all-btn:hover { background: #96281b; }
+    .message.success { background: rgba(14, 203, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); display: block; }
+    .message.error { background: rgba(246, 70, 93, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); display: block; }
+
+    /* Stats Grid */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 15px;
-      margin: 20px 0;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
     }
-    .stat-box {
-      background: #0f3460;
-      padding: 15px;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .stat-box .value {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #f1c40f;
-    }
-    .stat-box .label {
-      font-size: 0.9rem;
-      color: #bbb;
-    }
-    .stat-box.negative .value { color: #e74c3c; }
-    .stat-box.positive .value { color: #2ecc71; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      padding: 10px;
-      text-align: left;
-      border-bottom: 1px solid #2a3a5e;
-    }
-    th { background: #0f3460; color: #f1c40f; }
-    .no-data { text-align: center; color: #888; padding: 20px; }
-    .loading { text-align: center; color: #f1c40f; padding: 20px; }
-    .btn-force {
-      background: #e74c3c;
-      border: none;
-      color: #fff;
-      padding: 4px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-    .btn-force:hover:not(:disabled) { background: #c0392b; }
-    .btn-force:disabled {
-      background: #555;
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-    .btn-set {
-      background: #2ecc71;
-      border: none;
-      color: #fff;
-      padding: 4px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-    .btn-set:hover { background: #27ae60; }
-    /* NEW: per-bot zero button */
-    .btn-zero {
-      background: #c0392b;
-      border: none;
-      color: #fff;
-      padding: 4px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-    .btn-zero:hover { background: #96281b; }
-    .balance-input {
-      width: 70px;
-      padding: 4px;
-      border-radius: 4px;
-      border: 1px solid #2a3a5e;
-      background: #1a1a2e;
-      color: #fff;
-    }
-    .message {
-      padding: 10px;
-      border-radius: 5px;
-      margin-bottom: 15px;
-      display: none;
-    }
-    .message.success { background: #27ae60; display: block; }
-    .message.error { background: #e74c3c; display: block; }
-    .actions-cell {
+    .stat-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      align-items: center;
+      flex-direction: column;
+      gap: 8px;
     }
+    .stat-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .stat-header i { font-size: 1.1rem; }
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+    }
+    .stat-subtext {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .stat-card.positive .stat-value { color: var(--accent-green); }
+    .stat-card.negative .stat-value { color: var(--accent-red); }
+
+    /* Section Headers */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .section-header h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-header h3 i { color: var(--accent-gold); }
+    .sort-label {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Bot Cards */
+    .bot-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .bot-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bot-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .bot-id {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .bot-id i { color: var(--accent-gold); }
+    .bot-stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .bot-stats-row span { display: flex; flex-direction: column; gap: 2px; }
+    .bot-stats-row strong { color: var(--text-primary); font-size: 0.95rem; font-weight: 600; }
+    .bot-stats-row strong.positive { color: var(--accent-green); }
+    .bot-stats-row strong.negative { color: var(--accent-red); }
+
+    .bot-actions { display: flex; gap: 8px; }
+    .bot-actions button {
+      flex: 1;
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+    }
+    .bot-actions button:hover { opacity: 0.8; }
+    .btn-set { background: #1c2331; color: #5b9bf5; border: 1px solid #2a3a5e; }
+    .btn-zero { background: #1c2331; color: var(--text-secondary); border: 1px solid #2a3a5e; }
+    .btn-force { background: rgba(14, 203, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(14, 203, 129, 0.3); }
+    .btn-force:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Recent Games List */
+    .recent-games-list { display: flex; flex-direction: column; gap: 8px; }
+    .game-item {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .game-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .game-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .game-title { font-weight: 600; font-size: 0.95rem; }
+    .game-meta { font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+    .game-prize {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      color: var(--accent-gold);
+    }
+    .game-prize i { font-size: 1.2rem; margin-bottom: 2px; }
+    .game-prize span { font-weight: 700; font-size: 1rem; }
+    .game-prize small { font-size: 0.7rem; color: var(--text-secondary); }
+
+    /* Bottom Sticky Actions */
+    .bottom-actions {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-color);
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+      border-top: 1px solid var(--border-color);
+      z-index: 100;
+    }
+    .bottom-actions button {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-reset-all { background: var(--accent-gold); color: #000; }
+    .btn-zero-all { background: var(--accent-red); color: #fff; }
+
+    /* Filter Form (Hidden by default, triggered by icon) */
+    .filter-panel {
+      display: none;
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      gap: 10px;
+      flex-direction: column;
+    }
+    .filter-panel.active { display: flex; }
+    .filter-panel input {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-color);
+      color: #fff;
+      width: 100%;
+    }
+    .filter-panel button {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent-blue);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .loading { text-align: center; color: var(--text-secondary); padding: 20px; }
+    .no-data { text-align: center; color: var(--text-secondary); padding: 20px; }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>🤖 Bot Performance Stats</h1>
-  <div id="message" class="message"></div>
-  <div class="card">
-    <div class="filter-form">
-      <label>From: <input type="date" id="fromDate"></label>
-      <label>To: <input type="date" id="toDate"></label>
-      <button onclick="fetchStats()">Apply Filter</button>
-      <button class="refresh-btn" onclick="fetchStats()">↻ Refresh</button>
-      <button class="reset-all-btn" onclick="resetAllBalances()">Reset All Balances to 1000</button>
-      <!-- NEW BUTTON -->
-      <button class="zero-all-btn" onclick="zeroAllBalances()">⛔ Zero All Balances (Stop Bots)</button>
+  
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <i class="fa-solid fa-robot"></i>
+      Bot Stats
     </div>
-    <div id="statsDisplay">
-      <div class="stats-grid" id="summaryStats">
-        <div class="stat-box"><div class="value" id="totalGames">-</div><div class="label">Total Bot Participations</div></div>
-        <div class="stat-box"><div class="value" id="totalWinnings">-</div><div class="label">Total Winnings (ETB)</div></div>
-        <div class="stat-box"><div class="value" id="totalEntryFees">-</div><div class="label">Entry Fees (participations × 20)</div></div>
-        <div class="stat-box" id="differenceBox"><div class="value" id="difference">-</div><div class="label">Difference (Winnings - Fees)</div></div>
-        <div class="stat-box"><div class="value" id="totalBalance">-</div><div class="label">Total Current Balance (ETB)</div></div>
-      </div>
-      <h3>Per Bot Breakdown</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Bot ID</th>
-            <th>Games Played</th>
-            <th>Total Winnings (ETB)</th>
-            <th>Current Balance (ETB)</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="perBotTable"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
-      </table>
-      <div id="recentGames" style="margin-top:20px;">
-        <h3>Recent Games (last 10)</h3>
-        <table>
-          <thead><tr><th>Game #</th><th>Bot ID</th><th>Date</th><th>Prize Won (ETB)</th></tr></thead>
-          <tbody id="recentTable"></tbody>
-        </table>
-      </div>
+    <div class="header-actions">
+      <i class="fa-solid fa-filter" onclick="document.getElementById('filterPanel').classList.toggle('active')"></i>
+      <i class="fa-solid fa-rotate-right" onclick="fetchStats()"></i>
     </div>
   </div>
+
+  <!-- Filter Panel -->
+  <div class="filter-panel" id="filterPanel">
+    <label style="font-size: 0.8rem; color: var(--text-secondary);">From Date</label>
+    <input type="date" id="fromDate">
+    <label style="font-size: 0.8rem; color: var(--text-secondary);">To Date</label>
+    <input type="date" id="toDate">
+    <button onclick="fetchStats()">Apply Filter</button>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <!-- Stats Summary -->
+  <div class="stats-grid" id="summaryStats">
+    <div class="stat-card">
+      <div class="stat-header"><i class="fa-solid fa-gamepad"></i> Total Games</div>
+      <div class="stat-value" id="totalGames">-</div>
+      <div class="stat-subtext">All bots combined</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header"><i class="fa-solid fa-trophy"></i> Total Winnings</div>
+      <div class="stat-value" id="totalWinnings">-</div>
+      <div class="stat-subtext">All bots combined</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-header"><i class="fa-solid fa-coins"></i> Entry Fees</div>
+      <div class="stat-value" id="totalEntryFees">-</div>
+      <div class="stat-subtext">All bots combined</div>
+    </div>
+    <div class="stat-card" id="differenceBox">
+      <div class="stat-header"><i class="fa-solid fa-chart-line"></i> Difference</div>
+      <div class="stat-value" id="difference">-</div>
+      <div class="stat-subtext" id="differencePercent">Profit</div>
+    </div>
+  </div>
+
+  <!-- Bot Performance -->
+  <div class="section-header">
+    <h3><i class="fa-solid fa-robot"></i> Bot Performance</h3>
+    <div class="sort-label"><i class="fa-solid fa-arrow-up-wide-short"></i> Sort: Bot ID</div>
+  </div>
+  <div class="bot-list" id="perBotList">
+    <div class="loading">Loading...</div>
+  </div>
+
+  <!-- Recent Games -->
+  <div class="section-header" style="margin-top: 24px;">
+    <h3>Recent Games (last 10)</h3>
+  </div>
+  <div class="recent-games-list" id="recentGamesList">
+    <!-- Populated by JS -->
+  </div>
+
 </div>
+
+<!-- Bottom Sticky Actions -->
+<div class="bottom-actions">
+  <button class="btn-reset-all" onclick="resetAllBalances()"><i class="fa-solid fa-rotate-left"></i> Reset All</button>
+  <button class="btn-zero-all" onclick="zeroAllBalances()"><i class="fa-solid fa-xmark"></i> Zero All</button>
+</div>
+
 <script>
   const ADMIN_SECRET = prompt('Enter admin secret:') || '';
 
@@ -261,7 +408,7 @@
       const data = await resp.json();
       if (!data.success) throw new Error(data.error || 'Failed');
       showMessage(`✅ Balance for ${botId} set to ${newBalance} ETB`, 'success');
-      fetchStats(); // refresh
+      fetchStats(); 
     } catch (err) {
       showMessage('Error: ' + err.message, 'error');
     }
@@ -282,7 +429,6 @@
     }
   }
 
-  /* NEW: zero every bot's balance so they can no longer pay the entry fee */
   async function zeroAllBalances() {
     if (!confirm('Set ALL bot balances to 0 ETB?\n\nThis will STOP all bots from playing until you reset their balance again.')) return;
     try {
@@ -331,28 +477,34 @@
   }
 
   function renderStats(history, bots) {
-    const balanceMap = {};
-    const inGameMap = {};
-    bots.forEach(b => {
-      balanceMap[b.id] = b.balance;
-      inGameMap[b.id] = b.inGame;
-    });
-
+    // Summary Stats
     const totalGames = history.length;
     const totalWinnings = history.reduce((sum, e) => sum + e.prizeWon, 0);
     const totalEntryFees = totalGames * 20;
     const difference = totalWinnings - totalEntryFees;
     const totalBalance = bots.reduce((sum, b) => sum + b.balance, 0);
 
-    document.getElementById('totalGames').textContent = totalGames;
-    document.getElementById('totalWinnings').textContent = totalWinnings.toFixed(2);
-    document.getElementById('totalEntryFees').textContent = totalEntryFees.toFixed(2);
-    document.getElementById('totalBalance').textContent = totalBalance.toFixed(2);
+    document.getElementById('totalGames').textContent = totalGames.toLocaleString();
+    document.getElementById('totalWinnings').textContent = totalWinnings.toFixed(2) + ' ETB';
+    document.getElementById('totalEntryFees').textContent = totalEntryFees.toFixed(2) + ' ETB';
+    
     const diffEl = document.getElementById('difference');
-    diffEl.textContent = difference.toFixed(2);
+    diffEl.textContent = difference.toFixed(2) + ' ETB';
+    
     const box = document.getElementById('differenceBox');
-    box.className = 'stat-box ' + (difference >= 0 ? 'positive' : 'negative');
+    box.className = 'stat-card ' + (difference >= 0 ? 'positive' : 'negative');
+    
+    const diffPercent = totalEntryFees > 0 ? ((difference / totalEntryFees) * 100).toFixed(2) : 0;
+    const percentEl = document.getElementById('differencePercent');
+    if (difference >= 0) {
+      percentEl.textContent = `Profit (+${diffPercent}%)`;
+      percentEl.style.color = 'var(--accent-green)';
+    } else {
+      percentEl.textContent = `Loss (${diffPercent}%)`;
+      percentEl.style.color = 'var(--accent-red)';
+    }
 
+    // Per Bot Breakdown
     const perBot = {};
     for (const entry of history) {
       if (!perBot[entry.botId]) perBot[entry.botId] = { games: 0, winnings: 0 };
@@ -365,43 +517,69 @@
       perBot[bot.id].inGame = bot.inGame;
     }
 
-    const tbody = document.getElementById('perBotTable');
-    tbody.innerHTML = '';
+    const botListContainer = document.getElementById('perBotList');
+    botListContainer.innerHTML = '';
+    
     for (const [botId, stats] of Object.entries(perBot)) {
       const inGame = stats.inGame || false;
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${botId}</td>
-        <td>${stats.games}</td>
-        <td>${stats.winnings.toFixed(2)}</td>
-        <td>${(stats.balance || 0).toFixed(2)}</td>
-        <td>
-          <div class="actions-cell">
-            <input type="number" class="balance-input" id="bal_${botId}" value="${stats.balance || 0}" step="1" min="0">
-            <button class="btn-set" onclick="resetBalance('${botId}', parseFloat(document.getElementById('bal_${botId}').value))">Set</button>
-            <button class="btn-zero" onclick="resetBalance('${botId}', 0)">Zero</button>
-            <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
-              ${inGame ? 'Force Win' : 'Not in Game'}
-            </button>
-          </div>
-        </td>
+      const balance = stats.balance || 0;
+      const balanceClass = balance >= 0 ? 'positive' : 'negative';
+      
+      const card = document.createElement('div');
+      card.className = 'bot-card';
+      card.innerHTML = `
+        <div class="bot-card-header">
+          <div class="bot-id"><i class="fa-solid fa-robot"></i> ${botId}</div>
+        </div>
+        <div class="bot-stats-row">
+          <span>Games played <strong>${stats.games}</strong></span>
+          <span>Winnings <strong>${stats.winnings.toFixed(2)} ETB</strong></span>
+          <span>Balance <strong class="${balanceClass}">${balance >= 0 ? '+' : ''}${balance.toFixed(2)} ETB</strong></span>
+        </div>
+        <div class="bot-actions">
+          <button class="btn-set" onclick="promptSetBalance('${botId}', ${balance})">
+            <i class="fa-solid fa-gear"></i> Set
+          </button>
+          <button class="btn-zero" onclick="resetBalance('${botId}', 0)">
+            <i class="fa-solid fa-circle-xmark"></i> Zero
+          </button>
+          <button class="btn-force" ${inGame ? '' : 'disabled'} onclick="forceWin('${botId}')">
+            <i class="fa-solid fa-trophy"></i> ${inGame ? 'Force Win' : 'Not in Game'}
+          </button>
+        </div>
       `;
-      tbody.appendChild(tr);
+      botListContainer.appendChild(card);
     }
 
-    const recentTable = document.getElementById('recentTable');
+    // Recent Games List
+    const recentContainer = document.getElementById('recentGamesList');
     if (history.length === 0) {
-      recentTable.innerHTML = '<tr><td colspan="4" class="no-data">No games played.</td></tr>';
+      recentContainer.innerHTML = '<div class="no-data">No games played.</div>';
     } else {
       const recent = history.slice(-10).reverse();
-      recentTable.innerHTML = recent.map(e => `
-        <tr>
-          <td>${e.gameNumber}</td>
-          <td>${e.botId}</td>
-          <td>${new Date(e.date).toLocaleDateString()}</td>
-          <td>${e.prizeWon.toFixed(2)}</td>
-        </tr>
+      recentContainer.innerHTML = recent.map(e => `
+        <div class="game-item">
+          <div class="game-icon">#</div>
+          <div class="game-info">
+            <div class="game-title">Game #${e.gameNumber}</div>
+            <div class="game-meta"><i class="fa-solid fa-robot"></i> ${e.botId}</div>
+            <div class="game-meta"><i class="fa-solid fa-calendar"></i> ${new Date(e.date).toLocaleString()}</div>
+          </div>
+          <div class="game-prize">
+            <i class="fa-solid fa-trophy"></i>
+            <span>${e.prizeWon}</span>
+            <small>Gold</small>
+          </div>
+        </div>
       `).join('');
+    }
+  }
+
+  // Helper for Set button to use native prompt instead of input field in the card
+  function promptSetBalance(botId, currentBalance) {
+    const newBalance = prompt(`Enter new balance for ${botId}:`, currentBalance);
+    if (newBalance !== null) {
+      resetBalance(botId, parseFloat(newBalance));
     }
   }
 
@@ -409,6 +587,8 @@
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('fromDate').value = today;
   document.getElementById('toDate').value = today;
+  
+  // Initial fetch
   fetchStats();
 </script>
 </body>
