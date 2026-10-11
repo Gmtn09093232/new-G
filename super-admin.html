@@ -3,10 +3,54 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0F0F0F" />
     <title>Super Admin · Dashboard</title>
+
+    <!-- Fonts + Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
-        /* ─── RESET & BASE ─── */
+        /* ─── DESIGN TOKENS ─── */
+        :root {
+            --bg: #0F0F0F;
+            --bg-elev: #161616;
+            --card: #1A1A1C;
+            --card-2: #202024;
+            --card-3: #26262B;
+
+            --border: rgba(255, 255, 255, 0.07);
+            --border-strong: rgba(255, 255, 255, 0.13);
+
+            --text: #FFFFFF;
+            --text-2: #E8E8EA;
+            --muted: #8E8E93;
+            --muted-2: #636366;
+
+            --accent: #FF6B00;
+            --accent-2: #FF9A3D;
+            --accent-soft: rgba(255, 107, 0, 0.12);
+            --accent-line: rgba(255, 107, 0, 0.30);
+
+            --green: #22C55E;
+            --green-soft: rgba(34, 197, 94, 0.12);
+            --red: #EF4444;
+            --red-soft: rgba(239, 68, 68, 0.12);
+            --amber: #F5B301;
+            --amber-soft: rgba(245, 179, 1, 0.12);
+            --blue: #3B82F6;
+            --blue-soft: rgba(59, 130, 246, 0.12);
+            --teal: #14B8A6;
+            --rose: #F43F5E;
+
+            --r-lg: 20px;
+            --r-md: 16px;
+            --r-sm: 12px;
+        }
+
+        /* ─── RESET ─── */
         * {
             margin: 0;
             padding: 0;
@@ -14,33 +58,46 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0F0F0F;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(900px 380px at 50% -140px, rgba(255, 107, 0, 0.10), transparent 70%),
+                radial-gradient(600px 300px at 100% 0%, rgba(255, 107, 0, 0.04), transparent 70%);
+            background-repeat: no-repeat;
+            color: var(--text);
             min-height: 100vh;
-            padding-bottom: 90px;
+            padding-bottom: 80px;
             font-size: 15px;
-            color: #FFFFFF;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        button, .btn, .tab-btn, .stat-card, .refresh-btn-header, .modal-close {
-            transition: all 0.15s ease !important;
+        /* ─── FAST TRANSITIONS ─── */
+        button, .btn, .tab-btn, .stat-card, .icon-btn, .modal-close,
+        .mini-pagination button, .admin-card, .player-select {
+            transition: all 0.15s ease;
         }
 
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #1A1A1A; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 20px; }
+        /* ─── SCROLLBAR ─── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 20px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 107, 0, 0.5); }
 
         /* ─── HEADER ─── */
         .header {
-            background: #0F0F0F;
-            color: #fff;
-            padding: 14px 16px;
             position: sticky;
             top: 0;
             z-index: 100;
-            border-bottom: 1px solid #1F1F1F;
+            background: rgba(15, 15, 15, 0.82);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
+            padding-top: calc(12px + env(safe-area-inset-top, 0px));
         }
         .header-content {
             max-width: 1280px;
@@ -48,1087 +105,2181 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .header-left .menu-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px;
-        }
+        .header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .header-title { min-width: 0; }
         .header-left h1 {
             font-size: 18px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .header-right {
+        .header-left .subtitle {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .icon-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
             display: flex;
             align-items: center;
-            gap: 12px;
-        }
-        .header-right .notif-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 18px;
+            justify-content: center;
+            font-size: 15px;
             cursor: pointer;
             position: relative;
+            flex-shrink: 0;
+            font-family: inherit;
         }
-        .refresh-btn-header {
-            background: #1C1C1E;
-            border: 1px solid #2A2A2A;
-            color: #fff;
-            padding: 8px 14px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .icon-btn:active { transform: scale(0.93); background: var(--card-2); }
+        .icon-btn .dot {
+            position: absolute;
+            top: 9px;
+            right: 10px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 2.5px #0F0F0F;
         }
-        .refresh-btn-header:active {
-            transform: scale(0.95);
-            background: #252525;
+        .icon-btn .dot[hidden] { display: none; }
+
+        @media (max-width: 480px) {
+            .header-left h1 { font-size: 16px; }
+            .icon-btn { width: 40px; height: 40px; border-radius: 13px; font-size: 14px; }
         }
 
         /* ─── CONTAINER ─── */
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 16px;
-        }
+        .container { max-width: 1280px; margin: 0 auto; padding: 16px 16px 24px; }
 
         /* ─── FILTER BAR ─── */
         .filter-bar {
-            background: #1C1C1E;
-            border-radius: 16px;
-            padding: 14px 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            padding: 14px;
             margin-bottom: 16px;
-            border: 1px solid #2A2A2A;
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
-        .filter-bar .row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .filter-bar .filter-group {
-            flex: 1 1 140px;
-            min-width: 120px;
-        }
+        .filter-bar.hidden { display: none; }
+        .filter-bar .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .filter-bar .filter-group { flex: 1 1 150px; min-width: 130px; }
         .filter-bar .filter-group label {
             display: block;
-            font-size: 11px;
-            font-weight: 500;
-            color: #888;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin-bottom: 5px;
+            letter-spacing: 0.6px;
+            margin-bottom: 6px;
         }
-        .filter-bar .filter-group input,
-        .filter-bar .filter-group select {
+
+        input[type="date"],
+        input[type="text"],
+        select {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #333;
-            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            border-radius: 13px;
             font-size: 14px;
-            background: #141414;
-            color: #fff;
-            min-height: 42px;
+            font-weight: 500;
+            color: var(--text);
+            min-height: 46px;
             outline: none;
+            font-family: inherit;
+            color-scheme: dark;
+            appearance: none;
+            -webkit-appearance: none;
         }
-        .filter-bar .filter-group input:focus,
-        .filter-bar .filter-group select:focus {
-            border-color: #FF6B00;
+        select {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238E8E93' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 38px;
         }
+        input:focus, select:focus {
+            border-color: var(--accent-line);
+            box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.12);
+            background: var(--card-3);
+        }
+        input::placeholder { color: var(--muted-2); }
+
+        .filter-bar .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+        /* ─── BUTTONS ─── */
         .btn {
-            padding: 10px 18px;
-            border-radius: 12px;
-            border: none;
+            padding: 12px 20px;
+            border-radius: 14px;
+            border: 1px solid transparent;
             font-weight: 600;
             font-size: 14px;
+            font-family: inherit;
             cursor: pointer;
-            min-height: 42px;
+            touch-action: manipulation;
+            min-height: 46px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 7px;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+            background: var(--card-2);
+            color: var(--text);
         }
         .btn:active { transform: scale(0.96); }
+        .btn i { font-size: 13px; }
+
         .btn-primary {
-            background: #FF6B00;
-            color: #fff;
+            background: var(--accent);
+            color: #121212;
+            box-shadow: 0 6px 20px rgba(255, 107, 0, 0.22);
+            font-weight: 700;
         }
-        .btn-primary:active { background: #E55F00; }
+        .btn-primary:active { box-shadow: 0 3px 10px rgba(255, 107, 0, 0.16); }
+
         .btn-outline {
             background: transparent;
-            border: 1px solid #333;
-            color: #ccc;
+            border: 1px solid var(--border-strong);
+            color: var(--text);
         }
-        .btn-outline:active { background: #1C1C1E; }
-        .btn-success { background: #10B981; color: #fff; }
-        .btn-danger { background: #EF4444; color: #fff; }
-        .btn-warning { background: #F59E0B; color: #fff; }
-        .btn-sm { padding: 7px 14px; font-size: 13px; min-height: 36px; border-radius: 10px; }
-        .btn-xs { padding: 5px 10px; font-size: 12px; min-height: 30px; border-radius: 8px; }
+        .btn-outline:active { background: var(--card-2); }
+
+        .btn-success {
+            background: var(--green);
+            color: #06170C;
+            font-weight: 700;
+        }
+        .btn-danger {
+            background: var(--red);
+            color: #fff;
+            font-weight: 700;
+        }
+        .btn-outline-danger {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.40);
+            color: var(--red);
+        }
+        .btn-outline-danger:active { background: var(--red-soft); }
+
+        .btn-warning { background: var(--amber); color: #1A1400; font-weight: 700; }
         .btn-ghost {
             background: transparent;
-            color: #FF6B00;
-            border: 1px solid #FF6B00;
+            color: var(--accent);
+            border: 1px solid var(--accent-line);
         }
-        .btn-ghost:active { background: #FF6B00; color: #fff; }
+        .btn-ghost:active { background: var(--accent-soft); }
+        .btn-indigo { background: var(--blue); color: #fff; }
+        .btn-rose { background: var(--rose); color: #fff; }
+        .btn-teal { background: var(--teal); color: #04211E; font-weight: 700; }
 
-        /* ─── STATS / OVERVIEW ─── */
-        .overview-header {
-            margin-bottom: 20px;
-        }
-        .overview-header .date-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .overview-header .date-chip {
-            background: #1C1C1E;
-            border: 1px solid #2A2A2A;
-            color: #ccc;
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .house-profit {
-            margin-bottom: 24px;
-        }
-        .house-profit .label {
-            font-size: 13px;
-            color: #888;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-        .house-profit .value {
-            font-size: 42px;
-            font-weight: 700;
-            letter-spacing: -1px;
-            line-height: 1.1;
-        }
-        .house-profit .value .currency {
-            font-size: 18px;
-            color: #888;
-            font-weight: 500;
-            margin-left: 4px;
-        }
-        .house-profit .change {
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .house-profit .change.up { color: #10B981; }
-        .house-profit .change.down { color: #EF4444; }
+        .btn-sm { padding: 9px 14px; font-size: 12.5px; min-height: 38px; border-radius: 11px; }
+        .btn-xs { padding: 6px 10px; font-size: 11px; min-height: 30px; border-radius: 9px; gap: 4px; }
+        .btn-xs i { font-size: 10px; }
 
-        .dep-with-row {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-        .dep-with-item {
-            flex: 1;
-        }
-        .dep-with-item .label {
-            font-size: 13px;
-            color: #888;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .dep-with-item .label .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .dep-with-item .label .dot.white { background: #fff; }
-        .dep-with-item .label .dot.orange { background: #FF6B00; }
-        .dep-with-item .value {
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        /* Simple bar chart */
-        .chart-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 6px;
-            height: 100px;
-            margin-bottom: 24px;
-            padding: 0 4px;
-        }
-        .chart-bars .bar-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-        }
-        .chart-bars .bars {
-            display: flex;
-            gap: 3px;
-            align-items: flex-end;
-            height: 80px;
-        }
-        .chart-bars .bar {
-            width: 8px;
-            border-radius: 3px;
-            min-height: 4px;
-        }
-        .chart-bars .bar.deposit { background: #FFFFFF; }
-        .chart-bars .bar.withdraw { background: #FF6B00; }
-        .chart-bars .day {
-            font-size: 10px;
-            color: #666;
-        }
-
-        .stats-row {
+        /* ─── STATS GRID ─── */
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
         }
-        .stat-box {
-            background: #1C1C1E;
-            border-radius: 14px;
-            padding: 16px 12px;
-            text-align: center;
-            border: 1px solid #2A2A2A;
-        }
-        .stat-box .num {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 2px;
-        }
-        .stat-box .lbl {
-            font-size: 12px;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-        .stat-box.pending .num { color: #FF6B00; }
-
-        .alert-banner {
-            background: #FF6B00;
-            color: #fff;
-            border-radius: 14px;
-            padding: 14px 16px;
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 14px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
-            font-weight: 600;
-            font-size: 14px;
+            gap: 12px;
+            min-width: 0;
+        }
+        .stat-card:hover { border-color: var(--border-strong); }
+        .stat-card .stat-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .stat-card .stat-icon.blue { background: var(--blue-soft); color: var(--blue); }
+        .stat-card .stat-icon.green { background: var(--green-soft); color: var(--green); }
+        .stat-card .stat-icon.orange { background: var(--accent-soft); color: var(--accent); }
+        .stat-card .stat-icon.purple { background: var(--amber-soft); color: var(--amber); }
+        .stat-card .stat-icon.red { background: var(--red-soft); color: var(--red); }
+        .stat-card .stat-icon.indigo { background: rgba(129, 140, 248, 0.12); color: #818CF8; }
+
+        .stat-card .stat-info { flex: 1; min-width: 0; }
+        .stat-card .stat-info .label {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .stat-card .stat-info .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.3;
+            margin-top: 2px;
+            letter-spacing: -0.4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        @media (min-width: 700px) { .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; } }
+        @media (min-width: 1024px) {
+            .stats-grid { grid-template-columns: repeat(6, 1fr); }
+            .stat-card { flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px; }
+            .stat-card .stat-info .value { font-size: 20px; }
+        }
+
+        /* ─── ALERT BANNER ─── */
+        .alert-banner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            border-radius: 18px;
+            background: linear-gradient(100deg, rgba(255, 107, 0, 0.18), rgba(255, 107, 0, 0.05));
+            border: 1px solid var(--accent-line);
             cursor: pointer;
         }
-        .alert-banner:active { opacity: 0.9; }
+        .alert-banner:active { transform: scale(0.99); }
+        .alert-banner .alert-icon {
+            width: 38px; height: 38px; border-radius: 12px;
+            background: rgba(255, 107, 0, 0.20);
+            color: var(--accent);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px; flex-shrink: 0;
+        }
+        .alert-banner .alert-text {
+            flex: 1; font-size: 13.5px; color: var(--text-2);
+            line-height: 1.35; min-width: 0;
+        }
+        .alert-banner .alert-text strong { color: var(--accent); font-weight: 700; }
+        .alert-banner .alert-cta {
+            font-size: 12.5px; font-weight: 700; color: var(--accent);
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+        }
 
         /* ─── TABS ─── */
         .tabs {
             display: flex;
             gap: 6px;
             margin-bottom: 16px;
-            background: #1C1C1E;
-            padding: 5px;
-            border-radius: 14px;
-            border: 1px solid #2A2A2A;
+            background: var(--card);
+            padding: 6px;
+            border-radius: 18px;
+            border: 1px solid var(--border);
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
+            flex-wrap: nowrap;
         }
         .tabs::-webkit-scrollbar { display: none; }
+
         .tab-btn {
             padding: 10px 16px;
             border: none;
             background: transparent;
-            border-radius: 10px;
+            border-radius: 13px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 14px;
-            color: #888;
+            font-size: 13.5px;
+            font-family: inherit;
+            color: var(--muted);
             white-space: nowrap;
             flex-shrink: 0;
             min-height: 42px;
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
+            touch-action: manipulation;
         }
+        .tab-btn i { font-size: 14px; }
+        .tab-btn:active { transform: scale(0.96); }
         .tab-btn.active {
-            background: #FF6B00;
-            color: #fff;
+            background: var(--accent);
+            color: #121212;
+            font-weight: 700;
+            box-shadow: 0 6px 18px rgba(255, 107, 0, 0.25);
         }
         .tab-btn .badge {
-            background: #EF4444;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 0 7px;
-            border-radius: 20px;
-            min-width: 18px;
-            height: 18px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-2);
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 0 7px;
+            border-radius: 20px;
+            min-width: 20px;
+            height: 19px;
+            line-height: 19px;
+            text-align: center;
         }
-        .tab-btn.active .badge {
-            background: rgba(255,255,255,0.25);
-        }
+        .tab-btn.active .badge { background: rgba(0, 0, 0, 0.18); color: #121212; }
 
         /* ─── TAB CONTENT ─── */
         .tab-content {
-            background: transparent;
+            background: var(--card);
+            border-radius: var(--r-lg);
+            padding: 16px;
+            border: 1px solid var(--border);
             min-height: 280px;
         }
-        .tab-pane { display: none; }
+        .tab-pane { display: none; animation: fadeSlide 0.18s ease; }
         .tab-pane.active { display: block; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-        /* ─── ADMIN CARDS (new style) ─── */
+        .tab-pane h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 16px;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            flex-wrap: wrap;
+        }
+        .tab-pane h2 i { color: var(--accent); font-size: 15px; }
+        .tab-pane h2 .sub { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+
+        /* ─── TABLES ─── */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
+            padding: 0 4px;
+            border-radius: var(--r-sm);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 620px; }
+        table th {
+            background: transparent;
+            text-align: left;
+            padding: 10px 12px;
+            font-weight: 700;
+            color: var(--muted);
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            font-size: 13.5px;
+            color: var(--text-2);
+        }
+        table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+        table tbody tr:last-child td { border-bottom: none; }
+
+        .cell-user { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .cell-name { font-weight: 600; color: var(--text); font-size: 13.5px; }
+        .cell-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+        /* ─── AVATARS ─── */
+        .avatar {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #FF6B00, #FF9A3D);
+            color: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 14px;
+            letter-spacing: 0.2px;
+            flex-shrink: 0;
+        }
+        .avatar-sm { width: 34px; height: 34px; font-size: 12px; }
+
+        /* ─── BADGES ─── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            gap: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .status-badge.pending { background: var(--accent-soft); color: var(--accent); }
+        .status-badge.approved { background: var(--green-soft); color: var(--green); }
+        .status-badge.rejected { background: var(--red-soft); color: var(--red); }
+        .status-badge.active { background: var(--green-soft); color: var(--green); }
+        .status-badge.inactive { background: rgba(255, 255, 255, 0.07); color: var(--muted); }
+        .status-badge.completed { background: var(--blue-soft); color: var(--blue); }
+        .status-badge.banned { background: var(--red-soft); color: var(--red); }
+
+        /* ─── ADMIN CARDS ─── */
         .admin-card {
-            background: #1C1C1E;
-            border-radius: 16px;
+            background: var(--card-2);
+            border: 1px solid var(--border);
+            border-radius: 18px;
             padding: 16px;
             margin-bottom: 12px;
-            border: 1px solid #2A2A2A;
         }
+        .admin-card:hover { border-color: var(--border-strong); }
+
         .admin-card .admin-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
             margin-bottom: 12px;
         }
-        .admin-card .admin-left {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        .admin-card .rank {
-            font-size: 13px;
-            color: #666;
-            font-weight: 600;
-            min-width: 22px;
-        }
-        .admin-card .avatar {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .admin-name-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .admin-id { min-width: 0; }
+        .admin-card .admin-name {
             font-weight: 700;
             font-size: 15px;
-            flex-shrink: 0;
-        }
-        .admin-card .admin-info .name {
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 2px;
-        }
-        .admin-card .admin-info .phone {
-            font-size: 13px;
-            color: #888;
-        }
-        .admin-card .admin-right {
+            color: var(--text);
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            letter-spacing: -0.2px;
         }
-        .status-badge {
+        .admin-card .admin-name .super-tag {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+        .admin-card .admin-phone { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+        .admin-card .admin-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0 0 12px;
+        }
+        .admin-card .admin-meta span {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px 11px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
+            gap: 5px;
         }
-        .status-badge.active { background: rgba(16,185,129,0.15); color: #10B981; }
-        .status-badge.inactive { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.pending { background: rgba(255,107,0,0.15); color: #FF6B00; }
-        .status-badge.approved { background: rgba(16,185,129,0.15); color: #10B981; }
-        .status-badge.rejected { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.banned { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.completed { background: rgba(59,130,246,0.15); color: #3B82F6; }
+        .admin-card .admin-meta span i { color: var(--accent); font-size: 10px; }
 
-        .admin-card .pct {
-            font-size: 13px;
-            color: #888;
-            font-weight: 500;
-        }
-        .progress-bar {
+        .admin-progress {
             height: 6px;
-            background: #2A2A2A;
-            border-radius: 10px;
-            margin: 12px 0;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, 0.07);
             overflow: hidden;
-        }
-        .progress-bar .fill {
-            height: 100%;
-            background: linear-gradient(90deg, #FF6B00, #FF8C00);
-            border-radius: 10px;
-        }
-        .admin-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
             margin-bottom: 14px;
         }
-        .admin-stats .stat-item {
-            text-align: center;
-        }
-        .admin-stats .stat-item strong {
+        .admin-progress span {
             display: block;
-            font-size: 16px;
-            font-weight: 700;
-        }
-        .admin-stats .stat-item .slabel {
-            font-size: 11px;
-            color: #888;
-            margin-top: 2px;
-        }
-        .admin-stats .stat-item.earned strong { color: #FF6B00; }
-        .admin-stats .stat-item.pending strong { color: #F59E0B; }
-        .admin-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .admin-actions .btn {
-            flex: 1;
-            min-width: 70px;
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #FF6B00, #FF9A3D);
+            transition: width 0.3s ease;
         }
 
-        /* ─── PLAYERS LIST ─── */
-        .players-toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
-        }
-        .players-toolbar input,
-        .players-toolbar select {
-            flex: 1;
-            min-width: 140px;
-            padding: 10px 14px;
-            border: 1px solid #333;
-            border-radius: 12px;
-            background: #1C1C1E;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-        .players-toolbar input:focus,
-        .players-toolbar select:focus {
-            border-color: #FF6B00;
-        }
-        .selection-bar {
-            background: #FF6B00;
-            color: #fff;
-            border-radius: 12px;
-            padding: 12px 16px;
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-            font-weight: 600;
-        }
-        .selection-bar.active { display: flex; }
-        .selection-bar .actions {
-            display: flex;
+        .admin-card .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
             gap: 8px;
+            margin: 0 0 14px;
         }
-        .player-item {
-            background: #1C1C1E;
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 10px;
-            border: 1px solid #2A2A2A;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .player-item .check {
-            width: 22px;
-            height: 22px;
-            accent-color: #FF6B00;
-        }
-        .player-item .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        .player-item .info {
-            flex: 1;
+        .admin-card .admin-stats .stat-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 9px 8px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
             min-width: 0;
         }
-        .player-item .info .name {
-            font-weight: 600;
+        .admin-card .admin-stats .stat-item strong {
+            display: block;
             font-size: 15px;
-            margin-bottom: 2px;
-        }
-        .player-item .info .handle {
-            font-size: 13px;
-            color: #888;
-        }
-        .player-item .info .admin-name {
-            font-size: 12px;
-            color: #666;
-            margin-top: 2px;
-        }
-        .player-item .right {
-            text-align: right;
-        }
-        .player-item .right .balance {
             font-weight: 700;
-            font-size: 15px;
-            margin-bottom: 4px;
+            color: var(--text);
+            letter-spacing: -0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-
-        /* ─── WITHDRAWAL CARDS ─── */
-        .withdrawal-card {
-            background: #1C1C1E;
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
-            border: 1px solid #2A2A2A;
-        }
-        .withdrawal-card .top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-        .withdrawal-card .amount {
-            font-size: 26px;
-            font-weight: 700;
-        }
-        .withdrawal-card .meta {
-            font-size: 13px;
-            color: #888;
-            margin-top: 4px;
-        }
-        .withdrawal-card .details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin: 12px 0;
-            font-size: 13px;
-        }
-        .withdrawal-card .details .item .lbl {
-            color: #888;
-            margin-bottom: 2px;
-        }
-        .withdrawal-card .actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 12px;
-        }
-
-        /* ─── RECENT ACTIVITY ─── */
-        .section-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #888;
-            margin-bottom: 12px;
+        .admin-card .admin-stats .stat-item:nth-child(2) strong { color: var(--accent); }
+        .admin-card .admin-stats .stat-item:nth-child(3) strong { color: var(--amber); }
+        .admin-card .admin-stats .stat-item:nth-child(4) strong { color: var(--text-2); }
+        .admin-card .admin-stats .stat-item .slabel {
+            font-size: 9px;
+            color: var(--muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 0;
-            border-bottom: 1px solid #1F1F1F;
-        }
-        .activity-item:last-child { border-bottom: none; }
-        .activity-item .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        .activity-item .info {
-            flex: 1;
-        }
-        .activity-item .info .name {
-            font-weight: 600;
-            font-size: 15px;
-        }
-        .activity-item .info .time {
-            font-size: 12px;
-            color: #666;
+            display: block;
             margin-top: 2px;
         }
-        .activity-item .right {
-            text-align: right;
-        }
-        .activity-item .right .amount {
-            font-weight: 700;
-            font-size: 15px;
-            margin-bottom: 4px;
+
+        .admin-card .admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .admin-card .admin-actions .btn { flex: 0 1 auto; }
+
+        @media (max-width: 480px) {
+            .admin-card { padding: 14px; border-radius: 16px; }
+            .admin-card .admin-actions .btn {
+                font-size: 11.5px;
+                padding: 7px 11px;
+                min-height: 34px;
+                flex: 1 1 auto;
+            }
+            .avatar { width: 40px; height: 40px; font-size: 13px; }
         }
 
         /* ─── LOADING / EMPTY ─── */
-        .loading-state, .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 50px 20px;
-            color: #666;
-            gap: 12px;
+        .loading-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 44px 20px; color: var(--muted); gap: 14px;
+            font-size: 13.5px;
         }
         .loading-state .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #333;
-            border-top-color: #FF6B00;
+            width: 34px; height: 34px;
+            border: 3px solid rgba(255, 255, 255, 0.08);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty-state .icon { font-size: 40px; opacity: 0.4; }
+
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 44px 20px; color: var(--muted); gap: 10px;
+            font-size: 13.5px; text-align: center;
+        }
+        .empty-state .icon { font-size: 40px; opacity: 0.35; color: var(--accent); }
+        .empty-state .retry-btn { margin-top: 10px; }
+
+        .muted-note { color: var(--muted); font-size: 12.5px; padding: 6px 0; }
 
         /* ─── MODAL ─── */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(8px);
+        .admin-detail-modal .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
             z-index: 2000;
             display: none;
             align-items: center;
             justify-content: center;
             padding: 16px;
         }
-        .modal-overlay.active { display: flex; }
-        .modal-content {
-            background: #1C1C1E;
-            border-radius: 20px;
-            padding: 24px;
-            max-width: 480px;
+        .admin-detail-modal .modal-overlay.active { display: flex; }
+        .admin-detail-modal .modal-content {
+            background: var(--card);
+            border: 1px solid var(--border-strong);
+            border-radius: 24px;
+            padding: 20px;
+            max-width: 840px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
-            border: 1px solid #2A2A2A;
+            box-shadow: 0 32px 90px rgba(0, 0, 0, 0.75);
+            animation: modalIn 0.18s ease;
         }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.96) translateY(14px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .modal-header h2 {
-            font-size: 18px;
-            font-weight: 700;
+        .modal-content .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px; padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
         }
-        .modal-close {
-            background: #2A2A2A;
-            border: none;
-            width: 34px;
-            height: 34px;
+        .modal-content .modal-header h2 {
+            font-size: 18px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.3px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .modal-content .modal-close {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            width: 38px; height: 38px;
             border-radius: 50%;
-            font-size: 16px;
+            font-size: 15px;
             cursor: pointer;
-            color: #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: var(--muted);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            font-family: inherit;
         }
-        .slide-approve {
-            background: #FF6B00;
-            color: #fff;
-            border: none;
-            width: 100%;
+        .modal-content .modal-close:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.12); }
+
+        .admin-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 20px;
+            background: rgba(255, 255, 255, 0.03);
             padding: 16px;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: 700;
-            margin-top: 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            border-radius: var(--r-md);
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
         }
-        .slide-approve:active { background: #E55F00; }
+        .admin-info-grid .item {
+            display: flex; justify-content: space-between; gap: 10px;
+            font-size: 13px; padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .admin-info-grid .item:last-child { border-bottom: none; }
+        .admin-info-grid .item .label { color: var(--muted); font-weight: 500; }
+        .admin-info-grid .item .value { font-weight: 600; color: var(--text); text-align: right; }
+
+        .section-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: var(--r-md);
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .section-card.deposits { border-left-color: var(--green); }
+        .section-card.withdrawals { border-left-color: var(--accent); }
+        .section-card.admin-withdrawals { border-left-color: var(--red); }
+        .section-card.earnings { border-left-color: var(--amber); }
+        .section-card.adjustments { border-left-color: var(--blue); }
+        .section-card.players { border-left-color: var(--accent); }
+
+        .section-card .section-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; gap: 10px; flex-wrap: wrap;
+        }
+        .section-card .section-header h4 {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            display: flex; align-items: center; gap: 7px;
+            letter-spacing: -0.1px;
+        }
+        .section-card .section-header .total {
+            font-size: 11.5px; font-weight: 700; color: var(--accent);
+            background: var(--accent-soft);
+            padding: 4px 12px; border-radius: 40px;
+            white-space: nowrap;
+        }
+        .section-card .section-body { font-size: 12.5px; max-height: 210px; overflow-y: auto; }
+        .section-card .section-body .row-item {
+            display: flex; justify-content: space-between;
+            padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 12px;
+        }
+        .section-card .section-body .row-item:last-child { border-bottom: none; }
+        .section-card .section-body .row-item .left { color: var(--muted); font-size: 12.5px; min-width: 0; }
+        .section-card .section-body .row-item .right {
+            font-weight: 600; color: var(--text); text-align: right;
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        }
+
+        .modal-actions {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .modal-actions .btn { flex: 1; min-width: 90px; justify-content: center; }
+
+        @media (max-width: 640px) {
+            .admin-detail-modal .modal-content { padding: 16px; border-radius: 20px; }
+            .admin-info-grid { grid-template-columns: 1fr; gap: 0; padding: 12px 14px; }
+            .admin-info-grid .item { font-size: 12.5px; }
+            .section-card .section-body { max-height: 140px; }
+            .modal-actions .btn { flex: 1 1 100%; }
+            .modal-content .modal-header h2 { font-size: 16px; }
+        }
 
         /* ─── TOAST ─── */
         .toast {
             position: fixed;
-            bottom: 100px;
+            bottom: 24px;
             left: 50%;
-            transform: translateX(-50%);
-            background: #1C1C1E;
+            transform: translateX(-50%) translateY(90px);
+            background: #1F1F23;
             color: #fff;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 14px 22px;
+            border-radius: 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-strong);
             z-index: 3000;
-            border: 1px solid #333;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: 0.2s ease;
+            pointer-events: none;
+            max-width: 92%;
+            text-align: center;
+            backdrop-filter: blur(10px);
         }
-        .toast.show { opacity: 1; }
-        .toast.success { border-color: #10B981; }
-        .toast.error { border-color: #EF4444; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #0E2A18; border-color: rgba(34, 197, 94, 0.35); color: #A7F3C4; }
+        .toast.error { background: #2A1010; border-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; }
+        .toast.info { background: #1F1F23; border-color: var(--accent-line); color: #FFC79A; }
 
-        /* ─── BOTTOM NAV (optional visual) ─── */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #0F0F0F;
-            border-top: 1px solid #1F1F1F;
-            display: flex;
-            justify-content: space-around;
-            padding: 10px 0 18px;
-            z-index: 90;
-        }
-        .bottom-nav .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            color: #666;
-            font-size: 11px;
-            background: none;
-            border: none;
+        /* ─── MINI PAGINATION ─── */
+        .mini-pagination { display: flex; gap: 5px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+        .mini-pagination button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+            color: var(--text-2);
             cursor: pointer;
-            min-width: 64px;
+            min-height: 34px;
         }
-        .bottom-nav .nav-item.active {
-            color: #FF6B00;
+        .mini-pagination button:active { transform: scale(0.94); }
+        .mini-pagination button.active-page {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #121212;
         }
-        .bottom-nav .nav-item i {
-            font-size: 20px;
+        .mini-pagination button:disabled { opacity: 0.3; pointer-events: none; }
+        .mini-pagination span { font-size: 12.5px; color: var(--muted); padding: 0 6px; font-weight: 600; }
+
+        /* ─── SEARCH BAR ─── */
+        .search-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .search-bar input, .search-bar select { flex: 1 1 180px; }
+        .search-bar .btn { flex-shrink: 0; }
+
+        /* ─── LIST TOOLBAR ─── */
+        .list-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .list-toolbar .lt-count { font-size: 13.5px; font-weight: 700; color: var(--text); }
+        .list-toolbar .lt-count i { color: var(--accent); margin-right: 5px; }
+        .list-toolbar .lt-sub { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+        .list-toolbar .lt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .check-label {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 12.5px; font-weight: 600; color: var(--muted);
+            cursor: pointer; user-select: none;
+        }
+        input[type="checkbox"] {
+            width: 17px; height: 17px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            border-radius: 5px;
         }
 
-        /* ─── RESPONSIVE ─── */
+        /* ─── ANALYSIS ─── */
+        .analysis-toggle { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .analysis-toggle .btn { min-width: 110px; }
+
+        .analysis-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .analysis-summary .stat-box {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 14px 10px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .analysis-summary .stat-box .num {
+            font-size: 19px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.4px;
+        }
+        .analysis-summary .stat-box .lbl {
+            font-size: 9.5px; color: var(--muted); text-transform: uppercase;
+            font-weight: 700; letter-spacing: 0.6px; margin-top: 3px;
+        }
+
+        .chart-container {
+            margin-top: 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--r-md);
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        .chart-container h4 {
+            font-size: 13px; font-weight: 700; margin-bottom: 14px;
+            color: var(--text); letter-spacing: -0.1px;
+        }
+        .chart-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 9px; }
+        .chart-bar-label {
+            width: 96px; font-size: 12px; font-weight: 600;
+            color: var(--muted); flex-shrink: 0; text-align: right;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .chart-bar-track {
+            flex: 1; height: 26px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden; display: flex; position: relative;
+        }
+        .chart-bar-segment {
+            height: 100%;
+            transition: width 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 700; color: #0F0F0F;
+            white-space: nowrap; padding: 0 4px; min-width: 18px;
+        }
+        .chart-bar-total {
+            font-size: 12px; font-weight: 700; color: var(--text);
+            width: 76px; text-align: left; flex-shrink: 0;
+        }
+        .chart-legend {
+            display: flex; flex-wrap: wrap; gap: 14px;
+            margin-top: 14px; padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .chart-legend-item {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 11.5px; color: var(--muted); font-weight: 600;
+        }
+        .chart-legend-item .color-box { width: 14px; height: 14px; border-radius: 5px; }
+
+        @media (max-width: 640px) {
+            .chart-bar-label { width: 68px; font-size: 11px; }
+            .chart-bar-total { width: 58px; font-size: 11px; }
+            .chart-bar-track { height: 22px; }
+            .chart-bar-segment { font-size: 8px; min-width: 14px; }
+            .analysis-summary { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ─── PLATFORM STAT TILES ─── */
+        .platform-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .platform-stat {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
+            padding: 16px 12px;
+            text-align: center;
+        }
+        .platform-stat .ps-label {
+            font-size: 10px; color: var(--muted); font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.6px;
+        }
+        .platform-stat .ps-value {
+            font-size: 21px; font-weight: 700; color: var(--text);
+            margin-top: 5px; letter-spacing: -0.5px;
+        }
+        .platform-stat .ps-value.green { color: var(--green); }
+        .platform-stat .ps-value.orange { color: var(--accent); }
+        .platform-stat .ps-value.amber { color: var(--amber); }
+        .platform-stat .ps-value.blue { color: #818CF8; }
+        .platform-stat .ps-value.red { color: var(--red); }
+
+        /* ─── DELETE CONFIRM ─── */
+        .delete-confirm-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 4000; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .delete-confirm-overlay.active { display: flex; }
+        .delete-confirm-box {
+            background: var(--card);
+            border: 1px solid var(--border-strong);
+            border-radius: 22px;
+            padding: 30px 24px;
+            max-width: 420px; width: 100%;
+            text-align: center;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+            animation: modalIn 0.18s ease;
+        }
+        .delete-confirm-box .icon {
+            width: 66px; height: 66px; margin: 0 auto 14px;
+            border-radius: 22px;
+            background: var(--red-soft);
+            color: var(--red);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+        }
+        .delete-confirm-box h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+        .delete-confirm-box p { color: var(--muted); font-size: 13.5px; margin-bottom: 22px; line-height: 1.55; }
+        .delete-confirm-box .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .delete-confirm-box .btn-group .btn { min-width: 110px; }
+
+        /* ─── TRANSFER ─── */
+        .transfer-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 4001; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .transfer-overlay.active { display: flex; }
+        .transfer-box {
+            background: var(--card);
+            border: 1px solid var(--border-strong);
+            border-radius: 22px;
+            padding: 26px 22px;
+            max-width: 460px; width: 100%;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+            animation: modalIn 0.18s ease;
+        }
+        .transfer-box h3 { font-size: 18px; color: var(--text); margin-bottom: 6px; letter-spacing: -0.3px; }
+        .transfer-box p { color: var(--muted); font-size: 13.5px; margin-bottom: 18px; line-height: 1.5; }
+        .transfer-box label {
+            display: block; font-size: 11px; font-weight: 700; color: var(--muted);
+            margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.6px;
+        }
+        .transfer-box select { margin-bottom: 20px; }
+        .transfer-box .btn-group { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+        .transfer-box .btn-group .btn { min-width: 90px; }
+
+        /* ─── RESPONSIVE TWEAKS ─── */
+        @media (max-width: 640px) {
+            body { font-size: 14.5px; }
+            .container { padding: 12px 12px 20px; }
+            .filter-bar .row { flex-direction: column; align-items: stretch; }
+            .filter-bar .filter-group { flex: 1 1 auto; min-width: unset; }
+            .filter-bar .btn-group .btn { flex: 1 1 auto; }
+            .tab-btn { font-size: 13px; padding: 9px 13px; min-height: 40px; }
+            .tab-content { padding: 13px; border-radius: 18px; }
+            table { font-size: 12.5px; min-width: 460px; }
+            table th, table td { padding: 10px 9px; }
+            .search-bar .btn { flex: 1 1 auto; }
+            .btn { padding: 11px 16px; font-size: 13.5px; }
+        }
+
         @media (min-width: 768px) {
-            .stats-row { grid-template-columns: repeat(3, 1fr); }
-            .admin-stats { grid-template-columns: repeat(3, 1fr); }
+            .filter-bar { flex-direction: row; align-items: center; flex-wrap: wrap; }
+            .filter-bar .row { flex: 1; }
+            .container { padding: 20px 20px 32px; }
         }
     </style>
 </head>
 <body>
-    <!-- HEADER -->
-    <div class="header">
+
+    <!-- ─── HEADER ─── -->
+    <header class="header">
         <div class="header-content">
             <div class="header-left">
-                <button class="menu-btn"><i class="fas fa-bars"></i></button>
-                <h1 id="pageTitle">Overview</h1>
+                <button class="icon-btn" onclick="toggleFilters()" aria-label="Toggle filters">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="header-title">
+                    <h1>Super Admin</h1>
+                    <div class="subtitle">Platform oversight &amp; admin management</div>
+                </div>
             </div>
             <div class="header-right">
-                <button class="notif-btn"><i class="fas fa-bell"></i></button>
-                <button class="refresh-btn-header" onclick="refreshAll()">
+                <button class="icon-btn" onclick="switchTab('withdrawals')" aria-label="Pending withdrawals">
+                    <i class="fas fa-bell"></i>
+                    <span class="dot" id="bellDot" hidden></span>
+                </button>
+                <button class="icon-btn" onclick="refreshAll()" aria-label="Refresh">
                     <i class="fas fa-sync-alt"></i>
-                    <span class="label">Refresh</span>
                 </button>
             </div>
         </div>
-    </div>
+    </header>
 
     <div class="container">
-        <!-- FILTER BAR -->
-        <div class="filter-bar">
+
+        <!-- ─── FILTER BAR ─── -->
+        <div class="filter-bar" id="filterBar">
             <div class="row">
                 <div class="filter-group">
                     <label>From</label>
-                    <input type="date" id="filterFrom">
+                    <input type="date" id="filterFrom" />
                 </div>
                 <div class="filter-group">
                     <label>To</label>
-                    <input type="date" id="filterTo">
+                    <input type="date" id="filterTo" />
                 </div>
                 <div class="filter-group">
                     <label>Admin</label>
-                    <select id="filterAdmin">
-                        <option value="all">All admins</option>
-                    </select>
+                    <select id="filterAdmin"><option value="all">All Admins</option></select>
                 </div>
-                <div class="btn-group" style="display:flex;gap:8px;">
-                    <button class="btn btn-primary btn-sm" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply</button>
-                    <button class="btn btn-outline btn-sm" onclick="resetFilters()">Reset</button>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply</button>
+                    <button class="btn btn-outline" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
                 </div>
             </div>
         </div>
 
-        <!-- TABS -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">
-                <i class="fas fa-chart-pie"></i> Overview
-            </button>
-            <button class="tab-btn" data-tab="admins" onclick="switchTab('admins')">
-                <i class="fas fa-user-shield"></i> Admins
+        <!-- ─── STATS ─── -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+                <div class="stat-info"><div class="label">Users</div><div class="value" id="statUsers">-</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fas fa-user-shield"></i></div>
+                <div class="stat-info"><div class="label">Admins</div><div class="value" id="statAdmins">-</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fas fa-wallet"></i></div>
+                <div class="stat-info"><div class="label">Deposits</div><div class="value" id="statDeposits">-</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange"><i class="fas fa-hand-holding-usd"></i></div>
+                <div class="stat-info"><div class="label">Withdrawals</div><div class="value" id="statWithdrawals">-</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple"><i class="fas fa-chart-pie"></i></div>
+                <div class="stat-info"><div class="label">House Profit</div><div class="value" id="statHouseProfit">-</div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon red"><i class="fas fa-hourglass-half"></i></div>
+                <div class="stat-info"><div class="label">Pending Admin With.</div><div class="value" id="statPendingWithdrawals">-</div></div>
+            </div>
+        </div>
+
+        <!-- ─── ALERT BANNER ─── -->
+        <div class="alert-banner" id="pendingBanner" style="display:none;" onclick="switchTab('withdrawals')">
+            <div class="alert-icon"><i class="fas fa-clock"></i></div>
+            <div class="alert-text"><strong id="pendingBannerCount">0</strong> withdrawal requests awaiting decision</div>
+            <div class="alert-cta">Review <i class="fas fa-arrow-right"></i></div>
+        </div>
+
+        <!-- ─── TABS ─── -->
+        <div class="tabs" id="tabContainer">
+            <button class="tab-btn active" data-tab="admins" onclick="switchTab('admins')">
+                <i class="fas fa-users-cog"></i> Admins <span class="badge" id="adminBadge">0</span>
             </button>
             <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">
-                <i class="fas fa-money-bill-wave"></i> Withdrawals
-                <span class="badge" id="pendingBadge">0</span>
-            </button>
-            <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
-                <i class="fas fa-users"></i> Players
-                <span class="badge" id="globalPlayersBadge">0</span>
+                <i class="fas fa-money-bill-wave"></i> Withdrawals <span class="badge" id="withdrawalBadge">0</span>
             </button>
             <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
-                <i class="fas fa-chart-bar"></i> Analysis
+                <i class="fas fa-chart-line"></i> Platform
+            </button>
+            <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
+                <i class="fas fa-user-friends"></i> Players <span class="badge" id="globalPlayersBadge">0</span>
             </button>
         </div>
 
-        <!-- TAB CONTENT -->
+        <!-- ─── TAB CONTENT ─── -->
         <div class="tab-content">
-            <!-- OVERVIEW -->
-            <div class="tab-pane active" id="tab-overview">
-                <div class="overview-header">
-                    <div class="date-row">
-                        <div class="date-chip"><i class="fas fa-calendar"></i> <span id="dateRangeLabel">Oct 1–11</span></div>
-                        <div class="date-chip"><i class="fas fa-users"></i> All admins</div>
-                    </div>
-
-                    <div class="house-profit">
-                        <div class="label">HOUSE PROFIT</div>
-                        <div class="value" id="houseProfitValue">0<span class="currency">ETB</span></div>
-                        <div class="change up" id="houseProfitChange"><i class="fas fa-arrow-up"></i> 0%</div>
-                    </div>
-
-                    <div class="dep-with-row">
-                        <div class="dep-with-item">
-                            <div class="label"><span class="dot white"></span> Deposits</div>
-                            <div class="value" id="totalDeposits">0</div>
-                        </div>
-                        <div class="dep-with-item">
-                            <div class="label"><span class="dot orange"></span> Withdrawals</div>
-                            <div class="value" id="totalWithdrawals">0</div>
-                        </div>
-                    </div>
-
-                    <!-- Simple visual bars (static demo – replace with real data) -->
-                    <div class="chart-bars" id="overviewChart">
-                        <!-- bars will be generated by JS -->
-                    </div>
-
-                    <div class="stats-row">
-                        <div class="stat-box">
-                            <div class="num" id="statUsers">0</div>
-                            <div class="lbl">Users</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="num" id="statAdmins">0</div>
-                            <div class="lbl">Admins</div>
-                        </div>
-                        <div class="stat-box pending">
-                            <div class="num" id="statPending">0</div>
-                            <div class="lbl">Pending</div>
-                        </div>
-                    </div>
-
-                    <div class="alert-banner" onclick="switchTab('withdrawals')">
-                        <span><i class="fas fa-exclamation-circle"></i> <span id="pendingAlertText">0 withdrawals awaiting decision</span></span>
-                        <span>Review →</span>
-                    </div>
-
-                    <div class="section-title">Recent Activity</div>
-                    <div id="recentActivity">
-                        <div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>
-                    </div>
-                </div>
-            </div>
 
             <!-- ADMINS -->
-            <div class="tab-pane" id="tab-admins">
-                <div style="margin-bottom:14px;">
-                    <input type="text" id="adminSearch" placeholder="Search admins..." 
-                           style="width:100%;padding:12px 16px;border:1px solid #333;border-radius:12px;background:#1C1C1E;color:#fff;font-size:14px;outline:none;"
-                           oninput="filterAdmins()">
-                </div>
-                <div id="adminsList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div>
-                </div>
+            <div class="tab-pane active" id="tab-admins">
+                <h2><i class="fas fa-users-cog"></i> All Admins <span class="sub">— manage and monitor</span></h2>
+                <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
             </div>
 
             <!-- WITHDRAWALS -->
             <div class="tab-pane" id="tab-withdrawals">
-                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="withdrawalFilters">
-                    <button class="btn btn-sm btn-primary" data-filter="pending" onclick="setWithdrawFilter('pending')">Pending</button>
-                    <button class="btn btn-sm btn-outline" data-filter="approved" onclick="setWithdrawFilter('approved')">Approved</button>
-                    <button class="btn btn-sm btn-outline" data-filter="rejected" onclick="setWithdrawFilter('rejected')">Rejected</button>
-                    <button class="btn btn-sm btn-outline" data-filter="all" onclick="setWithdrawFilter('all')">All</button>
+                <h2><i class="fas fa-money-bill-wave"></i> Admin Withdrawals <span class="sub">— requests from admins</span></h2>
+                <div class="withdrawal-filter-group" id="withdrawalFilterGroup" style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" data-status="pending" onclick="setWithdrawalFilter('pending')">Pending</button>
+                    <button class="btn btn-outline btn-sm" data-status="approved" onclick="setWithdrawalFilter('approved')">Approved</button>
+                    <button class="btn btn-outline btn-sm" data-status="rejected" onclick="setWithdrawalFilter('rejected')">Rejected</button>
+                    <button class="btn btn-outline btn-sm" data-status="all" onclick="setWithdrawalFilter('all')">All</button>
                 </div>
-                <div id="withdrawalsList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>
+                <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
+            </div>
+
+            <!-- PLATFORM -->
+            <div class="tab-pane" id="tab-platform">
+                <h2><i class="fas fa-chart-line"></i> Platform <span class="sub">— overview &amp; analysis</span></h2>
+
+                <div class="analysis-toggle">
+                    <button class="btn btn-primary btn-sm" id="platformOverviewBtn" onclick="showPlatformView('overview')">Overview</button>
+                    <button class="btn btn-outline btn-sm" id="platformAnalysisBtn" onclick="showPlatformView('analysis')">Analysis</button>
+                </div>
+
+                <div id="platformOverview">
+                    <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+                </div>
+
+                <div id="platformAnalysis" style="display:none;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+                        <button class="btn btn-primary" onclick="fetchAnalysis()"><i class="fas fa-chart-bar"></i> Load Analysis</button>
+                        <span style="font-size:12.5px; color:var(--muted);">Uses the date and admin filters above.</span>
+                    </div>
+                    <div id="analysisResults">
+                        <div class="loading-state"><div class="spinner"></div><span>Load analysis data by clicking the button above.</span></div>
+                    </div>
                 </div>
             </div>
 
             <!-- PLAYERS -->
             <div class="tab-pane" id="tab-players">
-                <div class="players-toolbar">
-                    <input type="text" id="globalPlayerSearch" placeholder="Username, handle or ID" oninput="filterGlobalPlayers()">
-                    <select id="playerAdminFilter" onchange="filterGlobalPlayers()">
-                        <option value="all">All admins</option>
+                <h2><i class="fas fa-user-friends"></i> All Players <span class="sub">— all registered users</span></h2>
+                <div class="search-bar">
+                    <input type="text" id="globalPlayerSearch" placeholder="Search by username, handle, or ID..." />
+                    <select id="playerAdminFilter">
+                        <option value="all">All Admins</option>
                     </select>
+                    <button class="btn btn-primary" onclick="filterGlobalPlayers()"><i class="fas fa-search"></i> Search</button>
+                    <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()"><i class="fas fa-times"></i> Reset</button>
+                    <button class="btn btn-success" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                    <button class="btn btn-teal" onclick="transferSelectedPlayers('global')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
                 </div>
-                <div class="selection-bar" id="selectionBar">
-                    <span id="selectedCount">0 selected</span>
-                    <div class="actions">
-                        <button class="btn btn-sm" style="background:#fff;color:#FF6B00;" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Message</button>
-                        <button class="btn btn-sm" style="background:#fff;color:#FF6B00;" onclick="showBulkTransfer()"><i class="fas fa-exchange-alt"></i> Transfer</button>
-                    </div>
-                </div>
-                <div id="globalPlayersList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading players…</span></div>
-                </div>
+                <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
 
-            <!-- PLATFORM / ANALYSIS -->
-            <div class="tab-pane" id="tab-platform">
-                <div id="analysisResults">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading analysis…</span></div>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- MODAL -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Admin Detail</h2>
-                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
-            </div>
-            <div id="modalBody">
-                <!-- filled by JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- TOAST -->
+    <!-- ─── TOAST ─── -->
     <div class="toast" id="toast"></div>
 
-    <!-- BOTTOM NAV (visual only – optional) -->
-    <div class="bottom-nav">
-        <button class="nav-item active" onclick="switchTab('overview')">
-            <i class="fas fa-chart-pie"></i>
-            <span>Overview</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('admins')">
-            <i class="fas fa-user-shield"></i>
-            <span>Admins</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('withdrawals')">
-            <i class="fas fa-money-bill-wave"></i>
-            <span>Withdraw</span>
-        </button>
-        <button class="nav-item" onclick="switchTab('players')">
-            <i class="fas fa-users"></i>
-            <span>Players</span>
-        </button>
+    <!-- ─── MODAL ─── -->
+    <div class="admin-detail-modal" id="adminDetailModal">
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Admin Details</h2>
+                    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="modalBody"><div class="loading-state"><div class="spinner"></div><span>Loading…</span></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── DELETE CONFIRM OVERLAY ─── -->
+    <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
+        <div class="delete-confirm-box">
+            <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3>Delete Player</h3>
+            <p id="deleteConfirmMessage">Are you sure you want to delete this player?</p>
+            <div class="btn-group">
+                <button class="btn btn-outline" onclick="cancelDelete()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()"><i class="fas fa-trash-alt"></i> Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TRANSFER OVERLAY ─── -->
+    <div class="transfer-overlay" id="transferOverlay">
+        <div class="transfer-box">
+            <h3 id="transferTitle">Transfer Player</h3>
+            <p id="transferMessage">Select a new admin for this player.</p>
+            <label for="transferAdminSelect">Target Admin</label>
+            <select id="transferAdminSelect"></select>
+            <div class="btn-group">
+                <button class="btn btn-outline" onclick="cancelTransfer()">Cancel</button>
+                <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()"><i class="fas fa-exchange-alt"></i> Transfer</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // ─── CONFIG ───
-        const SECRET = 'your-secret-here'; // keep your original secret
-        const API_BASE = ''; // your API base if needed
+        // ============================================================
+        //  SUPER ADMIN – Full functionality + DELETE + TRANSFER
+        //  (Dark / Orange UI — logic unchanged)
+        // ============================================================
 
-        let currentTab = 'overview';
-        let filterFrom = '';
-        let filterTo = '';
-        let filterAdmin = 'all';
-        let currentWithdrawFilter = 'pending';
-        let isRefreshing = false;
-        let refreshInterval = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const SECRET = urlParams.get('secret') || '';
+
+        if (!SECRET) {
+            document.body.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;background:#0F0F0F;font-family:system-ui;color:#fff;">
+                    <div style="font-size:64px;margin-bottom:16px;">🔑</div>
+                    <h1 style="font-size:24px;color:#fff;">Secret Required</h1>
+                    <p style="color:#8E8E93;max-width:380px;margin:8px auto;">Please add <code style="background:#202024;padding:2px 10px;border-radius:6px;color:#FF6B00;">?secret=YOUR_SECRET</code> to the URL.</p>
+                    <p style="font-size:13px;color:#636366;margin-top:4px;">Default secret is <code style="background:#202024;padding:2px 10px;border-radius:6px;color:#FF6B00;">01207</code>.</p>
+                </div>
+            `;
+            throw new Error('No secret provided');
+        }
 
         // ─── HELPERS ───
-        function apiUrl(path, params = {}) {
-            const url = new URL(path, window.location.origin);
-            Object.entries(params).forEach(([k, v]) => {
-                if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
-            });
-            return url.toString();
+        function apiUrl(path, extraParams = {}) {
+            const params = new URLSearchParams({ secret: SECRET, ...extraParams });
+            for (const [key, value] of Object.entries(params)) {
+                if (value === '' || value === 'all' || value === null || value === undefined) params.delete(key);
+            }
+            const query = params.toString();
+            return query ? `${path}?${query}` : path;
         }
 
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
-        function showToast(msg, type = 'info') {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast show ' + type;
-            setTimeout(() => t.classList.remove('show'), 2500);
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const d = new Date(dateString);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch { return dateString; }
         }
 
         function getInitials(name) {
             if (!name) return '?';
-            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        let currentTab = 'admins';
+        let currentWithdrawFilter = 'pending';
+        let refreshInterval = null;
+        let isRefreshing = false;
+        let filterFrom = '';
+        let filterTo = '';
+        let filterAdmin = 'all';
+        let allAdmins = [];
+
+        // ─── DELETE STATE ───
+        let deletePending = { telegramId: null, username: null, adminId: null, source: null };
+
+        // ─── TRANSFER STATE ───
+        let transferPending = { players: [], source: null, currentAdminId: null };
+
+        // ─── TOAST ───
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        // ─── FILTER BAR TOGGLE ───
+        function toggleFilters() {
+            const bar = document.getElementById('filterBar');
+            if (bar) bar.classList.toggle('hidden');
         }
 
         // ─── TAB SWITCH ───
         function switchTab(tab) {
             currentTab = tab;
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
-            document.querySelectorAll('.bottom-nav .nav-item').forEach((n, i) => {
-                const tabs = ['overview','admins','withdrawals','players'];
-                n.classList.toggle('active', tabs[i] === tab);
-            });
-
-            const titles = {
-                overview: 'Overview',
-                admins: 'Admins',
-                withdrawals: 'Withdrawals',
-                players: 'Players',
-                platform: 'Analysis'
-            };
-            document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
-
+            document.querySelectorAll('.tab-btn').forEach(btn =>
+                btn.classList.toggle('active', btn.dataset.tab === tab)
+            );
+            document.querySelectorAll('.tab-pane').forEach(pane =>
+                pane.classList.toggle('active', pane.id === `tab-${tab}`)
+            );
             if (tab === 'admins') loadAdmins();
-            else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
-            else if (tab === 'players') loadGlobalPlayers();
-            else if (tab === 'platform') fetchAnalysis();
-            else if (tab === 'overview') loadPlatformStats();
+            else if (tab === 'withdrawals') {
+                updateWithdrawalFilterButtons(currentWithdrawFilter);
+                loadAdminWithdrawals(currentWithdrawFilter);
+            } else if (tab === 'platform') {
+                showPlatformView('overview');
+                loadPlatformStats();
+            } else if (tab === 'players') loadGlobalPlayers();
+
+            const container = document.getElementById('tabContainer');
+            const activeBtn = container.querySelector('.tab-btn.active');
+            if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
+
+        // ─── PLATFORM VIEW TOGGLE ───
+        let currentPlatformView = 'overview';
+
+        function showPlatformView(view) {
+            currentPlatformView = view;
+            const overviewBtn = document.getElementById('platformOverviewBtn');
+            const analysisBtn = document.getElementById('platformAnalysisBtn');
+            const overviewDiv = document.getElementById('platformOverview');
+            const analysisDiv = document.getElementById('platformAnalysis');
+
+            if (view === 'overview') {
+                overviewBtn.className = 'btn btn-primary btn-sm';
+                analysisBtn.className = 'btn btn-outline btn-sm';
+                overviewDiv.style.display = 'block';
+                analysisDiv.style.display = 'none';
+                if (document.getElementById('platformContent').querySelector('.loading-state')) {
+                    loadPlatformStats();
+                }
+            } else {
+                overviewBtn.className = 'btn btn-outline btn-sm';
+                analysisBtn.className = 'btn btn-primary btn-sm';
+                overviewDiv.style.display = 'none';
+                analysisDiv.style.display = 'block';
+            }
+        }
+
+        // ─── WITHDRAWAL FILTER BUTTONS ───
+        function updateWithdrawalFilterButtons(activeStatus) {
+            const group = document.getElementById('withdrawalFilterGroup');
+            if (!group) return;
+            const buttons = group.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                const status = btn.dataset.status;
+                if (status === activeStatus) {
+                    btn.className = 'btn btn-primary btn-sm';
+                } else {
+                    btn.className = 'btn btn-outline btn-sm';
+                }
+            });
+        }
+
+        function setWithdrawalFilter(status) {
+            currentWithdrawFilter = status;
+            updateWithdrawalFilterButtons(status);
+            loadAdminWithdrawals(status);
+        }
+
+        // ─── PLATFORM STATS (Overview) ───
+        async function loadPlatformStats() {
+            const container = document.getElementById('platformContent');
+            try {
+                const params = {};
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/platform-stats', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load platform stats');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('statUsers').textContent = data.stats.totalUsers;
+                document.getElementById('statAdmins').textContent = data.stats.totalAdmins;
+                document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`;
+                document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
+                document.getElementById('statHouseProfit').textContent = `${data.stats.totalHouseProfit.toFixed(0)} ETB`;
+                document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
+
+                // ─── Pending banner + bell dot ───
+                const pendingCount = data.stats.pendingWithdrawals || 0;
+                const banner = document.getElementById('pendingBanner');
+                const bannerCount = document.getElementById('pendingBannerCount');
+                if (banner && bannerCount) {
+                    bannerCount.textContent = pendingCount;
+                    banner.style.display = pendingCount > 0 ? 'flex' : 'none';
+                }
+                const bellDot = document.getElementById('bellDot');
+                if (bellDot) bellDot.hidden = pendingCount <= 0;
+
+                container.innerHTML = `
+                    <div class="platform-stats-grid">
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Users</div>
+                            <div class="ps-value">${data.stats.totalUsers}</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Active Admins</div>
+                            <div class="ps-value">${data.stats.totalAdmins}</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Deposits</div>
+                            <div class="ps-value green">${data.stats.totalDeposits.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Withdrawals</div>
+                            <div class="ps-value orange">${data.stats.totalWithdrawals.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">House Profit</div>
+                            <div class="ps-value amber">${data.stats.totalHouseProfit.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Admin Earnings Paid</div>
+                            <div class="ps-value blue">${data.stats.totalAdminEarnings.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Pending Admin With.</div>
+                            <div class="ps-value red">${data.stats.pendingWithdrawals}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── REDUCE DEPOSIT BALANCE ───
+        async function reduceDepositBalance(adminId, currentBalance) {
+            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
+            if (amountStr === null) return;
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                showToast('Please enter a valid positive amount.', 'error');
+                return;
+            }
+            if (amount > currentBalance) {
+                showToast(`Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
+                return;
+            }
+            if (!confirm(`Deduct ${amount.toFixed(0)} ETB from admin ${adminId}?`)) return;
+            try {
+                const url = apiUrl('/super-admin/adjust-deposit-balance');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, amount: -amount, description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`, 'success');
+                    refreshAll();
+                } else {
+                    throw new Error(data.error || 'Failed');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── LOAD ADMINS ───
+        async function loadAdmins() {
+            const container = document.getElementById('adminsList');
+            try {
+                const url = apiUrl('/super-admin/admins');
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admins');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                allAdmins = data.admins;
+                document.getElementById('adminBadge').textContent = allAdmins.length;
+                populateAdminDropdown(allAdmins);
+
+                if (allAdmins.length === 0) {
+                    container.innerHTML =
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>No admins found</p></div>`;
+                    return;
+                }
+
+                container.innerHTML = allAdmins.map(admin => {
+                    const rawDeposits = admin.stats.totalDeposits || 0;
+                    const balance = admin.stats.holdingBalance || 0;
+                    const initials = getInitials(admin.name);
+                    const pct = rawDeposits > 0 ? Math.max(2, Math.min(100, Math.round((balance / rawDeposits) * 100))) : 0;
+
+                    return `
+                    <div class="admin-card">
+                        <div class="admin-header">
+                            <div class="admin-name-wrap">
+                                <span class="avatar">${initials}</span>
+                                <div class="admin-id">
+                                    <div class="admin-name">
+                                        ${escapeHtml(admin.name)}
+                                        ${admin.is_super_admin ? '<span class="super-tag">SUPER</span>' : ''}
+                                    </div>
+                                    <div class="admin-phone">${escapeHtml(admin.phone)}</div>
+                                </div>
+                            </div>
+                            <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
+                        </div>
+
+                        <div class="admin-meta">
+                            <span>Code: ${admin.invite_code || 'N/A'}</span>
+                            <span>${(admin.commission_rate * 100).toFixed(0)}% commission</span>
+                            <span><i class="fas fa-users"></i> ${admin.stats.playerCount || 0} players</span>
+                        </div>
+
+                        <div class="admin-progress"><span style="width:${pct}%"></span></div>
+
+                        <div class="admin-stats">
+                            <div class="stat-item"><strong>${admin.stats.playerCount || 0}</strong><span class="slabel">Players</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalEarned.toFixed(0)}</strong><span class="slabel">Earned</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalPendingEarnings.toFixed(0)}</strong><span class="slabel">Pending</span></div>
+                            <div class="stat-item"><strong>${balance.toFixed(0)}</strong><span class="slabel">Balance</span></div>
+                            <div class="stat-item"><strong>${rawDeposits.toFixed(0)}</strong><span class="slabel">Deposits</span></div>
+                        </div>
+
+                        <div class="admin-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})"><i class="fas fa-eye"></i> View</button>
+                            <button class="btn btn-outline btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})"><i class="fas fa-percent"></i> Rate</button>
+                            <button class="btn btn-outline btn-sm" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')"><i class="fas fa-users"></i> Players</button>
+                            <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})"><i class="fas fa-minus-circle"></i> Reduce</button>
+                            <button class="btn ${admin.is_active ? 'btn-outline-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
+                                <i class="fas ${admin.is_active ? 'fa-user-slash' : 'fa-user-check'}"></i> ${admin.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                        </div>
+                    </div>
+                `}).join('');
+
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        function populateAdminDropdown(admins) {
+            const select = document.getElementById('filterAdmin');
+            if (select.options.length > 1) return;
+            select.innerHTML = '<option value="all">All Admins</option>';
+            admins.forEach(admin => {
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name;
+                select.appendChild(opt);
+            });
+            const playerAdminFilter = document.getElementById('playerAdminFilter');
+            if (playerAdminFilter) {
+                playerAdminFilter.innerHTML = '<option value="all">All Admins</option>';
+                admins.forEach(admin => {
+                    const opt = document.createElement('option');
+                    opt.value = admin.id;
+                    opt.textContent = admin.name;
+                    playerAdminFilter.appendChild(opt);
+                });
+            }
+            populateTransferDropdown(admins);
+        }
+
+        function populateTransferDropdown(admins) {
+            const select = document.getElementById('transferAdminSelect');
+            select.innerHTML = '';
+            admins.forEach(admin => {
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name + (admin.is_super_admin ? ' (Super)' : '');
+                select.appendChild(opt);
+            });
+        }
+
+        // ─── DELETE PLAYER ───
+        function showDeleteConfirm(telegramId, username, adminId, source) {
+            deletePending.telegramId = telegramId;
+            deletePending.username = username;
+            deletePending.adminId = adminId;
+            deletePending.source = source;
+
+            document.getElementById('deleteConfirmMessage').textContent =
+                `Are you sure you want to delete player "${username}" (ID: ${telegramId})? This action cannot be undone.`;
+            document.getElementById('deleteConfirmOverlay').classList.add('active');
+        }
+
+        function cancelDelete() {
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+            deletePending = { telegramId: null, username: null, adminId: null, source: null };
+        }
+
+        async function confirmDelete() {
+            const { telegramId, username, adminId, source } = deletePending;
+            if (!telegramId) return;
+
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+
+            try {
+                const url = apiUrl('/super-admin/delete-player');
+                const res = await fetch(url, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Player "${username}" deleted successfully!`, 'success');
+                    if (source === 'modal' && adminId) {
+                        loadAdminPlayers(adminId, currentPlayersPage || 1);
+                    } else if (source === 'global') {
+                        loadGlobalPlayers();
+                    } else {
+                        refreshAll();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to delete player');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                deletePending = { telegramId: null, username: null, adminId: null, source: null };
+            }
+        }
+
+        // ─── TRANSFER PLAYER (single and bulk) ───
+        function showTransferDialog(players, source, currentAdminId) {
+            if (!Array.isArray(players)) {
+                players = [players];
+            }
+            if (players.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            transferPending.players = players;
+            transferPending.source = source;
+            transferPending.currentAdminId = currentAdminId;
+
+            const count = players.length;
+            const names = players.map(p => p.name).join(', ');
+            document.getElementById('transferTitle').textContent = count === 1 ? 'Transfer Player' : `Transfer ${count} Players`;
+            document.getElementById('transferMessage').textContent =
+                count === 1
+                    ? `Transfer player "${players[0].name}" to which admin?`
+                    : `Transfer ${count} players (${names}) to which admin?`;
+
+            const select = document.getElementById('transferAdminSelect');
+            select.innerHTML = '';
+            allAdmins.forEach(admin => {
+                if (currentAdminId && admin.id == currentAdminId) return;
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name + (admin.is_super_admin ? ' (Super)' : '');
+                select.appendChild(opt);
+            });
+            if (select.options.length === 0) {
+                select.innerHTML = '<option value="">No other admins available</option>';
+            }
+            document.getElementById('transferOverlay').classList.add('active');
+        }
+
+        function cancelTransfer() {
+            document.getElementById('transferOverlay').classList.remove('active');
+            transferPending = { players: [], source: null, currentAdminId: null };
+        }
+
+        async function confirmTransfer() {
+            const select = document.getElementById('transferAdminSelect');
+            const targetAdminId = select.value;
+            if (!targetAdminId) {
+                showToast('Please select a target admin.', 'error');
+                return;
+            }
+            const { players, source, currentAdminId } = transferPending;
+            if (!players || players.length === 0) {
+                showToast('No players to transfer.', 'error');
+                return;
+            }
+
+            document.getElementById('transferOverlay').classList.remove('active');
+
+            try {
+                const telegramIds = players.map(p => p.id);
+                const url = apiUrl('/super-admin/transfer-players');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramIds, targetAdminId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    if (source === 'modal' && currentAdminId) {
+                        loadAdminPlayers(currentAdminId, currentPlayersPage || 1);
+                    } else if (source === 'global') {
+                        loadGlobalPlayers();
+                    } else {
+                        refreshAll();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to transfer players');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                transferPending = { players: [], source: null, currentAdminId: null };
+            }
+        }
+
+        // ─── TRANSFER SELECTED (bulk action) ───
+        function transferSelectedPlayers(source) {
+            let checkboxes;
+            if (source === 'global') {
+                checkboxes = document.querySelectorAll('#globalPlayersList .player-select:checked');
+            } else if (source === 'modal') {
+                checkboxes = document.querySelectorAll('#modalBody .player-select:checked');
+            } else {
+                showToast('Invalid source.', 'error');
+                return;
+            }
+
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let currentAdminId = null;
+            if (source === 'modal') {
+                currentAdminId = currentPlayersAdminId;
+            }
+
+            showTransferDialog(players, source, currentAdminId);
+        }
+
+        // ─── LOAD ADMIN PLAYERS (modal) ───
+        const ADMIN_PLAYERS_PER_PAGE = 20;
+        let currentPlayersAdminId = null;
+        let currentPlayersPage = 1;
+        let currentPlayersTotal = 0;
+        let currentPlayersTotalPages = 0;
+
+        async function loadAdminPlayers(adminId, page = 1) {
+            currentPlayersAdminId = adminId;
+            currentPlayersPage = page;
+            const container = document.getElementById('modalBody');
+
+            container.innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <span>Loading players…</span>
+                </div>
+            `;
+
+            try {
+                const params = {
+                    limit: ADMIN_PLAYERS_PER_PAGE,
+                    page: page,
+                    adminId: adminId
+                };
+                const url = apiUrl('/super-admin/players', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load players');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                currentPlayersTotal = data.total || 0;
+                currentPlayersTotalPages = data.totalPages || 1;
+
+                const adminName = document.getElementById('modalTitle').textContent.replace('Players of ', '');
+                document.getElementById('modalTitle').textContent = `Players of ${adminName} (${currentPlayersTotal})`;
+
+                if (currentPlayersTotal === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
+                            <p>No registered players found for this admin.</p>
+                            <div style="margin-top:12px;">
+                                <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const playersHtml = data.players.map(p => `
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" />
+                        </td>
+                        <td>
+                            <div class="cell-user">
+                                <span class="avatar avatar-sm">${getInitials(p.username || 'U')}</span>
+                                <div>
+                                    <div class="cell-name">${escapeHtml(p.username || 'Unknown')}</div>
+                                    <div class="cell-sub">${escapeHtml(p.telegram_handle || 'N/A')}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(p.telegram_id || '')}</td>
+                        <td>${(p.balance || 0).toFixed(0)} ETB</td>
+                        <td>${escapeHtml(p.invite_code || 'N/A')}</td>
+                        <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'modal', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                let paginationHtml = '';
+                if (currentPlayersTotalPages > 1) {
+                    const pagesToShow = Math.min(currentPlayersTotalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(page - 2, currentPlayersTotalPages - pagesToShow + 1));
+                    const endPage = Math.min(currentPlayersTotalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === page ? 'active-page' : ''}" onclick="loadAdminPlayers(${adminId}, ${p})">${p}</button>`;
+                    }
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="loadAdminPlayers(${adminId}, ${page - 1})" ${page <= 1 ? 'disabled' : ''}>◀</button>
+                            ${pageButtons}
+                            <button onclick="loadAdminPlayers(${adminId}, ${page + 1})" ${page >= currentPlayersTotalPages ? 'disabled' : ''}>▶</button>
+                            <span>${page} / ${currentPlayersTotalPages}</span>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <div class="list-toolbar">
+                        <div>
+                            <div class="lt-count"><i class="fas fa-users"></i> ${currentPlayersTotal} players</div>
+                            <div class="lt-sub">Showing ${(page-1)*ADMIN_PLAYERS_PER_PAGE + 1}–${Math.min(page*ADMIN_PLAYERS_PER_PAGE, currentPlayersTotal)}</div>
+                        </div>
+                        <div class="lt-actions">
+                            <label class="check-label">
+                                <input type="checkbox" id="selectAllModalPlayers" onchange="toggleAllModalPlayers()" /> Select All
+                            </label>
+                            <button class="btn btn-success btn-sm" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                            <button class="btn btn-teal btn-sm" onclick="transferSelectedPlayers('modal')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back</button>
+                        </div>
+                    </div>
+                    <div class="section-card players">
+                        <div class="section-header">
+                            <h4>All Registered Players</h4>
+                            <span class="total">${currentPlayersTotal}</span>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;">Select</th>
+                                        <th>Player</th>
+                                        <th>Telegram ID</th>
+                                        <th>Balance</th>
+                                        <th>Invite Code</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${playersHtml}</tbody>
+                            </table>
+                        </div>
+                        ${paginationHtml}
+                    </div>
+                `;
+
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:#EF4444;font-weight:600;">${escapeHtml(err.message)}</p>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            <button class="btn btn-primary btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">Retry</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleAllModalPlayers() {
+            const checked = document.getElementById('selectAllModalPlayers').checked;
+            document.querySelectorAll('#modalBody .player-select').forEach(cb => cb.checked = checked);
+        }
+
+        function openModalPlayers(adminId, adminName) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('modalTitle').textContent = `Players of ${adminName}`;
+            loadAdminPlayers(adminId, 1);
+        }
+
+        // ─── LOAD ADMIN DETAIL (modal) ───
+        async function loadAdminDetail(adminId) {
+            const body = document.getElementById('modalBody');
+            try {
+                const url = apiUrl(`/super-admin/admin/${adminId}`);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admin details');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                const a = data.admin;
+                const stats = data.stats;
+                document.getElementById('modalTitle').textContent = `Admin: ${a.name}`;
+
+                const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric',
+                        year: 'numeric' }) : 'N/A';
+
+                const totalDeposits = stats.deposits ? stats.deposits.reduce((s, d) => s + Number(d.amount), 0) : 0;
+                const totalWithdrawals = stats.withdrawals ? stats.withdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
+                const totalAdminWithdrawals = stats.adminWithdrawals ? stats.adminWithdrawals.reduce((s, w) => s + Number(w
+                    .amount), 0) : 0;
+                const totalEarnings = stats.earnings ? stats.earnings.reduce((s, e) => s + Number(e.commission_amount), 0) :
+                    0;
+
+                const depositsHtml = stats.deposits && stats.deposits.length > 0 ?
+                    stats.deposits.slice(0, 10).map(d =>
+                        `<div class="row-item"><span class="left">${escapeHtml(d.username)}</span><span class="right"><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No deposits</div>';
+
+                const withdrawalsHtml = stats.withdrawals && stats.withdrawals.length > 0 ?
+                    stats.withdrawals.slice(0, 10).map(w =>
+                        `<div class="row-item"><span class="left">${escapeHtml(w.username)} → ${escapeHtml(w.phone_number)}</span><span class="right"><strong>${w.amount} ETB</strong> <span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No withdrawals</div>';
+
+                const adminWithdrawalsHtml = stats.adminWithdrawals && stats.adminWithdrawals.length > 0 ?
+                    stats.adminWithdrawals.map(w =>
+                        `<div class="row-item"><span class="left">${w.amount} ETB — ${w.withdrawal_type}</span><span class="right"><span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No pending withdrawals</div>';
+
+                const earningsHtml = stats.earnings && stats.earnings.length > 0 ?
+                    stats.earnings.slice(0, 10).map(e =>
+                        `<div class="row-item"><span class="left">${fmt(e.date)}</span><span class="right"><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No earnings</div>';
+
+                const adjustmentsHtml = stats.adjustments && stats.adjustments.length > 0 ?
+                    stats.adjustments.map(adj =>
+                        `<div class="row-item"><span class="left">${fmt(adj.created_at)} — ${escapeHtml(adj.description || 'N/A')}</span><span class="right"><strong style="color:${adj.amount > 0 ? '#22C55E' : '#EF4444'};">${adj.amount > 0 ? '+' : ''}${adj.amount.toFixed(0)} ETB</strong></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No adjustments</div>';
+
+                body.innerHTML = `
+                    <div class="admin-info-grid">
+                        <div class="item"><span class="label">Phone</span><span class="value">${a.phone}</span></div>
+                        <div class="item"><span class="label">Invite Code</span><span class="value">${a.invite_code || 'N/A'}</span></div>
+                        <div class="item"><span class="label">Status</span><span class="value"><span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></span></div>
+                        <div class="item"><span class="label">Commission</span><span class="value">${(a.commission_rate * 100)}%</span></div>
+                        <div class="item"><span class="label">Super Admin</span><span class="value">${a.is_super_admin ? 'Yes' : 'No'}</span></div>
+                        <div class="item"><span class="label">Players</span><span class="value">${stats.players}</span></div>
+                        <div class="item"><span class="label">Deposits (raw)</span><span class="value">${(stats.totalDeposits || 0).toFixed(0)} ETB</span></div>
+                        <div class="item"><span class="label">Balance (adjusted)</span><span class="value"><strong>${(stats.holdingBalance || 0).toFixed(0)} ETB</strong></span></div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <button class="btn btn-indigo btn-sm" onclick="loadAdminPlayers(${adminId}, 1)"><i class="fas fa-users"></i> View All Players (${stats.players})</button>
+                    </div>
+
+                    <div class="section-card deposits">
+                        <div class="section-header"><h4>Recent Deposits</h4><span class="total">Total: ${totalDeposits.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${depositsHtml}</div>
+                    </div>
+
+                    <div class="section-card withdrawals">
+                        <div class="section-header"><h4>Recent Withdrawals</h4><span class="total">Total: ${totalWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${withdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card admin-withdrawals">
+                        <div class="section-header"><h4>Admin Withdrawal Requests</h4><span class="total">Total: ${totalAdminWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${adminWithdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card earnings">
+                        <div class="section-header"><h4>Earnings History</h4><span class="total">Total: ${totalEarnings.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${earningsHtml}</div>
+                    </div>
+
+                    <div class="section-card adjustments">
+                        <div class="section-header"><h4>Adjustment History</h4><span class="total">${stats.adjustments ? stats.adjustments.reduce((s, a) => s + Number(a.amount), 0).toFixed(0) : '0'} ETB</span></div>
+                        <div class="section-body">${adjustmentsHtml}</div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)"><i class="fas fa-user-slash"></i> Deactivate</button>
+                        <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)"><i class="fas fa-user-check"></i> Activate</button>
+                        <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})"><i class="fas fa-percent"></i> Set Commission</button>
+                        <button class="btn btn-indigo" onclick="loadAdminPlayers(${a.id}, 1)"><i class="fas fa-users"></i> Players</button>
+                        <button class="btn btn-outline" onclick="closeModal()">Close</button>
+                    </div>
+                `;
+
+            } catch (err) {
+                body.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── LOAD ADMIN WITHDRAWALS ───
+        async function loadAdminWithdrawals(status = 'pending') {
+            currentWithdrawFilter = status;
+            updateWithdrawalFilterButtons(status);
+
+            const container = document.getElementById('withdrawalsList');
+            try {
+                const params = { status, limit: 100 };
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/admin-withdrawals', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load withdrawals');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('withdrawalBadge').textContent =
+                    status === 'pending' ? data.requests.filter(r => r.status === 'pending').length : 0;
+
+                if (data.requests.length === 0) {
+                    container.innerHTML =
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawal requests found</p></div>`;
+                    return;
+                }
+
+                const showActions = status === 'pending';
+
+                container.innerHTML = `
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Admin</th><th>Amount</th><th>Phone</th><th>Method</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead>
+                            <tbody>${data.requests.map(req => `
+                                <tr>
+                                    <td>
+                                        <div class="cell-user">
+                                            <span class="avatar avatar-sm">${getInitials(req.admins?.name || 'U')}</span>
+                                            <div>
+                                                <div class="cell-name">${escapeHtml(req.admins?.name || 'Unknown')}</div>
+                                                <div class="cell-sub">${req.admins?.phone || ''}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><strong style="color:#FF6B00;">${req.amount} ETB</strong></td>
+                                    <td>${req.phone}</td>
+                                    <td>${req.withdrawal_type}</td>
+                                    <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                                    <td>${formatDate(req.created_at)}</td>
+                                    ${showActions ? `
+                                        <td>
+                                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                                <button class="btn btn-success btn-xs" onclick="processAdminWithdrawal(${req.id},'approve')"><i class="fas fa-check"></i> Approve</button>
+                                                <button class="btn btn-rose btn-xs" onclick="processAdminWithdrawal(${req.id},'reject')"><i class="fas fa-times"></i> Reject</button>
+                                            </div>
+                                        </td>
+                                    ` : ''}
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── PROCESS ADMIN WITHDRAWAL ───
+        async function processAdminWithdrawal(requestId, action) {
+            if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
+            try {
+                const url = apiUrl('/super-admin/process-admin-withdrawal');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requestId, action })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Withdrawal ${action}ed!`, 'success');
+                    loadAdminWithdrawals(currentWithdrawFilter);
+                    loadPlatformStats();
+                } else {
+                    throw new Error(data.error || 'Failed to process');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── TOGGLE ADMIN ───
+        async function toggleAdmin(adminId, isActive) {
+            const action = isActive ? 'activate' : 'deactivate';
+            if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+            try {
+                const url = apiUrl('/super-admin/toggle-admin');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, isActive })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Admin ${action}d!`, 'success');
+                    loadAdmins();
+                    loadPlatformStats();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to toggle admin');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── EDIT COMMISSION ───
+        function editCommission(adminId, currentRate) {
+            const newRate = prompt(`Enter new commission rate (0.01 – 1.00):\nCurrent: ${(currentRate * 100)}%`, currentRate);
+            if (newRate === null) return;
+            const rate = parseFloat(newRate);
+            if (isNaN(rate) || rate < 0 || rate > 1) {
+                showToast('Invalid rate. Must be between 0 and 1', 'error');
+                return;
+            }
+            updateCommission(adminId, rate);
+        }
+
+        async function updateCommission(adminId, commissionRate) {
+            try {
+                const url = apiUrl('/super-admin/update-commission');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, commissionRate })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Commission updated to ${(commissionRate * 100)}%`, 'success');
+                    loadAdmins();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to update commission');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── MODAL ───
+        function openModal(adminId) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            loadAdminDetail(adminId);
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
 
         // ─── FILTERS ───
         function applyFilters() {
@@ -1137,283 +2288,21 @@
             filterAdmin = document.getElementById('filterAdmin').value;
             refreshAll();
         }
+
         function resetFilters() {
             document.getElementById('filterFrom').value = '';
             document.getElementById('filterTo').value = '';
             document.getElementById('filterAdmin').value = 'all';
-            filterFrom = filterTo = '';
+            filterFrom = '';
+            filterTo = '';
             filterAdmin = 'all';
             refreshAll();
         }
 
-        // ─── OVERVIEW / PLATFORM STATS ───
-        async function loadPlatformStats() {
-            try {
-                const params = {};
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
-
-                const res = await fetch(apiUrl('/super-admin/platform-stats', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Failed');
-
-                // Update big numbers
-                document.getElementById('houseProfitValue').innerHTML = 
-                    (data.houseProfit || 0).toLocaleString() + '<span class="currency">ETB</span>';
-                
-                const changeEl = document.getElementById('houseProfitChange');
-                const change = data.profitChange || 0;
-                changeEl.className = 'change ' + (change >= 0 ? 'up' : 'down');
-                changeEl.innerHTML = `<i class="fas fa-arrow-${change >= 0 ? 'up' : 'down'}"></i> ${Math.abs(change).toFixed(1)}%`;
-
-                document.getElementById('totalDeposits').textContent = (data.totalDeposits || 0).toLocaleString();
-                document.getElementById('totalWithdrawals').textContent = (data.totalWithdrawals || 0).toLocaleString();
-                document.getElementById('statUsers').textContent = (data.totalUsers || 0).toLocaleString();
-                document.getElementById('statAdmins').textContent = (data.totalAdmins || 0);
-                document.getElementById('statPending').textContent = (data.pendingWithdrawals || 0);
-                document.getElementById('pendingBadge').textContent = data.pendingWithdrawals || 0;
-                document.getElementById('pendingAlertText').textContent = 
-                    `${data.pendingWithdrawals || 0} withdrawals awaiting decision`;
-
-                // Simple chart
-                renderOverviewChart(data.daily || []);
-
-                // Recent activity
-                renderRecentActivity(data.recentActivity || []);
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        function renderOverviewChart(daily) {
-            const container = document.getElementById('overviewChart');
-            if (!daily.length) {
-                // demo bars
-                const days = ['1','2','3','4','5','6','7','8','9','10','11'];
-                container.innerHTML = days.map(d => `
-                    <div class="bar-group">
-                        <div class="bars">
-                            <div class="bar deposit" style="height:${30 + Math.random()*50}px"></div>
-                            <div class="bar withdraw" style="height:${20 + Math.random()*40}px"></div>
-                        </div>
-                        <div class="day">${d}</div>
-                    </div>
-                `).join('');
-                return;
-            }
-            // real data rendering can be added here
-        }
-
-        function renderRecentActivity(items) {
-            const container = document.getElementById('recentActivity');
-            if (!items.length) {
-                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-inbox"></i></div><p>No recent activity</p></div>`;
-                return;
-            }
-            container.innerHTML = items.map(item => `
-                <div class="activity-item">
-                    <div class="avatar">${getInitials(item.name)}</div>
-                    <div class="info">
-                        <div class="name">${escapeHtml(item.name)}</div>
-                        <div class="time">${escapeHtml(item.time || '')}</div>
-                    </div>
-                    <div class="right">
-                        <div class="amount">${(item.amount || 0).toLocaleString()} ETB</div>
-                        <span class="status-badge \( {item.status?.toLowerCase() || 'pending'}"> \){item.status || 'PENDING'}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // ─── ADMINS ───
-        async function loadAdmins() {
-            const container = document.getElementById('adminsList');
-            container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div>`;
-            try {
-                const params = {};
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                const res = await fetch(apiUrl('/super-admin/admins', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error);
-
-                // populate filter dropdown
-                const sel = document.getElementById('filterAdmin');
-                const playerSel = document.getElementById('playerAdminFilter');
-                const currentVal = sel.value;
-                sel.innerHTML = '<option value="all">All admins</option>';
-                playerSel.innerHTML = '<option value="all">All admins</option>';
-                (data.admins || []).forEach(a => {
-                    sel.innerHTML += `<option value="\( {a.id}"> \){escapeHtml(a.name)}</option>`;
-                    playerSel.innerHTML += `<option value="\( {a.id}"> \){escapeHtml(a.name)}</option>`;
-                });
-                sel.value = currentVal;
-
-                if (!data.admins?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>No admins found</p></div>`;
-                    return;
-                }
-
-                container.innerHTML = data.admins.map((a, idx) => {
-                    const earned = a.earned || 0;
-                    const pending = a.pending || 0;
-                    const balance = a.balance || 0;
-                    const total = earned + pending + balance || 1;
-                    const pctEarned = Math.round((earned / total) * 100);
-                    return `
-                    <div class="admin-card">
-                        <div class="admin-header">
-                            <div class="admin-left">
-                                <div class="rank">${String(idx + 1).padStart(2, '0')}</div>
-                                <div class="avatar">${getInitials(a.name)}</div>
-                                <div class="admin-info">
-                                    <div class="name">${escapeHtml(a.name)}</div>
-                                    <div class="phone">${escapeHtml(a.phone || '')}</div>
-                                </div>
-                            </div>
-                            <div class="admin-right">
-                                <span class="status-badge \( {a.is_active ? 'active' : 'inactive'}"> \){a.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
-                                <div class="pct">${a.commission_rate || 0}%</div>
-                            </div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="fill" style="width:${pctEarned}%"></div>
-                        </div>
-                        <div class="admin-stats">
-                            <div class="stat-item earned">
-                                <strong>${earned.toLocaleString()}</strong>
-                                <div class="slabel">Earned</div>
-                            </div>
-                            <div class="stat-item pending">
-                                <strong>${pending.toLocaleString()}</strong>
-                                <div class="slabel">Pending</div>
-                            </div>
-                            <div class="stat-item">
-                                <strong>${balance.toLocaleString()}</strong>
-                                <div class="slabel">Balance</div>
-                            </div>
-                        </div>
-                        <div class="admin-actions">
-                            <button class="btn btn-outline btn-sm" onclick="openAdminModal(${a.id})"><i class="fas fa-eye"></i> View</button>
-                            <button class="btn btn-outline btn-sm" onclick="rateAdmin(${a.id})"><i class="fas fa-percentage"></i> Rate</button>
-                            <button class="btn btn-outline btn-sm">${a.player_count || 0} Players</button>
-                            <button class="btn btn-ghost btn-sm" onclick="toggleAdminStatus(${a.id}, ${a.is_active})">
-                                ${a.is_active ? 'Deactivate' : 'Activate'}
-                            </button>
-                        </div>
-                    </div>`;
-                }).join('');
-            } catch (err) {
-                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadAdmins()">Retry</button></div>`;
-            }
-        }
-
-        function filterAdmins() {
-            const q = document.getElementById('adminSearch').value.toLowerCase();
-            document.querySelectorAll('.admin-card').forEach(card => {
-                const name = card.querySelector('.name')?.textContent.toLowerCase() || '';
-                const phone = card.querySelector('.phone')?.textContent.toLowerCase() || '';
-                card.style.display = (name.includes(q) || phone.includes(q)) ? '' : 'none';
-            });
-        }
-
-        // ─── WITHDRAWALS ───
-        function setWithdrawFilter(filter) {
-            currentWithdrawFilter = filter;
-            document.querySelectorAll('#withdrawalFilters .btn').forEach(b => {
-                b.classList.toggle('btn-primary', b.dataset.filter === filter);
-                b.classList.toggle('btn-outline', b.dataset.filter !== filter);
-            });
-            loadAdminWithdrawals(filter);
-        }
-
-        async function loadAdminWithdrawals(status = 'pending') {
-            const container = document.getElementById('withdrawalsList');
-            container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>`;
-            try {
-                const params = { status };
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
-
-                const res = await fetch(apiUrl('/super-admin/admin-withdrawals', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error);
-
-                if (!data.withdrawals?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-inbox"></i></div><p>No ${status} withdrawals</p></div>`;
-                    return;
-                }
-
-                container.innerHTML = data.withdrawals.map(w => `
-                    <div class="withdrawal-card">
-                        <div class="top">
-                            <div>
-                                <div class="amount">${(w.amount || 0).toLocaleString()} <span style="font-size:14px;color:#888">ETB</span></div>
-                                <div class="meta">#${w.id} · ${escapeHtml(w.created_at || '')}</div>
-                            </div>
-                            <span class="status-badge \( {w.status?.toLowerCase()}"> \){(w.status || 'PENDING').toUpperCase()}</span>
-                        </div>
-                        <div class="details">
-                            <div class="item"><div class="lbl">Admin</div><div>${escapeHtml(w.admin_name || '')}</div></div>
-                            <div class="item"><div class="lbl">Method</div><div>${escapeHtml(w.method || 'Telebirr')}</div></div>
-                            <div class="item"><div class="lbl">Payout</div><div>${escapeHtml(w.payout_account || '')}</div></div>
-                            <div class="item"><div class="lbl">Balance after</div><div>${(w.balance_after || 0).toLocaleString()} ETB</div></div>
-                        </div>
-                        ${w.status === 'pending' ? `
-                        <div class="actions">
-                            <button class="btn btn-primary" style="flex:1" onclick="approveWithdrawal(${w.id})">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                            <button class="btn btn-outline" style="flex:1;border-color:#EF4444;color:#EF4444" onclick="rejectWithdrawal(${w.id})">
-                                Reject
-                            </button>
-                        </div>` : ''}
-                    </div>
-                `).join('');
-            } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('${status}')">Retry</button></div>`;
-            }
-        }
-
-        async function approveWithdrawal(id) {
-            if (!confirm('Approve this withdrawal?')) return;
-            try {
-                const res = await fetch('/super-admin/approve-withdrawal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, secret: SECRET })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Withdrawal approved', 'success');
-                    loadAdminWithdrawals(currentWithdrawFilter);
-                    loadPlatformStats();
-                } else throw new Error(data.error);
-            } catch (e) { showToast(e.message, 'error'); }
-        }
-
-        async function rejectWithdrawal(id) {
-            if (!confirm('Reject this withdrawal?')) return;
-            try {
-                const res = await fetch('/super-admin/reject-withdrawal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, secret: SECRET })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Withdrawal rejected', 'success');
-                    loadAdminWithdrawals(currentWithdrawFilter);
-                } else throw new Error(data.error);
-            } catch (e) { showToast(e.message, 'error'); }
-        }
-
-        // ─── PLAYERS ───
+        // ─── GLOBAL PLAYERS ───
         let globalPlayersPage = 1;
+        let globalPlayersTotal = 0;
+        let globalPlayersTotalPages = 0;
         const GLOBAL_PLAYERS_PER_PAGE = 30;
 
         async function loadGlobalPlayers() {
@@ -1425,48 +2314,130 @@
                 const params = {
                     limit: GLOBAL_PLAYERS_PER_PAGE,
                     page: globalPlayersPage,
-                    adminId: adminFilter !== 'all' ? adminFilter : undefined,
+                    adminId: adminFilter,
                     search: search || undefined
                 };
-                const res = await fetch(apiUrl('/super-admin/players', params));
+                const url = apiUrl('/super-admin/players', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load players');
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                document.getElementById('globalPlayersBadge').textContent = data.total || 0;
+                globalPlayersTotal = data.total || 0;
+                globalPlayersTotalPages = data.totalPages || 1;
 
-                if (!data.players?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-users-slash"></i></div><p>No players found</p></div>`;
+                document.getElementById('globalPlayersBadge').textContent = globalPlayersTotal;
+
+                if (globalPlayersTotal === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
+                            <p>No players found.</p>
+                            <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
+                        </div>
+                    `;
                     return;
                 }
 
-                container.innerHTML = data.players.map(p => `
-                    <div class="player-item">
-                        <input type="checkbox" class="check player-select" data-id="\( {p.telegram_id}" data-name=" \){escapeHtml(p.username)}" onchange="updateSelectionBar()">
-                        <div class="avatar">${getInitials(p.username)}</div>
-                        <div class="info">
-                            <div class="name">${escapeHtml(p.username || 'Unknown')}</div>
-                            <div class="handle">@${escapeHtml(p.telegram_handle || 'N/A')}</div>
-                            <div class="admin-name">${escapeHtml(p.admin_name || 'No admin')}</div>
+                const playersHtml = data.players.map(p => {
+                    const adminId = p.admin_id || null;
+                    return `
+                    <tr>
+                        <td><input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" /></td>
+                        <td>
+                            <div class="cell-user">
+                                <span class="avatar avatar-sm">${getInitials(p.username || 'U')}</span>
+                                <div>
+                                    <div class="cell-name">${escapeHtml(p.username || 'Unknown')}</div>
+                                    <div class="cell-sub">${escapeHtml(p.telegram_handle || 'N/A')}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(p.telegram_id || '')}</td>
+                        <td><strong style="color:#FF6B00;">${p.balance.toFixed(0)} ETB</strong></td>
+                        <td>${p.invite_code || 'N/A'}</td>
+                        <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
+                        <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'global', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `}).join('');
+
+                let paginationHtml = '';
+                if (globalPlayersTotalPages > 1) {
+                    const pagesToShow = Math.min(globalPlayersTotalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(globalPlayersPage - 2, globalPlayersTotalPages - pagesToShow + 1));
+                    const endPage = Math.min(globalPlayersTotalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === globalPlayersPage ? 'active-page' : ''}" onclick="goToGlobalPage(${p})">${p}</button>`;
+                    }
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="goToGlobalPage(${globalPlayersPage - 1})" ${globalPlayersPage <= 1 ? 'disabled' : ''}>◀</button>
+                            ${pageButtons}
+                            <button onclick="goToGlobalPage(${globalPlayersPage + 1})" ${globalPlayersPage >= globalPlayersTotalPages ? 'disabled' : ''}>▶</button>
+                            <span>${globalPlayersPage} / ${globalPlayersTotalPages}</span>
                         </div>
-                        <div class="right">
-                            <div class="balance">${(p.balance || 0).toLocaleString()} ETB</div>
-                            <span class="status-badge ${p.is_active ? 'active' : (p.is_banned ? 'banned' : 'inactive')}">
-                                ${p.is_banned ? 'BANNED' : (p.is_active ? 'ACTIVE' : 'INACTIVE')}
-                            </span>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <div class="list-toolbar">
+                        <div>
+                            <div class="lt-count"><i class="fas fa-users"></i> ${globalPlayersTotal} players</div>
+                            <div class="lt-sub">Showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</div>
+                        </div>
+                        <div class="lt-actions">
+                            <label class="check-label">
+                                <input type="checkbox" id="selectAllGlobalPlayers" onchange="toggleAllGlobalPlayers()" /> Select All
+                            </label>
                         </div>
                     </div>
-                `).join('');
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;">Select</th>
+                                    <th>Player</th>
+                                    <th>Telegram ID</th>
+                                    <th>Balance</th>
+                                    <th>Invite Code</th>
+                                    <th>Admin</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${playersHtml}</tbody>
+                        </table>
+                    </div>
+                    ${paginationHtml}
+                `;
             } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button></div>`;
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:#EF4444;font-weight:600;">${escapeHtml(err.message)}</p>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
+                    </div>
+                `;
             }
         }
 
-        function updateSelectionBar() {
-            const checked = document.querySelectorAll('.player-select:checked');
-            const bar = document.getElementById('selectionBar');
-            document.getElementById('selectedCount').textContent = `${checked.length} selected`;
-            bar.classList.toggle('active', checked.length > 0);
+        function toggleAllGlobalPlayers() {
+            const checked = document.getElementById('selectAllGlobalPlayers').checked;
+            document.querySelectorAll('#globalPlayersList .player-select').forEach(cb => cb.checked = checked);
+        }
+
+        function goToGlobalPage(page) {
+            if (page < 1 || page > globalPlayersTotalPages) return;
+            globalPlayersPage = page;
+            loadGlobalPlayers();
         }
 
         function filterGlobalPlayers() {
@@ -1474,138 +2445,273 @@
             loadGlobalPlayers();
         }
 
-        // ─── MESSAGING ───
+        function resetGlobalPlayerSearch() {
+            document.getElementById('globalPlayerSearch').value = '';
+            document.getElementById('playerAdminFilter').value = 'all';
+            globalPlayersPage = 1;
+            loadGlobalPlayers();
+        }
+
+        // ─── TELEGRAM MESSAGING ───
         async function sendMessageToPlayer(userId, userName) {
-            const message = prompt(`Message to ${userName}:`);
-            if (!message?.trim()) return;
+            if (!userId) {
+                showToast('This player has no Telegram ID.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${userName} (Telegram ID: ${userId}):`);
+            if (message === null || message.trim() === '') return;
+
             try {
-                const res = await fetch('/super-admin/send-telegram-message', {
+                const url = '/super-admin/send-telegram-message';
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, message, secret: SECRET })
                 });
-                const data = await res.json();
-                if (data.success) showToast('Message sent!', 'success');
-                else throw new Error(data.error);
-            } catch (e) { showToast(e.message, 'error'); }
+
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`Message sent to ${userName}!`, 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to send');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
         }
 
         async function sendBulkMessage() {
-            const checks = document.querySelectorAll('.player-select:checked');
-            if (!checks.length) return showToast('No players selected', 'error');
-            const message = prompt(`Message to ${checks.length} players:`);
-            if (!message?.trim()) return;
-            let ok = 0;
-            for (const cb of checks) {
+            const checkboxes = document.querySelectorAll('.player-select:checked');
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${checkboxes.length} selected players:`);
+            if (message === null || message.trim() === '') return;
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let successCount = 0;
+            for (const p of players) {
                 try {
                     const res = await fetch('/super-admin/send-telegram-message', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: cb.dataset.id, message, secret: SECRET })
+                        body: JSON.stringify({ userId: p.id, message, secret: SECRET })
                     });
                     const data = await res.json();
-                    if (data.success) ok++;
-                } catch {}
+                    if (data.success) successCount++;
+                } catch (e) { /* ignore */ }
             }
-            showToast(`Sent to \( {ok}/ \){checks.length}`, 'info');
+
+            showToast(`Sent to ${successCount}/${players.length} players.`, 'info');
         }
 
-        // ─── ANALYSIS ───
+        // ─── ANALYSIS: FETCH AND RENDER ───
         async function fetchAnalysis() {
             const container = document.getElementById('analysisResults');
             container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading analysis…</span></div>`;
+
             try {
                 const params = {};
                 if (filterFrom) params.from = filterFrom;
                 if (filterTo) params.to = filterTo;
                 if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
 
-                const res = await fetch(apiUrl('/super-admin/analysis', params));
+                const url = apiUrl('/super-admin/analysis', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load analysis data');
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
                 const rows = data.data || [];
-                if (!rows.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-chart-bar"></i></div><p>No data</p></div>`;
+
+                if (rows.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-chart-bar"></i></div>
+                            <p>No data found for the selected filters.</p>
+                        </div>
+                    `;
                     return;
                 }
 
-                // simple table for now
-                container.innerHTML = `
-                    <div class="table-wrapper" style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                const totalPlayers = rows.reduce((sum, r) => sum + (r.player_count || 0), 0);
+                const totalCommission = rows.reduce((sum, r) => sum + (r.total_commission || 0), 0);
+                const totalAdminShare = rows.reduce((sum, r) => sum + (r.admin_share || 0), 0);
+                const uniqueGames = [...new Set(rows.map(r => r.game_name))].length;
+
+                let tableHtml = `
+                    <div class="analysis-summary">
+                        <div class="stat-box"><div class="num">${uniqueGames}</div><div class="lbl">Games</div></div>
+                        <div class="stat-box"><div class="num">${totalPlayers}</div><div class="lbl">Total Players</div></div>
+                        <div class="stat-box"><div class="num">${totalCommission.toFixed(0)} ETB</div><div class="lbl">Total Commission</div></div>
+                        <div class="stat-box"><div class="num" style="color:#FF6B00;">${totalAdminShare.toFixed(0)} ETB</div><div class="lbl">Admin Share</div></div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
                             <thead>
-                                <tr style="color:#888;text-align:left;">
-                                    <th style="padding:10px 8px;border-bottom:1px solid #2A2A2A;">Game</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #2A2A2A;">Admin</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #2A2A2A;">Players</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #2A2A2A;">Commission</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #2A2A2A;">Admin Share</th>
+                                <tr>
+                                    <th>Game</th>
+                                    <th>Admin</th>
+                                    <th>Players</th>
+                                    <th>Total Commission (ETB)</th>
+                                    <th>Admin Share (ETB)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${rows.map(r => `
                                     <tr>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1F1F1F;"><strong>${escapeHtml(r.game_name)}</strong></td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1F1F1F;">${escapeHtml(r.admin_name)}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1F1F1F;">${r.player_count || 0}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1F1F1F;">${(r.total_commission || 0).toLocaleString()}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1F1F1F;color:#FF6B00;">${(r.admin_share || 0).toLocaleString()}</td>
+                                        <td><strong style="color:#fff;">${escapeHtml(r.game_name)}</strong></td>
+                                        <td>${escapeHtml(r.admin_name)}</td>
+                                        <td>${r.player_count || 0}</td>
+                                        <td>${(r.total_commission || 0).toFixed(0)}</td>
+                                        <td style="color:#FF6B00;font-weight:600;">${(r.admin_share || 0).toFixed(0)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
-                    </div>`;
+                    </div>
+                `;
+
+                const gameMap = new Map();
+                rows.forEach(r => {
+                    const key = r.game_name;
+                    if (!gameMap.has(key)) {
+                        gameMap.set(key, { game: key, admins: [] });
+                    }
+                    gameMap.get(key).admins.push({
+                        admin: r.admin_name,
+                        share: r.admin_share || 0,
+                        commission: r.total_commission || 0,
+                        players: r.player_count || 0
+                    });
+                });
+
+                const allAdminNames = [...new Set(rows.map(r => r.admin_name))];
+                const colorPalette = [
+                    '#FF6B00', '#3B82F6', '#22C55E', '#F5B301', '#EF4444',
+                    '#14B8A6', '#F43F5E', '#818CF8', '#84CC16', '#06B6D4',
+                    '#FF9A3D', '#D946EF', '#0EA5E9', '#EAB308', '#F97316'
+                ];
+                const adminColorMap = {};
+                allAdminNames.forEach((name, idx) => {
+                    adminColorMap[name] = colorPalette[idx % colorPalette.length];
+                });
+
+                let chartHtml = `
+                    <div class="chart-container">
+                        <h4>Admin Share per Game (stacked bar)</h4>
+                        ${Array.from(gameMap.entries()).map(([gameName, gameData]) => {
+                            const total = gameData.admins.reduce((sum, a) => sum + a.share, 0);
+                            let segments = '';
+                            gameData.admins.forEach(a => {
+                                const share = a.share || 0;
+                                const segWidth = total > 0 ? (share / total) * 100 : 0;
+                                if (segWidth > 0) {
+                                    segments += `
+                                        <div class="chart-bar-segment" style="width:${segWidth}%;background:${adminColorMap[a.admin]};">
+                                            ${segWidth > 8 ? Math.round(share) : ''}
+                                        </div>
+                                    `;
+                                }
+                            });
+                            return `
+                                <div class="chart-bar-row">
+                                    <div class="chart-bar-label" title="${escapeHtml(gameName)}">${escapeHtml(gameName)}</div>
+                                    <div class="chart-bar-track">
+                                        ${segments}
+                                    </div>
+                                    <div class="chart-bar-total">${total.toFixed(0)} ETB</div>
+                                </div>
+                            `;
+                        }).join('')}
+                        <div class="chart-legend">
+                            ${allAdminNames.map(name => `
+                                <div class="chart-legend-item">
+                                    <span class="color-box" style="background:${adminColorMap[name]};"></span>
+                                    ${escapeHtml(name)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = tableHtml + chartHtml;
+
             } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="fetchAnalysis()">Retry</button></div>`;
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:#EF4444;">${escapeHtml(err.message)}</p>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="fetchAnalysis()"><i class="fas fa-sync-alt"></i> Retry</button>
+                    </div>
+                `;
             }
         }
-
-        // ─── MODAL ───
-        function openAdminModal(adminId) {
-            document.getElementById('modalOverlay').classList.add('active');
-            document.body.style.overflow = 'hidden';
-            // load detail here if needed
-            document.getElementById('modalBody').innerHTML = `<div class="loading-state"><div class="spinner"></div></div>`;
-        }
-        function closeModal() {
-            document.getElementById('modalOverlay').classList.remove('active');
-            document.body.style.overflow = '';
-        }
-        document.getElementById('modalOverlay').addEventListener('click', e => {
-            if (e.target === e.currentTarget) closeModal();
-        });
 
         // ─── REFRESH ───
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
             try {
-                if (currentTab === 'overview') await loadPlatformStats();
-                else if (currentTab === 'admins') await loadAdmins();
-                else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
-                else if (currentTab === 'players') await loadGlobalPlayers();
-                else if (currentTab === 'platform') await fetchAnalysis();
+                if (currentTab === 'admins') await loadAdmins();
+                else if (currentTab === 'withdrawals') {
+                    updateWithdrawalFilterButtons(currentWithdrawFilter);
+                    await loadAdminWithdrawals(currentWithdrawFilter);
+                } else if (currentTab === 'platform') {
+                    if (currentPlatformView === 'overview') {
+                        await loadPlatformStats();
+                    } else {
+                        await fetchAnalysis();
+                    }
+                } else if (currentTab === 'players') await loadGlobalPlayers();
                 showToast('Refreshed', 'info');
+            } catch (err) {
+                console.error('Refresh error:', err);
             } finally {
                 isRefreshing = false;
             }
         }
 
+        // ─── AUTO REFRESH ───
         function startAutoRefresh() {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
                 if (!document.hidden) refreshAll();
             }, 30000);
         }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (refreshInterval) { clearInterval(refreshInterval);
+                    refreshInterval = null; }
+            } else {
+                startAutoRefresh();
+                refreshAll();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault();
+                refreshAll(); }
+        });
 
         // ─── INIT ───
         async function init() {
-            await loadPlatformStats();
             await loadAdmins();
+            await loadPlatformStats();
+            updateWithdrawalFilterButtons('pending');
+            await loadAdminWithdrawals('pending');
+            await loadGlobalPlayers();
             startAutoRefresh();
         }
+
+        document.addEventListener('touchstart', function() {}, { passive: true });
         init();
     </script>
 </body>
