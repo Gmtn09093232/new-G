@@ -19,6 +19,7 @@
         :root {
             --bg-base: #0B1120;       
             --bg-card: #1E293B;       
+            --bg-card-hover: #26354A;
             --text-main: #F8FAFC;
             --text-muted: #94A3B8;
             --primary-blue: #3B82F6;
@@ -39,6 +40,17 @@
             line-height: 1.4;
         }
 
+        /* ---------- SVG ICON UTILITIES ---------- */
+        svg {
+            display: inline-block;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+        .icon-sm { width: 16px; height: 16px; }
+        .icon-md { width: 20px; height: 20px; }
+        .icon-lg { width: 24px; height: 24px; }
+        .icon-xl { width: 32px; height: 32px; }
+
         /* ---------- APP HEADER ---------- */
         .app-header {
             display: flex;
@@ -57,7 +69,6 @@
             gap: 16px;
         }
         .menu-icon {
-            font-size: 1.5rem;
             color: var(--primary-blue);
             cursor: pointer;
         }
@@ -66,7 +77,6 @@
             font-weight: 700;
         }
         .bell-icon {
-            font-size: 1.3rem;
             color: var(--text-main);
             position: relative;
             cursor: pointer;
@@ -189,7 +199,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
         }
         .stat-card.commission .stat-icon { background: rgba(59, 130, 246, 0.15); color: var(--primary-blue); }
         .stat-card.deposit .stat-icon { background: rgba(16, 185, 129, 0.15); color: var(--success-green); }
@@ -278,7 +287,6 @@
         .player-stats { display: flex; gap: 12px; margin-top: 4px; }
         .player-stat { font-size: 0.7rem; color: var(--text-muted); }
         .player-stat span { color: var(--text-main); font-weight: 600; }
-        .player-action { color: var(--text-muted); font-size: 1.2rem; }
 
         /* ---------- MORE MENU ---------- */
         .more-menu {
@@ -292,7 +300,7 @@
             padding: 16px;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             border: 1px solid var(--border-color);
             cursor: pointer;
             color: var(--text-main);
@@ -300,7 +308,7 @@
             font-size: 0.9rem;
             font-weight: 500;
         }
-        .more-item .icon { font-size: 1.2rem; width: 24px; text-align: center; }
+        .more-item svg { color: var(--text-muted); }
 
         /* ---------- BOTTOM NAVIGATION ---------- */
         .bottom-nav {
@@ -319,7 +327,7 @@
             flex: 1; cursor: pointer; transition: color 0.2s;
         }
         .nav-item.active { color: var(--primary-blue); }
-        .nav-icon { font-size: 1.2rem; margin-bottom: 2px; }
+        .nav-icon { margin-bottom: 2px; }
 
         /* ---------- MODALS / BOTTOM SHEETS ---------- */
         .modal-overlay {
@@ -344,7 +352,7 @@
         .modal-close {
             background: var(--bg-base); border: none; color: var(--text-muted);
             width: 32px; height: 32px; border-radius: 50%; display: flex;
-            align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer;
+            align-items: center; justify-content: center; cursor: pointer;
         }
         .user-summary { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
         .user-avatar {
@@ -369,9 +377,10 @@
         }
         .tx-icon {
             width: 36px; height: 36px; border-radius: 50%;
-            background: rgba(16, 185, 129, 0.15); color: var(--success-green);
-            display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
         }
+        .tx-icon.deposit { background: rgba(16, 185, 129, 0.15); color: var(--success-green); }
+        .tx-icon.withdrawal { background: rgba(239, 68, 68, 0.15); color: var(--danger-red); }
         .tx-details { flex: 1; }
         .tx-amount { font-size: 0.9rem; font-weight: 600; }
         .tx-date { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
@@ -400,10 +409,14 @@
     <!-- Header -->
     <header class="app-header">
         <div class="header-left">
-            <span class="menu-icon">☰</span>
+            <span class="menu-icon">
+                <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </span>
             <h1 id="pageTitle">Win Dashboard</h1>
         </div>
-        <span class="bell-icon">🔔</span>
+        <span class="bell-icon">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </span>
     </header>
 
     <!-- ================= VIEW: DASHBOARD ================= -->
@@ -423,7 +436,7 @@
         </div>
 
         <div id="errorContainer" class="error-msg"></div>
-        <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
+        <div id="loadingMessage" class="loading">Loading analytics data…</div>
 
         <!-- Stats Grid -->
         <div id="statsGrid" class="stats-grid"></div>
@@ -441,11 +454,17 @@
         </div>
         <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
             <div class="stat-card" style="padding: 12px;">
-                <h3 style="font-size:0.8rem; margin-bottom:10px; color:var(--accent-yellow);">🏆 by Payout</h3>
+                <h3 style="font-size:0.8rem; margin-bottom:10px; color:var(--accent-yellow); display:flex; align-items:center; gap:6px;">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+                    by Payout
+                </h3>
                 <ul class="list-container" id="payoutList" style="gap:8px;"></ul>
             </div>
             <div class="stat-card" style="padding: 12px;">
-                <h3 style="font-size:0.8rem; margin-bottom:10px; color:var(--primary-blue);">🏆 by Wins</h3>
+                <h3 style="font-size:0.8rem; margin-bottom:10px; color:var(--primary-blue); display:flex; align-items:center; gap:6px;">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+                    by Wins
+                </h3>
                 <ul class="list-container" id="winsList" style="gap:8px;"></ul>
             </div>
         </div>
@@ -474,16 +493,20 @@
         </div>
         <div class="more-menu">
             <a href="#" class="more-item">
-                <span class="icon">⚙️</span> Settings
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                Settings
             </a>
             <a href="#" class="more-item">
-                <span class="icon">❓</span> Help & Support
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                Help & Support
             </a>
             <a href="#" class="more-item">
-                <span class="icon">📢</span> Announcements
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14v-3z"></path><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path></svg>
+                Announcements
             </a>
             <a href="#" class="more-item">
-                <span class="icon">🚪</span> Log Out
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                Log Out
             </a>
         </div>
     </section>
@@ -491,19 +514,27 @@
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
         <a href="#" class="nav-item active" data-target="view-dashboard" data-title="Win Dashboard">
-            <span class="nav-icon">🏠</span>
+            <span class="nav-icon">
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </span>
             <span>Dashboard</span>
         </a>
         <a href="#" class="nav-item" data-target="view-rounds" data-title="Rounds History">
-            <span class="nav-icon">📅</span>
+            <span class="nav-icon">
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </span>
             <span>Rounds</span>
         </a>
         <a href="#" class="nav-item" data-target="view-players" data-title="Players">
-            <span class="nav-icon">👥</span>
+            <span class="nav-icon">
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </span>
             <span>Players</span>
         </a>
         <a href="#" class="nav-item" data-target="view-more" data-title="More">
-            <span class="nav-icon">⚙️</span>
+            <span class="nav-icon">
+                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+            </span>
             <span>More</span>
         </a>
     </nav>
@@ -513,13 +544,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>User Deposit Details</h2>
-                <button class="modal-close" id="depositModalCloseBtn">&times;</button>
+                <button class="modal-close" id="depositModalCloseBtn">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <div class="user-summary">
                 <div class="user-avatar" id="depositAvatar">AK</div>
                 <div class="user-details">
                     <h3 id="depositModalUserName">User</h3>
-                    <span class="verified-badge">✔ Verified</span>
+                    <span class="verified-badge">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Verified
+                    </span>
                 </div>
                 <div class="user-total">
                     <div class="label">Total Deposits</div>
@@ -536,13 +572,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>User Withdrawal Details</h2>
-                <button class="modal-close" id="withdrawalModalCloseBtn">&times;</button>
+                <button class="modal-close" id="withdrawalModalCloseBtn">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
             <div class="user-summary">
                 <div class="user-avatar" id="withdrawalAvatar">AK</div>
                 <div class="user-details">
                     <h3 id="withdrawalModalUserName">User</h3>
-                    <span class="verified-badge">✔ Verified</span>
+                    <span class="verified-badge">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Verified
+                    </span>
                 </div>
                 <div class="user-total">
                     <div class="label">Total Withdrawn</div>
@@ -599,7 +640,6 @@
 
         // ----- SPA Navigation Logic -----
         function switchTab(targetId) {
-            // Update bottom nav active state
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.classList.remove('active');
                 if (item.dataset.target === targetId) {
@@ -607,7 +647,6 @@
                     pageTitle.textContent = item.dataset.title;
                 }
             });
-            // Show target view, hide others
             document.querySelectorAll('.view-section').forEach(section => {
                 section.classList.remove('active');
             });
@@ -660,13 +699,15 @@
                 sorted.forEach(d => {
                     rows += `
                         <div class="tx-item">
-                            <div class="tx-icon">₹</div>
+                            <div class="tx-icon deposit">
+                                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg>
+                            </div>
                             <div class="tx-details">
-                                <div class="tx-amount">₹${fmt(d.amount)}</div>
+                                <div class="tx-amount">ETB ${fmt(d.amount)}</div>
                                 <div class="tx-date">${formatDate(d.created_at)}</div>
                             </div>
                             <div class="tx-method">${d.payment_type || 'UPI'}</div>
-                            <div class="tx-phone">📞 ${d.phone || '-'}</div>
+                            <div class="tx-phone">${d.phone || '-'}</div>
                         </div>
                     `;
                 });
@@ -696,13 +737,15 @@
                 sorted.forEach(d => {
                     rows += `
                         <div class="tx-item">
-                            <div class="tx-icon" style="background:rgba(239,68,68,0.15);color:var(--danger-red);">↑</div>
+                            <div class="tx-icon withdrawal">
+                                <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="16 12 12 8 8 12"></polyline><line x1="12" y1="16" x2="12" y2="8"></line></svg>
+                            </div>
                             <div class="tx-details">
-                                <div class="tx-amount">₹${fmt(d.amount)}</div>
+                                <div class="tx-amount">ETB ${fmt(d.amount)}</div>
                                 <div class="tx-date">${formatDate(d.created_at)}</div>
                             </div>
                             <div class="tx-method">${d.withdrawal_type || 'UPI'}</div>
-                            <div class="tx-phone">📞 ${d.phone_number || '-'}</div>
+                            <div class="tx-phone">${d.phone_number || '-'}</div>
                         </div>
                     `;
                 });
@@ -777,19 +820,25 @@
                 // 3. Render Stats Cards
                 statsGrid.innerHTML = `
                     <div class="stat-card commission">
-                        <div class="stat-icon">💰</div>
+                        <div class="stat-icon">
+                            <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5z"></path><path d="M16 12h.01"></path><path d="M3 7h18"></path></svg>
+                        </div>
                         <div class="stat-label">Total Commission</div>
                         <div class="stat-value blue">ETB ${fmt(totalCommission)}</div>
                         <div class="stat-trend up">↑ 12.4%</div>
                     </div>
                     <div class="stat-card deposit">
-                        <div class="stat-icon">🏦</div>
+                        <div class="stat-icon">
+                            <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="8 12 12 16 16 12"></polyline><line x1="12" y1="8" x2="12" y2="16"></line></svg>
+                        </div>
                         <div class="stat-label">Total Deposits</div>
                         <div class="stat-value green">ETB ${fmt(totalDeposits)}</div>
                         <div class="stat-trend up">↑ 9.7%</div>
                     </div>
                     <div class="stat-card withdrawal">
-                        <div class="stat-icon">💸</div>
+                        <div class="stat-icon">
+                            <svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="16 12 12 8 8 12"></polyline><line x1="12" y1="16" x2="12" y2="8"></line></svg>
+                        </div>
                         <div class="stat-label">Total Withdrawals</div>
                         <div class="stat-value red">ETB ${fmt(totalWithdrawals)}</div>
                         <div class="stat-trend up">↑ 8.1%</div>
@@ -948,7 +997,6 @@
 
                 // 7. Render ALL Players (Players Tab)
                 let playersHtml = '';
-                // Sort by total deposits + withdrawals to show most active users first
                 const sortedPlayers = [...globalUserSummaries].sort((a, b) => (b.totalDeposits + b.totalWithdrawn) - (a.totalDeposits + a.totalWithdrawn));
                 
                 sortedPlayers.forEach(u => {
@@ -962,7 +1010,7 @@
                                     <span class="player-stat">Wins: <span>${u.wins}</span></span>
                                 </div>
                             </div>
-                            <span class="player-action">›</span>
+                            <span style="color:var(--text-muted);">›</span>
                         </div>
                     `;
                 });
@@ -995,7 +1043,6 @@
                 } else if (user.totalWithdrawn > 0) {
                     showWithdrawalModal(userId, username);
                 } else {
-                    // Fallback: show deposit modal with empty state
                     showDepositModal(userId, username);
                 }
             }
