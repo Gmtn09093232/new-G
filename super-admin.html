@@ -3,10 +3,57 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
     <title>Super Admin · Dashboard</title>
+
+    <!-- Fonts + Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
-        /* ─── RESET & BASE ─── */
+        /* ─── DESIGN TOKENS (LIGHT THEME) ─── */
+        :root {
+            --bg: #FFFFFF;
+            --bg-alt: #F8F9FA;
+            --card: #FFFFFF;
+            --card-2: #F3F4F6;
+
+            --border: #E5E7EB;
+            --border-strong: #D1D5DB;
+
+            --text: #111827;
+            --text-2: #374151;
+            --muted: #6B7280;
+            --muted-2: #9CA3AF;
+
+            --accent: #F97316;
+            --accent-hover: #EA580C;
+            --accent-soft: #FFF7ED;
+            --accent-line: #FED7AA;
+
+            --green: #10B981;
+            --green-soft: #ECFDF5;
+            --red: #EF4444;
+            --red-soft: #FEF2F2;
+            --amber: #F59E0B;
+            --amber-soft: #FFFBEB;
+            --blue: #3B82F6;
+            --blue-soft: #EFF6FF;
+            --teal: #14B8A6;
+            --rose: #F43F5E;
+
+            --r-lg: 20px;
+            --r-md: 16px;
+            --r-sm: 12px;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+        }
+
+        /* ─── RESET ─── */
         * {
             margin: 0;
             padding: 0;
@@ -14,33 +61,69 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0B1120;          /* Blue-black */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--bg-alt);
+            color: var(--text);
             min-height: 100vh;
-            padding-bottom: 90px;
+            padding-bottom: 80px; /* Space for bottom nav */
             font-size: 15px;
-            color: #FFFFFF;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        button, .btn, .tab-btn, .stat-card, .refresh-btn-header, .modal-close {
-            transition: all 0.15s ease !important;
+        /* ─── FAST TRANSITIONS ─── */
+        button, .btn, .tab-btn, .stat-card, .icon-btn, .modal-close,
+        .mini-pagination button, .admin-card, .player-select {
+            transition: all 0.15s ease;
         }
 
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: #111827; }
-        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 20px; }
+        /* ─── SCROLLBAR ─── */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 20px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-        /* ─── HEADER ─── */
-        .header {
-            background: #0B1120;
-            color: #fff;
-            padding: 14px 16px;
+        /* ─── TOP APP BAR ─── */
+        .app-bar {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
+            padding-top: calc(12px + env(safe-area-inset-top, 0px));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             position: sticky;
             top: 0;
-            z-index: 100;
-            border-bottom: 1px solid #1E293B;
+            z-index: 200;
+        }
+        .app-bar .app-title {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+        .app-bar .app-actions { display: flex; gap: 16px; align-items: center; }
+        .app-bar .app-actions button {
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: var(--text);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* ─── MAIN HEADER ─── */
+        .header {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 16px;
+            position: sticky;
+            top: 49px; /* Below app bar */
+            z-index: 150;
         }
         .header-content {
             max-width: 1280px;
@@ -48,1066 +131,2201 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .header-left .menu-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px;
-        }
+        .header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .header-title { min-width: 0; }
         .header-left h1 {
             font-size: 18px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+            line-height: 1.15;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .header-right {
+        .header-left .subtitle {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .icon-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            color: var(--text);
             display: flex;
             align-items: center;
-            gap: 12px;
-        }
-        .header-right .notif-btn {
-            background: none;
-            border: none;
-            color: #fff;
-            font-size: 18px;
+            justify-content: center;
+            font-size: 15px;
             cursor: pointer;
             position: relative;
+            flex-shrink: 0;
+            font-family: inherit;
         }
-        .refresh-btn-header {
-            background: #1E293B;
-            border: 1px solid #334155;
-            color: #fff;
-            padding: 8px 14px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        .icon-btn:active { transform: scale(0.93); background: var(--card-2); }
+        .icon-btn .dot {
+            position: absolute;
+            top: 9px;
+            right: 10px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 2.5px var(--card);
         }
-        .refresh-btn-header:active {
-            transform: scale(0.95);
-            background: #334155;
+        .icon-btn .dot[hidden] { display: none; }
+
+        @media (max-width: 480px) {
+            .header-left h1 { font-size: 16px; }
+            .icon-btn { width: 40px; height: 40px; border-radius: 13px; font-size: 14px; }
         }
 
         /* ─── CONTAINER ─── */
-        .container {
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 16px;
-        }
+        .container { max-width: 1280px; margin: 0 auto; padding: 16px 16px 24px; }
 
-        /* ─── FILTER BAR ─── */
+        /* ─── FILTER BAR (MATCHING SCREENSHOT) ─── */
         .filter-bar {
-            background: #111827;
-            border-radius: 16px;
-            padding: 14px 16px;
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            padding: 16px;
             margin-bottom: 16px;
-            border: 1px solid #1E293B;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 14px;
         }
-        .filter-bar .row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: flex-end;
-        }
-        .filter-bar .filter-group {
-            flex: 1 1 140px;
-            min-width: 120px;
-        }
+        .filter-bar.hidden { display: none; }
+        .filter-bar .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .filter-bar .filter-group { flex: 1 1 140px; min-width: 120px; }
         .filter-bar .filter-group label {
             display: block;
-            font-size: 11px;
-            font-weight: 500;
-            color: #94A3B8;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: 0.4px;
-            margin-bottom: 5px;
+            letter-spacing: 0.6px;
+            margin-bottom: 6px;
         }
-        .filter-bar .filter-group input,
-        .filter-bar .filter-group select {
+
+        input[type="date"],
+        input[type="text"],
+        select {
             width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #334155;
-            border-radius: 12px;
+            padding: 12px 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 13px;
             font-size: 14px;
-            background: #0F172A;
-            color: #fff;
-            min-height: 42px;
+            font-weight: 500;
+            color: var(--text);
+            min-height: 46px;
             outline: none;
+            font-family: inherit;
+            color-scheme: light;
+            appearance: none;
+            -webkit-appearance: none;
+            box-shadow: var(--shadow-sm);
         }
-        .filter-bar .filter-group input:focus,
-        .filter-bar .filter-group select:focus {
-            border-color: #FF6B00;
+        select {
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 38px;
         }
+        input:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+        input::placeholder { color: var(--muted-2); }
+
+        .filter-bar .btn-group { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+        /* ─── BUTTONS ─── */
         .btn {
-            padding: 10px 18px;
-            border-radius: 12px;
-            border: none;
+            padding: 12px 20px;
+            border-radius: 14px;
+            border: 1px solid transparent;
             font-weight: 600;
             font-size: 14px;
+            font-family: inherit;
             cursor: pointer;
-            min-height: 42px;
+            touch-action: manipulation;
+            min-height: 46px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 7px;
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+            background: var(--card);
+            color: var(--text);
+            box-shadow: var(--shadow-sm);
         }
         .btn:active { transform: scale(0.96); }
+
         .btn-primary {
-            background: #FF6B00;
+            background: var(--accent);
             color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
         }
-        .btn-primary:active { background: #E55F00; }
+        .btn-primary:active { background: var(--accent-hover); border-color: var(--accent-hover); }
+
         .btn-outline {
             background: transparent;
-            border: 1px solid #334155;
-            color: #CBD5E1;
+            border: 1px solid var(--border-strong);
+            color: var(--text-2);
         }
-        .btn-outline:active { background: #1E293B; }
-        .btn-success { background: #10B981; color: #fff; }
-        .btn-danger { background: #EF4444; color: #fff; }
-        .btn-warning { background: #F59E0B; color: #fff; }
-        .btn-sm { padding: 7px 14px; font-size: 13px; min-height: 36px; border-radius: 10px; }
-        .btn-xs { padding: 5px 10px; font-size: 12px; min-height: 30px; border-radius: 8px; }
+        .btn-outline:active { background: var(--card-2); }
+
+        .btn-success {
+            background: var(--green);
+            color: #fff;
+            border-color: var(--green);
+        }
+        .btn-danger {
+            background: var(--red);
+            color: #fff;
+            border-color: var(--red);
+        }
+        .btn-outline-danger {
+            background: transparent;
+            border: 1px solid var(--red);
+            color: var(--red);
+        }
+        .btn-outline-danger:active { background: var(--red-soft); }
+
+        .btn-warning { background: var(--amber); color: #fff; border-color: var(--amber); }
         .btn-ghost {
             background: transparent;
-            color: #FF6B00;
-            border: 1px solid #FF6B00;
+            color: var(--accent);
+            border: 1px solid var(--accent);
         }
-        .btn-ghost:active { background: #FF6B00; color: #fff; }
+        .btn-ghost:active { background: var(--accent-soft); }
+        .btn-indigo { background: var(--blue); color: #fff; border-color: var(--blue); }
+        .btn-rose { background: var(--rose); color: #fff; border-color: var(--rose); }
+        .btn-teal { background: var(--teal); color: #fff; border-color: var(--teal); }
 
-        /* ─── STATS / OVERVIEW ─── */
-        .overview-header { margin-bottom: 20px; }
-        .overview-header .date-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        .overview-header .date-chip {
-            background: #111827;
-            border: 1px solid #1E293B;
-            color: #CBD5E1;
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .house-profit { margin-bottom: 24px; }
-        .house-profit .label {
-            font-size: 13px;
-            color: #94A3B8;
-            font-weight: 500;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-        .house-profit .value {
-            font-size: 42px;
-            font-weight: 700;
-            letter-spacing: -1px;
-            line-height: 1.1;
-        }
-        .house-profit .value .currency {
-            font-size: 18px;
-            color: #94A3B8;
-            font-weight: 500;
-            margin-left: 4px;
-        }
-        .house-profit .change {
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .house-profit .change.up { color: #10B981; }
-        .house-profit .change.down { color: #EF4444; }
+        .btn-sm { padding: 9px 14px; font-size: 12.5px; min-height: 38px; border-radius: 11px; }
+        .btn-xs { padding: 6px 10px; font-size: 11px; min-height: 30px; border-radius: 9px; gap: 4px; }
+        .btn-xs i { font-size: 10px; }
 
-        .dep-with-row {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-        .dep-with-item { flex: 1; }
-        .dep-with-item .label {
-            font-size: 13px;
-            color: #94A3B8;
-            margin-bottom: 4px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .dep-with-item .label .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .dep-with-item .label .dot.white { background: #fff; }
-        .dep-with-item .label .dot.orange { background: #FF6B00; }
-        .dep-with-item .value {
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        .chart-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 6px;
-            height: 100px;
-            margin-bottom: 24px;
-            padding: 0 4px;
-        }
-        .chart-bars .bar-group {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-        }
-        .chart-bars .bars {
-            display: flex;
-            gap: 3px;
-            align-items: flex-end;
-            height: 80px;
-        }
-        .chart-bars .bar {
-            width: 8px;
-            border-radius: 3px;
-            min-height: 4px;
-        }
-        .chart-bars .bar.deposit { background: #FFFFFF; }
-        .chart-bars .bar.withdraw { background: #FF6B00; }
-        .chart-bars .day {
-            font-size: 10px;
-            color: #64748B;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-        .stat-box {
-            background: #111827;
-            border-radius: 14px;
-            padding: 16px 12px;
-            text-align: center;
-            border: 1px solid #1E293B;
-        }
-        .stat-box .num {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 2px;
-        }
-        .stat-box .lbl {
-            font-size: 12px;
-            color: #94A3B8;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-        }
-        .stat-box.pending .num { color: #FF6B00; }
-
-        .alert-banner {
-            background: #FF6B00;
-            color: #fff;
-            border-radius: 14px;
-            padding: 14px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        .alert-banner:active { opacity: 0.9; }
-
-        /* ─── TABS ─── */
+        /* ─── TABS (SEGMENTED CONTROL) ─── */
         .tabs {
             display: flex;
-            gap: 6px;
+            gap: 4px;
             margin-bottom: 16px;
-            background: #111827;
+            background: var(--bg-alt);
             padding: 5px;
-            border-radius: 14px;
-            border: 1px solid #1E293B;
+            border-radius: 16px;
+            border: 1px solid var(--border);
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
+            flex-wrap: nowrap;
         }
         .tabs::-webkit-scrollbar { display: none; }
+
         .tab-btn {
             padding: 10px 16px;
             border: none;
             background: transparent;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 14px;
-            color: #94A3B8;
+            font-size: 13.5px;
+            font-family: inherit;
+            color: var(--muted);
             white-space: nowrap;
             flex-shrink: 0;
             min-height: 42px;
             display: flex;
             align-items: center;
-            gap: 7px;
+            gap: 8px;
+            touch-action: manipulation;
         }
+        .tab-btn i { font-size: 14px; }
+        .tab-btn:active { transform: scale(0.96); }
         .tab-btn.active {
-            background: #FF6B00;
+            background: var(--accent);
             color: #fff;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
         }
         .tab-btn .badge {
-            background: #EF4444;
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 0 7px;
-            border-radius: 20px;
-            min-width: 18px;
-            height: 18px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-2);
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 0 7px;
+            border-radius: 20px;
+            min-width: 20px;
+            height: 19px;
+            line-height: 19px;
+            text-align: center;
         }
-        .tab-btn.active .badge {
-            background: rgba(255,255,255,0.25);
-        }
+        .tab-btn.active .badge { background: rgba(255, 255, 255, 0.25); color: #fff; }
 
         /* ─── TAB CONTENT ─── */
         .tab-content {
-            background: transparent;
+            background: var(--card);
+            border-radius: var(--r-lg);
+            padding: 16px;
+            border: 1px solid var(--border);
             min-height: 280px;
+            box-shadow: var(--shadow-sm);
         }
-        .tab-pane { display: none; }
+        .tab-pane { display: none; animation: fadeSlide 0.18s ease; }
         .tab-pane.active { display: block; }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tab-pane h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 16px;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            flex-wrap: wrap;
+        }
+        .tab-pane h2 i { color: var(--accent); font-size: 15px; }
+        .tab-pane h2 .sub { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+
+        /* ─── TABLES ─── */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
+            padding: 0 4px;
+            border-radius: var(--r-sm);
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 620px; }
+        table th {
+            background: transparent;
+            text-align: left;
+            padding: 10px 12px;
+            font-weight: 700;
+            color: var(--muted);
+            font-size: 10.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            font-size: 13.5px;
+            color: var(--text-2);
+        }
+        table tbody tr:hover { background: var(--bg-alt); }
+        table tbody tr:last-child td { border-bottom: none; }
+
+        .cell-user { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .cell-name { font-weight: 600; color: var(--text); font-size: 13.5px; }
+        .cell-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+        /* ─── AVATARS ─── */
+        .avatar {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #F97316, #FB923C);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 14px;
+            letter-spacing: 0.2px;
+            flex-shrink: 0;
+        }
+        .avatar-sm { width: 34px; height: 34px; font-size: 12px; }
+
+        /* ─── BADGES ─── */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            white-space: nowrap;
+            gap: 4px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .status-badge.pending { background: var(--accent-soft); color: var(--accent); }
+        .status-badge.approved { background: var(--green-soft); color: var(--green); }
+        .status-badge.rejected { background: var(--red-soft); color: var(--red); }
+        .status-badge.active { background: var(--green-soft); color: var(--green); }
+        .status-badge.inactive { background: var(--card-2); color: var(--muted); }
+        .status-badge.completed { background: var(--blue-soft); color: var(--blue); }
+        .status-badge.banned { background: var(--red-soft); color: var(--red); }
 
         /* ─── ADMIN CARDS ─── */
         .admin-card {
-            background: #111827;
-            border-radius: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
             padding: 16px;
             margin-bottom: 12px;
-            border: 1px solid #1E293B;
+            box-shadow: var(--shadow-sm);
         }
+        .admin-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+
         .admin-card .admin-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
             margin-bottom: 12px;
         }
-        .admin-card .admin-left {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        .admin-card .rank {
-            font-size: 13px;
-            color: #64748B;
-            font-weight: 600;
-            min-width: 22px;
-        }
-        .admin-card .avatar {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .admin-name-wrap { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .admin-id { min-width: 0; }
+        .admin-card .admin-name {
             font-weight: 700;
             font-size: 15px;
-            flex-shrink: 0;
-        }
-        .admin-card .admin-info .name {
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 2px;
-        }
-        .admin-card .admin-info .phone {
-            font-size: 13px;
-            color: #94A3B8;
-        }
-        .admin-card .admin-right {
+            color: var(--text);
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 6px;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            letter-spacing: -0.2px;
         }
-        .status-badge {
+        .admin-card .admin-name .super-tag {
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+        .admin-card .admin-phone { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+
+        .admin-card .admin-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0 0 12px;
+        }
+        .admin-card .admin-meta span {
+            background: var(--bg-alt);
+            padding: 4px 11px;
+            border-radius: 40px;
+            font-size: 11px;
+            font-weight: 600;
             display: inline-flex;
             align-items: center;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
+            gap: 5px;
+            border: 1px solid var(--border);
         }
-        .status-badge.active { background: rgba(16,185,129,0.15); color: #10B981; }
-        .status-badge.inactive { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.pending { background: rgba(255,107,0,0.15); color: #FF6B00; }
-        .status-badge.approved { background: rgba(16,185,129,0.15); color: #10B981; }
-        .status-badge.rejected { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.banned { background: rgba(239,68,68,0.15); color: #EF4444; }
-        .status-badge.completed { background: rgba(59,130,246,0.15); color: #3B82F6; }
+        .admin-card .admin-meta span i { color: var(--accent); font-size: 10px; }
 
-        .admin-card .pct {
-            font-size: 13px;
-            color: #94A3B8;
-            font-weight: 500;
-        }
-        .progress-bar {
+        .admin-progress {
             height: 6px;
-            background: #1E293B;
-            border-radius: 10px;
-            margin: 12px 0;
+            border-radius: 99px;
+            background: var(--border);
             overflow: hidden;
-        }
-        .progress-bar .fill {
-            height: 100%;
-            background: linear-gradient(90deg, #FF6B00, #FF8C00);
-            border-radius: 10px;
-        }
-        .admin-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
             margin-bottom: 14px;
         }
-        .admin-stats .stat-item { text-align: center; }
-        .admin-stats .stat-item strong {
+        .admin-progress span {
             display: block;
-            font-size: 16px;
-            font-weight: 700;
-        }
-        .admin-stats .stat-item .slabel {
-            font-size: 11px;
-            color: #94A3B8;
-            margin-top: 2px;
-        }
-        .admin-stats .stat-item.earned strong { color: #FF6B00; }
-        .admin-stats .stat-item.pending strong { color: #F59E0B; }
-        .admin-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .admin-actions .btn {
-            flex: 1;
-            min-width: 70px;
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #F97316, #FB923C);
+            transition: width 0.3s ease;
         }
 
-        /* ─── PLAYERS LIST ─── */
-        .players-toolbar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 14px;
-            flex-wrap: wrap;
-        }
-        .players-toolbar input,
-        .players-toolbar select {
-            flex: 1;
-            min-width: 140px;
-            padding: 10px 14px;
-            border: 1px solid #334155;
-            border-radius: 12px;
-            background: #111827;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-        }
-        .players-toolbar input:focus,
-        .players-toolbar select:focus {
-            border-color: #FF6B00;
-        }
-        .selection-bar {
-            background: #FF6B00;
-            color: #fff;
-            border-radius: 12px;
-            padding: 12px 16px;
-            display: none;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-            font-weight: 600;
-        }
-        .selection-bar.active { display: flex; }
-        .selection-bar .actions {
-            display: flex;
+        .admin-card .admin-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
             gap: 8px;
+            margin: 0 0 14px;
         }
-        .player-item {
-            background: #111827;
-            border-radius: 14px;
-            padding: 14px;
-            margin-bottom: 10px;
-            border: 1px solid #1E293B;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .player-item .check {
-            width: 22px;
-            height: 22px;
-            accent-color: #FF6B00;
-        }
-        .player-item .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        .player-item .info {
-            flex: 1;
+        .admin-card .admin-stats .stat-item {
+            background: var(--bg-alt);
+            padding: 9px 8px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
             min-width: 0;
         }
-        .player-item .info .name {
-            font-weight: 600;
+        .admin-card .admin-stats .stat-item strong {
+            display: block;
             font-size: 15px;
-            margin-bottom: 2px;
-        }
-        .player-item .info .handle {
-            font-size: 13px;
-            color: #94A3B8;
-        }
-        .player-item .info .admin-name {
-            font-size: 12px;
-            color: #64748B;
-            margin-top: 2px;
-        }
-        .player-item .right {
-            text-align: right;
-        }
-        .player-item .right .balance {
             font-weight: 700;
-            font-size: 15px;
-            margin-bottom: 4px;
+            color: var(--text);
+            letter-spacing: -0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-
-        /* ─── WITHDRAWAL CARDS ─── */
-        .withdrawal-card {
-            background: #111827;
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
-            border: 1px solid #1E293B;
-        }
-        .withdrawal-card .top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-        .withdrawal-card .amount {
-            font-size: 26px;
-            font-weight: 700;
-        }
-        .withdrawal-card .meta {
-            font-size: 13px;
-            color: #94A3B8;
-            margin-top: 4px;
-        }
-        .withdrawal-card .details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin: 12px 0;
-            font-size: 13px;
-        }
-        .withdrawal-card .details .item .lbl {
-            color: #94A3B8;
-            margin-bottom: 2px;
-        }
-        .withdrawal-card .actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 12px;
-        }
-
-        /* ─── RECENT ACTIVITY ─── */
-        .section-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #94A3B8;
-            margin-bottom: 12px;
+        .admin-card .admin-stats .stat-item:nth-child(2) strong { color: var(--accent); }
+        .admin-card .admin-stats .stat-item:nth-child(3) strong { color: var(--amber); }
+        .admin-card .admin-stats .stat-item:nth-child(4) strong { color: var(--text-2); }
+        .admin-card .admin-stats .stat-item .slabel {
+            font-size: 9px;
+            color: var(--muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 0;
-            border-bottom: 1px solid #1E293B;
-        }
-        .activity-item:last-child { border-bottom: none; }
-        .activity-item .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(145deg, #FF6B00, #FF8C00);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-        .activity-item .info { flex: 1; }
-        .activity-item .info .name {
-            font-weight: 600;
-            font-size: 15px;
-        }
-        .activity-item .info .time {
-            font-size: 12px;
-            color: #64748B;
+            display: block;
             margin-top: 2px;
         }
-        .activity-item .right { text-align: right; }
-        .activity-item .right .amount {
-            font-weight: 700;
-            font-size: 15px;
-            margin-bottom: 4px;
+
+        .admin-card .admin-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .admin-card .admin-actions .btn { flex: 0 1 auto; }
+
+        @media (max-width: 480px) {
+            .admin-card { padding: 14px; border-radius: 16px; }
+            .admin-card .admin-actions .btn {
+                font-size: 11.5px;
+                padding: 7px 11px;
+                min-height: 34px;
+                flex: 1 1 auto;
+            }
+            .avatar { width: 40px; height: 40px; font-size: 13px; }
         }
 
         /* ─── LOADING / EMPTY ─── */
-        .loading-state, .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 50px 20px;
-            color: #64748B;
-            gap: 12px;
+        .loading-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 44px 20px; color: var(--muted); gap: 14px;
+            font-size: 13.5px;
         }
         .loading-state .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid #1E293B;
-            border-top-color: #FF6B00;
+            width: 34px; height: 34px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .empty-state .icon { font-size: 40px; opacity: 0.4; }
+
+        .empty-state {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 44px 20px; color: var(--muted); gap: 10px;
+            font-size: 13.5px; text-align: center;
+        }
+        .empty-state .icon { font-size: 40px; opacity: 0.35; color: var(--accent); }
+        .empty-state .retry-btn { margin-top: 10px; }
+
+        .muted-note { color: var(--muted); font-size: 12.5px; padding: 6px 0; }
 
         /* ─── MODAL ─── */
-        .modal-overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(11, 17, 32, 0.85);
-            backdrop-filter: blur(8px);
+        .admin-detail-modal .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
             z-index: 2000;
             display: none;
             align-items: center;
             justify-content: center;
             padding: 16px;
         }
-        .modal-overlay.active { display: flex; }
-        .modal-content {
-            background: #111827;
-            border-radius: 20px;
-            padding: 24px;
-            max-width: 480px;
+        .admin-detail-modal .modal-overlay.active { display: flex; }
+        .admin-detail-modal .modal-content {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 20px;
+            max-width: 840px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
-            border: 1px solid #1E293B;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn 0.18s ease;
         }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.96) translateY(14px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .modal-header h2 {
-            font-size: 18px;
-            font-weight: 700;
+        .modal-content .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px; padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+            gap: 12px;
         }
-        .modal-close {
-            background: #1E293B;
-            border: none;
-            width: 34px;
-            height: 34px;
+        .modal-content .modal-header h2 {
+            font-size: 18px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.3px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .modal-content .modal-close {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            width: 38px; height: 38px;
             border-radius: 50%;
-            font-size: 16px;
+            font-size: 15px;
             cursor: pointer;
-            color: #CBD5E1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: var(--muted);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            font-family: inherit;
+        }
+        .modal-content .modal-close:active { transform: scale(0.9); background: var(--border); }
+
+        .admin-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 20px;
+            background: var(--bg-alt);
+            padding: 16px;
+            border-radius: var(--r-md);
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+        .admin-info-grid .item {
+            display: flex; justify-content: space-between; gap: 10px;
+            font-size: 13px; padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .admin-info-grid .item:last-child { border-bottom: none; }
+        .admin-info-grid .item .label { color: var(--muted); font-weight: 500; }
+        .admin-info-grid .item .value { font-weight: 600; color: var(--text); text-align: right; }
+
+        .section-card {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: var(--r-md);
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .section-card.deposits { border-left-color: var(--green); }
+        .section-card.withdrawals { border-left-color: var(--accent); }
+        .section-card.admin-withdrawals { border-left-color: var(--red); }
+        .section-card.earnings { border-left-color: var(--amber); }
+        .section-card.adjustments { border-left-color: var(--blue); }
+        .section-card.players { border-left-color: var(--accent); }
+
+        .section-card .section-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 10px; gap: 10px; flex-wrap: wrap;
+        }
+        .section-card .section-header h4 {
+            font-size: 13px; font-weight: 700; color: var(--text);
+            display: flex; align-items: center; gap: 7px;
+            letter-spacing: -0.1px;
+        }
+        .section-card .section-header .total {
+            font-size: 11.5px; font-weight: 700; color: var(--accent);
+            background: var(--accent-soft);
+            padding: 4px 12px; border-radius: 40px;
+            white-space: nowrap;
+        }
+        .section-card .section-body { font-size: 12.5px; max-height: 210px; overflow-y: auto; }
+        .section-card .section-body .row-item {
+            display: flex; justify-content: space-between;
+            padding: 7px 0; border-bottom: 1px solid var(--border);
+            gap: 12px;
+        }
+        .section-card .section-body .row-item:last-child { border-bottom: none; }
+        .section-card .section-body .row-item .left { color: var(--muted); font-size: 12.5px; min-width: 0; }
+        .section-card .section-body .row-item .right {
+            font-weight: 600; color: var(--text); text-align: right;
+            flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+        }
+
+        .modal-actions {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .modal-actions .btn { flex: 1; min-width: 90px; justify-content: center; }
+
+        @media (max-width: 640px) {
+            .admin-detail-modal .modal-content { padding: 16px; border-radius: 20px; }
+            .admin-info-grid { grid-template-columns: 1fr; gap: 0; padding: 12px 14px; }
+            .admin-info-grid .item { font-size: 12.5px; }
+            .section-card .section-body { max-height: 140px; }
+            .modal-actions .btn { flex: 1 1 100%; }
+            .modal-content .modal-header h2 { font-size: 16px; }
         }
 
         /* ─── TOAST ─── */
         .toast {
             position: fixed;
-            bottom: 100px;
+            bottom: 90px; /* Above bottom nav */
             left: 50%;
-            transform: translateX(-50%);
-            background: #111827;
+            transform: translateX(-50%) translateY(90px);
+            background: #1F2937;
             color: #fff;
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 14px 22px;
+            border-radius: 16px;
+            font-size: 13.5px;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255,255,255,0.1);
             z-index: 3000;
-            border: 1px solid #334155;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: 0.2s ease;
+            pointer-events: none;
+            max-width: 92%;
+            text-align: center;
+            backdrop-filter: blur(10px);
         }
-        .toast.show { opacity: 1; }
-        .toast.success { border-color: #10B981; }
-        .toast.error { border-color: #EF4444; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #065F46; border-color: rgba(16, 185, 129, 0.35); color: #A7F3D0; }
+        .toast.error { background: #991B1B; border-color: rgba(239, 68, 68, 0.35); color: #FCA5A5; }
+        .toast.info { background: #1F2937; border-color: rgba(255, 255, 255, 0.1); color: #F3F4F6; }
 
-        /* ─── BOTTOM NAV ─── */
+        /* ─── MINI PAGINATION ─── */
+        .mini-pagination { display: flex; gap: 5px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+        .mini-pagination button {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 9px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+            color: var(--text-2);
+            cursor: pointer;
+            min-height: 34px;
+        }
+        .mini-pagination button:active { transform: scale(0.94); }
+        .mini-pagination button.active-page {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .mini-pagination button:disabled { opacity: 0.3; pointer-events: none; }
+        .mini-pagination span { font-size: 12.5px; color: var(--muted); padding: 0 6px; font-weight: 600; }
+
+        /* ─── SEARCH BAR ─── */
+        .search-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+        .search-bar input, .search-bar select { flex: 1 1 180px; }
+        .search-bar .btn { flex-shrink: 0; }
+
+        /* ─── LIST TOOLBAR ─── */
+        .list-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .list-toolbar .lt-count { font-size: 13.5px; font-weight: 700; color: var(--text); }
+        .list-toolbar .lt-count i { color: var(--accent); margin-right: 5px; }
+        .list-toolbar .lt-sub { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+        .list-toolbar .lt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .check-label {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 12.5px; font-weight: 600; color: var(--muted);
+            cursor: pointer; user-select: none;
+        }
+        input[type="checkbox"] {
+            width: 17px; height: 17px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        /* ─── ANALYSIS ─── */
+        .analysis-toggle { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .analysis-toggle .btn { min-width: 110px; }
+
+        .analysis-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .analysis-summary .stat-box {
+            background: var(--bg-alt);
+            padding: 14px 10px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .analysis-summary .stat-box .num {
+            font-size: 19px; font-weight: 700; color: var(--text);
+            letter-spacing: -0.4px;
+        }
+        .analysis-summary .stat-box .lbl {
+            font-size: 9.5px; color: var(--muted); text-transform: uppercase;
+            font-weight: 700; letter-spacing: 0.6px; margin-top: 3px;
+        }
+
+        .chart-container {
+            margin-top: 18px;
+            background: var(--bg-alt);
+            border-radius: var(--r-md);
+            padding: 16px;
+            border: 1px solid var(--border);
+        }
+        .chart-container h4 {
+            font-size: 13px; font-weight: 700; margin-bottom: 14px;
+            color: var(--text); letter-spacing: -0.1px;
+        }
+        .chart-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 9px; }
+        .chart-bar-label {
+            width: 96px; font-size: 12px; font-weight: 600;
+            color: var(--muted); flex-shrink: 0; text-align: right;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .chart-bar-track {
+            flex: 1; height: 26px;
+            background: var(--border);
+            border-radius: 8px;
+            overflow: hidden; display: flex; position: relative;
+        }
+        .chart-bar-segment {
+            height: 100%;
+            transition: width 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 700; color: #fff;
+            white-space: nowrap; padding: 0 4px; min-width: 18px;
+        }
+        .chart-bar-total {
+            font-size: 12px; font-weight: 700; color: var(--text);
+            width: 76px; text-align: left; flex-shrink: 0;
+        }
+        .chart-legend {
+            display: flex; flex-wrap: wrap; gap: 14px;
+            margin-top: 14px; padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .chart-legend-item {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 11.5px; color: var(--muted); font-weight: 600;
+        }
+        .chart-legend-item .color-box { width: 14px; height: 14px; border-radius: 5px; }
+
+        @media (max-width: 640px) {
+            .chart-bar-label { width: 68px; font-size: 11px; }
+            .chart-bar-total { width: 58px; font-size: 11px; }
+            .chart-bar-track { height: 22px; }
+            .chart-bar-segment { font-size: 8px; min-width: 14px; }
+            .analysis-summary { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* ─── PLATFORM STAT TILES ─── */
+        .platform-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .platform-stat {
+            background: var(--bg-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--r-md);
+            padding: 16px 12px;
+            text-align: center;
+        }
+        .platform-stat .ps-label {
+            font-size: 10px; color: var(--muted); font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.6px;
+        }
+        .platform-stat .ps-value {
+            font-size: 21px; font-weight: 700; color: var(--text);
+            margin-top: 5px; letter-spacing: -0.5px;
+        }
+        .platform-stat .ps-value.green { color: var(--green); }
+        .platform-stat .ps-value.orange { color: var(--accent); }
+        .platform-stat .ps-value.amber { color: var(--amber); }
+        .platform-stat .ps-value.blue { color: var(--blue); }
+        .platform-stat .ps-value.red { color: var(--red); }
+
+        /* ─── DELETE CONFIRM ─── */
+        .delete-confirm-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            z-index: 4000; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .delete-confirm-overlay.active { display: flex; }
+        .delete-confirm-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 30px 24px;
+            max-width: 420px; width: 100%;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn 0.18s ease;
+        }
+        .delete-confirm-box .icon {
+            width: 66px; height: 66px; margin: 0 auto 14px;
+            border-radius: 22px;
+            background: var(--red-soft);
+            color: var(--red);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+        }
+        .delete-confirm-box h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+        .delete-confirm-box p { color: var(--muted); font-size: 13.5px; margin-bottom: 22px; line-height: 1.55; }
+        .delete-confirm-box .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .delete-confirm-box .btn-group .btn { min-width: 110px; }
+
+        /* ─── TRANSFER ─── */
+        .transfer-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            z-index: 4001; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .transfer-overlay.active { display: flex; }
+        .transfer-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 22px;
+            padding: 26px 22px;
+            max-width: 460px; width: 100%;
+            box-shadow: var(--shadow-lg);
+            animation: modalIn 0.18s ease;
+        }
+        .transfer-box h3 { font-size: 18px; color: var(--text); margin-bottom: 6px; letter-spacing: -0.3px; }
+        .transfer-box p { color: var(--muted); font-size: 13.5px; margin-bottom: 18px; line-height: 1.5; }
+        .transfer-box label {
+            display: block; font-size: 11px; font-weight: 700; color: var(--muted);
+            margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.6px;
+        }
+        .transfer-box select { margin-bottom: 20px; }
+        .transfer-box .btn-group { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+        .transfer-box .btn-group .btn { min-width: 90px; }
+
+        /* ─── BOTTOM NAVIGATION ─── */
         .bottom-nav {
             position: fixed;
             bottom: 0;
             left: 0;
-            right: 0;
-            background: #0B1120;
-            border-top: 1px solid #1E293B;
+            width: 100%;
+            background: var(--card);
+            border-top: 1px solid var(--border);
             display: flex;
             justify-content: space-around;
-            padding: 10px 0 18px;
-            z-index: 90;
+            align-items: center;
+            padding: 8px 12px;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            z-index: 1000;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
         }
-        .bottom-nav .nav-item {
+        .bottom-nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
-            color: #64748B;
-            font-size: 11px;
             background: none;
             border: none;
+            font-family: inherit;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--muted);
             cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 12px;
             min-width: 64px;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
         }
-        .bottom-nav .nav-item.active {
-            color: #FF6B00;
-        }
-        .bottom-nav .nav-item i {
-            font-size: 20px;
+        .bottom-nav-item i { font-size: 20px; }
+        .bottom-nav-item:active { transform: scale(0.92); }
+        .bottom-nav-item.active { color: var(--accent); }
+        .bottom-nav-item.active i { color: var(--accent); }
+
+        /* ─── RESPONSIVE TWEAKS ─── */
+        @media (min-width: 768px) {
+            .bottom-nav { display: none; } /* Hide bottom nav on desktop */
+            body { padding-bottom: 20px; }
+            .toast { bottom: 24px; }
+            .header { top: 0; }
+            .app-bar { display: none; } /* Hide app bar on desktop */
+            .container { padding: 20px 20px 32px; }
+            .filter-bar { flex-direction: row; align-items: center; flex-wrap: wrap; }
+            .filter-bar .row { flex: 1; }
+            .tabs { display: flex; } /* Show tabs on desktop */
         }
 
-        @media (min-width: 768px) {
-            .stats-row { grid-template-columns: repeat(3, 1fr); }
-            .admin-stats { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 640px) {
+            body { font-size: 14.5px; }
+            .container { padding: 12px 12px 20px; }
+            .filter-bar .row { flex-direction: column; align-items: stretch; }
+            .filter-bar .filter-group { flex: 1 1 auto; min-width: unset; }
+            .filter-bar .btn-group .btn { flex: 1 1 auto; }
+            .tab-btn { font-size: 13px; padding: 9px 13px; min-height: 40px; }
+            .tab-content { padding: 13px; border-radius: 18px; }
+            table { font-size: 12.5px; min-width: 460px; }
+            table th, table td { padding: 10px 9px; }
+            .search-bar .btn { flex: 1 1 auto; }
+            .btn { padding: 11px 16px; font-size: 13.5px; }
+        }
+
+        /* ─── SECRET MISSING OVERLAY ─── */
+        .secret-overlay {
+            position: fixed; inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 5000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+        }
+        .secret-overlay .icon { font-size: 64px; margin-bottom: 16px; }
+        .secret-overlay h1 { font-size: 24px; color: var(--text); margin-bottom: 8px; }
+        .secret-overlay p { color: var(--muted); max-width: 380px; margin: 0 auto 16px; }
+        .secret-overlay code {
+            background: var(--bg-alt);
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: var(--accent);
+            font-weight: 600;
+            border: 1px solid var(--border);
         }
     </style>
 </head>
 <body>
-    <!-- HEADER -->
-    <div class="header">
-        <div class="header-content">
-            <div class="header-left">
-                <button class="menu-btn"><i class="fas fa-bars"></i></button>
-                <h1 id="pageTitle">Overview</h1>
-            </div>
-            <div class="header-right">
-                <button class="notif-btn"><i class="fas fa-bell"></i></button>
-                <button class="refresh-btn-header" onclick="refreshAll()">
-                    <i class="fas fa-sync-alt"></i>
-                    <span class="label">Refresh</span>
-                </button>
-            </div>
+
+    <!-- ─── SECRET MISSING OVERLAY ─── -->
+    <div class="secret-overlay" id="secretOverlay" style="display:none;">
+        <div class="icon">🔑</div>
+        <h1>Secret Required</h1>
+        <p>Please add <code>?secret=YOUR_SECRET</code> to the URL to access the dashboard.</p>
+        <p style="font-size:13px;">Default secret is <code>01207</code>.</p>
+    </div>
+
+    <!-- ─── TOP APP BAR ─── -->
+    <div class="app-bar">
+        <button onclick="history.back()"><i class="fas fa-times"></i></button>
+        <div class="app-title">Audit</div>
+        <div class="app-actions">
+            <button><i class="fas fa-chevron-down"></i></button>
+            <button><i class="fas fa-ellipsis-v"></i></button>
         </div>
     </div>
 
+    <!-- ─── MAIN HEADER ─── -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <button class="icon-btn" onclick="toggleFilters()" aria-label="Toggle filters">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="header-title">
+                    <h1 id="pageTitle">Withdrawals</h1>
+                    <div class="subtitle">Manage requests &amp; payouts</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" onclick="switchTab('withdrawals')" aria-label="Pending withdrawals">
+                    <i class="fas fa-bell"></i>
+                    <span class="dot" id="bellDot" hidden></span>
+                </button>
+                <button class="icon-btn" onclick="refreshAll()" aria-label="Refresh">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
     <div class="container">
-        <!-- FILTER BAR -->
-        <div class="filter-bar">
+
+        <!-- ─── FILTER BAR ─── -->
+        <div class="filter-bar" id="filterBar">
             <div class="row">
                 <div class="filter-group">
                     <label>From</label>
-                    <input type="date" id="filterFrom">
+                    <input type="date" id="filterFrom" />
                 </div>
                 <div class="filter-group">
                     <label>To</label>
-                    <input type="date" id="filterTo">
+                    <input type="date" id="filterTo" />
                 </div>
                 <div class="filter-group">
                     <label>Admin</label>
-                    <select id="filterAdmin">
-                        <option value="all">All admins</option>
-                    </select>
+                    <select id="filterAdmin"><option value="all">All admins</option></select>
                 </div>
-                <div class="btn-group" style="display:flex;gap:8px;">
-                    <button class="btn btn-primary btn-sm" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply</button>
-                    <button class="btn btn-outline btn-sm" onclick="resetFilters()">Reset</button>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="applyFilters()"><i class="fas fa-filter"></i> Apply</button>
+                    <button class="btn btn-outline" onclick="resetFilters()"><i class="fas fa-undo"></i> Reset</button>
                 </div>
             </div>
         </div>
 
-        <!-- TABS -->
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">
+        <!-- ─── TABS (SEGMENTED CONTROL) ─── -->
+        <div class="tabs" id="tabContainer">
+            <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
                 <i class="fas fa-chart-pie"></i> Overview
             </button>
             <button class="tab-btn" data-tab="admins" onclick="switchTab('admins')">
-                <i class="fas fa-user-shield"></i> Admins
+                <i class="fas fa-users-cog"></i> Admins
             </button>
-            <button class="tab-btn" data-tab="withdrawals" onclick="switchTab('withdrawals')">
-                <i class="fas fa-money-bill-wave"></i> Withdrawals
-                <span class="badge" id="pendingBadge">0</span>
+            <button class="tab-btn active" data-tab="withdrawals" onclick="switchTab('withdrawals')">
+                <i class="fas fa-money-bill-wave"></i> Withdrawals <span class="badge" id="withdrawalBadge">0</span>
             </button>
             <button class="tab-btn" data-tab="players" onclick="switchTab('players')">
-                <i class="fas fa-users"></i> Players
-                <span class="badge" id="globalPlayersBadge">0</span>
-            </button>
-            <button class="tab-btn" data-tab="platform" onclick="switchTab('platform')">
-                <i class="fas fa-chart-bar"></i> Analysis
+                <i class="fas fa-user-friends"></i> Players <span class="badge" id="globalPlayersBadge">0</span>
             </button>
         </div>
 
-        <!-- TAB CONTENT -->
+        <!-- ─── TAB CONTENT ─── -->
         <div class="tab-content">
-            <!-- OVERVIEW -->
-            <div class="tab-pane active" id="tab-overview">
-                <div class="overview-header">
-                    <div class="date-row">
-                        <div class="date-chip"><i class="fas fa-calendar"></i> <span id="dateRangeLabel">Oct 1–11</span></div>
-                        <div class="date-chip"><i class="fas fa-users"></i> All admins</div>
+
+            <!-- OVERVIEW / PLATFORM -->
+            <div class="tab-pane" id="tab-platform">
+                <h2><i class="fas fa-chart-line"></i> Platform <span class="sub">— overview &amp; analysis</span></h2>
+                
+                <div class="analysis-toggle">
+                    <button class="btn btn-primary btn-sm" id="platformOverviewBtn" onclick="showPlatformView('overview')">Overview</button>
+                    <button class="btn btn-outline btn-sm" id="platformAnalysisBtn" onclick="showPlatformView('analysis')">Analysis</button>
+                </div>
+
+                <div id="platformOverview">
+                    <div id="platformContent"><div class="loading-state"><div class="spinner"></div><span>Loading platform data…</span></div></div>
+                </div>
+
+                <div id="platformAnalysis" style="display:none;">
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center;">
+                        <button class="btn btn-primary" onclick="fetchAnalysis()"><i class="fas fa-chart-bar"></i> Load Analysis</button>
+                        <span style="font-size:12.5px; color:var(--muted);">Uses the date and admin filters above.</span>
                     </div>
-
-                    <div class="house-profit">
-                        <div class="label">HOUSE PROFIT</div>
-                        <div class="value" id="houseProfitValue">0<span class="currency">ETB</span></div>
-                        <div class="change up" id="houseProfitChange"><i class="fas fa-arrow-up"></i> 0%</div>
-                    </div>
-
-                    <div class="dep-with-row">
-                        <div class="dep-with-item">
-                            <div class="label"><span class="dot white"></span> Deposits</div>
-                            <div class="value" id="totalDeposits">0</div>
-                        </div>
-                        <div class="dep-with-item">
-                            <div class="label"><span class="dot orange"></span> Withdrawals</div>
-                            <div class="value" id="totalWithdrawals">0</div>
-                        </div>
-                    </div>
-
-                    <div class="chart-bars" id="overviewChart"></div>
-
-                    <div class="stats-row">
-                        <div class="stat-box">
-                            <div class="num" id="statUsers">0</div>
-                            <div class="lbl">Users</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="num" id="statAdmins">0</div>
-                            <div class="lbl">Admins</div>
-                        </div>
-                        <div class="stat-box pending">
-                            <div class="num" id="statPending">0</div>
-                            <div class="lbl">Pending</div>
-                        </div>
-                    </div>
-
-                    <div class="alert-banner" onclick="switchTab('withdrawals')">
-                        <span><i class="fas fa-exclamation-circle"></i> <span id="pendingAlertText">0 withdrawals awaiting decision</span></span>
-                        <span>Review →</span>
-                    </div>
-
-                    <div class="section-title">Recent Activity</div>
-                    <div id="recentActivity">
-                        <div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>
+                    <div id="analysisResults">
+                        <div class="loading-state"><div class="spinner"></div><span>Load analysis data by clicking the button above.</span></div>
                     </div>
                 </div>
             </div>
 
             <!-- ADMINS -->
             <div class="tab-pane" id="tab-admins">
-                <div style="margin-bottom:14px;">
-                    <input type="text" id="adminSearch" placeholder="Search admins..." 
-                           style="width:100%;padding:12px 16px;border:1px solid #334155;border-radius:12px;background:#111827;color:#fff;font-size:14px;outline:none;"
-                           oninput="filterAdmins()">
-                </div>
-                <div id="adminsList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div>
-                </div>
+                <h2><i class="fas fa-users-cog"></i> All Admins <span class="sub">— manage and monitor</span></h2>
+                <div id="adminsList"><div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div></div>
             </div>
 
             <!-- WITHDRAWALS -->
-            <div class="tab-pane" id="tab-withdrawals">
-                <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="withdrawalFilters">
-                    <button class="btn btn-sm btn-primary" data-filter="pending" onclick="setWithdrawFilter('pending')">Pending</button>
-                    <button class="btn btn-sm btn-outline" data-filter="approved" onclick="setWithdrawFilter('approved')">Approved</button>
-                    <button class="btn btn-sm btn-outline" data-filter="rejected" onclick="setWithdrawFilter('rejected')">Rejected</button>
-                    <button class="btn btn-sm btn-outline" data-filter="all" onclick="setWithdrawFilter('all')">All</button>
+            <div class="tab-pane active" id="tab-withdrawals">
+                <h2><i class="fas fa-money-bill-wave"></i> Admin Withdrawals <span class="sub">— requests from admins</span></h2>
+                
+                <div class="withdrawal-filter-group" id="withdrawalFilterGroup" style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-primary btn-sm" data-status="pending" onclick="setWithdrawalFilter('pending')">Pending</button>
+                    <button class="btn btn-outline btn-sm" data-status="approved" onclick="setWithdrawalFilter('approved')">Approved</button>
+                    <button class="btn btn-outline btn-sm" data-status="rejected" onclick="setWithdrawalFilter('rejected')">Rejected</button>
+                    <button class="btn btn-outline btn-sm" data-status="all" onclick="setWithdrawalFilter('all')">All</button>
                 </div>
-                <div id="withdrawalsList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>
-                </div>
+                
+                <div id="withdrawalsList"><div class="loading-state"><div class="spinner"></div><span>Loading withdrawals…</span></div></div>
             </div>
 
             <!-- PLAYERS -->
             <div class="tab-pane" id="tab-players">
-                <div class="players-toolbar">
-                    <input type="text" id="globalPlayerSearch" placeholder="Username, handle or ID" oninput="filterGlobalPlayers()">
-                    <select id="playerAdminFilter" onchange="filterGlobalPlayers()">
-                        <option value="all">All admins</option>
+                <h2><i class="fas fa-user-friends"></i> All Players <span class="sub">— all registered users</span></h2>
+                
+                <div class="search-bar">
+                    <input type="text" id="globalPlayerSearch" placeholder="Search by username, handle, or ID..." />
+                    <select id="playerAdminFilter">
+                        <option value="all">All Admins</option>
                     </select>
+                    <button class="btn btn-primary" onclick="filterGlobalPlayers()"><i class="fas fa-search"></i> Search</button>
+                    <button class="btn btn-outline" onclick="resetGlobalPlayerSearch()"><i class="fas fa-times"></i> Reset</button>
+                    <button class="btn btn-success" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                    <button class="btn btn-teal" onclick="transferSelectedPlayers('global')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
                 </div>
-                <div class="selection-bar" id="selectionBar">
-                    <span id="selectedCount">0 selected</span>
-                    <div class="actions">
-                        <button class="btn btn-sm" style="background:#fff;color:#FF6B00;" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Message</button>
-                        <button class="btn btn-sm" style="background:#fff;color:#FF6B00;" onclick="showBulkTransfer()"><i class="fas fa-exchange-alt"></i> Transfer</button>
-                    </div>
-                </div>
-                <div id="globalPlayersList">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading players…</span></div>
-                </div>
+                
+                <div id="globalPlayersList"><div class="loading-state"><div class="spinner"></div><span>Loading all players…</span></div></div>
             </div>
 
-            <!-- PLATFORM / ANALYSIS -->
-            <div class="tab-pane" id="tab-platform">
-                <div id="analysisResults">
-                    <div class="loading-state"><div class="spinner"></div><span>Loading analysis…</span></div>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- MODAL -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Admin Detail</h2>
-                <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
-            </div>
-            <div id="modalBody"></div>
-        </div>
-    </div>
-
-    <!-- TOAST -->
+    <!-- ─── TOAST ─── -->
     <div class="toast" id="toast"></div>
 
-    <!-- BOTTOM NAV -->
-    <div class="bottom-nav">
-        <button class="nav-item active" onclick="switchTab('overview')">
+    <!-- ─── BOTTOM NAVIGATION ─── -->
+    <nav class="bottom-nav">
+        <button class="bottom-nav-item" data-tab="platform" onclick="switchTab('platform')">
             <i class="fas fa-chart-pie"></i>
             <span>Overview</span>
         </button>
-        <button class="nav-item" onclick="switchTab('admins')">
-            <i class="fas fa-user-shield"></i>
+        <button class="bottom-nav-item" data-tab="admins" onclick="switchTab('admins')">
+            <i class="fas fa-users-cog"></i>
             <span>Admins</span>
         </button>
-        <button class="nav-item" onclick="switchTab('withdrawals')">
+        <button class="bottom-nav-item active" data-tab="withdrawals" onclick="switchTab('withdrawals')">
             <i class="fas fa-money-bill-wave"></i>
             <span>Withdraw</span>
         </button>
-        <button class="nav-item" onclick="switchTab('players')">
-            <i class="fas fa-users"></i>
+        <button class="bottom-nav-item" data-tab="players" onclick="switchTab('players')">
+            <i class="fas fa-user-friends"></i>
             <span>Players</span>
         </button>
+    </nav>
+
+    <!-- ─── MODAL ─── -->
+    <div class="admin-detail-modal" id="adminDetailModal">
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Admin Details</h2>
+                    <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="modalBody"><div class="loading-state"><div class="spinner"></div><span>Loading…</span></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── DELETE CONFIRM OVERLAY ─── -->
+    <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
+        <div class="delete-confirm-box">
+            <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <h3>Delete Player</h3>
+            <p id="deleteConfirmMessage">Are you sure you want to delete this player?</p>
+            <div class="btn-group">
+                <button class="btn btn-outline" onclick="cancelDelete()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()"><i class="fas fa-trash-alt"></i> Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TRANSFER OVERLAY ─── -->
+    <div class="transfer-overlay" id="transferOverlay">
+        <div class="transfer-box">
+            <h3 id="transferTitle">Transfer Player</h3>
+            <p id="transferMessage">Select a new admin for this player.</p>
+            <label for="transferAdminSelect">Target Admin</label>
+            <select id="transferAdminSelect"></select>
+            <div class="btn-group">
+                <button class="btn btn-outline" onclick="cancelTransfer()">Cancel</button>
+                <button class="btn btn-primary" id="confirmTransferBtn" onclick="confirmTransfer()"><i class="fas fa-exchange-alt"></i> Transfer</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // ─── SECRET FROM URL ───
+        // ============================================================
+        //  SUPER ADMIN – Full functionality + DELETE + TRANSFER
+        //  (Light / White UI — logic unchanged)
+        // ============================================================
+
         const urlParams = new URLSearchParams(window.location.search);
         const SECRET = urlParams.get('secret') || '';
 
+        // Show overlay if secret is missing, but keep the UI underneath
         if (!SECRET) {
-            document.body.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;text-align:center;background:#0B1120;font-family:system-ui;color:#fff;">
-                    <div style="font-size:64px;margin-bottom:16px;">🔑</div>
-                    <h1 style="font-size:24px;">Secret Required</h1>
-                    <p style="color:#94A3B8;max-width:380px;margin:8px auto;">Please add <code style="background:#1E293B;padding:2px 10px;border-radius:6px;">?secret=YOUR_SECRET</code> to the URL.</p>
-                    <p style="font-size:13px;color:#64748B;margin-top:4px;">Default secret is <code style="background:#1E293B;padding:2px 10px;border-radius:6px;">01207</code>.</p>
-                </div>
-            `;
-            throw new Error('No secret provided');
+            document.getElementById('secretOverlay').style.display = 'flex';
         }
 
         // ─── HELPERS ───
         function apiUrl(path, extraParams = {}) {
             const params = new URLSearchParams({ secret: SECRET, ...extraParams });
-            for (const [key, value] of Object.entries(Object.fromEntries(params))) {
-                if (value === '' || value === 'all' || value === null || value === undefined) {
-                    params.delete(key);
-                }
+            for (const [key, value] of Object.entries(params)) {
+                if (value === '' || value === 'all' || value === null || value === undefined) params.delete(key);
             }
             const query = params.toString();
-            return query ? `\( {path}? \){query}` : path;
+            return query ? `${path}?${query}` : path;
         }
 
-        function escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
-        function showToast(msg, type = 'info') {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast show ' + type;
-            setTimeout(() => t.classList.remove('show'), 2500);
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            try {
+                const d = new Date(dateString);
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } catch { return dateString; }
         }
 
         function getInitials(name) {
             if (!name) return '?';
-            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
         }
 
-        let currentTab = 'overview';
+        let currentTab = 'withdrawals';
+        let currentWithdrawFilter = 'pending';
+        let refreshInterval = null;
+        let isRefreshing = false;
         let filterFrom = '';
         let filterTo = '';
         let filterAdmin = 'all';
-        let currentWithdrawFilter = 'pending';
-        let isRefreshing = false;
-        let refreshInterval = null;
+        let allAdmins = [];
+
+        // ─── DELETE STATE ───
+        let deletePending = { telegramId: null, username: null, adminId: null, source: null };
+
+        // ─── TRANSFER STATE ───
+        let transferPending = { players: [], source: null, currentAdminId: null };
+
+        // ─── TOAST ───
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        // ─── FILTER BAR TOGGLE ───
+        function toggleFilters() {
+            const bar = document.getElementById('filterBar');
+            if (bar) bar.classList.toggle('hidden');
+        }
 
         // ─── TAB SWITCH ───
         function switchTab(tab) {
             currentTab = tab;
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
-            document.querySelectorAll('.bottom-nav .nav-item').forEach((n, i) => {
-                const tabs = ['overview','admins','withdrawals','players'];
-                n.classList.toggle('active', tabs[i] === tab);
-            });
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn =>
+                btn.classList.toggle('active', btn.dataset.tab === tab)
+            );
+            
+            // Update bottom nav
+            document.querySelectorAll('.bottom-nav-item').forEach(btn =>
+                btn.classList.toggle('active', btn.dataset.tab === tab)
+            );
 
+            // Update panes
+            document.querySelectorAll('.tab-pane').forEach(pane =>
+                pane.classList.toggle('active', pane.id === `tab-${tab}`)
+            );
+
+            // Update page title
             const titles = {
-                overview: 'Overview',
-                admins: 'Admins',
-                withdrawals: 'Withdrawals',
-                players: 'Players',
-                platform: 'Analysis'
+                'platform': 'Overview',
+                'admins': 'Admins',
+                'withdrawals': 'Withdrawals',
+                'players': 'Players'
             };
             document.getElementById('pageTitle').textContent = titles[tab] || 'Dashboard';
 
+            // Load data
             if (tab === 'admins') loadAdmins();
-            else if (tab === 'withdrawals') loadAdminWithdrawals(currentWithdrawFilter);
-            else if (tab === 'players') loadGlobalPlayers();
-            else if (tab === 'platform') fetchAnalysis();
-            else if (tab === 'overview') loadPlatformStats();
+            else if (tab === 'withdrawals') {
+                updateWithdrawalFilterButtons(currentWithdrawFilter);
+                loadAdminWithdrawals(currentWithdrawFilter);
+            } else if (tab === 'platform') {
+                showPlatformView('overview');
+                loadPlatformStats();
+            } else if (tab === 'players') loadGlobalPlayers();
+
+            // Scroll tab into view
+            const container = document.getElementById('tabContainer');
+            const activeBtn = container.querySelector('.tab-btn.active');
+            if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
+
+        // ─── PLATFORM VIEW TOGGLE ───
+        let currentPlatformView = 'overview';
+
+        function showPlatformView(view) {
+            currentPlatformView = view;
+            const overviewBtn = document.getElementById('platformOverviewBtn');
+            const analysisBtn = document.getElementById('platformAnalysisBtn');
+            const overviewDiv = document.getElementById('platformOverview');
+            const analysisDiv = document.getElementById('platformAnalysis');
+
+            if (view === 'overview') {
+                overviewBtn.className = 'btn btn-primary btn-sm';
+                analysisBtn.className = 'btn btn-outline btn-sm';
+                overviewDiv.style.display = 'block';
+                analysisDiv.style.display = 'none';
+                if (document.getElementById('platformContent').querySelector('.loading-state')) {
+                    loadPlatformStats();
+                }
+            } else {
+                overviewBtn.className = 'btn btn-outline btn-sm';
+                analysisBtn.className = 'btn btn-primary btn-sm';
+                overviewDiv.style.display = 'none';
+                analysisDiv.style.display = 'block';
+            }
+        }
+
+        // ─── WITHDRAWAL FILTER BUTTONS ───
+        function updateWithdrawalFilterButtons(activeStatus) {
+            const group = document.getElementById('withdrawalFilterGroup');
+            if (!group) return;
+            const buttons = group.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                const status = btn.dataset.status;
+                if (status === activeStatus) {
+                    btn.className = 'btn btn-primary btn-sm';
+                } else {
+                    btn.className = 'btn btn-outline btn-sm';
+                }
+            });
+        }
+
+        function setWithdrawalFilter(status) {
+            currentWithdrawFilter = status;
+            updateWithdrawalFilterButtons(status);
+            loadAdminWithdrawals(status);
+        }
+
+        // ─── PLATFORM STATS (Overview) ───
+        async function loadPlatformStats() {
+            const container = document.getElementById('platformContent');
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+            try {
+                const params = {};
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/platform-stats', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load platform stats');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('statUsers') && (document.getElementById('statUsers').textContent = data.stats.totalUsers);
+                document.getElementById('statAdmins') && (document.getElementById('statAdmins').textContent = data.stats.totalAdmins);
+                document.getElementById('statDeposits') && (document.getElementById('statDeposits').textContent = `${data.stats.totalDeposits.toFixed(0)} ETB`);
+                document.getElementById('statWithdrawals') && (document.getElementById('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`);
+                document.getElementById('statHouseProfit') && (document.getElementById('statHouseProfit').textContent = `${data.stats.totalHouseProfit.toFixed(0)} ETB`);
+                document.getElementById('statPendingWithdrawals') && (document.getElementById('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals);
+
+                // ─── Pending banner + bell dot ───
+                const pendingCount = data.stats.pendingWithdrawals || 0;
+                const bellDot = document.getElementById('bellDot');
+                if (bellDot) bellDot.hidden = pendingCount <= 0;
+                
+                // Update withdrawal badge too
+                const wBadge = document.getElementById('withdrawalBadge');
+                if (wBadge && currentTab !== 'withdrawals') {
+                    wBadge.textContent = pendingCount;
+                }
+
+                container.innerHTML = `
+                    <div class="platform-stats-grid">
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Users</div>
+                            <div class="ps-value">${data.stats.totalUsers}</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Active Admins</div>
+                            <div class="ps-value">${data.stats.totalAdmins}</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Deposits</div>
+                            <div class="ps-value green">${data.stats.totalDeposits.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Total Withdrawals</div>
+                            <div class="ps-value orange">${data.stats.totalWithdrawals.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">House Profit</div>
+                            <div class="ps-value amber">${data.stats.totalHouseProfit.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Admin Earnings Paid</div>
+                            <div class="ps-value blue">${data.stats.totalAdminEarnings.toFixed(0)} ETB</div>
+                        </div>
+                        <div class="platform-stat">
+                            <div class="ps-label">Pending Admin With.</div>
+                            <div class="ps-value red">${data.stats.pendingWithdrawals}</div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:var(--red);">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── REDUCE DEPOSIT BALANCE ───
+        async function reduceDepositBalance(adminId, currentBalance) {
+            const amountStr = prompt(`Enter amount to deduct from deposit balance (current: ${currentBalance.toFixed(0)} ETB):`, '');
+            if (amountStr === null) return;
+            const amount = parseFloat(amountStr);
+            if (isNaN(amount) || amount <= 0) {
+                showToast('Please enter a valid positive amount.', 'error');
+                return;
+            }
+            if (amount > currentBalance) {
+                showToast(`Amount cannot exceed current balance (${currentBalance.toFixed(0)} ETB).`, 'error');
+                return;
+            }
+            if (!confirm(`Deduct ${amount.toFixed(0)} ETB from admin ${adminId}?`)) return;
+            try {
+                const url = apiUrl('/super-admin/adjust-deposit-balance');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, amount: -amount, description: `Super admin deduction of ${amount.toFixed(0)} ETB` })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Balance reduced by ${amount.toFixed(0)} ETB. New: ${data.newBalance.toFixed(0)} ETB`, 'success');
+                    refreshAll();
+                } else {
+                    throw new Error(data.error || 'Failed');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── LOAD ADMINS ───
+        async function loadAdmins() {
+            const container = document.getElementById('adminsList');
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+            try {
+                const url = apiUrl('/super-admin/admins');
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admins');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                allAdmins = data.admins;
+                document.getElementById('adminBadge') && (document.getElementById('adminBadge').textContent = allAdmins.length);
+                populateAdminDropdown(allAdmins);
+
+                if (allAdmins.length === 0) {
+                    container.innerHTML =
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>No admins found</p></div>`;
+                    return;
+                }
+
+                container.innerHTML = allAdmins.map(admin => {
+                    const rawDeposits = admin.stats.totalDeposits || 0;
+                    const balance = admin.stats.holdingBalance || 0;
+                    const initials = getInitials(admin.name);
+                    const pct = rawDeposits > 0 ? Math.max(2, Math.min(100, Math.round((balance / rawDeposits) * 100))) : 0;
+
+                    return `
+                    <div class="admin-card">
+                        <div class="admin-header">
+                            <div class="admin-name-wrap">
+                                <span class="avatar">${initials}</span>
+                                <div class="admin-id">
+                                    <div class="admin-name">
+                                        ${escapeHtml(admin.name)}
+                                        ${admin.is_super_admin ? '<span class="super-tag">SUPER</span>' : ''}
+                                    </div>
+                                    <div class="admin-phone">${escapeHtml(admin.phone)}</div>
+                                </div>
+                            </div>
+                            <span class="status-badge ${admin.is_active ? 'active' : 'inactive'}">${admin.is_active ? 'Active' : 'Inactive'}</span>
+                        </div>
+
+                        <div class="admin-meta">
+                            <span>Code: ${admin.invite_code || 'N/A'}</span>
+                            <span>${(admin.commission_rate * 100).toFixed(0)}% commission</span>
+                            <span><i class="fas fa-users"></i> ${admin.stats.playerCount || 0} players</span>
+                        </div>
+
+                        <div class="admin-progress"><span style="width:${pct}%"></span></div>
+
+                        <div class="admin-stats">
+                            <div class="stat-item"><strong>${admin.stats.playerCount || 0}</strong><span class="slabel">Players</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalEarned.toFixed(0)}</strong><span class="slabel">Earned</span></div>
+                            <div class="stat-item"><strong>${admin.stats.totalPendingEarnings.toFixed(0)}</strong><span class="slabel">Pending</span></div>
+                            <div class="stat-item"><strong>${balance.toFixed(0)}</strong><span class="slabel">Balance</span></div>
+                            <div class="stat-item"><strong>${rawDeposits.toFixed(0)}</strong><span class="slabel">Deposits</span></div>
+                        </div>
+
+                        <div class="admin-actions">
+                            <button class="btn btn-primary btn-sm" onclick="openModal(${admin.id})"><i class="fas fa-eye"></i> View</button>
+                            <button class="btn btn-outline btn-sm" onclick="editCommission(${admin.id}, ${admin.commission_rate})"><i class="fas fa-percent"></i> Rate</button>
+                            <button class="btn btn-outline btn-sm" onclick="openModalPlayers(${admin.id}, '${escapeHtml(admin.name)}')"><i class="fas fa-users"></i> Players</button>
+                            <button class="btn btn-outline btn-sm" onclick="reduceDepositBalance(${admin.id}, ${balance})"><i class="fas fa-minus-circle"></i> Reduce</button>
+                            <button class="btn ${admin.is_active ? 'btn-outline-danger' : 'btn-success'} btn-sm" onclick="toggleAdmin(${admin.id}, ${!admin.is_active})">
+                                <i class="fas ${admin.is_active ? 'fa-user-slash' : 'fa-user-check'}"></i> ${admin.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                        </div>
+                    </div>
+                `}).join('');
+
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:var(--red);">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        function populateAdminDropdown(admins) {
+            const select = document.getElementById('filterAdmin');
+            if (select.options.length > 1) return;
+            select.innerHTML = '<option value="all">All admins</option>';
+            admins.forEach(admin => {
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name;
+                select.appendChild(opt);
+            });
+            const playerAdminFilter = document.getElementById('playerAdminFilter');
+            if (playerAdminFilter) {
+                playerAdminFilter.innerHTML = '<option value="all">All Admins</option>';
+                admins.forEach(admin => {
+                    const opt = document.createElement('option');
+                    opt.value = admin.id;
+                    opt.textContent = admin.name;
+                    playerAdminFilter.appendChild(opt);
+                });
+            }
+            populateTransferDropdown(admins);
+        }
+
+        function populateTransferDropdown(admins) {
+            const select = document.getElementById('transferAdminSelect');
+            select.innerHTML = '';
+            admins.forEach(admin => {
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name + (admin.is_super_admin ? ' (Super)' : '');
+                select.appendChild(opt);
+            });
+        }
+
+        // ─── DELETE PLAYER ───
+        function showDeleteConfirm(telegramId, username, adminId, source) {
+            deletePending.telegramId = telegramId;
+            deletePending.username = username;
+            deletePending.adminId = adminId;
+            deletePending.source = source;
+
+            document.getElementById('deleteConfirmMessage').textContent =
+                `Are you sure you want to delete player "${username}" (ID: ${telegramId})? This action cannot be undone.`;
+            document.getElementById('deleteConfirmOverlay').classList.add('active');
+        }
+
+        function cancelDelete() {
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+            deletePending = { telegramId: null, username: null, adminId: null, source: null };
+        }
+
+        async function confirmDelete() {
+            const { telegramId, username, adminId, source } = deletePending;
+            if (!telegramId) return;
+
+            document.getElementById('deleteConfirmOverlay').classList.remove('active');
+
+            try {
+                const url = apiUrl('/super-admin/delete-player');
+                const res = await fetch(url, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Player "${username}" deleted successfully!`, 'success');
+                    if (source === 'modal' && adminId) {
+                        loadAdminPlayers(adminId, currentPlayersPage || 1);
+                    } else if (source === 'global') {
+                        loadGlobalPlayers();
+                    } else {
+                        refreshAll();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to delete player');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                deletePending = { telegramId: null, username: null, adminId: null, source: null };
+            }
+        }
+
+        // ─── TRANSFER PLAYER (single and bulk) ───
+        function showTransferDialog(players, source, currentAdminId) {
+            if (!Array.isArray(players)) {
+                players = [players];
+            }
+            if (players.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            transferPending.players = players;
+            transferPending.source = source;
+            transferPending.currentAdminId = currentAdminId;
+
+            const count = players.length;
+            const names = players.map(p => p.name).join(', ');
+            document.getElementById('transferTitle').textContent = count === 1 ? 'Transfer Player' : `Transfer ${count} Players`;
+            document.getElementById('transferMessage').textContent =
+                count === 1
+                    ? `Transfer player "${players[0].name}" to which admin?`
+                    : `Transfer ${count} players (${names}) to which admin?`;
+
+            const select = document.getElementById('transferAdminSelect');
+            select.innerHTML = '';
+            allAdmins.forEach(admin => {
+                if (currentAdminId && admin.id == currentAdminId) return;
+                const opt = document.createElement('option');
+                opt.value = admin.id;
+                opt.textContent = admin.name + (admin.is_super_admin ? ' (Super)' : '');
+                select.appendChild(opt);
+            });
+            if (select.options.length === 0) {
+                select.innerHTML = '<option value="">No other admins available</option>';
+            }
+            document.getElementById('transferOverlay').classList.add('active');
+        }
+
+        function cancelTransfer() {
+            document.getElementById('transferOverlay').classList.remove('active');
+            transferPending = { players: [], source: null, currentAdminId: null };
+        }
+
+        async function confirmTransfer() {
+            const select = document.getElementById('transferAdminSelect');
+            const targetAdminId = select.value;
+            if (!targetAdminId) {
+                showToast('Please select a target admin.', 'error');
+                return;
+            }
+            const { players, source, currentAdminId } = transferPending;
+            if (!players || players.length === 0) {
+                showToast('No players to transfer.', 'error');
+                return;
+            }
+
+            document.getElementById('transferOverlay').classList.remove('active');
+
+            try {
+                const telegramIds = players.map(p => p.id);
+                const url = apiUrl('/super-admin/transfer-players');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegramIds, targetAdminId })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    if (source === 'modal' && currentAdminId) {
+                        loadAdminPlayers(currentAdminId, currentPlayersPage || 1);
+                    } else if (source === 'global') {
+                        loadGlobalPlayers();
+                    } else {
+                        refreshAll();
+                    }
+                } else {
+                    throw new Error(data.error || 'Failed to transfer players');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            } finally {
+                transferPending = { players: [], source: null, currentAdminId: null };
+            }
+        }
+
+        // ─── TRANSFER SELECTED (bulk action) ───
+        function transferSelectedPlayers(source) {
+            let checkboxes;
+            if (source === 'global') {
+                checkboxes = document.querySelectorAll('#globalPlayersList .player-select:checked');
+            } else if (source === 'modal') {
+                checkboxes = document.querySelectorAll('#modalBody .player-select:checked');
+            } else {
+                showToast('Invalid source.', 'error');
+                return;
+            }
+
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let currentAdminId = null;
+            if (source === 'modal') {
+                currentAdminId = currentPlayersAdminId;
+            }
+
+            showTransferDialog(players, source, currentAdminId);
+        }
+
+        // ─── LOAD ADMIN PLAYERS (modal) ───
+        const ADMIN_PLAYERS_PER_PAGE = 20;
+        let currentPlayersAdminId = null;
+        let currentPlayersPage = 1;
+        let currentPlayersTotal = 0;
+        let currentPlayersTotalPages = 0;
+
+        async function loadAdminPlayers(adminId, page = 1) {
+            currentPlayersAdminId = adminId;
+            currentPlayersPage = page;
+            const container = document.getElementById('modalBody');
+
+            container.innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <span>Loading players…</span>
+                </div>
+            `;
+
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+
+            try {
+                const params = {
+                    limit: ADMIN_PLAYERS_PER_PAGE,
+                    page: page,
+                    adminId: adminId
+                };
+                const url = apiUrl('/super-admin/players', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load players');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                currentPlayersTotal = data.total || 0;
+                currentPlayersTotalPages = data.totalPages || 1;
+
+                const adminName = document.getElementById('modalTitle').textContent.replace('Players of ', '');
+                document.getElementById('modalTitle').textContent = `Players of ${adminName} (${currentPlayersTotal})`;
+
+                if (currentPlayersTotal === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
+                            <p>No registered players found for this admin.</p>
+                            <div style="margin-top:12px;">
+                                <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const playersHtml = data.players.map(p => `
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" />
+                        </td>
+                        <td>
+                            <div class="cell-user">
+                                <span class="avatar avatar-sm">${getInitials(p.username || 'U')}</span>
+                                <div>
+                                    <div class="cell-name">${escapeHtml(p.username || 'Unknown')}</div>
+                                    <div class="cell-sub">${escapeHtml(p.telegram_handle || 'N/A')}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(p.telegram_id || '')}</td>
+                        <td>${(p.balance || 0).toFixed(0)} ETB</td>
+                        <td>${escapeHtml(p.invite_code || 'N/A')}</td>
+                        <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'modal', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', ${adminId}, 'modal')"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+
+                let paginationHtml = '';
+                if (currentPlayersTotalPages > 1) {
+                    const pagesToShow = Math.min(currentPlayersTotalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(page - 2, currentPlayersTotalPages - pagesToShow + 1));
+                    const endPage = Math.min(currentPlayersTotalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === page ? 'active-page' : ''}" onclick="loadAdminPlayers(${adminId}, ${p})">${p}</button>`;
+                    }
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="loadAdminPlayers(${adminId}, ${page - 1})" ${page <= 1 ? 'disabled' : ''}>◀</button>
+                            ${pageButtons}
+                            <button onclick="loadAdminPlayers(${adminId}, ${page + 1})" ${page >= currentPlayersTotalPages ? 'disabled' : ''}>▶</button>
+                            <span>${page} / ${currentPlayersTotalPages}</span>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <div class="list-toolbar">
+                        <div>
+                            <div class="lt-count"><i class="fas fa-users"></i> ${currentPlayersTotal} players</div>
+                            <div class="lt-sub">Showing ${(page-1)*ADMIN_PLAYERS_PER_PAGE + 1}–${Math.min(page*ADMIN_PLAYERS_PER_PAGE, currentPlayersTotal)}</div>
+                        </div>
+                        <div class="lt-actions">
+                            <label class="check-label">
+                                <input type="checkbox" id="selectAllModalPlayers" onchange="toggleAllModalPlayers()" /> Select All
+                            </label>
+                            <button class="btn btn-success btn-sm" onclick="sendBulkMessage()"><i class="fas fa-paper-plane"></i> Send to Selected</button>
+                            <button class="btn btn-teal btn-sm" onclick="transferSelectedPlayers('modal')"><i class="fas fa-exchange-alt"></i> Transfer Selected</button>
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back</button>
+                        </div>
+                    </div>
+                    <div class="section-card players">
+                        <div class="section-header">
+                            <h4>All Registered Players</h4>
+                            <span class="total">${currentPlayersTotal}</span>
+                        </div>
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;">Select</th>
+                                        <th>Player</th>
+                                        <th>Telegram ID</th>
+                                        <th>Balance</th>
+                                        <th>Invite Code</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${playersHtml}</tbody>
+                            </table>
+                        </div>
+                        ${paginationHtml}
+                    </div>
+                `;
+
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:var(--red);font-weight:600;">${escapeHtml(err.message)}</p>
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                            <button class="btn btn-outline btn-sm" onclick="openModal(${adminId})">← Back to Details</button>
+                            <button class="btn btn-primary btn-sm" onclick="loadAdminPlayers(${adminId}, 1)">Retry</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleAllModalPlayers() {
+            const checked = document.getElementById('selectAllModalPlayers').checked;
+            document.querySelectorAll('#modalBody .player-select').forEach(cb => cb.checked = checked);
+        }
+
+        function openModalPlayers(adminId, adminName) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            document.getElementById('modalTitle').textContent = `Players of ${adminName}`;
+            loadAdminPlayers(adminId, 1);
+        }
+
+        // ─── LOAD ADMIN DETAIL (modal) ───
+        async function loadAdminDetail(adminId) {
+            const body = document.getElementById('modalBody');
+            if (!SECRET) {
+                body.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+            try {
+                const url = apiUrl(`/super-admin/admin/${adminId}`);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load admin details');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                const a = data.admin;
+                const stats = data.stats;
+                document.getElementById('modalTitle').textContent = `Admin: ${a.name}`;
+
+                const fmt = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric',
+                        year: 'numeric' }) : 'N/A';
+
+                const totalDeposits = stats.deposits ? stats.deposits.reduce((s, d) => s + Number(d.amount), 0) : 0;
+                const totalWithdrawals = stats.withdrawals ? stats.withdrawals.reduce((s, w) => s + Number(w.amount), 0) : 0;
+                const totalAdminWithdrawals = stats.adminWithdrawals ? stats.adminWithdrawals.reduce((s, w) => s + Number(w
+                    .amount), 0) : 0;
+                const totalEarnings = stats.earnings ? stats.earnings.reduce((s, e) => s + Number(e.commission_amount), 0) :
+                    0;
+
+                const depositsHtml = stats.deposits && stats.deposits.length > 0 ?
+                    stats.deposits.slice(0, 10).map(d =>
+                        `<div class="row-item"><span class="left">${escapeHtml(d.username)}</span><span class="right"><strong>${d.amount} ETB</strong> <span class="status-badge ${d.status}">${d.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No deposits</div>';
+
+                const withdrawalsHtml = stats.withdrawals && stats.withdrawals.length > 0 ?
+                    stats.withdrawals.slice(0, 10).map(w =>
+                        `<div class="row-item"><span class="left">${escapeHtml(w.username)} → ${escapeHtml(w.phone_number)}</span><span class="right"><strong>${w.amount} ETB</strong> <span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No withdrawals</div>';
+
+                const adminWithdrawalsHtml = stats.adminWithdrawals && stats.adminWithdrawals.length > 0 ?
+                    stats.adminWithdrawals.map(w =>
+                        `<div class="row-item"><span class="left">${w.amount} ETB — ${w.withdrawal_type}</span><span class="right"><span class="status-badge ${w.status}">${w.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No pending withdrawals</div>';
+
+                const earningsHtml = stats.earnings && stats.earnings.length > 0 ?
+                    stats.earnings.slice(0, 10).map(e =>
+                        `<div class="row-item"><span class="left">${fmt(e.date)}</span><span class="right"><strong>${e.commission_amount.toFixed(0)} ETB</strong> <span class="status-badge ${e.status}">${e.status}</span></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No earnings</div>';
+
+                const adjustmentsHtml = stats.adjustments && stats.adjustments.length > 0 ?
+                    stats.adjustments.map(adj =>
+                        `<div class="row-item"><span class="left">${fmt(adj.created_at)} — ${escapeHtml(adj.description || 'N/A')}</span><span class="right"><strong style="color:${adj.amount > 0 ? 'var(--green)' : 'var(--red)'};">${adj.amount > 0 ? '+' : ''}${adj.amount.toFixed(0)} ETB</strong></span></div>`
+                    ).join('') :
+                    '<div class="muted-note">No adjustments</div>';
+
+                body.innerHTML = `
+                    <div class="admin-info-grid">
+                        <div class="item"><span class="label">Phone</span><span class="value">${a.phone}</span></div>
+                        <div class="item"><span class="label">Invite Code</span><span class="value">${a.invite_code || 'N/A'}</span></div>
+                        <div class="item"><span class="label">Status</span><span class="value"><span class="status-badge ${a.is_active ? 'active' : 'inactive'}">${a.is_active ? 'Active' : 'Inactive'}</span></span></div>
+                        <div class="item"><span class="label">Commission</span><span class="value">${(a.commission_rate * 100)}%</span></div>
+                        <div class="item"><span class="label">Super Admin</span><span class="value">${a.is_super_admin ? 'Yes' : 'No'}</span></div>
+                        <div class="item"><span class="label">Players</span><span class="value">${stats.players}</span></div>
+                        <div class="item"><span class="label">Deposits (raw)</span><span class="value">${(stats.totalDeposits || 0).toFixed(0)} ETB</span></div>
+                        <div class="item"><span class="label">Balance (adjusted)</span><span class="value"><strong>${(stats.holdingBalance || 0).toFixed(0)} ETB</strong></span></div>
+                    </div>
+
+                    <div style="margin-bottom:14px;">
+                        <button class="btn btn-indigo btn-sm" onclick="loadAdminPlayers(${adminId}, 1)"><i class="fas fa-users"></i> View All Players (${stats.players})</button>
+                    </div>
+
+                    <div class="section-card deposits">
+                        <div class="section-header"><h4>Recent Deposits</h4><span class="total">Total: ${totalDeposits.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${depositsHtml}</div>
+                    </div>
+
+                    <div class="section-card withdrawals">
+                        <div class="section-header"><h4>Recent Withdrawals</h4><span class="total">Total: ${totalWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${withdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card admin-withdrawals">
+                        <div class="section-header"><h4>Admin Withdrawal Requests</h4><span class="total">Total: ${totalAdminWithdrawals.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${adminWithdrawalsHtml}</div>
+                    </div>
+
+                    <div class="section-card earnings">
+                        <div class="section-header"><h4>Earnings History</h4><span class="total">Total: ${totalEarnings.toFixed(0)} ETB</span></div>
+                        <div class="section-body">${earningsHtml}</div>
+                    </div>
+
+                    <div class="section-card adjustments">
+                        <div class="section-header"><h4>Adjustment History</h4><span class="total">${stats.adjustments ? stats.adjustments.reduce((s, a) => s + Number(a.amount), 0).toFixed(0) : '0'} ETB</span></div>
+                        <div class="section-body">${adjustmentsHtml}</div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-danger" onclick="toggleAdmin(${a.id}, false)"><i class="fas fa-user-slash"></i> Deactivate</button>
+                        <button class="btn btn-success" onclick="toggleAdmin(${a.id}, true)"><i class="fas fa-user-check"></i> Activate</button>
+                        <button class="btn btn-warning" onclick="editCommission(${a.id}, ${a.commission_rate})"><i class="fas fa-percent"></i> Set Commission</button>
+                        <button class="btn btn-indigo" onclick="loadAdminPlayers(${a.id}, 1)"><i class="fas fa-users"></i> Players</button>
+                        <button class="btn btn-outline" onclick="closeModal()">Close</button>
+                    </div>
+                `;
+
+            } catch (err) {
+                body.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:var(--red);">${escapeHtml(err.message)}</p></div>`;
+            }
+        }
+
+        // ─── LOAD ADMIN WITHDRAWALS ───
+        async function loadAdminWithdrawals(status = 'pending') {
+            currentWithdrawFilter = status;
+            updateWithdrawalFilterButtons(status);
+
+            const container = document.getElementById('withdrawalsList');
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p><div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="location.reload()">Retry</button></div></div>`;
+                return;
+            }
+            try {
+                const params = { status, limit: 100 };
+                if (filterFrom) params.from = filterFrom;
+                if (filterTo) params.to = filterTo;
+                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
+
+                const url = apiUrl('/super-admin/admin-withdrawals', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load withdrawals');
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+
+                document.getElementById('withdrawalBadge') && (document.getElementById('withdrawalBadge').textContent =
+                    status === 'pending' ? data.requests.filter(r => r.status === 'pending').length : 0);
+
+                if (data.requests.length === 0) {
+                    container.innerHTML =
+                        `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawal requests found</p></div>`;
+                    return;
+                }
+
+                const showActions = status === 'pending';
+
+                container.innerHTML = `
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Admin</th><th>Amount</th><th>Phone</th><th>Method</th><th>Status</th><th>Date</th>${showActions ? '<th>Actions</th>' : ''}</tr></thead>
+                            <tbody>${data.requests.map(req => `
+                                <tr>
+                                    <td>
+                                        <div class="cell-user">
+                                            <span class="avatar avatar-sm">${getInitials(req.admins?.name || 'U')}</span>
+                                            <div>
+                                                <div class="cell-name">${escapeHtml(req.admins?.name || 'Unknown')}</div>
+                                                <div class="cell-sub">${req.admins?.phone || ''}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td><strong style="color:var(--accent);">${req.amount} ETB</strong></td>
+                                    <td>${req.phone}</td>
+                                    <td>${req.withdrawal_type}</td>
+                                    <td><span class="status-badge ${req.status}">${req.status}</span></td>
+                                    <td>${formatDate(req.created_at)}</td>
+                                    ${showActions ? `
+                                        <td>
+                                            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                                                <button class="btn btn-success btn-xs" onclick="processAdminWithdrawal(${req.id},'approve')"><i class="fas fa-check"></i> Approve</button>
+                                                <button class="btn btn-rose btn-xs" onclick="processAdminWithdrawal(${req.id},'reject')"><i class="fas fa-times"></i> Reject</button>
+                                            </div>
+                                        </td>
+                                    ` : ''}
+                                </tr>
+                            `).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML =
+                    `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:var(--red);">${escapeHtml(err.message)}</p><div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('${status}')">Retry</button></div></div>`;
+            }
+        }
+
+        // ─── PROCESS ADMIN WITHDRAWAL ───
+        async function processAdminWithdrawal(requestId, action) {
+            if (!confirm(`Are you sure you want to ${action} this withdrawal request?`)) return;
+            try {
+                const url = apiUrl('/super-admin/process-admin-withdrawal');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requestId, action })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Withdrawal ${action}ed!`, 'success');
+                    loadAdminWithdrawals(currentWithdrawFilter);
+                    loadPlatformStats();
+                } else {
+                    throw new Error(data.error || 'Failed to process');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── TOGGLE ADMIN ───
+        async function toggleAdmin(adminId, isActive) {
+            const action = isActive ? 'activate' : 'deactivate';
+            if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+            try {
+                const url = apiUrl('/super-admin/toggle-admin');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, isActive })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Admin ${action}d!`, 'success');
+                    loadAdmins();
+                    loadPlatformStats();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to toggle admin');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── EDIT COMMISSION ───
+        function editCommission(adminId, currentRate) {
+            const newRate = prompt(`Enter new commission rate (0.01 – 1.00):\nCurrent: ${(currentRate * 100)}%`, currentRate);
+            if (newRate === null) return;
+            const rate = parseFloat(newRate);
+            if (isNaN(rate) || rate < 0 || rate > 1) {
+                showToast('Invalid rate. Must be between 0 and 1', 'error');
+                return;
+            }
+            updateCommission(adminId, rate);
+        }
+
+        async function updateCommission(adminId, commissionRate) {
+            try {
+                const url = apiUrl('/super-admin/update-commission');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ adminId, commissionRate })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Commission updated to ${(commissionRate * 100)}%`, 'success');
+                    loadAdmins();
+                    closeModal();
+                } else {
+                    throw new Error(data.error || 'Failed to update commission');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ─── MODAL ───
+        function openModal(adminId) {
+            document.getElementById('modalOverlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            loadAdminDetail(adminId);
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('modalOverlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
 
         // ─── FILTERS ───
         function applyFilters() {
@@ -1116,273 +2334,21 @@
             filterAdmin = document.getElementById('filterAdmin').value;
             refreshAll();
         }
+
         function resetFilters() {
             document.getElementById('filterFrom').value = '';
             document.getElementById('filterTo').value = '';
             document.getElementById('filterAdmin').value = 'all';
-            filterFrom = filterTo = '';
+            filterFrom = '';
+            filterTo = '';
             filterAdmin = 'all';
             refreshAll();
         }
 
-        // ─── OVERVIEW ───
-        async function loadPlatformStats() {
-            try {
-                const params = {};
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
-
-                const res = await fetch(apiUrl('/super-admin/platform-stats', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error || 'Failed');
-
-                document.getElementById('houseProfitValue').innerHTML = 
-                    (data.houseProfit || 0).toLocaleString() + '<span class="currency">ETB</span>';
-                
-                const changeEl = document.getElementById('houseProfitChange');
-                const change = data.profitChange || 0;
-                changeEl.className = 'change ' + (change >= 0 ? 'up' : 'down');
-                changeEl.innerHTML = `<i class="fas fa-arrow-${change >= 0 ? 'up' : 'down'}"></i> ${Math.abs(change).toFixed(1)}%`;
-
-                document.getElementById('totalDeposits').textContent = (data.totalDeposits || 0).toLocaleString();
-                document.getElementById('totalWithdrawals').textContent = (data.totalWithdrawals || 0).toLocaleString();
-                document.getElementById('statUsers').textContent = (data.totalUsers || 0).toLocaleString();
-                document.getElementById('statAdmins').textContent = (data.totalAdmins || 0);
-                document.getElementById('statPending').textContent = (data.pendingWithdrawals || 0);
-                document.getElementById('pendingBadge').textContent = data.pendingWithdrawals || 0;
-                document.getElementById('pendingAlertText').textContent = 
-                    `${data.pendingWithdrawals || 0} withdrawals awaiting decision`;
-
-                renderOverviewChart(data.daily || []);
-                renderRecentActivity(data.recentActivity || []);
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        function renderOverviewChart(daily) {
-            const container = document.getElementById('overviewChart');
-            const days = ['1','2','3','4','5','6','7','8','9','10','11'];
-            container.innerHTML = days.map(d => `
-                <div class="bar-group">
-                    <div class="bars">
-                        <div class="bar deposit" style="height:${30 + Math.random()*50}px"></div>
-                        <div class="bar withdraw" style="height:${20 + Math.random()*40}px"></div>
-                    </div>
-                    <div class="day">${d}</div>
-                </div>
-            `).join('');
-        }
-
-        function renderRecentActivity(items) {
-            const container = document.getElementById('recentActivity');
-            if (!items.length) {
-                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-inbox"></i></div><p>No recent activity</p></div>`;
-                return;
-            }
-            container.innerHTML = items.map(item => `
-                <div class="activity-item">
-                    <div class="avatar">${getInitials(item.name)}</div>
-                    <div class="info">
-                        <div class="name">${escapeHtml(item.name)}</div>
-                        <div class="time">${escapeHtml(item.time || '')}</div>
-                    </div>
-                    <div class="right">
-                        <div class="amount">${(item.amount || 0).toLocaleString()} ETB</div>
-                        <span class="status-badge \( {item.status?.toLowerCase() || 'pending'}"> \){item.status || 'PENDING'}</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // ─── ADMINS ───
-        async function loadAdmins() {
-            const container = document.getElementById('adminsList');
-            container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading admins…</span></div>`;
-            try {
-                const params = {};
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                const res = await fetch(apiUrl('/super-admin/admins', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error);
-
-                const sel = document.getElementById('filterAdmin');
-                const playerSel = document.getElementById('playerAdminFilter');
-                const currentVal = sel.value;
-                sel.innerHTML = '<option value="all">All admins</option>';
-                playerSel.innerHTML = '<option value="all">All admins</option>';
-                (data.admins || []).forEach(a => {
-                    sel.innerHTML += `<option value="\( {a.id}"> \){escapeHtml(a.name)}</option>`;
-                    playerSel.innerHTML += `<option value="\( {a.id}"> \){escapeHtml(a.name)}</option>`;
-                });
-                sel.value = currentVal;
-
-                if (!data.admins?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>No admins found</p></div>`;
-                    return;
-                }
-
-                container.innerHTML = data.admins.map((a, idx) => {
-                    const earned = a.earned || 0;
-                    const pending = a.pending || 0;
-                    const balance = a.balance || 0;
-                    const total = earned + pending + balance || 1;
-                    const pctEarned = Math.round((earned / total) * 100);
-                    return `
-                    <div class="admin-card">
-                        <div class="admin-header">
-                            <div class="admin-left">
-                                <div class="rank">${String(idx + 1).padStart(2, '0')}</div>
-                                <div class="avatar">${getInitials(a.name)}</div>
-                                <div class="admin-info">
-                                    <div class="name">${escapeHtml(a.name)}</div>
-                                    <div class="phone">${escapeHtml(a.phone || '')}</div>
-                                </div>
-                            </div>
-                            <div class="admin-right">
-                                <span class="status-badge \( {a.is_active ? 'active' : 'inactive'}"> \){a.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
-                                <div class="pct">${a.commission_rate || 0}%</div>
-                            </div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="fill" style="width:${pctEarned}%"></div>
-                        </div>
-                        <div class="admin-stats">
-                            <div class="stat-item earned">
-                                <strong>${earned.toLocaleString()}</strong>
-                                <div class="slabel">Earned</div>
-                            </div>
-                            <div class="stat-item pending">
-                                <strong>${pending.toLocaleString()}</strong>
-                                <div class="slabel">Pending</div>
-                            </div>
-                            <div class="stat-item">
-                                <strong>${balance.toLocaleString()}</strong>
-                                <div class="slabel">Balance</div>
-                            </div>
-                        </div>
-                        <div class="admin-actions">
-                            <button class="btn btn-outline btn-sm" onclick="openAdminModal(${a.id})"><i class="fas fa-eye"></i> View</button>
-                            <button class="btn btn-outline btn-sm" onclick="rateAdmin(${a.id})"><i class="fas fa-percentage"></i> Rate</button>
-                            <button class="btn btn-outline btn-sm">${a.player_count || 0} Players</button>
-                            <button class="btn btn-ghost btn-sm" onclick="toggleAdminStatus(${a.id}, ${a.is_active})">
-                                ${a.is_active ? 'Deactivate' : 'Activate'}
-                            </button>
-                        </div>
-                    </div>`;
-                }).join('');
-            } catch (err) {
-                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadAdmins()">Retry</button></div>`;
-            }
-        }
-
-        function filterAdmins() {
-            const q = document.getElementById('adminSearch').value.toLowerCase();
-            document.querySelectorAll('.admin-card').forEach(card => {
-                const name = card.querySelector('.name')?.textContent.toLowerCase() || '';
-                const phone = card.querySelector('.phone')?.textContent.toLowerCase() || '';
-                card.style.display = (name.includes(q) || phone.includes(q)) ? '' : 'none';
-            });
-        }
-
-        // ─── WITHDRAWALS ───
-        function setWithdrawFilter(filter) {
-            currentWithdrawFilter = filter;
-            document.querySelectorAll('#withdrawalFilters .btn').forEach(b => {
-                b.classList.toggle('btn-primary', b.dataset.filter === filter);
-                b.classList.toggle('btn-outline', b.dataset.filter !== filter);
-            });
-            loadAdminWithdrawals(filter);
-        }
-
-        async function loadAdminWithdrawals(status = 'pending') {
-            const container = document.getElementById('withdrawalsList');
-            container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading…</span></div>`;
-            try {
-                const params = { status };
-                if (filterFrom) params.from = filterFrom;
-                if (filterTo) params.to = filterTo;
-                if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
-
-                const res = await fetch(apiUrl('/super-admin/admin-withdrawals', params));
-                const data = await res.json();
-                if (!data.success) throw new Error(data.error);
-
-                if (!data.withdrawals?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-inbox"></i></div><p>No ${status} withdrawals</p></div>`;
-                    return;
-                }
-
-                container.innerHTML = data.withdrawals.map(w => `
-                    <div class="withdrawal-card">
-                        <div class="top">
-                            <div>
-                                <div class="amount">${(w.amount || 0).toLocaleString()} <span style="font-size:14px;color:#94A3B8">ETB</span></div>
-                                <div class="meta">#${w.id} · ${escapeHtml(w.created_at || '')}</div>
-                            </div>
-                            <span class="status-badge \( {w.status?.toLowerCase()}"> \){(w.status || 'PENDING').toUpperCase()}</span>
-                        </div>
-                        <div class="details">
-                            <div class="item"><div class="lbl">Admin</div><div>${escapeHtml(w.admin_name || '')}</div></div>
-                            <div class="item"><div class="lbl">Method</div><div>${escapeHtml(w.method || 'Telebirr')}</div></div>
-                            <div class="item"><div class="lbl">Payout</div><div>${escapeHtml(w.payout_account || '')}</div></div>
-                            <div class="item"><div class="lbl">Balance after</div><div>${(w.balance_after || 0).toLocaleString()} ETB</div></div>
-                        </div>
-                        ${w.status === 'pending' ? `
-                        <div class="actions">
-                            <button class="btn btn-primary" style="flex:1" onclick="approveWithdrawal(${w.id})">
-                                <i class="fas fa-check"></i> Approve
-                            </button>
-                            <button class="btn btn-outline" style="flex:1;border-color:#EF4444;color:#EF4444" onclick="rejectWithdrawal(${w.id})">
-                                Reject
-                            </button>
-                        </div>` : ''}
-                    </div>
-                `).join('');
-            } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadAdminWithdrawals('${status}')">Retry</button></div>`;
-            }
-        }
-
-        async function approveWithdrawal(id) {
-            if (!confirm('Approve this withdrawal?')) return;
-            try {
-                const res = await fetch('/super-admin/approve-withdrawal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, secret: SECRET })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Withdrawal approved', 'success');
-                    loadAdminWithdrawals(currentWithdrawFilter);
-                    loadPlatformStats();
-                } else throw new Error(data.error);
-            } catch (e) { showToast(e.message, 'error'); }
-        }
-
-        async function rejectWithdrawal(id) {
-            if (!confirm('Reject this withdrawal?')) return;
-            try {
-                const res = await fetch('/super-admin/reject-withdrawal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, secret: SECRET })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Withdrawal rejected', 'success');
-                    loadAdminWithdrawals(currentWithdrawFilter);
-                } else throw new Error(data.error);
-            } catch (e) { showToast(e.message, 'error'); }
-        }
-
-        // ─── PLAYERS ───
+        // ─── GLOBAL PLAYERS ───
         let globalPlayersPage = 1;
+        let globalPlayersTotal = 0;
+        let globalPlayersTotalPages = 0;
         const GLOBAL_PLAYERS_PER_PAGE = 30;
 
         async function loadGlobalPlayers() {
@@ -1390,52 +2356,139 @@
             const adminFilter = document.getElementById('playerAdminFilter')?.value || 'all';
             const search = document.getElementById('globalPlayerSearch')?.value || '';
 
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+
             try {
                 const params = {
                     limit: GLOBAL_PLAYERS_PER_PAGE,
                     page: globalPlayersPage,
-                    adminId: adminFilter !== 'all' ? adminFilter : undefined,
+                    adminId: adminFilter,
                     search: search || undefined
                 };
-                const res = await fetch(apiUrl('/super-admin/players', params));
+                const url = apiUrl('/super-admin/players', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load players');
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
-                document.getElementById('globalPlayersBadge').textContent = data.total || 0;
+                globalPlayersTotal = data.total || 0;
+                globalPlayersTotalPages = data.totalPages || 1;
 
-                if (!data.players?.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-users-slash"></i></div><p>No players found</p></div>`;
+                document.getElementById('globalPlayersBadge') && (document.getElementById('globalPlayersBadge').textContent = globalPlayersTotal);
+
+                if (globalPlayersTotal === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-users-slash"></i></div>
+                            <p>No players found.</p>
+                            <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
+                        </div>
+                    `;
                     return;
                 }
 
-                container.innerHTML = data.players.map(p => `
-                    <div class="player-item">
-                        <input type="checkbox" class="check player-select" data-id="\( {p.telegram_id}" data-name=" \){escapeHtml(p.username)}" onchange="updateSelectionBar()">
-                        <div class="avatar">${getInitials(p.username)}</div>
-                        <div class="info">
-                            <div class="name">${escapeHtml(p.username || 'Unknown')}</div>
-                            <div class="handle">@${escapeHtml(p.telegram_handle || 'N/A')}</div>
-                            <div class="admin-name">${escapeHtml(p.admin_name || 'No admin')}</div>
+                const playersHtml = data.players.map(p => {
+                    const adminId = p.admin_id || null;
+                    return `
+                    <tr>
+                        <td><input type="checkbox" class="player-select" data-id="${p.telegram_id}" data-name="${escapeHtml(p.username)}" /></td>
+                        <td>
+                            <div class="cell-user">
+                                <span class="avatar avatar-sm">${getInitials(p.username || 'U')}</span>
+                                <div>
+                                    <div class="cell-name">${escapeHtml(p.username || 'Unknown')}</div>
+                                    <div class="cell-sub">${escapeHtml(p.telegram_handle || 'N/A')}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${escapeHtml(p.telegram_id || '')}</td>
+                        <td><strong style="color:var(--accent);">${p.balance.toFixed(0)} ETB</strong></td>
+                        <td>${p.invite_code || 'N/A'}</td>
+                        <td>${p.admin_name ? escapeHtml(p.admin_name) : 'None'}</td>
+                        <td><span class="status-badge ${p.is_active ? 'active' : 'inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td>
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <button class="btn btn-primary btn-xs" onclick="sendMessageToPlayer('${p.telegram_id}', '${escapeHtml(p.username)}')"><i class="fas fa-paper-plane"></i> Send</button>
+                                <button class="btn btn-teal btn-xs" onclick="showTransferDialog([{id:'${p.telegram_id}',name:'${escapeHtml(p.username)}'}], 'global', ${adminId})"><i class="fas fa-exchange-alt"></i> Transfer</button>
+                                <button class="btn btn-rose btn-xs" onclick="showDeleteConfirm('${p.telegram_id}', '${escapeHtml(p.username)}', null, 'global')"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `}).join('');
+
+                let paginationHtml = '';
+                if (globalPlayersTotalPages > 1) {
+                    const pagesToShow = Math.min(globalPlayersTotalPages, 5);
+                    let pageButtons = '';
+                    const startPage = Math.max(1, Math.min(globalPlayersPage - 2, globalPlayersTotalPages - pagesToShow + 1));
+                    const endPage = Math.min(globalPlayersTotalPages, startPage + pagesToShow - 1);
+                    for (let p = startPage; p <= endPage; p++) {
+                        pageButtons += `<button class="${p === globalPlayersPage ? 'active-page' : ''}" onclick="goToGlobalPage(${p})">${p}</button>`;
+                    }
+                    paginationHtml = `
+                        <div class="mini-pagination">
+                            <button onclick="goToGlobalPage(${globalPlayersPage - 1})" ${globalPlayersPage <= 1 ? 'disabled' : ''}>◀</button>
+                            ${pageButtons}
+                            <button onclick="goToGlobalPage(${globalPlayersPage + 1})" ${globalPlayersPage >= globalPlayersTotalPages ? 'disabled' : ''}>▶</button>
+                            <span>${globalPlayersPage} / ${globalPlayersTotalPages}</span>
                         </div>
-                        <div class="right">
-                            <div class="balance">${(p.balance || 0).toLocaleString()} ETB</div>
-                            <span class="status-badge ${p.is_active ? 'active' : (p.is_banned ? 'banned' : 'inactive')}">
-                                ${p.is_banned ? 'BANNED' : (p.is_active ? 'ACTIVE' : 'INACTIVE')}
-                            </span>
+                    `;
+                }
+
+                container.innerHTML = `
+                    <div class="list-toolbar">
+                        <div>
+                            <div class="lt-count"><i class="fas fa-users"></i> ${globalPlayersTotal} players</div>
+                            <div class="lt-sub">Showing ${(globalPlayersPage-1)*GLOBAL_PLAYERS_PER_PAGE + 1}–${Math.min(globalPlayersPage*GLOBAL_PLAYERS_PER_PAGE, globalPlayersTotal)}</div>
+                        </div>
+                        <div class="lt-actions">
+                            <label class="check-label">
+                                <input type="checkbox" id="selectAllGlobalPlayers" onchange="toggleAllGlobalPlayers()" /> Select All
+                            </label>
                         </div>
                     </div>
-                `).join('');
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;">Select</th>
+                                    <th>Player</th>
+                                    <th>Telegram ID</th>
+                                    <th>Balance</th>
+                                    <th>Invite Code</th>
+                                    <th>Admin</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${playersHtml}</tbody>
+                        </table>
+                    </div>
+                    ${paginationHtml}
+                `;
             } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="loadGlobalPlayers()">Retry</button></div>`;
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:var(--red);font-weight:600;">${escapeHtml(err.message)}</p>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="loadGlobalPlayers()"><i class="fas fa-sync-alt"></i> Retry</button>
+                    </div>
+                `;
             }
         }
 
-        function updateSelectionBar() {
-            const checked = document.querySelectorAll('.player-select:checked');
-            const bar = document.getElementById('selectionBar');
-            document.getElementById('selectedCount').textContent = `${checked.length} selected`;
-            bar.classList.toggle('active', checked.length > 0);
+        function toggleAllGlobalPlayers() {
+            const checked = document.getElementById('selectAllGlobalPlayers').checked;
+            document.querySelectorAll('#globalPlayersList .player-select').forEach(cb => cb.checked = checked);
+        }
+
+        function goToGlobalPage(page) {
+            if (page < 1 || page > globalPlayersTotalPages) return;
+            globalPlayersPage = page;
+            loadGlobalPlayers();
         }
 
         function filterGlobalPlayers() {
@@ -1443,122 +2496,289 @@
             loadGlobalPlayers();
         }
 
-        // ─── MESSAGING ───
+        function resetGlobalPlayerSearch() {
+            document.getElementById('globalPlayerSearch').value = '';
+            document.getElementById('playerAdminFilter').value = 'all';
+            globalPlayersPage = 1;
+            loadGlobalPlayers();
+        }
+
+        // ─── TELEGRAM MESSAGING ───
+        async function sendMessageToPlayer(userId, userName) {
+            if (!userId) {
+                showToast('This player has no Telegram ID.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${userName} (Telegram ID: ${userId}):`);
+            if (message === null || message.trim() === '') return;
+
+            try {
+                const url = '/super-admin/send-telegram-message';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, message, secret: SECRET })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showToast(`Message sent to ${userName}!`, 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to send');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        }
+
         async function sendBulkMessage() {
-            const checks = document.querySelectorAll('.player-select:checked');
-            if (!checks.length) return showToast('No players selected', 'error');
-            const message = prompt(`Message to ${checks.length} players:`);
-            if (!message?.trim()) return;
-            let ok = 0;
-            for (const cb of checks) {
+            const checkboxes = document.querySelectorAll('.player-select:checked');
+            if (checkboxes.length === 0) {
+                showToast('No players selected.', 'error');
+                return;
+            }
+
+            const message = prompt(`Enter message to send to ${checkboxes.length} selected players:`);
+            if (message === null || message.trim() === '') return;
+
+            const players = Array.from(checkboxes).map(cb => ({
+                id: cb.dataset.id,
+                name: cb.dataset.name
+            }));
+
+            let successCount = 0;
+            for (const p of players) {
                 try {
                     const res = await fetch('/super-admin/send-telegram-message', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: cb.dataset.id, message, secret: SECRET })
+                        body: JSON.stringify({ userId: p.id, message, secret: SECRET })
                     });
                     const data = await res.json();
-                    if (data.success) ok++;
-                } catch {}
+                    if (data.success) successCount++;
+                } catch (e) { /* ignore */ }
             }
-            showToast(`Sent to \( {ok}/ \){checks.length}`, 'info');
+
+            showToast(`Sent to ${successCount}/${players.length} players.`, 'info');
         }
 
-        // ─── ANALYSIS ───
+        // ─── ANALYSIS: FETCH AND RENDER ───
         async function fetchAnalysis() {
             const container = document.getElementById('analysisResults');
             container.innerHTML = `<div class="loading-state"><div class="spinner"></div><span>Loading analysis…</span></div>`;
+
+            if (!SECRET) {
+                container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-lock"></i></div><p style="color:var(--red);">Missing secret. Please add ?secret=... to the URL.</p></div>`;
+                return;
+            }
+
             try {
                 const params = {};
                 if (filterFrom) params.from = filterFrom;
                 if (filterTo) params.to = filterTo;
                 if (filterAdmin && filterAdmin !== 'all') params.adminId = filterAdmin;
 
-                const res = await fetch(apiUrl('/super-admin/analysis', params));
+                const url = apiUrl('/super-admin/analysis', params);
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Failed to load analysis data');
                 const data = await res.json();
                 if (!data.success) throw new Error(data.error);
 
                 const rows = data.data || [];
-                if (!rows.length) {
-                    container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-chart-bar"></i></div><p>No data</p></div>`;
+
+                if (rows.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon"><i class="fas fa-chart-bar"></i></div>
+                            <p>No data found for the selected filters.</p>
+                        </div>
+                    `;
                     return;
                 }
 
-                container.innerHTML = `
-                    <div style="overflow-x:auto;">
-                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                const totalPlayers = rows.reduce((sum, r) => sum + (r.player_count || 0), 0);
+                const totalCommission = rows.reduce((sum, r) => sum + (r.total_commission || 0), 0);
+                const totalAdminShare = rows.reduce((sum, r) => sum + (r.admin_share || 0), 0);
+                const uniqueGames = [...new Set(rows.map(r => r.game_name))].length;
+
+                let tableHtml = `
+                    <div class="analysis-summary">
+                        <div class="stat-box"><div class="num">${uniqueGames}</div><div class="lbl">Games</div></div>
+                        <div class="stat-box"><div class="num">${totalPlayers}</div><div class="lbl">Total Players</div></div>
+                        <div class="stat-box"><div class="num">${totalCommission.toFixed(0)} ETB</div><div class="lbl">Total Commission</div></div>
+                        <div class="stat-box"><div class="num" style="color:var(--accent);">${totalAdminShare.toFixed(0)} ETB</div><div class="lbl">Admin Share</div></div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
                             <thead>
-                                <tr style="color:#94A3B8;text-align:left;">
-                                    <th style="padding:10px 8px;border-bottom:1px solid #1E293B;">Game</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #1E293B;">Admin</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #1E293B;">Players</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #1E293B;">Commission</th>
-                                    <th style="padding:10px 8px;border-bottom:1px solid #1E293B;">Admin Share</th>
+                                <tr>
+                                    <th>Game</th>
+                                    <th>Admin</th>
+                                    <th>Players</th>
+                                    <th>Total Commission (ETB)</th>
+                                    <th>Admin Share (ETB)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${rows.map(r => `
                                     <tr>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1E293B;"><strong>${escapeHtml(r.game_name)}</strong></td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1E293B;">${escapeHtml(r.admin_name)}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1E293B;">${r.player_count || 0}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1E293B;">${(r.total_commission || 0).toLocaleString()}</td>
-                                        <td style="padding:10px 8px;border-bottom:1px solid #1E293B;color:#FF6B00;">${(r.admin_share || 0).toLocaleString()}</td>
+                                        <td><strong style="color:var(--text);">${escapeHtml(r.game_name)}</strong></td>
+                                        <td>${escapeHtml(r.admin_name)}</td>
+                                        <td>${r.player_count || 0}</td>
+                                        <td>${(r.total_commission || 0).toFixed(0)}</td>
+                                        <td style="color:var(--accent);font-weight:600;">${(r.admin_share || 0).toFixed(0)}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
-                    </div>`;
+                    </div>
+                `;
+
+                const gameMap = new Map();
+                rows.forEach(r => {
+                    const key = r.game_name;
+                    if (!gameMap.has(key)) {
+                        gameMap.set(key, { game: key, admins: [] });
+                    }
+                    gameMap.get(key).admins.push({
+                        admin: r.admin_name,
+                        share: r.admin_share || 0,
+                        commission: r.total_commission || 0,
+                        players: r.player_count || 0
+                    });
+                });
+
+                const allAdminNames = [...new Set(rows.map(r => r.admin_name))];
+                const colorPalette = [
+                    '#F97316', '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
+                    '#14B8A6', '#F43F5E', '#818CF8', '#84CC16', '#06B6D4',
+                    '#FB923C', '#D946EF', '#0EA5E9', '#EAB308', '#F97316'
+                ];
+                const adminColorMap = {};
+                allAdminNames.forEach((name, idx) => {
+                    adminColorMap[name] = colorPalette[idx % colorPalette.length];
+                });
+
+                let chartHtml = `
+                    <div class="chart-container">
+                        <h4>Admin Share per Game (stacked bar)</h4>
+                        ${Array.from(gameMap.entries()).map(([gameName, gameData]) => {
+                            const total = gameData.admins.reduce((sum, a) => sum + a.share, 0);
+                            let segments = '';
+                            gameData.admins.forEach(a => {
+                                const share = a.share || 0;
+                                const segWidth = total > 0 ? (share / total) * 100 : 0;
+                                if (segWidth > 0) {
+                                    segments += `
+                                        <div class="chart-bar-segment" style="width:${segWidth}%;background:${adminColorMap[a.admin]};">
+                                            ${segWidth > 8 ? Math.round(share) : ''}
+                                        </div>
+                                    `;
+                                }
+                            });
+                            return `
+                                <div class="chart-bar-row">
+                                    <div class="chart-bar-label" title="${escapeHtml(gameName)}">${escapeHtml(gameName)}</div>
+                                    <div class="chart-bar-track">
+                                        ${segments}
+                                    </div>
+                                    <div class="chart-bar-total">${total.toFixed(0)} ETB</div>
+                                </div>
+                            `;
+                        }).join('')}
+                        <div class="chart-legend">
+                            ${allAdminNames.map(name => `
+                                <div class="chart-legend-item">
+                                    <span class="color-box" style="background:${adminColorMap[name]};"></span>
+                                    ${escapeHtml(name)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = tableHtml + chartHtml;
+
             } catch (err) {
-                container.innerHTML = `<div class="empty-state"><p style="color:#EF4444">${escapeHtml(err.message)}</p>
-                <button class="btn btn-primary btn-sm" onclick="fetchAnalysis()">Retry</button></div>`;
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <p style="color:var(--red);">${escapeHtml(err.message)}</p>
+                        <button class="btn btn-primary btn-sm retry-btn" onclick="fetchAnalysis()"><i class="fas fa-sync-alt"></i> Retry</button>
+                    </div>
+                `;
             }
         }
-
-        // ─── MODAL ───
-        function openAdminModal(adminId) {
-            document.getElementById('modalOverlay').classList.add('active');
-            document.body.style.overflow = 'hidden';
-            document.getElementById('modalBody').innerHTML = `<div class="loading-state"><div class="spinner"></div></div>`;
-        }
-        function closeModal() {
-            document.getElementById('modalOverlay').classList.remove('active');
-            document.body.style.overflow = '';
-        }
-        document.getElementById('modalOverlay').addEventListener('click', e => {
-            if (e.target === e.currentTarget) closeModal();
-        });
 
         // ─── REFRESH ───
         async function refreshAll() {
             if (isRefreshing) return;
             isRefreshing = true;
             try {
-                if (currentTab === 'overview') await loadPlatformStats();
-                else if (currentTab === 'admins') await loadAdmins();
-                else if (currentTab === 'withdrawals') await loadAdminWithdrawals(currentWithdrawFilter);
-                else if (currentTab === 'players') await loadGlobalPlayers();
-                else if (currentTab === 'platform') await fetchAnalysis();
+                if (currentTab === 'admins') await loadAdmins();
+                else if (currentTab === 'withdrawals') {
+                    updateWithdrawalFilterButtons(currentWithdrawFilter);
+                    await loadAdminWithdrawals(currentWithdrawFilter);
+                } else if (currentTab === 'platform') {
+                    if (currentPlatformView === 'overview') {
+                        await loadPlatformStats();
+                    } else {
+                        await fetchAnalysis();
+                    }
+                } else if (currentTab === 'players') await loadGlobalPlayers();
                 showToast('Refreshed', 'info');
+            } catch (err) {
+                console.error('Refresh error:', err);
             } finally {
                 isRefreshing = false;
             }
         }
 
+        // ─── AUTO REFRESH ───
         function startAutoRefresh() {
             if (refreshInterval) clearInterval(refreshInterval);
             refreshInterval = setInterval(() => {
                 if (!document.hidden) refreshAll();
             }, 30000);
         }
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (refreshInterval) { clearInterval(refreshInterval);
+                    refreshInterval = null; }
+            } else {
+                startAutoRefresh();
+                refreshAll();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault();
+                refreshAll(); }
+        });
 
         // ─── INIT ───
         async function init() {
-            await loadPlatformStats();
+            // Set initial active tab state
+            switchTab('withdrawals');
+            
+            // Load initial data
             await loadAdmins();
+            await loadPlatformStats();
+            updateWithdrawalFilterButtons('pending');
+            await loadAdminWithdrawals('pending');
+            await loadGlobalPlayers();
             startAutoRefresh();
         }
-        init();
+
+        document.addEventListener('touchstart', function() {}, { passive: true });
+        
+        // Wait for DOM to be fully ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
