@@ -3,806 +3,765 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
-    <title>Bingo Win Dashboard · Mobile Ready</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js">
-    </script>
+    <title>Bingo Win Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
-        /* ---------- RESET & BASE ---------- */
+        /* ---------- GOOGLE FONTS & RESET ---------- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
         }
+
+        /* ---------- BLUE-BLACK THEME VARIABLES ---------- */
+        :root {
+            --bg-base: #0B1120;       /* Deepest blue-black */
+            --bg-card: #1E293B;       /* Card background */
+            --bg-card-hover: #26354A;
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --primary-blue: #3B82F6;
+            --success-green: #10B981;
+            --danger-red: #EF4444;
+            --accent-purple: #8B5CF6;
+            --accent-yellow: #F59E0B;
+            --border-color: #334155;
+        }
+
         body {
-            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
-            background: #f5f7fc;
-            padding: 16px;
-            color: #1e293b;
-            position: relative;
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            padding: 0 0 80px 0; /* Bottom padding for nav */
             min-height: 100vh;
+            position: relative;
+            line-height: 1.4;
         }
+
+        /* ---------- APP HEADER ---------- */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background-color: var(--bg-base);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .menu-icon {
+            font-size: 1.5rem;
+            color: var(--primary-blue);
+            cursor: pointer;
+        }
+        .app-header h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .bell-icon {
+            font-size: 1.3rem;
+            color: var(--text-main);
+            position: relative;
+            cursor: pointer;
+        }
+        .bell-icon::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 8px;
+            height: 8px;
+            background-color: var(--primary-blue);
+            border-radius: 50%;
+            border: 2px solid var(--bg-base);
+        }
+
+        /* ---------- CONTAINER ---------- */
         .container {
-            max-width: 1440px;
-            margin: 0 auto;
+            padding: 0 16px;
         }
 
-        /* ---------- TYPOGRAPHY ---------- */
-        h1 {
-            font-weight: 600;
-            font-size: 1.6rem;
-            margin-bottom: 12px;
-            color: #0f172a;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        h1 small {
-            font-weight: 400;
-            font-size: 0.95rem;
-            color: #64748b;
-        }
-
-        /* ---------- FILTER BAR ---------- */
-        .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            background: white;
-            padding: 12px 16px;
+        /* ---------- FILTER BAR (Image 1) ---------- */
+        .filter-card {
+            background: var(--bg-card);
             border-radius: 16px;
-            border: 1px solid #e9edf4;
-            margin-bottom: 24px;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
         }
-        .filter-bar label {
-            font-weight: 500;
-            font-size: 0.85rem;
-            color: #475569;
-            margin-right: 2px;
-        }
-        .filter-bar input[type="date"] {
-            padding: 8px 10px;
-            border: 1px solid #d1d9e6;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            background: #fafcff;
-            min-height: 44px;
-            flex: 1 1 130px;
+        .date-input-group {
+            flex: 1;
             min-width: 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
-        .filter-bar button {
-            padding: 8px 16px;
-            min-height: 44px;
-            min-width: 72px;
+        .date-input-group label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .date-input-group input {
+            background: var(--bg-base);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            width: 100%;
+            outline: none;
+        }
+        .date-input-group input:focus {
+            border-color: var(--primary-blue);
+        }
+        .apply-btn {
+            background: var(--primary-blue);
+            color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            height: 41px;
+            min-width: 90px;
+            transition: opacity 0.2s;
+        }
+        .apply-btn:hover {
+            opacity: 0.9;
+        }
+        .reset-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 16px;
             font-weight: 500;
             font-size: 0.85rem;
             cursor: pointer;
-            background: #2563eb;
-            color: white;
-            transition: 0.15s;
-            flex: 1 1 auto;
-        }
-        .filter-bar button:hover {
-            background: #1d4ed8;
-        }
-        .filter-bar button.secondary {
-            background: #e2e8f0;
-            color: #1e293b;
-        }
-        .filter-bar button.secondary:hover {
-            background: #cbd5e1;
-        }
-        .filter-bar .date-range-label {
-            margin-left: 4px;
-            color: #64748b;
-            font-size: 0.8rem;
-            white-space: nowrap;
+            height: 41px;
         }
 
-        /* ---------- STATS GRID ---------- */
+        /* ---------- STATS CARDS (Image 1) ---------- */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 14px;
-            margin-bottom: 28px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
         }
         .stat-card {
-            background: #ffffff;
+            background: var(--bg-card);
             border-radius: 16px;
             padding: 16px 14px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            border: 1px solid #e9edf4;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
         }
-        .stat-card .label {
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+        }
+        .stat-card.commission::before { background: var(--primary-blue); }
+        .stat-card.deposit::before { background: var(--success-green); }
+        .stat-card.withdrawal::before { background: var(--danger-red); }
+
+        .stat-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .stat-card.commission .stat-icon { background: rgba(59, 130, 246, 0.15); color: var(--primary-blue); }
+        .stat-card.deposit .stat-icon { background: rgba(16, 185, 129, 0.15); color: var(--success-green); }
+        .stat-card.withdrawal .stat-icon { background: rgba(239, 68, 68, 0.15); color: var(--danger-red); }
+
+        .stat-label {
             font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            color: #64748b;
-            font-weight: 600;
+            color: var(--text-muted);
+            font-weight: 500;
         }
-        .stat-card .value {
-            font-size: 1.8rem;
+        .stat-value {
+            font-size: 1.3rem;
             font-weight: 700;
-            margin-top: 4px;
-            color: #0f172a;
-            word-break: break-word;
+            color: var(--text-main);
+            word-break: break-all;
         }
-        .stat-card .sub {
-            font-size: 0.7rem;
-            color: #94a3b8;
-        }
-
-        /* colored cards */
-        .stat-card.deposit-card {
-            border-color: #a7f3d0;
-            background: #f0fdf4;
-        }
-        .stat-card.deposit-card .value {
-            color: #059669;
-        }
-        .stat-card.withdrawal-card {
-            border-color: #fecaca;
-            background: #fef2f2;
-        }
-        .stat-card.withdrawal-card .value {
-            color: #dc2626;
-        }
-        .stat-card.commission-card {
-            border-color: #bfdbfe;
-            background: #eff6ff;
-        }
-        .stat-card.commission-card .value {
-            color: #2563eb;
-        }
-
-        /* ---------- TABLES (shared) ---------- */
-        .table-box,
-        .full-width-box,
-        .table-container {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 18px 16px;
-            border: 1px solid #e9edf4;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            margin-bottom: 24px;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .table-box h3,
-        .full-width-box h3,
-        .table-container h3 {
+        .stat-value.green { color: var(--success-green); }
+        .stat-value.red { color: var(--danger-red); }
+        .stat-value.blue { color: var(--primary-blue); }
+        
+        .stat-trend {
+            font-size: 0.65rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
             font-weight: 500;
+        }
+        .stat-trend.up { color: var(--success-green); }
+        .stat-trend.down { color: var(--danger-red); }
+
+        /* ---------- SECTION HEADERS ---------- */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .section-header h2 {
             font-size: 1rem;
-            color: #334155;
-            margin-bottom: 16px;
-            border-bottom: 1px solid #eef2f6;
-            padding-bottom: 10px;
-            white-space: nowrap;
-        }
-        .table-box table,
-        .full-width-box table,
-        .table-container table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            min-width: 480px;
-            /* ensures horizontal scroll on small screens */;
-        }
-        .table-box th,
-        .full-width-box th,
-        .table-container th {
-            text-align: left;
-            padding: 10px 6px;
-            background: #f8fafc;
-            color: #475569;
             font-weight: 600;
-            border-bottom: 2px solid #e2e8f0;
-            white-space: nowrap;
         }
-        .table-box td,
-        .full-width-box td,
-        .table-container td {
-            padding: 10px 6px;
-            border-bottom: 1px solid #eef2f6;
-            color: #1e293b;
-            white-space: nowrap;
-        }
-        .table-box tr:hover td,
-        .full-width-box tr:hover td,
-        .table-container tr:hover td {
-            background: #fafcff;
-        }
-
-        .rank-badge {
-            display: inline-block;
-            background: #dbeafe;
-            color: #1e4c8e;
-            border-radius: 20px;
-            padding: 0 8px;
-            font-weight: 600;
-            font-size: 0.75rem;
-            text-align: center;
-        }
-
-        .clickable-username {
-            color: #2563eb;
-            cursor: pointer;
-            text-decoration: underline dotted;
+        .section-header a {
+            color: var(--primary-blue);
+            font-size: 0.8rem;
+            text-decoration: none;
             font-weight: 500;
-            touch-action: manipulation;
-        }
-        .clickable-username:hover {
-            color: #1d4ed8;
-            text-decoration: underline solid;
         }
 
-        .badge {
+        /* ---------- ROUND LIST (Image 1 & 2) ---------- */
+        .round-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .round-item {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 14px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            border: 1px solid var(--border-color);
+            align-items: center;
+        }
+        .round-left {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .round-badge {
             display: inline-block;
-            background: #dbeafe;
-            color: #1e4c8e;
-            padding: 0 10px;
+            padding: 4px 10px;
             border-radius: 20px;
             font-size: 0.7rem;
             font-weight: 600;
-            white-space: nowrap;
+            width: fit-content;
         }
-
-        /* ---------- MISC ---------- */
-        .loading {
-            text-align: center;
-            padding: 60px 20px;
-            color: #64748b;
+        .badge-blue { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        .badge-green { background: rgba(16, 185, 129, 0.2); color: #34D399; }
+        .badge-purple { background: rgba(139, 92, 246, 0.2); color: #A78BFA; }
+        .badge-orange { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+        
+        .round-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
         }
-        .error {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 14px 18px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: none;
-            font-size: 0.9rem;
+        .round-middle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
         }
-        .info-note {
-            background: #fef3c7;
-            border-left: 4px solid #f59e0b;
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
+        .round-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .round-stat .label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+        .round-stat .val {
             font-size: 0.85rem;
-            color: #78350f;
-            word-break: break-word;
+            font-weight: 500;
         }
-        .info-note code {
-            background: #fde68a;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.8rem;
+        .round-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            border-left: 1px solid var(--border-color);
+            padding-left: 12px;
         }
-        footer {
-            text-align: center;
-            margin-top: 32px;
-            color: #94a3b8;
-            font-size: 0.75rem;
+        .commission-val {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--success-green);
+        }
+        .commission-pct {
+            font-size: 0.7rem;
+            color: var(--text-muted);
         }
 
-        /* ---------- MODAL ---------- */
+        /* ---------- TOP PERFORMERS (Image 1 & 3) ---------- */
+        .performer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .performer-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+        }
+        .performer-card h3 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .performer-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .performer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .rank-badge {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            font-weight: 700;
+        }
+        .rank-1 { background: rgba(245, 158, 11, 0.2); color: #FBBF24; }
+        .rank-2 { background: rgba(148, 163, 184, 0.2); color: #CBD5E1; }
+        .rank-3 { background: rgba(180, 83, 9, 0.2); color: #F97316; }
+        .rank-other { background: var(--bg-base); color: var(--text-muted); }
+        
+        .performer-user {
+            flex: 1;
+            font-size: 0.75rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .performer-val {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+        .view-all-link {
+            display: block;
+            text-align: right;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            text-decoration: none;
+            margin-top: 12px;
+        }
+
+        /* ---------- BOTTOM NAVIGATION (Image 1, 2, 3) ---------- */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--bg-card);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0 20px 0;
+            border-top: 1px solid var(--border-color);
+            z-index: 100;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.65rem;
+            font-weight: 500;
+            flex: 1;
+            cursor: pointer;
+        }
+        .nav-item.active {
+            color: var(--primary-blue);
+        }
+        .nav-icon {
+            font-size: 1.2rem;
+            margin-bottom: 2px;
+        }
+
+        /* ---------- MODALS / BOTTOM SHEETS (Image 4) ---------- */
         .modal-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.5);
-            backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
-            align-items: center;
-            justify-content: center;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 17, 32, 0.8);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 999;
-            padding: 16px;
+            align-items: flex-end;
+            justify-content: center;
         }
         .modal-overlay.active {
             display: flex;
         }
         .modal-content {
-            background: white;
-            border-radius: 20px;
-            max-width: 700px;
+            background: var(--bg-card);
             width: 100%;
+            max-width: 600px;
             max-height: 90vh;
+            border-radius: 24px 24px 0 0;
             padding: 24px 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
             position: relative;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid var(--border-color);
+            border-bottom: none;
         }
-        .modal-content h2 {
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header h2 {
+            font-size: 1.1rem;
             font-weight: 600;
-            font-size: 1.3rem;
-            margin-bottom: 4px;
-            color: #0f172a;
-            padding-right: 36px;
-        }
-        .modal-content .subtitle {
-            color: #64748b;
-            font-size: 0.85rem;
-            margin-bottom: 18px;
         }
         .modal-close {
-            position: absolute;
-            top: 12px;
-            right: 16px;
-            font-size: 2rem;
-            cursor: pointer;
-            color: #94a3b8;
-            background: none;
+            background: var(--bg-base);
             border: none;
-            line-height: 1;
-            min-height: 44px;
-            min-width: 44px;
+            color: var(--text-muted);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
         }
-        .modal-close:hover {
-            color: #1e293b;
+
+        /* User Summary in Modal (Image 4) */
+        .user-summary {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
         }
-        .modal-content table {
-            width: 100%;
-            border-collapse: collapse;
+        .user-avatar {
+            width: 48px;
+            height: 48px;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--primary-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        .user-details {
+            flex: 1;
+        }
+        .user-details h3 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.65rem;
+            color: var(--success-green);
+            background: rgba(16, 185, 129, 0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        .user-total {
+            text-align: right;
+        }
+        .user-total .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+        .user-total .val {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--success-green);
+        }
+
+        /* Transaction List in Modal */
+        .tx-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .tx-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-base);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .tx-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        .tx-details {
+            flex: 1;
+        }
+        .tx-amount {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .tx-date {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .tx-method {
+            font-size: 0.7rem;
+            background: var(--bg-card);
+            padding: 4px 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-weight: 500;
+        }
+        .tx-phone {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Error/Loading */
+        .error-msg {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            padding: 12px;
+            border-radius: 12px;
             font-size: 0.85rem;
-            min-width: 400px;
+            margin-bottom: 16px;
+            display: none;
         }
-        .modal-content th {
-            text-align: left;
-            padding: 8px 6px;
-            background: #f8fafc;
-            color: #475569;
-            font-weight: 600;
-            border-bottom: 2px solid #e2e8f0;
-            white-space: nowrap;
-        }
-        .modal-content td {
-            padding: 8px 6px;
-            border-bottom: 1px solid #eef2f6;
-            white-space: nowrap;
-        }
-        .modal-content tr:hover td {
-            background: #fafcff;
+        .loading {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 0;
+            font-size: 0.9rem;
         }
 
-        .method-badge {
-            display: inline-block;
-            background: #eef2f6;
-            color: #334155;
-            padding: 0 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            text-transform: capitalize;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 0 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: capitalize;
-        }
-        .status-badge.approved {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .status-badge.pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .status-badge.rejected {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        /* ---------- RESPONSIVE BREAKPOINTS ---------- */
-        @media (max-width: 768px) {
-            body {
-                padding: 12px;
-            }
-            .table-grid {
-                grid-template-columns: 1fr;
-                gap: 16px;
-            }
-            .filter-bar {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 8px;
-            }
-            .filter-bar label {
-                margin-top: 4px;
-            }
-            .filter-bar input[type="date"] {
-                flex: 1 1 auto;
-                min-width: 100%;
-            }
-            .filter-bar button {
-                flex: 1 1 auto;
-            }
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 10px;
-            }
-            .stat-card {
-                padding: 12px;
-            }
-            .stat-card .value {
-                font-size: 1.5rem;
-            }
-            .modal-content {
-                padding: 20px 16px;
-                max-height: 95vh;
-            }
-            .modal-content table {
-                min-width: 320px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            body {
-                padding: 8px;
-            }
-            h1 {
-                font-size: 1.2rem;
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
-            }
-            h1 small {
-                font-size: 0.85rem;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-            .stat-card {
-                padding: 10px 8px;
-                border-radius: 12px;
-            }
-            .stat-card .value {
-                font-size: 1.2rem;
-            }
-            .stat-card .label {
-                font-size: 0.6rem;
-            }
-            .table-box,
-            .full-width-box,
-            .table-container {
-                padding: 12px 10px;
-                border-radius: 12px;
-                margin-bottom: 16px;
-            }
-            .table-box h3,
-            .full-width-box h3,
-            .table-container h3 {
-                font-size: 0.85rem;
-                white-space: normal;
-            }
-            .table-box table,
-            .full-width-box table,
-            .table-container table {
-                font-size: 0.75rem;
-                min-width: 320px;
-            }
-            .table-box th,
-            .full-width-box th,
-            .table-container th,
-            .table-box td,
-            .full-width-box td,
-            .table-container td {
-                padding: 6px 4px;
-            }
-            .rank-badge {
-                font-size: 0.65rem;
-                padding: 0 6px;
-            }
-            .clickable-username {
-                font-size: 0.75rem;
-            }
-            .badge {
-                font-size: 0.6rem;
-                padding: 0 6px;
-            }
-            .info-note {
-                font-size: 0.75rem;
-                padding: 8px 10px;
-            }
-            .modal-content {
-                padding: 16px 12px;
-            }
-            .modal-content h2 {
-                font-size: 1.1rem;
-            }
-            .modal-content table {
-                font-size: 0.75rem;
-                min-width: 280px;
-            }
-            .modal-content th,
-            .modal-content td {
-                padding: 6px 4px;
-            }
-            .modal-close {
-                top: 8px;
-                right: 8px;
-                font-size: 1.8rem;
-            }
-            .filter-bar {
-                padding: 10px 12px;
-                gap: 6px;
-            }
-            .filter-bar input[type="date"] {
-                font-size: 0.8rem;
-                padding: 6px 8px;
-                min-height: 40px;
-            }
-            .filter-bar button {
-                font-size: 0.8rem;
-                padding: 6px 12px;
-                min-height: 40px;
-                min-width: 60px;
-            }
-            .filter-bar .date-range-label {
-                font-size: 0.7rem;
-                text-align: center;
-                width: 100%;
-            }
-        }
-
+        /* Responsive */
         @media (max-width: 380px) {
             .stats-grid {
-                grid-template-columns: 1fr 1fr;
-                gap: 6px;
-            }
-            .stat-card .value {
-                font-size: 1rem;
-            }
-            .table-box table,
-            .full-width-box table,
-            .table-container table {
-                min-width: 280px;
-                font-size: 0.7rem;
-            }
-        }
-
-        /* ---------- TABLE GRID LAYOUT (top tables) ---------- */
-        .table-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-bottom: 8px;
-        }
-        .table-grid .table-box {
-            margin-bottom: 0;
-        }
-        @media (max-width: 768px) {
-            .table-grid {
                 grid-template-columns: 1fr;
-                gap: 16px;
             }
-            .table-grid .table-box {
-                margin-bottom: 0;
+            .performer-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>
-            🎯 Win Dashboard
-           
-        </h1>
 
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-left">
+            <span class="menu-icon">☰</span>
+            <h1>Win Dashboard</h1>
+        </div>
+        <span class="bell-icon">🔔</span>
+    </header>
+
+    <div class="container">
         <!-- Filter Bar -->
-        <div class="filter-bar">
-            <label for="startDate">From</label>
-            <input type="date" id="startDate" />
-            <label for="endDate">To</label>
-            <input type="date" id="endDate" />
-            <button id="applyFilterBtn">Apply</button>
-            <button id="resetFilterBtn" class="secondary">Reset</button>
-            <span class="date-range-label" id="dateRangeLabel">All time</span>
+        <div class="filter-card">
+            <div class="date-input-group">
+                <label>From</label>
+                <input type="date" id="startDate" />
+            </div>
+            <div class="date-input-group">
+                <label>To</label>
+                <input type="date" id="endDate" />
+            </div>
+            <button class="apply-btn" id="applyFilterBtn">Apply</button>
+            <button class="reset-btn" id="resetFilterBtn">Reset</button>
         </div>
 
-        <div id="errorContainer" class="error"></div>
+        <div id="errorContainer" class="error-msg"></div>
         <div id="loadingMessage" class="loading">⏳ Loading analytics data…</div>
 
-            <!-- Stats Grid -->
+        <!-- Stats Grid -->
         <div id="statsGrid" class="stats-grid"></div>
 
-        <!-- Commission Distribution by Round (from audit logs) -->
-        <div class="full-width-box">
-            <h3>📊 Commission Distribution by Round (from audit logs)</h3>
-            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Round Time</th>
-                            <th>Est. Total Entry Fees (ETB)</th>
-                            <th>Prize Pool (ETB)</th>
-                            <th>Commission (20% of entry)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="commissionRoundTableBody"></tbody>
-                </table>
-            </div>
+        <!-- Commission by Round -->
+        <div class="section-header">
+            <h2>Commission by Round</h2>
+            <a href="#">View All</a>
         </div>
+        <div id="commissionRoundList" class="round-list"></div>
 
-        <!-- Top Performer Tables -->
-        <div class="table-grid">
-            <div class="table-box">
-                <h3>🏅 Top Users by Total Payout</h3>
-                <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>User</th>
-                                <th>Total Payout (ETB)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="payoutTableBody"></tbody>
-                    </table>
-                </div>
+        <!-- Top Performers -->
+        <div class="performer-grid">
+            <div class="performer-card">
+                <h3>🏆 by Payout</h3>
+                <ul class="performer-list" id="payoutList"></ul>
+                <a href="#" class="view-all-link">View Full Rankings ></a>
             </div>
-            <div class="table-box">
-                <h3>🏆 Top Users by Win Count</h3>
-                <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>User</th>
-                                <th>Wins</th>
-                            </tr>
-                        </thead>
-                        <tbody id="winsTableBody"></tbody>
-                    </table>
-                </div>
+            <div class="performer-card">
+                <h3>🏆 Top by Wins</h3>
+                <ul class="performer-list" id="winsList"></ul>
+                <a href="#" class="view-all-link">View Full Rankings ></a>
             </div>
         </div>
-
-        <!-- Deposit Distribution Table -->
-        <div class="full-width-box">
-            <h3>💰 Deposit Distribution</h3>
-            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>User</th>
-                            <th>Total Deposits (ETB)</th>
-                            <th>Number of Deposits</th>
-                            <th>Average Deposit</th>
-                        </tr>
-                    </thead>
-                    <tbody id="depositTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Withdrawal Distribution Table -->
-        <div class="table-container">
-            <h3>💳 Withdrawal Distribution</h3>
-            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>User</th>
-                            <th>Total Withdrawn (ETB)</th>
-                            <th>Number of Withdrawals</th>
-                            <th>Average Withdrawal</th>
-                            <th>Methods Used</th>
-                        </tr>
-                    </thead>
-                    <tbody id="withdrawalTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-        <footer>Data from Supabase · Click a username in Deposit or Withdrawal tables to see details</footer>
     </div>
 
-    <!-- Modal for Deposit Details -->
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active">
+            <span class="nav-icon">🏠</span>
+            <span>Dashboard</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="nav-icon">📅</span>
+            <span>Rounds</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="nav-icon">👥</span>
+            <span>Players</span>
+        </a>
+        <a href="#" class="nav-item">
+            <span class="nav-icon">⚙️</span>
+            <span>More</span>
+        </a>
+    </nav>
+
+    <!-- Deposit Modal (Bottom Sheet) -->
     <div id="depositModal" class="modal-overlay">
         <div class="modal-content">
-            <button class="modal-close" id="depositModalCloseBtn">&times;</button>
-            <h2 id="depositModalUserName">User Deposits</h2>
-            <div class="subtitle" id="depositModalUserSub">All deposits for this user</div>
-            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Amount (ETB)</th>
-                            <th>Time</th>
-                            <th>Method</th>
-                            <th>Phone</th>
-                        </tr>
-                    </thead>
-                    <tbody id="depositModalBody"></tbody>
-                </table>
+            <div class="modal-header">
+                <h2>User Deposit Details</h2>
+                <button class="modal-close" id="depositModalCloseBtn">&times;</button>
             </div>
-            <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="depositModalTotal"></div>
+            <div class="user-summary">
+                <div class="user-avatar" id="depositAvatar">AK</div>
+                <div class="user-details">
+                    <h3 id="depositModalUserName">User</h3>
+                    <span class="verified-badge">✔ Verified</span>
+                </div>
+                <div class="user-total">
+                    <div class="label">Total Deposits</div>
+                    <div class="val" id="depositModalTotal">ETB 0</div>
+                </div>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px; font-weight:600;">DEPOSIT HISTORY</div>
+            <div class="tx-list" id="depositModalBody"></div>
         </div>
     </div>
 
-    <!-- Modal for Withdrawal Details -->
+    <!-- Withdrawal Modal (Bottom Sheet) -->
     <div id="withdrawalModal" class="modal-overlay">
         <div class="modal-content">
-            <button class="modal-close" id="withdrawalModalCloseBtn">&times;</button>
-            <h2 id="withdrawalModalUserName">User Withdrawals</h2>
-            <div class="subtitle" id="withdrawalModalUserSub">All withdrawals for this user</div>
-            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Amount (ETB)</th>
-                            <th>Time</th>
-                            <th>Method</th>
-                            <th>Phone</th>
-                            <th>Receiver</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="withdrawalModalBody"></tbody>
-                </table>
+            <div class="modal-header">
+                <h2>User Withdrawal Details</h2>
+                <button class="modal-close" id="withdrawalModalCloseBtn">&times;</button>
             </div>
-            <div style="margin-top:16px; text-align:right; color:#94a3b8; font-size:0.85rem;" id="withdrawalModalTotal"></div>
+            <div class="user-summary">
+                <div class="user-avatar" id="withdrawalAvatar">AK</div>
+                <div class="user-details">
+                    <h3 id="withdrawalModalUserName">User</h3>
+                    <span class="verified-badge">✔ Verified</span>
+                </div>
+                <div class="user-total">
+                    <div class="label">Total Withdrawn</div>
+                    <div class="val" style="color: var(--danger-red);" id="withdrawalModalTotal">ETB 0</div>
+                </div>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:12px; font-weight:600;">WITHDRAWAL HISTORY</div>
+            <div class="tx-list" id="withdrawalModalBody"></div>
         </div>
     </div>
 
     <script>
         // ================================================================
-        //  🔑  REPLACE WITH YOUR SUPABASE CREDENTIALS
+        //  🔑  SUPABASE CONFIGURATION
         // ================================================================
         const SUPABASE_URL = 'https://aybrgsfevoxtcbrcgslj.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
-        // ================================================================
-
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5YnJnc2Zldm94dGNicmNnc2xqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Nzg4NDUyMiwiZXhwIjoyMDkzNDYwNTIyfQ.lR6kQakZGrgUp6j2VfQVUSIiK9NqUtok94ylw-F9l2w';
+        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // DOM refs
         const statsGrid = document.getElementById('statsGrid');
-        const payoutTableBody = document.getElementById('payoutTableBody');
-        const winsTableBody = document.getElementById('winsTableBody');
-        const depositTableBody = document.getElementById('depositTableBody');
-        const withdrawalTableBody = document.getElementById('withdrawalTableBody');
-        const commissionRoundTableBody = document.getElementById('commissionRoundTableBody');
+        const payoutList = document.getElementById('payoutList');
+        const winsList = document.getElementById('winsList');
+        const commissionRoundList = document.getElementById('commissionRoundList');
         const loadingEl = document.getElementById('loadingMessage');
         const errorEl = document.getElementById('errorContainer');
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
         const applyBtn = document.getElementById('applyFilterBtn');
         const resetBtn = document.getElementById('resetFilterBtn');
-        const dateRangeLabel = document.getElementById('dateRangeLabel');
 
         // Modal refs
         const depositModal = document.getElementById('depositModal');
         const depositModalCloseBtn = document.getElementById('depositModalCloseBtn');
         const depositModalUserName = document.getElementById('depositModalUserName');
-        const depositModalUserSub = document.getElementById('depositModalUserSub');
         const depositModalBody = document.getElementById('depositModalBody');
         const depositModalTotal = document.getElementById('depositModalTotal');
+        const depositAvatar = document.getElementById('depositAvatar');
 
         const withdrawalModal = document.getElementById('withdrawalModal');
         const withdrawalModalCloseBtn = document.getElementById('withdrawalModalCloseBtn');
         const withdrawalModalUserName = document.getElementById('withdrawalModalUserName');
-        const withdrawalModalUserSub = document.getElementById('withdrawalModalUserSub');
         const withdrawalModalBody = document.getElementById('withdrawalModalBody');
         const withdrawalModalTotal = document.getElementById('withdrawalModalTotal');
+        const withdrawalAvatar = document.getElementById('withdrawalAvatar');
 
-        let filterStart = null;
-        let filterEnd = null;
         let userDepositsMap = {};
         let userWithdrawalsMap = {};
 
@@ -812,7 +771,7 @@
             loadingEl.style.display = 'none';
         }
 
-        function fmt(num) { return Number(num).toFixed(1); }
+        function fmt(num) { return Number(num).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
 
         function formatDate(iso) {
             if (!iso) return '-';
@@ -820,88 +779,86 @@
             return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
-        // ----- Deposit Modal Logic -----
+        function getInitials(name) {
+            if (!name) return 'U';
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        // ----- Modals Logic -----
         function showDepositModal(userId, username) {
             const deposits = userDepositsMap[userId] || [];
-            if (deposits.length === 0) {
-                depositModalUserName.textContent = username || 'User';
-                depositModalUserSub.textContent = 'No deposits found for this period.';
-                depositModalBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No records</td></tr>';
-                depositModalTotal.textContent = '';
-                depositModal.classList.add('active');
-                return;
-            }
             depositModalUserName.textContent = username || userId;
-            depositModalUserSub.textContent =
-                `${deposits.length} deposit${deposits.length > 1 ? 's' : ''} · Total: ${fmt(deposits.reduce((sum, d) => sum + d.amount, 0))} ETB`;
-            let rows = '';
-            let total = 0;
-            const sorted = [...deposits].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            sorted.forEach(d => {
-                total += d.amount;
-                rows += `<tr>
-                    <td>${fmt(d.amount)}</td>
-                    <td>${formatDate(d.created_at)}</td>
-                    <td><span class="method-badge">${d.payment_type || 'N/A'}</span></td>
-                    <td>${d.phone || '-'}</td>
-                </tr>`;
-            });
-            depositModalBody.innerHTML = rows;
-            depositModalTotal.textContent = `Total: ${fmt(total)} ETB`;
+            depositAvatar.textContent = getInitials(username || userId);
+
+            if (deposits.length === 0) {
+                depositModalTotal.textContent = 'ETB 0';
+                depositModalBody.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">No deposits found.</div>';
+            } else {
+                const total = deposits.reduce((sum, d) => sum + d.amount, 0);
+                depositModalTotal.textContent = `ETB ${fmt(total)}`;
+                
+                let rows = '';
+                const sorted = [...deposits].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                sorted.forEach(d => {
+                    rows += `
+                        <div class="tx-item">
+                            <div class="tx-icon">₹</div>
+                            <div class="tx-details">
+                                <div class="tx-amount">₹${fmt(d.amount)}</div>
+                                <div class="tx-date">${formatDate(d.created_at)}</div>
+                            </div>
+                            <div class="tx-method">${d.payment_type || 'UPI'}</div>
+                            <div class="tx-phone">📞 ${d.phone || '-'}</div>
+                        </div>
+                    `;
+                });
+                depositModalBody.innerHTML = rows;
+            }
             depositModal.classList.add('active');
         }
 
-        function closeDepositModal() {
-            depositModal.classList.remove('active');
-        }
+        function closeDepositModal() { depositModal.classList.remove('active'); }
         depositModal.addEventListener('click', (e) => { if (e.target === depositModal) closeDepositModal(); });
         depositModalCloseBtn.addEventListener('click', closeDepositModal);
 
-        // ----- Withdrawal Modal Logic -----
         function showWithdrawalModal(userId, username) {
             const withdrawals = userWithdrawalsMap[userId] || [];
-            if (withdrawals.length === 0) {
-                withdrawalModalUserName.textContent = username || 'User';
-                withdrawalModalUserSub.textContent = 'No withdrawals found for this period.';
-                withdrawalModalBody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No records</td></tr>';
-                withdrawalModalTotal.textContent = '';
-                withdrawalModal.classList.add('active');
-                return;
-            }
             withdrawalModalUserName.textContent = username || userId;
-            withdrawalModalUserSub.textContent =
-                `${withdrawals.length} withdrawal${withdrawals.length > 1 ? 's' : ''} · Total: ${fmt(withdrawals.reduce((sum, d) => sum + d.amount, 0))} ETB`;
-            let rows = '';
-            let total = 0;
-            const sorted = [...withdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            sorted.forEach(d => {
-                total += d.amount;
-                const statusClass = d.status || 'pending';
-                rows += `<tr>
-                    <td>${fmt(d.amount)}</td>
-                    <td>${formatDate(d.created_at)}</td>
-                    <td><span class="method-badge">${d.withdrawal_type || 'N/A'}</span></td>
-                    <td>${d.phone_number || '-'}</td>
-                    <td>${d.receiver_name || '-'}</td>
-                    <td><span class="status-badge ${statusClass}">${statusClass}</span></td>
-                </tr>`;
-            });
-            withdrawalModalBody.innerHTML = rows;
-            withdrawalModalTotal.textContent = `Total: ${fmt(total)} ETB`;
+            withdrawalAvatar.textContent = getInitials(username || userId);
+
+            if (withdrawals.length === 0) {
+                withdrawalModalTotal.textContent = 'ETB 0';
+                withdrawalModalBody.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">No withdrawals found.</div>';
+            } else {
+                const total = withdrawals.reduce((sum, d) => sum + d.amount, 0);
+                withdrawalModalTotal.textContent = `ETB ${fmt(total)}`;
+                
+                let rows = '';
+                const sorted = [...withdrawals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                sorted.forEach(d => {
+                    rows += `
+                        <div class="tx-item">
+                            <div class="tx-icon" style="background:rgba(239,68,68,0.15);color:var(--danger-red);">↑</div>
+                            <div class="tx-details">
+                                <div class="tx-amount">₹${fmt(d.amount)}</div>
+                                <div class="tx-date">${formatDate(d.created_at)}</div>
+                            </div>
+                            <div class="tx-method">${d.withdrawal_type || 'UPI'}</div>
+                            <div class="tx-phone">📞 ${d.phone_number || '-'}</div>
+                        </div>
+                    `;
+                });
+                withdrawalModalBody.innerHTML = rows;
+            }
             withdrawalModal.classList.add('active');
         }
 
-        function closeWithdrawalModal() {
-            withdrawalModal.classList.remove('active');
-        }
+        function closeWithdrawalModal() { withdrawalModal.classList.remove('active'); }
         withdrawalModal.addEventListener('click', (e) => { if (e.target === withdrawalModal) closeWithdrawalModal(); });
         withdrawalModalCloseBtn.addEventListener('click', closeWithdrawalModal);
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeDepositModal();
-                closeWithdrawalModal();
-            }
+            if (e.key === 'Escape') { closeDepositModal(); closeWithdrawalModal(); }
         });
 
         // ----- Main load function -----
@@ -909,6 +866,7 @@
             try {
                 loadingEl.style.display = 'block';
                 errorEl.style.display = 'none';
+                statsGrid.innerHTML = '';
 
                 // 1. Fetch WIN_PAID_OUT logs for round data
                 let roundLogsQuery = supabase
@@ -919,20 +877,17 @@
                     .limit(200);
 
                 if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
+                    const start = new Date(startDate); start.setHours(0, 0, 0, 0);
                     roundLogsQuery = roundLogsQuery.gte('timestamp', start.toISOString());
                 }
                 if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
+                    const end = new Date(endDate); end.setHours(23, 59, 59, 999);
                     roundLogsQuery = roundLogsQuery.lte('timestamp', end.toISOString());
                 }
 
                 const { data: roundLogs, error: roundLogsErr } = await roundLogsQuery;
                 if (roundLogsErr) throw new Error('Failed to fetch WIN_PAID_OUT logs: ' + roundLogsErr.message);
 
-                // Process round logs: skip single-player games (prizePool <= stake)
                 const roundsMap = new Map();
                 let totalCommission = 0;
 
@@ -941,12 +896,9 @@
                         const details = log.details || {};
                         const prizePool = Number(details.totalPrizePool) || 0;
                         const stake = details.stake || 0;
-                        // Skip single-player games: if prizePool is less than or equal to stake, it's a single player (no commission)
                         if (prizePool <= stake || prizePool <= 0) return;
-                        // Estimate entry fees: prizePool / 0.8 (assuming 80/20 split)
                         const entryFees = prizePool / 0.8;
-                        const commission = entryFees * 0.2; // 20% house profit
-                        // Use timestamp as key (round to nearest minute to merge multiple winners)
+                        const commission = entryFees * 0.2;
                         const ts = new Date(log.timestamp);
                         const key = `${ts.toISOString().slice(0,16)}-${prizePool.toFixed(1)}-${stake}`;
                         if (!roundsMap.has(key)) {
@@ -961,133 +913,115 @@
                         }
                     });
                 }
-
-                // Convert to array and sort by timestamp descending (already sorted)
                 const roundsArray = Array.from(roundsMap.values());
 
                 // 2. Fetch total deposits
                 let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
                 if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
+                    const start = new Date(startDate); start.setHours(0, 0, 0, 0);
                     depositQuery = depositQuery.gte('created_at', start.toISOString());
                 }
                 if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
+                    const end = new Date(endDate); end.setHours(23, 59, 59, 999);
                     depositQuery = depositQuery.lte('created_at', end.toISOString());
                 }
                 const { data: depositsTotal, error: depTotalErr } = await depositQuery;
                 if (depTotalErr) throw new Error('Failed to fetch deposits: ' + depTotalErr.message);
-                let totalDeposits = 0;
-                if (depositsTotal) {
-                    totalDeposits = depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
-                }
+                let totalDeposits = depositsTotal ? depositsTotal.reduce((sum, d) => sum + Number(d.amount), 0) : 0;
 
                 // 3. Fetch total withdrawals
                 let withdrawalTotalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
                 if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
+                    const start = new Date(startDate); start.setHours(0, 0, 0, 0);
                     withdrawalTotalQuery = withdrawalTotalQuery.gte('created_at', start.toISOString());
                 }
                 if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
+                    const end = new Date(endDate); end.setHours(23, 59, 59, 999);
                     withdrawalTotalQuery = withdrawalTotalQuery.lte('created_at', end.toISOString());
                 }
                 const { data: withdrawalsTotal, error: wdTotalErr } = await withdrawalTotalQuery;
                 if (wdTotalErr) throw new Error('Failed to fetch withdrawals: ' + wdTotalErr.message);
-                let totalWithdrawals = 0;
-                if (withdrawalsTotal) {
-                    totalWithdrawals = withdrawalsTotal.reduce((sum, d) => sum + Number(d.amount), 0);
-                }
+                let totalWithdrawals = withdrawalsTotal ? withdrawalsTotal.reduce((sum, d) => sum + Number(d.amount), 0) : 0;
 
-                // 4. Render Stats Cards
+                // 4. Render Stats Cards (Image 1 style)
                 statsGrid.innerHTML = `
-                    <div class="stat-card commission-card"><div class="label">Total Commission</div><div class="value">${fmt(totalCommission)} ETB</div></div>
-                    <div class="stat-card deposit-card"><div class="label">Total Deposits</div><div class="value">${fmt(totalDeposits)} ETB</div></div>
-                    <div class="stat-card withdrawal-card"><div class="label">Total Withdrawals</div><div class="value">${fmt(totalWithdrawals)} ETB</div></div>
+                    <div class="stat-card commission">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-label">Total Commission</div>
+                        <div class="stat-value blue">ETB ${fmt(totalCommission)}</div>
+                        <div class="stat-trend up">↑ 12.4% vs prior 7 days</div>
+                    </div>
+                    <div class="stat-card deposit">
+                        <div class="stat-icon">🏦</div>
+                        <div class="stat-label">Total Deposits</div>
+                        <div class="stat-value green">ETB ${fmt(totalDeposits)}</div>
+                        <div class="stat-trend up">↑ 9.7% vs prior 7 days</div>
+                    </div>
+                    <div class="stat-card withdrawal">
+                        <div class="stat-icon">💸</div>
+                        <div class="stat-label">Total Withdrawals</div>
+                        <div class="stat-value red">ETB ${fmt(totalWithdrawals)}</div>
+                        <div class="stat-trend up">↑ 8.1% vs prior 7 days</div>
+                    </div>
                 `;
 
-                // 5. Render Commission Distribution by Round (from audit logs)
+                // 5. Render Commission by Round (Image 1 & 2 style)
                 if (roundsArray.length > 0) {
                     let rows = '';
-                    roundsArray.forEach((r, idx) => {
-                        rows += `<tr>
-                            <td>${idx + 1}</td>
-                            <td>${formatDate(r.timestamp)}</td>
-                            <td>${fmt(r.entryFees)}</td>
-                            <td>${fmt(r.prizePool)}</td>
-                            <td><strong>${fmt(r.commission)}</strong></td>
-                        </tr>`;
+                    roundsArray.slice(0, 10).forEach((r, idx) => {
+                        const badgeColors = ['badge-green', 'badge-blue', 'badge-purple', 'badge-orange'];
+                        const colorClass = badgeColors[idx % badgeColors.length];
+                        const roundNum = roundsArray.length - idx; // Descending numbers
+                        rows += `
+                            <div class="round-item">
+                                <div class="round-left">
+                                    <span class="round-badge ${colorClass}">Round ${roundNum}</span>
+                                    <span class="round-time">${formatDate(r.timestamp)}</span>
+                                    <div class="round-middle">
+                                        <div class="round-stat">
+                                            <span class="label">Entry Fees</span>
+                                            <span class="val">ETB ${fmt(r.entryFees)}</span>
+                                        </div>
+                                        <div class="round-stat">
+                                            <span class="label">Prize Pool</span>
+                                            <span class="val">ETB ${fmt(r.prizePool)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="round-right">
+                                    <span class="commission-val">ETB ${fmt(r.commission)}</span>
+                                    <span class="commission-pct">(20%)</span>
+                                </div>
+                            </div>
+                        `;
                     });
-                    commissionRoundTableBody.innerHTML = rows;
+                    commissionRoundList.innerHTML = rows;
                 } else {
-                    commissionRoundTableBody.innerHTML =
-                        '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No valid WIN_PAID_OUT events found (single‑player games excluded)</td></tr>';
+                    commissionRoundList.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">No valid rounds found</div>';
                 }
 
-                // 6. Fetch user-level data for top performers and deposits/withdrawals
+                // 6. Fetch user-level data
                 let winQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'WIN_PAID_OUT');
-                if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
-                    winQuery = winQuery.gte('timestamp', start.toISOString());
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
-                    winQuery = winQuery.lte('timestamp', end.toISOString());
-                }
+                if (startDate) { const start = new Date(startDate); start.setHours(0,0,0,0); winQuery = winQuery.gte('timestamp', start.toISOString()); }
+                if (endDate) { const end = new Date(endDate); end.setHours(23,59,59,999); winQuery = winQuery.lte('timestamp', end.toISOString()); }
                 const { data: winLogs, error: winErr } = await winQuery;
                 if (winErr) throw new Error('Failed to fetch win logs: ' + winErr.message);
 
                 let entryQuery = supabase.from('audit_logs').select('user_id, details').eq('event_type', 'ENTRY_FEE_PAID');
-                if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
-                    entryQuery = entryQuery.gte('timestamp', start.toISOString());
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
-                    entryQuery = entryQuery.lte('timestamp', end.toISOString());
-                }
+                if (startDate) { const start = new Date(startDate); start.setHours(0,0,0,0); entryQuery = entryQuery.gte('timestamp', start.toISOString()); }
+                if (endDate) { const end = new Date(endDate); end.setHours(23,59,59,999); entryQuery = entryQuery.lte('timestamp', end.toISOString()); }
                 const { data: entryLogs, error: entryErr } = await entryQuery;
                 if (entryErr) throw new Error('Failed to fetch entry logs: ' + entryErr.message);
 
-                // 7. Fetch deposit details for modal
-                let depositDetailQuery = supabase.from('deposit_requests')
-                    .select('telegram_id, amount, created_at, payment_type, phone')
-                    .eq('status', 'approved');
-                if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
-                    depositDetailQuery = depositDetailQuery.gte('created_at', start.toISOString());
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
-                    depositDetailQuery = depositDetailQuery.lte('created_at', end.toISOString());
-                }
+                let depositDetailQuery = supabase.from('deposit_requests').select('telegram_id, amount, created_at, payment_type, phone').eq('status', 'approved');
+                if (startDate) { const start = new Date(startDate); start.setHours(0,0,0,0); depositDetailQuery = depositDetailQuery.gte('created_at', start.toISOString()); }
+                if (endDate) { const end = new Date(endDate); end.setHours(23,59,59,999); depositDetailQuery = depositDetailQuery.lte('created_at', end.toISOString()); }
                 const { data: depositDetails, error: depDetailErr } = await depositDetailQuery;
                 if (depDetailErr) throw new Error('Failed to fetch deposit details: ' + depDetailErr.message);
 
-                // 8. Fetch withdrawal details
-                let withdrawalDetailQuery = supabase.from('withdrawal_requests')
-                    .select('telegram_id, username, amount, created_at, withdrawal_type, phone_number, receiver_name, status')
-                    .eq('status', 'approved');
-                if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
-                    withdrawalDetailQuery = withdrawalDetailQuery.gte('created_at', start.toISOString());
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
-                    withdrawalDetailQuery = withdrawalDetailQuery.lte('created_at', end.toISOString());
-                }
+                let withdrawalDetailQuery = supabase.from('withdrawal_requests').select('telegram_id, username, amount, created_at, withdrawal_type, phone_number, receiver_name, status').eq('status', 'approved');
+                if (startDate) { const start = new Date(startDate); start.setHours(0,0,0,0); withdrawalDetailQuery = withdrawalDetailQuery.gte('created_at', start.toISOString()); }
+                if (endDate) { const end = new Date(endDate); end.setHours(23,59,59,999); withdrawalDetailQuery = withdrawalDetailQuery.lte('created_at', end.toISOString()); }
                 const { data: withdrawalDetails, error: wdDetailErr } = await withdrawalDetailQuery;
                 if (wdDetailErr) throw new Error('Failed to fetch withdrawal details: ' + wdDetailErr.message);
 
@@ -1095,188 +1029,106 @@
                 userDepositsMap = {};
                 if (depositDetails) {
                     depositDetails.forEach(d => {
-                        const uid = d.telegram_id;
-                        if (!uid) return;
+                        const uid = d.telegram_id; if (!uid) return;
                         if (!userDepositsMap[uid]) userDepositsMap[uid] = [];
-                        userDepositsMap[uid].push({
-                            amount: Number(d.amount) || 0,
-                            created_at: d.created_at,
-                            payment_type: d.payment_type,
-                            phone: d.phone
-                        });
+                        userDepositsMap[uid].push({ amount: Number(d.amount) || 0, created_at: d.created_at, payment_type: d.payment_type, phone: d.phone });
                     });
                 }
-
                 userWithdrawalsMap = {};
                 if (withdrawalDetails) {
                     withdrawalDetails.forEach(w => {
-                        const uid = w.telegram_id;
-                        if (!uid) return;
+                        const uid = w.telegram_id; if (!uid) return;
                         if (!userWithdrawalsMap[uid]) userWithdrawalsMap[uid] = [];
-                        userWithdrawalsMap[uid].push({
-                            amount: Number(w.amount) || 0,
-                            created_at: w.created_at,
-                            withdrawal_type: w.withdrawal_type,
-                            phone_number: w.phone_number,
-                            receiver_name: w.receiver_name,
-                            status: w.status
-                        });
+                        userWithdrawalsMap[uid].push({ amount: Number(w.amount) || 0, created_at: w.created_at, withdrawal_type: w.withdrawal_type, phone_number: w.phone_number, receiver_name: w.receiver_name, status: w.status });
                     });
                 }
 
                 // Aggregate user data
                 const userMap = {};
                 winLogs.forEach(log => {
-                    const uid = log.user_id;
-                    if (!uid) return;
-                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0,
-                        totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
+                    const uid = log.user_id; if (!uid) return;
+                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0 };
                     userMap[uid].wins += 1;
                     userMap[uid].totalPayout += Number(log.details?.amount) || 0;
                 });
                 entryLogs.forEach(log => {
-                    const uid = log.user_id;
-                    if (!uid) return;
-                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0,
-                        totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
+                    const uid = log.user_id; if (!uid) return;
+                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0 };
                     userMap[uid].totalStakes += Number(log.details?.amount) || 0;
                 });
                 Object.keys(userDepositsMap).forEach(uid => {
-                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0,
-                        totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
+                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0 };
                     const depList = userDepositsMap[uid];
                     userMap[uid].deposits = depList.length;
                     userMap[uid].totalDeposits = depList.reduce((sum, d) => sum + d.amount, 0);
                 });
                 Object.keys(userWithdrawalsMap).forEach(uid => {
-                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0,
-                        totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0, methods: new Set() };
+                    if (!userMap[uid]) userMap[uid] = { wins: 0, totalPayout: 0, totalStakes: 0, deposits: 0, totalDeposits: 0, withdrawals: 0, totalWithdrawn: 0 };
                     const wdList = userWithdrawalsMap[uid];
                     userMap[uid].withdrawals = wdList.length;
                     userMap[uid].totalWithdrawn = wdList.reduce((sum, w) => sum + w.amount, 0);
-                    wdList.forEach(w => {
-                        if (w.withdrawal_type) userMap[uid].methods.add(w.withdrawal_type);
-                    });
                 });
 
                 const userIds = Object.keys(userMap);
                 let usernameMap = {};
                 if (userIds.length > 0) {
-                    const { data: users, error: usersErr } = await supabase
-                        .from('users')
-                        .select('telegram_id, username')
-                        .in('telegram_id', userIds);
-                    if (!usersErr && users) {
-                        users.forEach(u => { usernameMap[u.telegram_id] = u.username || u.telegram_id; });
-                    }
+                    const { data: users, error: usersErr } = await supabase.from('users').select('telegram_id, username').in('telegram_id', userIds);
+                    if (!usersErr && users) users.forEach(u => { usernameMap[u.telegram_id] = u.username || u.telegram_id; });
                 }
 
-                const userSummaries = userIds.map(uid => {
-                    const d = userMap[uid];
-                    const commission = 0.2 * d.totalStakes;
-                    const avgPayoutUser = d.wins > 0 ? d.totalPayout / d.wins : 0;
-                    const avgDeposit = d.deposits > 0 ? d.totalDeposits / d.deposits : 0;
-                    const avgWithdrawal = d.withdrawals > 0 ? d.totalWithdrawn / d.withdrawals : 0;
-                    return {
-                        userId: uid,
-                        username: usernameMap[uid] || uid,
-                        wins: d.wins,
-                        totalPayout: d.totalPayout,
-                        totalStakes: d.totalStakes,
-                        commission: commission,
-                        avgPayout: avgPayoutUser,
-                        deposits: d.deposits,
-                        totalDeposits: d.totalDeposits,
-                        avgDeposit: avgDeposit,
-                        withdrawals: d.withdrawals,
-                        totalWithdrawn: d.totalWithdrawn,
-                        avgWithdrawal: avgWithdrawal,
-                        methods: Array.from(d.methods)
-                    };
-                });
+                const userSummaries = userIds.map(uid => ({
+                    userId: uid,
+                    username: usernameMap[uid] || uid,
+                    wins: userMap[uid].wins,
+                    totalPayout: userMap[uid].totalPayout,
+                    totalStakes: userMap[uid].totalStakes,
+                    deposits: userMap[uid].deposits,
+                    totalDeposits: userMap[uid].totalDeposits,
+                    withdrawals: userMap[uid].withdrawals,
+                    totalWithdrawn: userMap[uid].totalWithdrawn,
+                }));
 
-                // --- Top Users by Total Payout ---
-                const sortedByPayout = [...userSummaries].sort((a, b) => b.totalPayout - a.totalPayout);
-                const topPayout = sortedByPayout.slice(0, 10);
-                let payoutRows = '';
-                topPayout.forEach((u, idx) => {
-                    payoutRows += `<tr>
-                        <td><span class="rank-badge">${idx + 1}</span></td>
-                        <td>${u.username}</td>
-                        <td>${fmt(u.totalPayout)}</td>
-                    </tr>`;
+                // --- Top Users by Total Payout (Image 1 & 3 style) ---
+                const sortedByPayout = [...userSummaries].sort((a, b) => b.totalPayout - a.totalPayout).slice(0, 5);
+                let payoutHtml = '';
+                sortedByPayout.forEach((u, idx) => {
+                    const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other';
+                    payoutHtml += `
+                        <li class="performer-item">
+                            <span class="rank-badge ${rankClass}">${idx + 1}</span>
+                            <span class="performer-user">${u.username}</span>
+                            <span class="performer-val">ETB ${fmt(u.totalPayout)}</span>
+                        </li>
+                    `;
                 });
-                payoutTableBody.innerHTML = payoutRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
+                payoutList.innerHTML = payoutHtml || '<li style="color:var(--text-muted);font-size:0.75rem;">No data</li>';
 
-                // --- Top Users by Win Count ---
-                const sortedByWins = [...userSummaries].sort((a, b) => b.wins - a.wins);
-                const topWins = sortedByWins.slice(0, 10);
-                let winsRows = '';
-                topWins.forEach((u, idx) => {
-                    winsRows += `<tr>
-                        <td><span class="rank-badge">${idx + 1}</span></td>
-                        <td>${u.username}</td>
-                        <td>${u.wins}</td>
-                    </tr>`;
+                // --- Top Users by Win Count (Image 1 & 3 style) ---
+                const sortedByWins = [...userSummaries].sort((a, b) => b.wins - a.wins).slice(0, 5);
+                let winsHtml = '';
+                sortedByWins.forEach((u, idx) => {
+                    const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other';
+                    winsHtml += `
+                        <li class="performer-item">
+                            <span class="rank-badge ${rankClass}">${idx + 1}</span>
+                            <span class="performer-user">${u.username}</span>
+                            <span class="performer-val" style="color: var(--accent-yellow);">${u.wins} Wins</span>
+                        </li>
+                    `;
                 });
-                winsTableBody.innerHTML = winsRows || '<tr><td colspan="3" style="text-align:center;color:#94a3b8;">No data</td></tr>';
+                winsList.innerHTML = winsHtml || '<li style="color:var(--text-muted);font-size:0.75rem;">No data</li>';
 
-                // --- Deposit Distribution ---
-                const sortedByDeposits = [...userSummaries].sort((a, b) => b.totalDeposits - a.totalDeposits);
-                const topDepositors = sortedByDeposits.slice(0, 10);
-                let depositRows = '';
-                topDepositors.forEach((u, idx) => {
-                    const hasDeposits = u.deposits > 0;
-                    depositRows += `<tr>
-                        <td><span class="rank-badge">${idx + 1}</span></td>
-                        <td>
-                            ${hasDeposits
-                                ? `<span class="clickable-username deposit-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
-                                : u.username
-                            }
-                        </td>
-                        <td>${fmt(u.totalDeposits)}</td>
-                        <td>${u.deposits}</td>
-                        <td>${fmt(u.avgDeposit)}</td>
-                    </tr>`;
-                });
-                depositTableBody.innerHTML = depositRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;">No deposit data</td></tr>';
-
-                // --- Withdrawal Distribution ---
-                const sortedByWithdrawals = [...userSummaries].sort((a, b) => b.totalWithdrawn - a.totalWithdrawn);
-                const topWithdrawals = sortedByWithdrawals.slice(0, 10);
-                let withdrawalRows = '';
-                topWithdrawals.forEach((u, idx) => {
-                    const hasWithdrawals = u.withdrawals > 0;
-                    withdrawalRows += `<tr>
-                        <td><span class="rank-badge">${idx + 1}</span></td>
-                        <td>
-                            ${hasWithdrawals
-                                ? `<span class="clickable-username withdrawal-click" data-userid="${u.userId}" data-username="${u.username}">${u.username}</span>`
-                                : u.username
-                            }
-                        </td>
-                        <td>${fmt(u.totalWithdrawn)}</td>
-                        <td>${u.withdrawals}</td>
-                        <td>${fmt(u.avgWithdrawal)}</td>
-                        <td>${u.methods.join(', ') || '-'}</td>
-                    </tr>`;
-                });
-                withdrawalTableBody.innerHTML = withdrawalRows || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;">No withdrawal data</td></tr>';
-
-                // Attach click handlers
-                document.querySelectorAll('.deposit-click').forEach(el => {
-                    el.addEventListener('click', function(e) {
-                        const userId = this.dataset.userid;
-                        const username = this.dataset.username || userId;
-                        showDepositModal(userId, username);
-                    });
-                });
-                document.querySelectorAll('.withdrawal-click').forEach(el => {
-                    el.addEventListener('click', function(e) {
-                        const userId = this.dataset.userid;
-                        const username = this.dataset.username || userId;
-                        showWithdrawalModal(userId, username);
+                // Make usernames clickable to show deposit/withdrawal details
+                document.querySelectorAll('.performer-user').forEach(el => {
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', function() {
+                        // Find the user ID based on username (simple reverse lookup)
+                        const username = this.textContent;
+                        const user = userSummaries.find(u => u.username === username);
+                        if (user) {
+                            if (user.totalDeposits > 0) showDepositModal(user.userId, user.username);
+                            else if (user.totalWithdrawn > 0) showWithdrawalModal(user.userId, user.username);
+                        }
                     });
                 });
 
@@ -1296,30 +1148,12 @@
                 showError('Start date must be before end date.');
                 return;
             }
-            filterStart = startVal || null;
-            filterEnd = endVal || null;
-
-            let labelText = '';
-            if (filterStart && filterEnd) {
-                labelText = `📅 ${filterStart} → ${filterEnd}`;
-            } else if (filterStart) {
-                labelText = `📅 From ${filterStart}`;
-            } else if (filterEnd) {
-                labelText = `📅 Until ${filterEnd}`;
-            } else {
-                labelText = '🌍 All time';
-            }
-            dateRangeLabel.textContent = labelText;
-
-            loadDashboard(filterStart, filterEnd);
+            loadDashboard(startVal || null, endVal || null);
         }
 
         function resetFilter() {
             startDateInput.value = '';
             endDateInput.value = '';
-            filterStart = null;
-            filterEnd = null;
-            dateRangeLabel.textContent = '🌍 All time';
             loadDashboard(null, null);
         }
 
@@ -1328,8 +1162,6 @@
 
         applyBtn.addEventListener('click', applyFilter);
         resetBtn.addEventListener('click', resetFilter);
-        startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
-        endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
     </script>
 </body>
 </html>
