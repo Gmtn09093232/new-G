@@ -525,8 +525,17 @@ input  { font-family: inherit; }
     color: var(--text);
     width: 100px;
     text-align: center;
+    transition: all 0.3s ease;
 }
 .stake-option.selected { border-color: var(--accent); background: rgba(251,191,36,.1); color: var(--accent); }
+.stake-option.has-players {
+    border-color: var(--accent-line);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.15);
+}
+.stake-option.selected.has-players {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+}
 .player-count-badge {
     display: block;
     font-size: .65rem;
@@ -536,6 +545,12 @@ input  { font-family: inherit; }
     background: rgba(15,23,42,.8);
     padding: 2px 10px;
     border-radius: 40px;
+    transition: all 0.3s ease;
+}
+.player-count-badge.has-players {
+    background: rgba(251, 191, 36, 0.2);
+    color: var(--accent);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
 }
 
 .stake-table-wrap {
@@ -570,15 +585,17 @@ input  { font-family: inherit; }
     border-bottom: 1px solid var(--border);
     font-weight: 600;
     color: var(--text);
+    transition: all 0.3s ease;
 }
 .stake-table tr:last-child td { border-bottom: none; }
-.stake-table .stake-amount { font-weight: 800; color: var(--text); }
+.stake-table .stake-amount { font-weight: 800; color: var(--text); transition: color 0.3s ease; }
 .stake-table .count-num {
     display: inline-block;
     background: var(--bg-soft);
     padding: 2px 10px;
     border-radius: 40px;
     font-size: .8rem;
+    transition: all 0.3s ease;
 }
 .stake-bar-wrap {
     width: 100%;
@@ -595,6 +612,24 @@ input  { font-family: inherit; }
     border-radius: 20px;
     transform-origin: left center;
     transform: scaleX(0);
+    transition: background 0.3s ease, transform 0.3s ease;
+}
+
+/* Dynamic Stake Highlighting */
+.stake-table tr.has-players td {
+    background: rgba(251, 191, 36, 0.08);
+    border-bottom-color: rgba(251, 191, 36, 0.25);
+}
+.stake-table tr.has-players .stake-amount {
+    color: var(--accent);
+}
+.stake-table tr.has-players .count-num {
+    background: rgba(251, 191, 36, 0.2);
+    color: var(--accent);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.2);
+}
+.stake-bar.has-players {
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent-hi));
 }
 
 .rules-text {
@@ -1508,15 +1543,36 @@ const stakeCounts = { 10: 0, 20: 0, 30: 0 };
 function updateStakeTable(stake, count) {
     if (![10, 20, 30].includes(stake)) return;
     stakeCounts[stake] = count;
+
     const el = $(`t${stake}`);
     if (el) el.innerText = count;
+
     const max = Math.max(stakeCounts[10], stakeCounts[20], stakeCounts[30], 1);
     for (const s of [10, 20, 30]) {
         const bar = $(`b${s}`);
-        if (bar) bar.style.transform = `scaleX(${stakeCounts[s] / max})`;
+        if (bar) {
+            bar.style.transform = `scaleX(${stakeCounts[s] / max})`;
+            bar.classList.toggle('has-players', stakeCounts[s] > 0);
+        }
     }
+
     const badge = $(`c${stake}`);
-    if (badge) badge.innerText = `👥 ${count} players`;
+    if (badge) {
+        badge.innerText = `👥 ${count} players`;
+        badge.classList.toggle('has-players', count > 0);
+    }
+
+    // Highlight table row and stake button
+    const tableRows = document.querySelectorAll('.stake-table tbody tr');
+    const stakeOptions = document.querySelectorAll('.stake-option');
+    
+    const stakes = [10, 20, 30];
+    stakes.forEach((s, index) => {
+        const row = tableRows[index];
+        const option = stakeOptions[index];
+        if (row) row.classList.toggle('has-players', stakeCounts[s] > 0);
+        if (option) option.classList.toggle('has-players', stakeCounts[s] > 0);
+    });
 }
 
 function connectStakeSocket() {
