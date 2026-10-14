@@ -1457,7 +1457,7 @@ const state = {
     savedPhone: '',
     savedAmount: '',
     submitting: false,
-    currentPage: 'lobby'
+    currentPage: 'stake'
 };
 
 let socket = null;
@@ -1510,13 +1510,21 @@ function initLiteMode() {
 function switchPage(id) {
     const current = document.querySelector('.page:not(.hidden)');
     const next = document.getElementById(id);
+
+    /* ✅ Always keep state.currentPage in sync, even if the DOM didn't change. */
+    if (id === 'stakePage') state.currentPage = 'stake';
+    else if (id === 'lobbyPage') state.currentPage = 'lobby';
+    else if (id === 'gamePage') state.currentPage = 'game';
+    else if (id === 'historyPage') state.currentPage = 'history';
+    else if (id === 'walletPage') state.currentPage = 'wallet';
+    else if (id === 'profilePage') state.currentPage = 'profile';
+
     if (!next || current === next) return;
     current?.classList.add('hidden');
     next.classList.remove('hidden');
 
-    /* ✅ Manage the stake-page balance poller based on which page is shown. */
+    /* Manage the stake-page balance poller based on which page is shown. */
     if (id === 'stakePage') {
-        state.currentPage = 'stake';
         startStakeBalancePolling();
     } else {
         stopStakeBalancePolling();
@@ -1613,7 +1621,7 @@ function stopApprovalPolling() {
 }
 
 /* ✅ Stake-page balance poller: runs only while the user is on the stake
-   page AND the app is visible. Refreshes every 12 s via HTTP so admin
+   page AND the app is visible. Refreshes every 8 s via HTTP so admin
    approvals land even if the /public namespace never emits balanceUpdate. */
 let stakeBalancePoller = null;
 function startStakeBalancePolling() {
@@ -1624,7 +1632,7 @@ function startStakeBalancePolling() {
         if (document.hidden) return;                 /* skip when backgrounded */
         if (state.currentPage !== 'stake') return;   /* only on stake page */
         fetchBalance();
-    }, 12000);
+    }, 8000);
 }
 function stopStakeBalancePolling() {
     if (stakeBalancePoller) { clearInterval(stakeBalancePoller); stakeBalancePoller = null; }
