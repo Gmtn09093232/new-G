@@ -1089,24 +1089,7 @@
         </div>
     </div>
 
-    <!-- ===== DEPOSIT DETAILS ===== -->
-    <div id="depositDetailsModal" class="modal">
-        <div class="modal-content">
-            <div class="bank-header">
-                <span class="bank-icon">💸</span>
-                <div>
-                    <div class="bank-title" data-key="deposit">Deposit</div>
-                    <div class="bank-sub" data-key="sendPayment">Send payment to the selected method</div>
-                </div>
-            </div>
-            <div class="input-group"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label><input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required autocomplete="off"></div>
-            <div class="input-group"><label data-key="amountLabel">💰 Amount (ETB)</label><input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off"></div>
-            <div class="transaction-summary" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
-            <div class="modal-buttons"><button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button><button id="backDepositBtn" class="btn-secondary" data-key="back">← Back</button></div>
-        </div>
-    </div>
-
-    <!-- ===== DEPOSIT PAYMENT CONFIRMATION ===== -->
+    <!-- ===== COMBINED DEPOSIT & PAYMENT MODAL ===== -->
     <div id="depositPaymentModal" class="modal">
         <div class="modal-content" style="max-width:420px;">
             <div class="bank-header">
@@ -1117,6 +1100,8 @@
                 </div>
             </div>
             <div class="amount-display" id="paymentAmountDisplay">0.00 ETB</div>
+            
+            <!-- Step 1: Payment Instructions -->
             <div class="deposit-step">
                 <div class="step-number">1️⃣ Step 1:</div>
                 <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this number</div>
@@ -1128,14 +1113,35 @@
                     <div style="font-size:0.7rem; color:#64748b; margin-top:8px;">Open your payment app → Send Money → Paste the number → Make the transfer</div>
                 </div>
             </div>
+
+            <!-- Step 2: User Inputs -->
             <div class="deposit-step">
                 <div class="step-number">2️⃣ Step 2:</div>
-                <div class="step-title" data-key="enterInvoice">Enter your Invoice Number</div>
+                <div class="step-title" data-key="enterDetails">Enter your details & amount</div>
                 <div class="step-content">
-                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
-                    <div class="invoice-input"><input type="text" id="paymentInvoiceNumber" placeholder="e.g. CKU3JPX6M3" data-key="invoicePlaceholder" autocomplete="off"></div>
+                    <div class="input-group" style="margin-top:8px;">
+                        <label data-key="yourPhone">📞 Your Phone Number (for verification)</label>
+                        <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required autocomplete="off">
+                    </div>
+                    <div class="input-group" style="margin-bottom:0;">
+                        <label data-key="amountLabel">💰 Amount (ETB)</label>
+                        <input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any" required autocomplete="off">
+                    </div>
                 </div>
             </div>
+
+            <!-- Step 3: Screenshot Proof -->
+            <div class="deposit-step">
+                <div class="step-number">3️⃣ Step 3:</div>
+                <div class="step-title" data-key="uploadProof">Upload Screenshot Proof</div>
+                <div class="step-content">
+                    <div style="font-size:0.75rem; color:#64748b; margin-bottom:8px;" data-key="uploadProofHint">
+                        Upload a screenshot of your payment confirmation.
+                    </div>
+                    <input type="file" id="paymentScreenshot" accept="image/*" style="width:100%; padding:10px; border-radius:20px; border:1px dashed #cbd5e1; background:#f8fafc; font-family:inherit; font-size:0.8rem;">
+                </div>
+            </div>
+
             <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
             <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
         </div>
@@ -1467,9 +1473,9 @@
                 copy: "Copy",
                 howToPay: "📞 How to pay?",
                 howToPayTitle: "How to Pay",
-                enterInvoice: "Enter your Invoice Number",
-                invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-                invoicePlaceholder: "e.g. CKU3JPX6M3",
+                enterDetails: "Enter your details & amount",
+                uploadProof: "Upload Screenshot Proof",
+                uploadProofHint: "Upload a screenshot of your payment confirmation.",
                 chooseStake: "የመግቢያ ክፍያ ይምረጡ",
                 bal: "ቀሪ ሂሳብ",
                 stakeBtn: "↺ ውርርድ",
@@ -1551,9 +1557,9 @@
                 copy: "Copy",
                 howToPay: "📞 How to pay?",
                 howToPayTitle: "How to Pay",
-                enterInvoice: "Enter your Invoice Number",
-                invoiceHint: "After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-                invoicePlaceholder: "e.g. CKU3JPX6M3",
+                enterDetails: "Enter your details & amount",
+                uploadProof: "Upload Screenshot Proof",
+                uploadProofHint: "Upload a screenshot of your payment confirmation.",
                 chooseStake: "Choose Your Stake",
                 bal: "BAL",
                 stakeBtn: "↺ Stake",
@@ -1805,11 +1811,13 @@
             submitting = false;
             const phoneInput = $('depositPlayerPhone');
             const amountInput = $('depositAmountSimple');
-            const invoiceInput = $('paymentInvoiceNumber');
+            const screenshotInput = $('paymentScreenshot');
             if (phoneInput) phoneInput.value = '';
             if (amountInput) amountInput.value = '';
-            if (invoiceInput) invoiceInput.value = '';
-            const modals = ['depositPaymentModal', 'depositDetailsModal', 'depositMethodListModal', 'howToPayModal'];
+            if (screenshotInput) screenshotInput.value = '';
+            $('paymentAmountDisplay').textContent = '0.00 ETB';
+            $('paymentStepAmountLabel').textContent = '0.00';
+            const modals = ['depositPaymentModal', 'depositMethodListModal', 'howToPayModal'];
             modals.forEach(id => { const el = $(id); if (el) el.classList.remove('active'); });
             const confirmBtn = $('confirmPaymentBtn');
             if (confirmBtn) {
@@ -1895,71 +1903,32 @@
                     selectedMethodNumber = number;
                     selectedAdminId = adminId;
                     selectedAdminObj = admin;
-                    transitionModal('depositMethodListModal', 'depositDetailsModal');
-                    if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-                    if (savedAmount) $('depositAmountSimple').value = savedAmount;
+                    
+                    // Setup combined modal
+                    const title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
+                    $('paymentMethodTitle').textContent = title + ' P2P';
+                    const disp = getSafeNumber(selectedMethodNumber);
+                    $('paymentRecipientNumber').textContent = `📞 ${disp}`;
+                    $('depositPlayerPhone').value = savedPhone || '';
+                    $('depositAmountSimple').value = savedAmount || '';
+                    $('paymentScreenshot').value = '';
+                    $('paymentAmountDisplay').textContent = '0.00 ETB';
+                    $('paymentStepAmountLabel').textContent = '0.00';
+                    
+                    transitionModal('depositMethodListModal', 'depositPaymentModal');
                 });
             });
-        }
-
-        function closeDepositDetails() {
-            transitionModal('depositDetailsModal', 'depositMethodListModal');
         }
 
         function closeMethodList() { $('depositMethodListModal').classList.remove('active');
             resetDepositState(); }
 
-        function openDepositDetails(admin, method, number) {
-            if (!admin || !method || !number) { alert('Please select a valid payment method.'); return; }
-            selectedAdminObj = admin;
-            selectedAdminId = admin.id;
-            selectedDepositType = method;
-            selectedMethodNumber = number;
-            if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-            if (savedAmount) $('depositAmountSimple').value = savedAmount;
-            $('depositDetailsModal').classList.add('active');
-            unlockSpeech();
-        }
-
-        function openPaymentConfirm(phone, amount) {
-            savedPhone = phone;
-            savedAmount = amount;
-            const amt = Number(amount).toFixed(2);
-            $('paymentAmountDisplay').textContent = amt + ' ETB';
+        // Listen for amount input to update Step 1 display
+        $('depositAmountSimple')?.addEventListener('input', function() {
+            const amt = this.value || '0.00';
+            $('paymentAmountDisplay').textContent = Number(amt).toFixed(2) + ' ETB';
             $('paymentStepAmountLabel').textContent = amt;
-            const lbl = $('paymentStep1Label');
-            const tmpl = lang === 'am' ? data.am.sendToNumber : data.en.sendToNumber;
-            if (tmpl) lbl.innerHTML = tmpl.replace('{amount}', amt);
-            const disp = getSafeNumber(selectedMethodNumber);
-            $('paymentRecipientNumber').textContent = `📞 ${disp}`;
-            const title = selectedDepositType.charAt(0).toUpperCase() + selectedDepositType.slice(1);
-            $('paymentMethodTitle').textContent = title + ' P2P';
-            const iconContainer = $('paymentMethodIcon');
-            if (iconContainer) {
-                const logoUrl = getMethodLogo(selectedDepositType);
-                const fallback = getFallbackIcon(selectedDepositType);
-                if (logoUrl) {
-                    iconContainer.innerHTML = `
-                        <img src="${logoUrl}" alt="${title}" referrerpolicy="no-referrer" 
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" 
-                             style="width:40px;height:40px;object-fit:contain;" />
-                        <span class="fallback-icon" style="display:none; font-size:2rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>
-                    `;
-                } else {
-                    iconContainer.innerHTML =
-                        `<span class="fallback-icon" style="font-size:2rem; font-weight:bold; background:${fallback.color}; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; text-align:center; line-height:40px;">${fallback.letter}</span>`;
-                }
-            }
-            $('paymentInvoiceNumber').value = '';
-            pendingAmount = Number(amount);
-            transitionModal('depositDetailsModal', 'depositPaymentModal');
-        }
-
-        function closePaymentConfirm() {
-            transitionModal('depositPaymentModal', 'depositDetailsModal');
-            if (savedPhone) $('depositPlayerPhone').value = savedPhone;
-            if (savedAmount) $('depositAmountSimple').value = savedAmount;
-        }
+        });
 
         function openHowToPay() {
             const method = selectedDepositType || 'telebirr';
@@ -1968,8 +1937,6 @@
             const content = document.getElementById('howToPayContent');
             const instructions = getPaymentInstructions(method);
             content.innerHTML = instructions;
-            const amountSpan = document.getElementById('howToPayAmount');
-            if (amountSpan) amountSpan.textContent = pendingAmount || '10';
             document.getElementById('howToPayModal').classList.add('active');
             unlockSpeech();
         }
@@ -1984,24 +1951,24 @@
                     <li>Open your ${methodLabel} app or mobile money service.</li>
                     <li>Select <strong>Send Money</strong> (or <strong>Transfer</strong>).</li>
                     <li>Enter the admin's phone number shown above.</li>
-                    <li>Enter the exact amount (<span id="howToPayAmount">${pendingAmount || '...'}</span> ETB).</li>
-                    <li>Complete the transaction and copy the <strong>Invoice Number</strong> (or the full SMS confirmation).</li>
-                    <li>Paste that Invoice Number in the field below and tap <strong>Confirm Payment</strong>.</li>
+                    <li>Enter the exact amount.</li>
+                    <li>Complete the transaction and take a <strong>screenshot</strong> of the confirmation.</li>
+                    <li>Upload that screenshot in the app and tap <strong>Confirm Payment</strong>.</li>
                 </ol>
                 <p style="margin-top:12px; background:#fef3c7; padding:10px; border-radius:16px;">
                     ⚠️ <strong>Important:</strong> Use the <strong>exact</strong> phone number and amount to ensure your deposit is credited automatically.
                 </p>
                 ${method === 'telebirr' ? `
                     <h4 style="margin-top:16px;">📱 Telebirr Specific</h4>
-                    <ul><li>Open Telebirr app → <strong>Send Money</strong> → <strong>To Individual</strong>.</li><li>Paste the admin's number (starting with <strong>09</strong>).</li><li>After payment, you'll receive an SMS with a <strong>Transaction ID</strong> – that is your Invoice Number.</li></ul>
+                    <ul><li>Open Telebirr app → <strong>Send Money</strong> → <strong>To Individual</strong>.</li><li>Paste the admin's number (starting with <strong>09</strong>).</li><li>After payment, you'll receive an SMS with a <strong>Transaction ID</strong>.</li></ul>
                 ` : method === 'cbebirr' ? `
                     <h4 style="margin-top:16px;">🏦 CBE Birr Specific</h4>
-                    <ul><li>Open CBE Birr app → <strong>Send Money</strong>.</li><li>Enter the admin's phone number.</li><li>Your Invoice Number is the <strong>reference number</strong> shown after the transaction.</li></ul>
+                    <ul><li>Open CBE Birr app → <strong>Send Money</strong>.</li><li>Enter the admin's phone number.</li><li>Your confirmation screen will show a <strong>reference number</strong>.</li></ul>
                 ` : method === 'mpesa' ? `
                     <h4 style="margin-top:16px;">📲 M-Pesa Specific</h4>
-                    <ul><li>Open M-Pesa → <strong>Send Money</strong>.</li><li>Enter the admin's phone number (starting with <strong>07</strong>).</li><li>Your Invoice Number is the <strong>transaction code</strong> (e.g., <code>CKU3JPX6M3</code>).</li></ul>
+                    <ul><li>Open M-Pesa → <strong>Send Money</strong>.</li><li>Enter the admin's phone number (starting with <strong>07</strong>).</li><li>You will receive an SMS with a <strong>transaction code</strong>.</li></ul>
                 ` : ''}
-                <p style="margin-top:16px; font-size:0.85rem; color:#64748b;">💡 <em>If you don't see your Invoice Number, wait a few seconds for the SMS to arrive.</em></p>
+                <p style="margin-top:16px; font-size:0.85rem; color:#64748b;">💡 <em>Make sure the screenshot clearly shows the amount, recipient, and status.</em></p>
             `;
         }
 
@@ -2132,60 +2099,70 @@
                 unlockSpeech(); }
         }
 
-        document.addEventListener('click', e => {
-            const t = e.target.closest('#requestDepositBtn');
-            if (t) {
-                const phone = $('depositPlayerPhone').value.trim();
-                const amount = $('depositAmountSimple').value.trim();
-                if (!phone.match(/^(09|07)\d{8}$/)) { alert(
-                        'Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'
-                        ); return; }
-                if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit is 10 ETB'); return; }
-                openPaymentConfirm(phone, amount);
-            }
-        });
-        document.addEventListener('click', e => {
-            const t = e.target.closest('#backPaymentBtn');
-            if (t) closePaymentConfirm();
-        });
-
+        // ========== CONFIRM DEPOSIT WITH SCREENSHOT ==========
         $('confirmPaymentBtn')?.addEventListener('click', async function() {
             if (submitting) return;
             const phone = $('depositPlayerPhone').value.trim();
-            const invoice = $('paymentInvoiceNumber').value.trim();
-            if (!invoice) { alert('Please paste your Invoice Number / SMS confirmation.'); return; }
-            submitting = true;
-            const btn = this;
-            const orig = btn.innerText;
-            btn.disabled = true;
-            btn.innerText = '⏳ Sending...';
-            try {
-                const r = await fetch('/api/request-deposit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, amount: pendingAmount, payment_type: selectedDepositType,
-                        admin_id: selectedAdminId, transaction_reference: invoice })
-                });
-                const d = await r.json();
-                if (d.success) {
-                    alert(
-                        `✅ Deposit request submitted!\n\n💰 Amount: ${pendingAmount} ETB\n📱 Invoice: ${invoice}\n\n⏳ Please wait for admin approval.`
-                        );
-                    resetDepositState();
-                    $('depositPaymentModal').classList.remove('active');
-                } else {
-                    alert('❌ Error: ' + (d.error || 'Submission failed'));
+            const amount = $('depositAmountSimple').value.trim();
+            const screenshotInput = $('paymentScreenshot');
+
+            if (!phone.match(/^(09|07)\d{8}$/)) { alert('Invalid phone number. Please enter a valid 10-digit number starting with 09 or 07.'); return; }
+            if (!amount || isNaN(amount) || Number(amount) < 10) { alert('Minimum deposit is 10 ETB'); return; }
+            if (!screenshotInput.files || screenshotInput.files.length === 0) { alert('Please upload a screenshot of your payment.'); return; }
+
+            const file = screenshotInput.files[0];
+            if (file.size > 5 * 1024 * 1024) { alert('File size exceeds 5MB. Please upload a smaller image.'); return; }
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Image = e.target.result;
+                submitting = true;
+                const btn = $('confirmPaymentBtn');
+                const orig = btn.innerText;
+                btn.disabled = true;
+                btn.innerText = '⏳ Sending...';
+                
+                try {
+                    const r = await fetch('/api/request-deposit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            phone, 
+                            amount: Number(amount), 
+                            payment_type: selectedDepositType, 
+                            admin_id: selectedAdminId, 
+                            transaction_reference: base64Image, // Send image as base64
+                            proof_type: 'image' // Flag to backend that this is an image
+                        })
+                    });
+                    const d = await r.json();
+                    if (d.success) {
+                        alert(`✅ Deposit request submitted!\n\n💰 Amount: ${amount} ETB\n\n⏳ Please wait for admin approval.`);
+                        resetDepositState();
+                        $('depositPaymentModal').classList.remove('active');
+                    } else {
+                        alert('❌ Error: ' + (d.error || 'Submission failed'));
+                    }
+                } catch (err) {
+                    alert('⚠️ Network error. Please try again.');
+                    console.error(err);
+                } finally {
+                    submitting = false;
+                    btn.disabled = false;
+                    btn.innerText = orig;
+                    unlockSpeech();
                 }
-            } catch (err) {
-                alert('⚠️ Network error. Please try again.');
-                console.error(err);
-            } finally {
-                submitting = false;
-                btn.disabled = false;
-                btn.innerText = orig;
-                unlockSpeech();
-            }
+            };
+            reader.readAsDataURL(file);
         });
+
+        $('backPaymentBtn')?.addEventListener('click', () => {
+            transitionModal('depositPaymentModal', 'depositMethodListModal');
+        });
+
+        // ============================================================
+        //  GAME FUNCTIONS
+        // ============================================================
 
         function genCard() {
             const cols = [
@@ -2684,7 +2661,6 @@
         $('depositMethodListBackBtn')?.addEventListener('click', () => { if (Object.keys(withdrawMethodMap).length >
                 0) { $('depositMethodListModal').classList.remove('active');
                 resetDepositState(); } else { closeMethodList(); } });
-        $('backDepositBtn')?.addEventListener('click', closeDepositDetails);
         $('paymentCopyBtn')?.addEventListener('click', function() { const el = $('paymentRecipientNumber'); const raw =
                 el.textContent.replace('📞 ', '').trim(); if (raw) copy(raw); });
         $('howToPayTrigger')?.addEventListener('click', openHowToPay);
