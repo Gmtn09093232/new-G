@@ -477,6 +477,33 @@ let toastEl=null;
 const toast=(msg,type='info')=>{if(!toastEl){toastEl=document.createElement('div');toastEl.className='toast';document.body.appendChild(toastEl)}toastEl.textContent=msg;toastEl.className=`toast ${type}`;void toastEl.offsetWidth;toastEl.classList.add('show');clearTimeout(toastEl._t);toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),3500)};
 const copyText=t=>t?navigator.clipboard.writeText(t).then(()=>toast('✅ Copied!','success')).catch(()=>toast('❌ Failed','error')):null;
 
+/* ============================================================
+   ✅ NEW: authFetch — injects Telegram initData on every call
+   This is what fixes the "Not logged in" error on iOS/WebView
+   where the session cookie is blocked.
+   ============================================================ */
+const tg = window.Telegram?.WebApp;
+async function authFetch(url, options = {}) {
+    const initData = tg?.initData || '';
+    const opts = { ...options, headers: { ...(options.headers || {}) } };
+
+    if (opts.method && opts.method.toUpperCase() !== 'GET') {
+        // POST / PUT / DELETE — inject into JSON body
+        if (opts.headers['Content-Type'] === 'application/json' && typeof opts.body === 'string') {
+            try {
+                const body = JSON.parse(opts.body);
+                body.initData = initData;
+                opts.body = JSON.stringify(body);
+            } catch { /* leave body untouched if not JSON */ }
+        }
+    } else {
+        // GET — append as query param
+        const sep = url.includes('?') ? '&' : '?';
+        url = url + sep + 'initData=' + encodeURIComponent(initData);
+    }
+    return fetch(url, opts);
+}
+
 const I18N={
 am:{deposit:"+ተቀማጭ",withdraw:"-ማውጣት",requestDeposit:"✔ ተቀማጭ ጠይቅ",back:"← ተመለስ",cancel:"ይቅር",
 yourPhone:"📞 የስልክ ቁጥርዎ (ለማረጋገጫ)",amountLabel:"💰 መጠን (ETB)",
@@ -580,7 +607,6 @@ $('langToggleBtn').textContent=lang==='am'?'🇬🇧 English':'🇪🇹 አማ�
 
 const state={stake:null,userCard:[],markedNumbers:new Set(),serverTaken:new Set(),displayTaken:new Set(),selectedCard:null,isGameActive:false,balance:0,balanceLoaded:false,awaitingStakeCheck:false,totalGames:0,recentGames:[],currentGameId:null,timerSeconds:30,soundMuted:localStorage.getItem('dot_bingo_sound_muted')==='true',speechUnlocked:false,utterance:null,depositAdmins:[],methodMode:null,selectedMethod:null,pendingAmount:0,savedPhone:'',savedAmount:'',submitting:false,currentPage:'lobby'};
 let socket=null,stakeSocket=null,lobbyTimer=null,amVoice=null;
-const tg=window.Telegram?.WebApp;
 tg?.ready();tg?.expand();
 
 function switchPage(id){
@@ -608,8 +634,8 @@ if(d.success){$('profileUsername').innerText=d.username||'Player';setInviteCode(
 return d;
 }catch(e){console.error('Auth error:',e);return null}
 }
-async function fetchInvite(){try{const r=await fetch('/api/user/invite-code');const d=await r.json();if(d.success)setInviteCode(d.invite_code)}catch(e){console.error(e)}}
-async function fetchBalance(){try{const r=await fetch('/api/user/balance');const d=await r.json();if(d.success)syncBalance(d.balance)}catch(e){console.error('Balance fetch error:',e)}}
+async function fetchInvite(){try{const r=await authFetch('/api/user/invite-code');const d=await r.json();if(d.success)setInviteCode(d.invite_code)}catch(e){console.error(e)}}
+async function fetchBalance(){try{const r=await authFetch('/api/user/balance');const d=await r.json();if(d.success)syncBalance(d.balance)}catch(e){console.error('Balance fetch error:',e)}}
 function setInviteCode(code){
 userInvite.code=code||null;
 const codeEl=$('userInviteCode'),profileCode=$('profileInviteCode');
@@ -712,7 +738,7 @@ async function loadAdmins(){
 const now=Date.now();
 if(_adminsCache.data&&now-_adminsCache.at<30000){state.depositAdmins=_adminsCache.data;return state.depositAdmins}
 try{
-const r=await fetch('/api/deposit-accounts');
+const r=await authFetch('/api/deposit-accounts');
 const d=await r.json();
 _adminsCache={data:d.success?(d.admins||[]):[],at:now};
 }catch{_adminsCache={data:[],at:now}}
@@ -820,7 +846,7 @@ if(!state.selectedMethod){toast('Please pick a payment method again','info');tra
 state.submitting=true;state.savedPhone=phone;state.savedAmount=amount;state.pendingAmount=Number(amount);
 try{
 const base64Image=await compressImage(file);
-const r=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:state.savedPhone,amount:state.pendingAmount,payment_type:state.selectedMethod.type,admin_id:state.selectedMethod.adminId,transaction_reference:base64Image})});
+const r=await authFetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:state.savedPhone,amount:state.pendingAmount,payment_type:state.selectedMethod.type,admin_id:state.selectedMethod.adminId,transaction_reference:base64Image})});
 const d=await r.json();
 if(d.success){toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`,'success');resetDepositState();if(socket)socket.emit('getBalance');else fetchBalance()}
 else{toast('❌ '+(d.error||'Submission failed'),'error')}
@@ -839,7 +865,7 @@ if(!phone.match(/^(09|07)\d{8}$/))return toast('Invalid phone number','error');
 if(!state.selectedMethod){toast('Please pick a payment method again','info');return}
 state.submitting=true;
 try{
-const r=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:Number(amount),phone,withdrawal_type:state.selectedMethod.type,name,admin_id:state.selectedMethod.adminId})});
+const r=await authFetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:Number(amount),phone,withdrawal_type:state.selectedMethod.type,name,admin_id:state.selectedMethod.adminId})});
 const d=await r.json();
 if(d.success){toast('✅ Withdrawal request submitted!','success');$('withdrawModal').classList.remove('active');resetDepositState();if(socket)socket.emit('getBalance');else fetchBalance()}
 else{toast('❌ '+(d.error||'Submission failed'),'error')}
