@@ -1513,6 +1513,14 @@ function switchPage(id) {
     if (!next || current === next) return;
     current?.classList.add('hidden');
     next.classList.remove('hidden');
+
+    /* ✅ Manage the stake-page balance poller based on which page is shown. */
+    if (id === 'stakePage') {
+        state.currentPage = 'stake';
+        startStakeBalancePolling();
+    } else {
+        stopStakeBalancePolling();
+    }
 }
 
 let modalZ = 2000;
@@ -1576,9 +1584,15 @@ async function fetchBalance() {
 /* ✅ Refresh balance through the active socket when possible,
    falling back to HTTP if no socket is connected. */
 function refreshBalance() {
-    if (socket?.connected) socket.emit('getBalance');
-    else if (stakeSocket?.connected) stakeSocket.emit('getBalance');
-    else fetchBalance();
+    /* The main namespace handles 'getBalance'.
+       The /public namespace does NOT — always use HTTP there. */
+    if (socket?.connected) {
+        socket.emit('getBalance');
+        /* HTTP safety net — some servers may not respond to the emit. */
+        setTimeout(() => { if (!document.hidden) fetchBalance(); }, 600);
+    } else {
+        fetchBalance();
+    }
 }
 
 /* ✅ Approval polling fallback: after a deposit/withdrawal is submitted,
@@ -1596,6 +1610,24 @@ function startApprovalPolling() {
 }
 function stopApprovalPolling() {
     if (approvalPoll) { clearInterval(approvalPoll); approvalPoll = null; }
+}
+
+/* ✅ Stake-page balance poller: runs only while the user is on the stake
+   page AND the app is visible. Refreshes every 12 s via HTTP so admin
+   approvals land even if the /public namespace never emits balanceUpdate. */
+let stakeBalancePoller = null;
+function startStakeBalancePolling() {
+    stopStakeBalancePolling();
+    /* Immediate refresh so the value is correct the instant the page opens. */
+    fetchBalance();
+    stakeBalancePoller = setInterval(() => {
+        if (document.hidden) return;                 /* skip when backgrounded */
+        if (state.currentPage !== 'stake') return;   /* only on stake page */
+        fetchBalance();
+    }, 12000);
+}
+function stopStakeBalancePolling() {
+    if (stakeBalancePoller) { clearInterval(stakeBalancePoller); stakeBalancePoller = null; }
 }
 
 function setInviteCode(code) {
@@ -1684,14 +1716,22 @@ function connectStakeSocket() {
     stakeSocket.on('depositStatus', d => {
         const ok = d.status === 'approved';
         toast(ok ? `✅ Deposit +${d.amount} ETB approved!` : '❌ Deposit rejected.', ok ? 'success' : 'error');
-        if (ok) refreshBalance();
-        else stopApprovalPolling();
+        if (ok) {
+            refreshBalance();
+            stopStakeBalancePolling();     /* job done — stop polling */
+        } else {
+            stopApprovalPolling();
+        }
     });
     stakeSocket.on('withdrawStatus', d => {
         const ok = d.status === 'approved';
         toast(ok ? `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.', ok ? 'success' : 'error');
-        if (ok) refreshBalance();
-        else stopApprovalPolling();
+        if (ok) {
+            refreshBalance();
+            stopStakeBalancePolling();
+        } else {
+            stopApprovalPolling();
+        }
     });
 }
 function disconnectStakeSocket() {
@@ -2837,6 +2877,8 @@ async function init() {
     applyLang();
     switchPage('stakePage');
     connectStakeSocket();
+    /* Belt-and-braces: switchPage already starts it, this guarantees it. */
+    startStakeBalancePolling();
     await authenticate();
     await fetchInvite();
     await fetchBalance();
