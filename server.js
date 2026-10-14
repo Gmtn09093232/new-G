@@ -5,6 +5,7 @@
 //             & Multipart Image Upload (Base64 fallback supported)
 //             ⚡ OPTIMIZED: compact numberCalled, deduped playerCount,
 //               cached HTML shell, tuned Socket.IO
+//             🩹 FIXED: deposit proof now reaches admin reliably
 // ================================================================
 
 require('dotenv').config();
@@ -90,8 +91,8 @@ const upload = multer({
   }
 });
 
-// ⚡ OPT: uploads now use multipart (multer). JSON only needs small payloads.
-// The Base64 fallback is still allowed at 2 MB for older clients.
+// ⚡ OPT: uploads use multipart (multer). JSON only needs small payloads.
+// Base64 fallback is allowed at 2 MB for older clients.
 app.use(express.json({ limit: '2mb' }));
 
 // ⚡ OPT: allow the Telegram WebView / mobile browsers to reuse the HTML shell.
@@ -1906,7 +1907,7 @@ app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bo
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ============================================================
-//  Player deposit endpoint – multipart (multer) + Base64 fallback
+//  🩹 FIXED: Player deposit endpoint — always delivers proof
 // ============================================================
 const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
@@ -1917,7 +1918,8 @@ const handleDepositRequest = async (req, res) => {
   const photoFile = req.file;
 
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
+  if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type))
+    return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
   const isBase64Image = transaction_reference && transaction_reference.startsWith('data:image/');
@@ -1926,55 +1928,26 @@ const handleDepositRequest = async (req, res) => {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
+  // ---------- Resolve the photo into a storable string ----------
   let extractedTxn = null;
   let photoUrl = null;
 
   if (isBase64Image) {
+    // Legacy path: client posted a raw Base64 data URL inside JSON
     photoUrl = transaction_reference;
-  } else if (transaction_reference) {
-    extractedTxn = extractTransactionNumber(transaction_reference);
-    if (!extractedTxn) {
-      return res.status(400).json({ error: 'Could not extract a valid transaction number from the provided text. Please paste the full SMS or the transaction number.' });
-    }
+    console.log(`📸 Deposit photo via JSON data URL (${photoUrl.length} chars)`);
+  } else if (photoFile) {
+    // Preferred path: multipart upload
+    console.log(`📸 Deposit photo received: ${photoFile.size} bytes, ${photoFile.mimetype}`);
 
-    const { data: existing, error: dupErr } = await supabase
-      .from('deposit_requests')
-      .select('id')
-      .eq('transaction_reference', extractedTxn)
-      .maybeSingle();
-    if (dupErr) {
-      console.error('Error checking duplicate transaction reference:', dupErr);
-      return res.status(500).json({ error: 'Error validating transaction number' });
-    }
-    if (existing) {
-      return res.status(400).json({ error: 'This transaction number has already been used.' });
-    }
-  }
-
-  try {
-    const { data: admin, error: adminErr } = await supabase
-      .from('admins')
-      .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-      .eq('id', admin_id)
-      .eq('is_active', true)
-      .maybeSingle();
-    if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
-
-    const methodField = `${payment_type}_number`;
-    if (!admin[methodField]) {
-      return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
-    }
-
-    const user = await loadUser(userId, null, null, null, false);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (photoFile) {
-      const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
+    // First try Supabase Storage, but never fail hard if it doesn't work.
+    try {
+      const fileExt = (photoFile.originalname || '').split('.').pop() || 'jpg';
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `deposit-proofs/${fileName}`;
 
       const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets.some(b => b.name === 'deposit-photos');
+      const bucketExists = buckets?.some(b => b.name === 'deposit-photos');
       if (!bucketExists) {
         await supabase.storage.createBucket('deposit-photos', {
           public: true,
@@ -1992,17 +1965,72 @@ const handleDepositRequest = async (req, res) => {
         });
 
       if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        return res.status(500).json({ error: 'Failed to upload photo proof', details: uploadError.message });
+        console.error('⚠️ Supabase Storage upload failed:', uploadError.message);
+      } else {
+        const { data: publicUrlData } = supabase.storage
+          .from('deposit-photos')
+          .getPublicUrl(filePath);
+        if (publicUrlData?.publicUrl) {
+          photoUrl = publicUrlData.publicUrl;
+          console.log(`✅ Photo uploaded to Supabase Storage: ${photoUrl}`);
+        }
       }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('deposit-photos')
-        .getPublicUrl(filePath);
-      photoUrl = publicUrlData?.publicUrl || null;
+    } catch (e) {
+      console.error('⚠️ Storage exception:', e.message);
     }
 
-    const { data, error } = await supabase.from('deposit_requests').insert({
+    // 🩹 FALLBACK: if Storage didn't produce a URL, embed the image as a
+    // Base64 data URL directly. Guarantees the admin always sees the receipt.
+    if (!photoUrl) {
+      const base64 = photoFile.buffer.toString('base64');
+      photoUrl = `data:${photoFile.mimetype};base64,${base64}`;
+      console.log(`📸 Using Base64 data URL fallback (${photoUrl.length} chars)`);
+    }
+  } else if (transaction_reference) {
+    // Text-only path: extract the transaction number
+    extractedTxn = extractTransactionNumber(transaction_reference);
+    if (!extractedTxn) {
+      return res.status(400).json({
+        error: 'Could not extract a valid transaction number from the provided text. Please paste the full SMS or the transaction number.'
+      });
+    }
+
+    const { data: existing, error: dupErr } = await supabase
+      .from('deposit_requests')
+      .select('id')
+      .eq('transaction_reference', extractedTxn)
+      .maybeSingle();
+    if (dupErr) {
+      console.error('Error checking duplicate transaction reference:', dupErr);
+      return res.status(500).json({ error: 'Error validating transaction number' });
+    }
+    if (existing) {
+      return res.status(400).json({ error: 'This transaction number has already been used.' });
+    }
+  }
+
+  // ---------- Validate the admin ----------
+  try {
+    const { data: admin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
+      .eq('id', admin_id)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (adminErr || !admin) return res.status(400).json({ error: 'Invalid deposit account' });
+
+    const methodField = `${payment_type}_number`;
+    if (!admin[methodField]) {
+      return res.status(400).json({ error: `Admin does not support ${payment_type} deposits` });
+    }
+
+    const user = await loadUser(userId, null, null, null, false);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // ---------- Insert the deposit row ----------
+    // 🩹 Write the photo URL into BOTH possible column names so whichever
+    // the admin HTML expects, the receipt shows up.
+    const insertPayload = {
       telegram_id: userId,
       username: user.username,
       amount: amt,
@@ -2011,11 +2039,42 @@ const handleDepositRequest = async (req, res) => {
       payment_type,
       transaction_reference: extractedTxn,
       proof_photo_url: photoUrl,
+      proof_path: photoUrl,          // safety net for older admin HTML
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
-    }).select().single();
+    };
+
+    let { data, error } = await supabase
+      .from('deposit_requests')
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    // 🩹 If the schema doesn't have one of the two column names, retry without it.
+    if (error) {
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('proof_path')) {
+        console.warn('⚠️ deposit_requests has no proof_path column, retrying without it');
+        delete insertPayload.proof_path;
+        ({ data, error } = await supabase
+          .from('deposit_requests')
+          .insert(insertPayload)
+          .select()
+          .single());
+      } else if (msg.includes('proof_photo_url')) {
+        console.warn('⚠️ deposit_requests has no proof_photo_url column, retrying with proof_path only');
+        delete insertPayload.proof_photo_url;
+        ({ data, error } = await supabase
+          .from('deposit_requests')
+          .insert(insertPayload)
+          .select()
+          .single());
+      }
+    }
 
     if (error) throw error;
+
+    console.log(`✅ Deposit row created (id=${data.id}) with photo ${photoUrl ? `(${photoUrl.slice(0, 40)}...)` : '(none)'}`);
 
     Audit.depositInitiated(userId, req.ip, {
       transactionId: data.id.toString(),
@@ -4186,7 +4245,6 @@ io.on('connection', async (socket) => {
       if (player) {
         socket.emit('yourCard', player.card);
         socket.emit('markedNumbers', player.markedNumbers);
-        /* ⚡ OPT: this is the single full-state sync used by reconnect */
         socket.emit('calledNumbers', game.calledNumbers);
       }
     }
