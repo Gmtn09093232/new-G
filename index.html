@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://telegram.org">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="dns-prefetch" href="https://upload.wikimedia.org">
 
 <!-- ✅ Font Awesome for Modern Solid Icons -->
@@ -901,6 +902,42 @@ input  { font-family: inherit; }
     font-size: 1.1rem;
     box-shadow: 0 4px 16px rgba(251,191,36,.3);
 }
+
+/* ============================================================
+   14. LOW-PERFORMANCE MODE  (opt-in / auto-detected)
+   ============================================================ */
+html.lite .modal.active {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+html.lite *, html.lite *::before, html.lite *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+}
+html.lite .page,
+html.lite .modal-content,
+html.lite .winner-card,
+html.lite .last-call,
+html.lite .lang-toggle,
+html.lite .toast,
+html.lite .btn-primary,
+html.lite .stake-option.has-players,
+html.lite .player-count-badge.has-players,
+html.lite .stake-table tr.has-players .count-num,
+html.lite .card-container td.marked,
+html.lite .grid-cell.own-card {
+    box-shadow: none !important;
+}
+html.lite .last-call-number { text-shadow: none !important; }
+html.lite .modal { background: rgba(0,0,0,.88); }
+
+/* Respect OS-level reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .modal, .modal-content, .winner-modal, .winner-card, .toast, .stake-option, .stake-bar {
+        transition: none !important;
+    }
+}
 </style>
 </head>
 <body>
@@ -1203,6 +1240,13 @@ input  { font-family: inherit; }
         <div class="label" data-key="inviteCodeLabel">🔑 Invite Code</div>
         <div style="margin-top:6px; color:var(--accent); font-weight:700; font-size:1.1rem;" id="profileInviteCode">—</div>
     </div>
+    <!-- ✅ Low-performance mode toggle (added) -->
+    <div class="profile-stat">
+        <div class="label" data-key="liteModeLabel">⚡ Low-performance mode</div>
+        <div style="margin-top:8px;">
+            <button id="liteToggleBtn" class="btn-secondary" style="padding:10px 28px; border-radius:40px;">OFF</button>
+        </div>
+    </div>
 </div>
 
 <!-- ============ GAME PAGE ============ -->
@@ -1216,12 +1260,13 @@ input  { font-family: inherit; }
         <div class="badge-pill" style="flex:1; text-align:right; display:inline-block;">👥 <span id="gamePlayersCount">0</span></div>
     </div>
 
-    <!-- ✅ Removed Mute and Rules buttons from here -->
+    <!-- ✅ Mute button restored here (user-controlled mute option) -->
     <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
         <div style="font-size:.85rem;">💰 <span id="gameBalance" style="color:var(--accent); font-weight:800;">0</span> ETB</div>
-        <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px; align-items:center;">
             <button class="btn-ghost" style="padding:4px 12px; color:var(--accent); border-color:var(--accent-line); font-size:.7rem;" data-action="deposit" data-key="deposit">+Deposit</button>
             <button class="btn-ghost" style="padding:4px 12px; font-size:.7rem;" data-action="withdraw" data-key="withdraw">-Withdraw</button>
+            <button id="muteToggleBtn" class="btn-ghost mute-btn" title="Mute / Unmute">🔊</button>
         </div>
     </div>
 
@@ -1333,6 +1378,7 @@ const I18N = {
         winningPrize:"🎁 የሽልማት ገንዘብ", amazing:"🎉 ደስ ያለኝ! 🎉",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back",
+        liteModeLabel:"⚡ ቀላል ሁነታ (ለአሮጌ ስልኮች)",
         insufficientBalance:"የማይበቃ ቀሪ ሂሳብ! እባክዎ መጀመሪያ ገንዘብ ያስገቡ።",
     },
     en: {
@@ -1381,6 +1427,7 @@ const I18N = {
         winningPrize:"🎁 WINNING PRIZE", amazing:"🎉 Amazing! 🎉",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back",
+        liteModeLabel:"⚡ Low-performance mode",
         insufficientBalance:"Insufficient balance! Please deposit first.",
     }
 };
@@ -1438,6 +1485,38 @@ let amVoice = null;
 const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
+
+/* ============================================================
+   3b. LOW-PERFORMANCE MODE
+   ============================================================ */
+const LITE_KEY = 'dot_bingo_lite';
+function isLiteOn() { return document.documentElement.classList.contains('lite'); }
+
+function applyLiteMode(on) {
+    document.documentElement.classList.toggle('lite', !!on);
+    const btn = $('liteToggleBtn');
+    if (btn) {
+        btn.textContent = on ? '⚡ ON' : 'OFF';
+        btn.style.color = on ? 'var(--accent)' : '';
+        btn.style.borderColor = on ? 'var(--accent-line)' : '';
+    }
+}
+
+function initLiteMode() {
+    const saved = localStorage.getItem(LITE_KEY);
+    let on;
+    if (saved === '1' || saved === '0') {
+        on = saved === '1';
+    } else {
+        const nav = navigator;
+        const mem = nav.deviceMemory;
+        const cores = nav.hardwareConcurrency;
+        const saveData = !!(nav.connection && nav.connection.saveData);
+        const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        on = !!(saveData || reduced || (mem && mem <= 4) || (cores && cores <= 4));
+    }
+    applyLiteMode(on);
+}
 
 /* ============================================================
    4. PAGE / MODAL TRANSITIONS
@@ -1535,41 +1614,55 @@ function checkInviteRequired() {
 /* ============================================================
    6. STAKE SOCKET
    ============================================================ */
+const STAKE_VALUES = [10, 20, 30];
 const stakeCounts = { 10: 0, 20: 0, 30: 0 };
+const stakeDom = { rows: null, opts: null, els: {} };
+
+/* Cache the static stake DOM nodes once — avoids repeated querySelectorAll
+   on every playersCount event (these elements never get recreated). */
+function cacheStakeDom() {
+    if (stakeDom.rows) return true;
+    const rows = document.querySelectorAll('.stake-table tbody tr');
+    const opts = document.querySelectorAll('.stake-option');
+    if (rows.length !== 3 || opts.length !== 3) return false;
+    stakeDom.rows = rows;
+    stakeDom.opts = opts;
+    for (const s of STAKE_VALUES) {
+        stakeDom.els[s] = { t: $(`t${s}`), b: $(`b${s}`), c: $(`c${s}`) };
+    }
+    return true;
+}
 
 function updateStakeTable(stake, count) {
-    if (![10, 20, 30].includes(stake)) return;
+    if (!(stake in stakeCounts)) return;
+    if (!cacheStakeDom()) return;
+    /* ✅ Skip all DOM work when nothing actually changed. */
+    if (stakeCounts[stake] === count) return;
     stakeCounts[stake] = count;
 
-    const el = $(`t${stake}`);
-    if (el) el.innerText = count;
+    const el = stakeDom.els[stake];
+    if (el.t) el.t.innerText = count;
 
     const max = Math.max(stakeCounts[10], stakeCounts[20], stakeCounts[30], 1);
-    for (const s of [10, 20, 30]) {
-        const bar = $(`b${s}`);
+    for (let i = 0; i < STAKE_VALUES.length; i++) {
+        const s = STAKE_VALUES[i];
+        const c = stakeCounts[s];
+        const bar = stakeDom.els[s].b;
         if (bar) {
-            bar.style.transform = `scaleX(${stakeCounts[s] / max})`;
-            bar.classList.toggle('has-players', stakeCounts[s] > 0);
+            bar.style.transform = `scaleX(${c / max})`;
+            bar.classList.toggle('has-players', c > 0);
         }
+        const row = stakeDom.rows[i];
+        if (row) row.classList.toggle('has-players', c > 0);
+        const option = stakeDom.opts[i];
+        if (option) option.classList.toggle('has-players', c > 0);
     }
 
-    const badge = $(`c${stake}`);
+    const badge = stakeDom.els[stake].c;
     if (badge) {
         badge.innerText = `👥 ${count} players`;
         badge.classList.toggle('has-players', count > 0);
     }
-
-    // Highlight table row and stake button
-    const tableRows = document.querySelectorAll('.stake-table tbody tr');
-    const stakeOptions = document.querySelectorAll('.stake-option');
-    
-    const stakes = [10, 20, 30];
-    stakes.forEach((s, index) => {
-        const row = tableRows[index];
-        const option = stakeOptions[index];
-        if (row) row.classList.toggle('has-players', stakeCounts[s] > 0);
-        if (option) option.classList.toggle('has-players', stakeCounts[s] > 0);
-    });
 }
 
 function connectStakeSocket() {
@@ -1998,7 +2091,10 @@ function renderCard(card, containerId, clickable) {
         }
     }
 
-    cont.dataset.clickable = clickable ? '1' : '0';
+    const clickFlag = clickable ? '1' : '0';
+    if (cont.dataset.clickable !== clickFlag) cont.dataset.clickable = clickFlag;
+
+    /* Only touch cells whose marked state actually changed */
     for (const [num, td] of entry.cells) {
         const on = state.markedNumbers.has(num);
         if (td.classList.contains('marked') !== on) td.classList.toggle('marked', on);
@@ -2006,6 +2102,7 @@ function renderCard(card, containerId, clickable) {
 }
 
 const gridCells = new Array(101);
+const gridState = new Int8Array(101); /* 0 = normal, 1 = taken, 2 = own */
 let gridBuilt = false;
 
 function buildGridOnce() {
@@ -2023,15 +2120,19 @@ function buildGridOnce() {
     gridBuilt = true;
 }
 
+/* ✅ Integer state comparison instead of string class-name comparison:
+   avoids 100 string allocations per repaint. */
 function paintGrid() {
     if (!gridBuilt) return;
     const own = state.selectedCard;
+    const taken = state.displayTaken;
     for (let i = 1; i <= 100; i++) {
-        const cell = gridCells[i];
-        const cls = own === i ? 'grid-cell own-card'
-                 : state.displayTaken.has(i) ? 'grid-cell taken'
-                 : 'grid-cell';
-        if (cell.className !== cls) cell.className = cls;
+        let s = 0;
+        if (own === i) s = 2;
+        else if (taken.has(i)) s = 1;
+        if (gridState[i] === s) continue;
+        gridState[i] = s;
+        gridCells[i].className = s === 2 ? 'grid-cell own-card' : s === 1 ? 'grid-cell taken' : 'grid-cell';
     }
 }
 
@@ -2043,8 +2144,11 @@ function formatCall(n) {
     return `${letter}-${n}`;
 }
 
+let lastPlayerCount = -1;
 function updateCount(c) {
     const v = c ?? state.serverTaken.size;
+    if (v === lastPlayerCount) return;
+    lastPlayerCount = v;
     if ($('playersCount')) $('playersCount').innerText = v;
     if ($('gamePlayersCount')) $('gamePlayersCount').innerText = v;
 }
@@ -2104,6 +2208,7 @@ function goStake() {
     state.isGameActive = false;
     state.currentGameId = null;
     state.awaitingStakeCheck = false;
+    lastPlayerCount = -1;
     localStorage.removeItem('dot_bingo_stake');
     clearInterval(lobbyTimer);
     switchPage('stakePage');
@@ -2212,15 +2317,32 @@ function updateStats() {
     }).join('');
 }
 
+/* ✅ Cached balance elements — avoids repeated $() lookups and redundant writes */
+const balanceEls = {
+    lobby: null, wallet: null, profile: null, game: null, stake: null
+};
+let lastBalanceValue = null;
+
 function syncBalance(v) {
+    const changed = v !== lastBalanceValue;
+    lastBalanceValue = v;
     state.balance = v;
     state.balanceLoaded = true;
-    const set = (id, val) => { const el = $(id); if (el) el.innerText = val; };
-    set('lobbyBalance', v);
-    set('walletBalance', v);
-    set('profileBalance', v);
-    set('gameBalance', v);
-    set('stakeBalance', v);
+
+    if (changed) {
+        if (!balanceEls.lobby) {
+            balanceEls.lobby = $('lobbyBalance');
+            balanceEls.wallet = $('walletBalance');
+            balanceEls.profile = $('profileBalance');
+            balanceEls.game = $('gameBalance');
+            balanceEls.stake = $('stakeBalance');
+        }
+        if (balanceEls.lobby) balanceEls.lobby.innerText = v;
+        if (balanceEls.wallet) balanceEls.wallet.innerText = v;
+        if (balanceEls.profile) balanceEls.profile.innerText = v;
+        if (balanceEls.game) balanceEls.game.innerText = v;
+        if (balanceEls.stake) balanceEls.stake.innerText = v;
+    }
 
     if (state.awaitingStakeCheck) {
         state.awaitingStakeCheck = false;
@@ -2245,7 +2367,27 @@ async function connectToGame(stake) {
     socket?.disconnect();
     socket = io();
 
-    socket.on('connect', () => socket.emit('joinLobby', { stake }));
+    /* Socket.IO reuses the same socket across reconnects, so these handlers
+       are attached exactly once — no duplicate listeners on reconnect. */
+    let firstConnect = true;
+    let disconnectToastShown = false;
+
+    socket.on('connect', () => {
+        socket.emit('joinLobby', { stake });
+        socket.emit('getBalance');
+        if (!firstConnect) toast('🔄 Reconnected', 'success');
+        firstConnect = false;
+        disconnectToastShown = false;
+    });
+
+    socket.on('disconnect', reason => {
+        if (reason === 'io client disconnect') return;
+        if (!disconnectToastShown) {
+            disconnectToastShown = true;
+            toast('📶 Connection lost, reconnecting…', 'info');
+        }
+    });
+
     socket.on('balanceUpdate', syncBalance);
 
     socket.on('insufficientBalance', () => {
@@ -2290,7 +2432,9 @@ async function connectToGame(stake) {
         if (d.stake === state.stake) updateCount(d.count);
         if (d.stake === state.stake && !state.isGameActive) {
             const pool = Math.floor(d.count * state.stake * 0.8);
-            if ($('winningBalance')) $('winningBalance').innerText = pool + ' ETB';
+            const el = $('winningBalance');
+            const txt = pool + ' ETB';
+            if (el && el.innerText !== txt) el.innerText = txt;
         }
         updateStakeTable(d.stake, d.count);
     });
@@ -2358,7 +2502,7 @@ function updateGrid(takenArr) {
 }
 
 /* ============================================================
-   11. SPEECH
+   11. SPEECH  (queued, non-destructive, mute-aware)
    ============================================================ */
 if (window.speechSynthesis) {
     const loadVoices = () => {
@@ -2372,19 +2516,71 @@ if (window.speechSynthesis) {
 function unlockSpeech() {
     if (state.speechUnlocked || !window.speechSynthesis) return;
     state.speechUnlocked = true;
-    const u = new SpeechSynthesisUtterance(' ');
-    u.volume = 0;
-    speechSynthesis.speak(u);
-    speechSynthesis.cancel();
+    try {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        u.rate = 2;
+        speechSynthesis.speak(u);
+    } catch (e) { /* speech not available — gameplay continues normally */ }
+}
+
+/* ---- Queued speaker: never cancels mid-word, max 2 pending announcements ---- */
+const speechQueue = [];
+let speechBusy = false;
+let speechWatchdog = null;
+
+function drainSpeech() {
+    if (speechBusy) return;
+    const text = speechQueue.shift();
+    if (text === undefined) return;
+
+    speechBusy = true;
+    let finished = false;
+    const done = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(speechWatchdog);
+        speechBusy = false;
+        state.utterance = null;
+        drainSpeech();
+    };
+
+    try {
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'am-ET';
+        u.rate = 0.85;
+        if (amVoice) u.voice = amVoice;
+        u.onend = done;
+        u.onerror = done;
+        state.utterance = u;
+        speechSynthesis.speak(u);
+        /* Watchdog: some Android WebViews never fire onend — keep the queue alive */
+        speechWatchdog = setTimeout(done, 5000);
+    } catch (e) {
+        done();
+    }
+}
+
+function enqueueSpeech(text) {
+    if (speechQueue.length >= 2) speechQueue.shift();
+    speechQueue.push(text);
+    if (!speechBusy) drainSpeech();
+}
+
+function clearSpeech() {
+    speechQueue.length = 0;
+    speechBusy = false;
+    state.utterance = null;
+    clearTimeout(speechWatchdog);
 }
 
 function toggleMute() {
     state.soundMuted = !state.soundMuted;
     localStorage.setItem('dot_bingo_sound_muted', state.soundMuted);
     updateMute();
-    if (state.soundMuted && state.utterance) {
+    if (state.soundMuted && window.speechSynthesis) {
+        clearSpeech();
         speechSynthesis.cancel();
-        state.utterance = null;
     }
     unlockSpeech();
 }
@@ -2410,15 +2606,17 @@ function amharicWord(n) {
 
 function speakAmharic(n) {
     if (state.soundMuted || n < 1 || n > 75 || !window.speechSynthesis) return;
-    if (!state.speechUnlocked) { unlockSpeech(); speakAmharic(n); return; }
-    if (state.utterance) speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(AM_LETTERS(n) + " " + amharicWord(n));
-    u.lang = 'am-ET';
-    u.rate = 0.85;
-    if (amVoice) u.voice = amVoice;
-    state.utterance = u;
-    speechSynthesis.speak(u);
+    if (!state.speechUnlocked) unlockSpeech();
+    enqueueSpeech(AM_LETTERS(n) + " " + amharicWord(n));
 }
+
+/* Stop announcements when the Mini App is backgrounded (saves battery/CPU) */
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && window.speechSynthesis) {
+        clearSpeech();
+        speechSynthesis.cancel();
+    }
+});
 
 /* ============================================================
    12. PAGE NAVIGATION HELPERS
@@ -2440,9 +2638,19 @@ $('langToggleBtn').addEventListener('click', () => {
     applyLang();
 });
 
-// stake buttons
+// low-performance mode toggle
+$('liteToggleBtn')?.addEventListener('click', () => {
+    const next = !isLiteOn();
+    applyLiteMode(next);
+    localStorage.setItem(LITE_KEY, next ? '1' : '0');
+    toast(next ? '⚡ Lite mode ON' : '✨ Lite mode OFF', 'info');
+});
+
+// stake buttons (double-tap guarded)
+let connectingStake = false;
 document.querySelectorAll('.stake-option').forEach(btn => {
     btn.addEventListener('click', () => {
+        if (connectingStake) return;
         loadStats();
         const stake = parseInt(btn.dataset.stake, 10);
 
@@ -2450,6 +2658,9 @@ document.querySelectorAll('.stake-option').forEach(btn => {
             toast(t('insufficientBalance'), 'error');
             return;
         }
+
+        connectingStake = true;
+        setTimeout(() => { connectingStake = false; }, 800);
 
         connectToGame(stake);
         showLobby(30);
@@ -2469,7 +2680,8 @@ $('numberGrid').addEventListener('click', e => {
 
     const i = Number(cell.dataset.number);
     if (state.displayTaken.has(i) || state.serverTaken.has(i)) return;
-    if (state.selectedCard !== null && state.selectedCard !== i) {
+    if (state.selectedCard === i) return; /* no-op on re-tap */
+    if (state.selectedCard !== null) {
         state.serverTaken.delete(state.selectedCard);
         state.displayTaken.delete(state.selectedCard);
     }
@@ -2480,15 +2692,19 @@ $('numberGrid').addEventListener('click', e => {
     updateBackToLobbyVisibility();
 }, { passive: true });
 
-// bingo claim
+// bingo claim (light debounce prevents accidental double-taps)
+let lastBingoClaim = 0;
 $('bingoBtn').addEventListener('click', () => {
-    if (socket && state.isGameActive) socket.emit('claimBingo');
+    if (!socket || !state.isGameActive) return;
+    const now = Date.now();
+    if (now - lastBingoClaim < 900) return;
+    lastBingoClaim = now;
+    socket.emit('claimBingo');
     unlockSpeech();
 });
 
-// mute (safely guarded as button was removed from game page)
-const muteToggleBtn = $('muteToggleBtn');
-if (muteToggleBtn) muteToggleBtn.addEventListener('click', toggleMute);
+// mute toggle (now present in the game page header)
+$('muteToggleBtn')?.addEventListener('click', toggleMute);
 
 // tab bar
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -2567,14 +2783,6 @@ $('rulesBtn').addEventListener('click', () => {
     $('rulesModal').style.zIndex = String(modalZ);
     $('rulesModal').classList.add('active');
 });
-const rulesBtnGame = $('rulesBtnGame');
-if (rulesBtnGame) {
-    rulesBtnGame.addEventListener('click', () => {
-        modalZ++;
-        $('rulesModal').style.zIndex = String(modalZ);
-        $('rulesModal').classList.add('active');
-    });
-}
 $('closeRulesBtn').addEventListener('click', () => $('rulesModal').classList.remove('active'));
 
 // winner celebrate
@@ -2595,8 +2803,10 @@ $('goToBotBtn').addEventListener('click', () => {
    14. INIT
    ============================================================ */
 async function init() {
+    initLiteMode();
     if (!checkInviteRequired()) return;
     buildGridOnce();
+    cacheStakeDom();
     loadStats();
     updateMute();
     applyLang();
@@ -2611,6 +2821,11 @@ init();
 
 /* ============================================================
    15. MODERN ICON REPLACEMENT (Font Awesome Solid)
+   ------------------------------------------------------------
+   Optimized: batched via requestAnimationFrame, observer is
+   disconnected during the rewrite (no self-triggering storms),
+   and a cheap "candidate" pre-test short-circuits the expensive
+   alternation regex for plain ASCII text nodes (the common case).
    ============================================================ */
 (function () {
   const EMOJI_MAP = {
@@ -2686,10 +2901,17 @@ init();
   const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const emojiKeys = Object.keys(EMOJI_MAP).sort((a, b) => b.length - a.length);
   const emojiRegex = new RegExp('(' + emojiKeys.map(escapeRegExp).join('|') + ')', 'g');
+  const emojiTest  = new RegExp('(' + emojiKeys.map(escapeRegExp).join('|') + ')');
+
+  /* Cheap pre-test: matches the code-unit ranges that can start any of our
+     mapped emoji. Plain ASCII ("12", "Called: B-5") bails out immediately. */
+  const EMOJI_FAST = /[\u2190-\u27BF\u2B00-\u2BFF\uFE0F\u20E3\uD83C\uD83D\uD83E]/;
 
   function replaceEmojisInTextNode(textNode) {
     const text = textNode.nodeValue;
-    if (!text || !emojiRegex.test(text)) return;
+    if (!text) return;
+    if (!EMOJI_FAST.test(text)) return;
+    if (!emojiTest.test(text)) return;
 
     const html = text.replace(emojiRegex, (match) => {
       const iconClass = EMOJI_MAP[match];
@@ -2708,7 +2930,7 @@ init();
       replaceEmojisInTextNode(node);
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const tag = node.tagName.toLowerCase();
-      if (['script', 'style', 'svg', 'path', 'i'].includes(tag)) return;
+      if (tag === 'script' || tag === 'style' || tag === 'svg' || tag === 'path' || tag === 'i') return;
       Array.from(node.childNodes).forEach(replaceEmojisInNode);
     }
   }
@@ -2728,14 +2950,36 @@ init();
       if (m.type === 'childList') {
         m.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
-            replaceEmojisInNode(node);
+            pending.push(node);
           }
         });
       } else if (m.type === 'characterData') {
-        replaceEmojisInTextNode(m.target);
+        pending.push(m.target);
       }
     }
+    schedule();
   });
+
+  const pending = [];
+  let scheduled = false;
+
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    (window.requestAnimationFrame || window.setTimeout)(flush, 16);
+  }
+
+  function flush() {
+    scheduled = false;
+    if (!pending.length) return;
+    const batch = pending.splice(0, pending.length);
+    observer.disconnect();
+    try {
+      for (let i = 0; i < batch.length; i++) replaceEmojisInNode(batch[i]);
+    } finally {
+      observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+  }
 
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 })();
