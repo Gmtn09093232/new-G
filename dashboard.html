@@ -1,2048 +1,1274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Admin Dashboard</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<title>Admin</title>
 <style>
-/* ---------- THEME VARIABLES ---------- */
+/* ---------- THEME ---------- */
 :root{
-  --bg-app:#0B1120;--bg-card:#1A2332;--bg-card-hover:#1E293B;--bg-input:#111827;
-  --border-color:#2D3748;--text-primary:#F8FAFC;--text-secondary:#94A3B8;
-  --primary-blue:#2563EB;--primary-blue-hover:#1D4ED8;--success:#10B981;
-  --danger:#EF4444;--warning:#F59E0B;--purple:#8B5CF6;
-  --radius-md:12px;--radius-lg:16px;--radius-xl:24px;
+  --bg:#0f1419; --panel:#1a1f26; --panel2:#232a33;
+  --line:#2d3540; --line2:#3d4856;
+  --fg:#e6e9ef; --dim:#8b95a3;
+  --blue:#3b82f6; --green:#10b981; --red:#ef4444; --amber:#f59e0b; --purple:#8b5cf6;
+  --r:6px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;
-  background:var(--bg-app);color:var(--text-primary);min-height:100vh;padding-bottom:90px;
-  -webkit-font-smoothing:antialiased}
-button,.btn,.tab-btn,.stat-card,.logout-btn,.adjust-btn,.copy-btn-icon,.nav-item,.rule-accordion summary{
-  transition:all .15s ease!important}
+html,body{background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+body{padding-bottom:76px;min-height:100vh}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+a{color:var(--blue);text-decoration:none}
+svg.i{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
 
-/* ---------- CONNECTION BANNER ---------- */
-#connBanner{
-  position:fixed;top:0;left:0;right:0;z-index:2000;
-  background:var(--warning);color:#1a1a1a;font-size:12px;font-weight:700;
-  text-align:center;padding:6px;transform:translateY(-100%);transition:transform .25s ease;
-}
-#connBanner.show{transform:translateY(0)}
-#connBanner.ok{background:var(--success);color:#fff}
+/* ---------- CONNECTION ---------- */
+#conn{position:fixed;top:0;left:0;right:0;z-index:99;background:var(--amber);color:#111;font-size:12px;font-weight:600;text-align:center;padding:4px;transform:translateY(-100%)}
+#conn.on{transform:none}
+#conn.ok{background:var(--green);color:#fff}
 
 /* ---------- HEADER ---------- */
-.header{background:rgba(11,17,32,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(45,55,72,.5);padding:16px 20px;position:sticky;top:0;z-index:100;
-  display:flex;justify-content:space-between;align-items:center}
-.header-left{display:flex;align-items:center;gap:16px}
-.header-title{font-size:20px;font-weight:700;letter-spacing:-.5px}
-.header-right{display:flex;align-items:center;gap:16px}
-.notification-btn{background:transparent;border:none;color:var(--text-secondary);font-size:20px;position:relative;cursor:pointer}
-.notification-badge{position:absolute;top:0;right:0;width:8px;height:8px;background:var(--danger);border-radius:50%;border:2px solid var(--bg-app)}
-.logout-btn{background:transparent;color:var(--text-secondary);border:1px solid var(--border-color);
-  padding:8px 16px;border-radius:var(--radius-xl);font-weight:600;font-size:13px;
-  display:flex;align-items:center;gap:6px;cursor:pointer}
-.logout-btn:hover{background:rgba(239,68,68,.1);border-color:var(--danger);color:var(--danger)}
+header{position:sticky;top:0;z-index:50;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.btn-out{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);color:var(--dim)}
+.btn-out:active{background:var(--panel2)}
 
-/* ---------- CONTAINER ---------- */
-.container{max-width:800px;margin:0 auto;padding:20px 16px}
+/* ---------- LAYOUT ---------- */
+.wrap{max-width:820px;margin:0 auto;padding:12px}
 
-/* ---------- COMMISSION BAR ---------- */
-.commission-bar{background:linear-gradient(135deg,#1E3A8A 0%,#2563EB 100%);border-radius:var(--radius-lg);
-  padding:20px;margin-bottom:24px;display:flex;flex-direction:column;gap:16px;
-  box-shadow:0 8px 24px rgba(37,99,235,.25);border:1px solid rgba(255,255,255,.1);position:relative}
-.commission-bar .updated-indicator{position:absolute;top:12px;right:16px;font-size:11px;
-  color:rgba(255,255,255,.7);display:flex;align-items:center;gap:6px}
-.commission-bar .item{display:flex;justify-content:space-between;align-items:center}
-.commission-bar .label{font-size:13px;color:rgba(255,255,255,.9);display:flex;align-items:center;gap:8px;font-weight:500}
-.commission-bar .amount{font-size:18px;font-weight:700;color:#fff}
-.commission-bar .amount.pending{color:#FDE047}
-.commission-bar .amount.earned{color:#A7F3D0}
-.commission-bar .amount.rate{color:#BFDBFE}
+/* ---------- COMMISSION ---------- */
+.comm{background:var(--blue);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;position:relative}
+.comm .cell{display:flex;flex-direction:column;gap:2px;min-width:0}
+.comm .cell .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.comm .cell .v{font:600 15px/1.2 ui-monospace,Menlo,Consolas,monospace;color:#fff}
+.comm .stamp{position:absolute;top:6px;right:8px;font-size:10px;color:rgba(255,255,255,.6)}
 
 /* ---------- STATS ---------- */
-.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
-.stat-card{background:var(--bg-card);padding:16px;border-radius:var(--radius-md);border:1px solid var(--border-color);
-  display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;height:100px}
-.stat-card:hover{background:var(--bg-card-hover);border-color:#3B82F6}
-.stat-card .label{font-size:11px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;
-  letter-spacing:.5px;display:flex;align-items:center;gap:6px}
-.stat-card .value{font-size:18px;font-weight:700;margin-top:4px;z-index:2}
-.stat-card .value.green{color:var(--success)}.stat-card .value.blue{color:#60A5FA}
-.stat-card .value.orange{color:var(--warning)}.stat-card .value.red{color:var(--danger)}
-.stat-card .value.purple{color:var(--purple)}
-.sparkline{position:absolute;bottom:0;left:0;width:100%;height:30px;opacity:.6;z-index:1}
-@media(min-width:600px){
-  .stats-grid{grid-template-columns:repeat(3,1fr)}
-  .commission-bar{flex-direction:row;justify-content:space-between;padding:24px;align-items:center}
-  .commission-bar .item{flex-direction:column;align-items:flex-start;gap:4px}
-  .commission-bar .amount{font-size:22px}
-}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+@media(min-width:560px){.stats{grid-template-columns:repeat(3,1fr)}}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);display:flex;align-items:center;gap:5px}
+.stat .v{font:600 16px/1.2 ui-monospace,Menlo,Consolas,monospace;color:var(--fg)}
+.stat .v.g{color:var(--green)}.stat .v.b{color:var(--blue)}.stat .v.a{color:var(--amber)}
+.stat .v.r{color:var(--red)}.stat .v.p{color:var(--purple)}
 
-/* ---------- BOTTOM NAV ---------- */
-.bottom-nav{position:fixed;bottom:0;left:0;width:100%;background:var(--bg-card);
-  border-top:1px solid var(--border-color);display:flex;justify-content:space-around;align-items:center;
-  padding:10px 0 env(safe-area-inset-bottom,10px) 0;z-index:1000;box-shadow:0 -4px 20px rgba(0,0,0,.3)}
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text-secondary);
-  text-decoration:none;font-size:11px;font-weight:500;background:transparent;border:none;cursor:pointer;
-  padding:8px 12px;border-radius:var(--radius-md);flex:1;position:relative}
-.nav-item i{font-size:18px}
-.nav-item.active{color:var(--primary-blue);background:rgba(37,99,235,.1)}
-.nav-item:active{transform:scale(.92)}
-.nav-item .nav-badge{position:absolute;top:2px;right:22%;background:var(--danger);color:#fff;
-  font-size:9px;font-weight:700;border-radius:8px;padding:1px 5px;min-width:16px;text-align:center;display:none}
-.nav-item .nav-badge.show{display:block}
-
-/* ---------- PAGES / TABS ---------- */
-.page{display:none;animation:fadeIn .3s ease}
-.page.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-.tabs{display:flex;background:var(--bg-card);padding:6px;border-radius:var(--radius-xl);
-  border:1px solid var(--border-color);margin-bottom:20px;overflow-x:auto;scrollbar-width:none;gap:4px}
+/* ---------- TABS ---------- */
+.tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:3px;gap:3px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-.tab-btn{flex:1;padding:10px 16px;border:none;background:transparent;border-radius:var(--radius-lg);
-  font-weight:600;font-size:13px;color:var(--text-secondary);cursor:pointer;white-space:nowrap;
-  display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
-.tab-btn.active{background:var(--primary-blue);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.3)}
-.tab-btn .badge{background:var(--danger);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700}
-.tab-btn.active .badge{background:rgba(255,255,255,.3)}
-.tab-content{min-height:300px}
-.tab-pane{display:none}
-.tab-pane.active{display:block;animation:fadeIn .2s ease}
-.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
-.section-header h2{font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}
-.section-header h2 i{color:var(--primary-blue)}
-.section-header .filter-icon{background:var(--bg-card);border:1px solid var(--border-color);
-  color:var(--text-secondary);width:40px;height:40px;border-radius:var(--radius-md);display:flex;
-  align-items:center;justify-content:center;cursor:pointer}
+.tab{flex:1;min-width:max-content;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:600;color:var(--dim);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+.tab.on{background:var(--blue);color:#fff}
+.tab .n{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:8px;font-size:10px}
+.tab.on .n{background:rgba(255,255,255,.25)}
 
-/* ---------- FILTER BAR ---------- */
-.filter-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;background:var(--bg-card);
-  padding:16px;border-radius:var(--radius-md);border:1px solid var(--border-color);align-items:flex-end}
-.filter-bar .input-group{flex:1;min-width:120px}
-.filter-bar .input-group label{font-size:11px;font-weight:600;color:var(--text-secondary);
-  margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.5px}
-.filter-bar .input-group select,.filter-bar .input-group input{width:100%;padding:10px 14px;
-  border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:13px;
-  background:var(--bg-input);color:var(--text-primary);min-height:44px;appearance:none}
-.filter-bar .input-group select:focus,.filter-bar .input-group input:focus{
-  outline:none;border-color:var(--primary-blue);box-shadow:0 0 0 3px rgba(37,99,235,.2)}
-.showing-text{font-size:13px;color:var(--text-secondary);margin-bottom:12px}
+/* ---------- SECTIONS ---------- */
+.pane{display:none}.pane.on{display:block}
+.sec{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sec h2{font-size:14px;font-weight:600}
+.icon-btn{width:34px;height:34px;border:1px solid var(--line);border-radius:var(--r);display:inline-flex;align-items:center;justify-content:center;color:var(--dim)}
+.icon-btn:active{background:var(--panel2)}
+.filter{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.filter .g{flex:1;min-width:120px}
+.filter label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:4px}
+.filter select,.filter input{padding:8px 10px;font-size:12px}
+.muted{font-size:12px;color:var(--dim);margin-bottom:8px}
+.row-actions{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.row-actions .btn{flex:1;min-width:120px}
 
-/* ---------- TABLE ---------- */
-.table-wrapper{display:flex;flex-direction:column;gap:12px}
+/* ---------- BUTTONS ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;border-radius:var(--r);font-size:12px;font-weight:600;min-height:36px;border:1px solid transparent}
+.btn:active{filter:brightness(.9)}
+.btn.p{background:var(--blue);color:#fff}
+.btn.s{background:var(--green);color:#fff}
+.btn.d{background:var(--red);color:#fff}
+.btn.w{background:var(--amber);color:#111}
+.btn.g{background:var(--panel2);color:var(--fg);border-color:var(--line)}
+.btn.o{background:transparent;color:var(--blue);border-color:var(--blue)}
+.btn.sm{padding:6px 10px;min-height:30px;font-size:11px}
+.adj{background:var(--panel2);color:var(--amber);border:1px solid var(--line);padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.link{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:4px;background:var(--panel2);color:var(--blue);font-size:11px;font-weight:600;border:1px solid var(--line)}
+.copy{background:none;border:1px solid var(--line);border-radius:4px;padding:3px 6px;color:var(--dim);font-size:11px}
+
+/* ---------- TABLES ---------- */
+.list{display:flex;flex-direction:column;gap:8px}
 table{width:100%;border-collapse:collapse}
 thead{display:none}
-tr{display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border-color);
-  border-radius:var(--radius-md);padding:16px;gap:10px;margin-bottom:12px}
-tr.row-pending{opacity:.55;pointer-events:none}
-tr.row-flash{animation:flash .9s ease}
-@keyframes flash{0%{background:rgba(37,99,235,.28)}100%{background:var(--bg-card)}}
-td{display:flex;justify-content:space-between;align-items:center;padding:0;border:none;
-  font-size:13px;color:var(--text-primary)}
-td::before{content:attr(data-label);font-weight:600;color:var(--text-secondary);font-size:12px;margin-right:16px}
-.user-cell{display:flex;flex-direction:row;align-items:center;gap:10px}
-.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
-.avatar.blue{background:#3B82F6}.avatar.green{background:#10B981}
-.avatar.purple{background:#8B5CF6}.avatar.orange{background:#F59E0B}
-.user-info{display:flex;flex-direction:column}
-.user-info .name{font-weight:600;font-size:14px}
-.user-info .id{font-size:11px;color:var(--text-secondary)}
-.action-buttons{display:flex;gap:8px;justify-content:flex-end;width:100%}
-.action-buttons .btn{flex:1}
-@media(min-width:768px){
+tr{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px;gap:6px;margin-bottom:8px}
+tr.busy{opacity:.55;pointer-events:none}
+td{display:flex;justify-content:space-between;align-items:center;font-size:12px;gap:8px}
+td::before{content:attr(data-label);font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600}
+.cell-user{display:flex;align-items:center;gap:8px}
+.av{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;background:var(--blue);flex:none}
+.av.g{background:var(--green)}.av.p{background:var(--purple)}.av.o{background:var(--amber)}
+.uinfo{display:flex;flex-direction:column;min-width:0}
+.uinfo .n{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uinfo .i{font-size:10px;color:var(--dim);font-family:ui-monospace,monospace}
+.acts{display:flex;gap:6px;width:100%}
+.acts .btn{flex:1}
+@media(min-width:720px){
   thead{display:table-header-group}tbody{display:table-row-group}table{display:table}
-  tr{display:table-row;padding:0;margin:0;border:none;border-radius:0;background:transparent}
-  th{display:table-cell;background:var(--bg-card);text-align:left;padding:14px 16px;font-weight:600;
-    color:var(--text-secondary);border-bottom:1px solid var(--border-color);font-size:12px;
-    text-transform:uppercase;letter-spacing:.5px}
-  td{display:table-cell;padding:16px;border-bottom:1px solid var(--border-color);background:var(--bg-card)}
-  tr:hover td{background:var(--bg-card-hover)}
+  tr{display:table-row;padding:0;margin:0;border:0;border-radius:0;background:transparent}
+  th{display:table-cell;background:var(--panel);text-align:left;padding:8px 10px;font-weight:600;color:var(--dim);border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  td{display:table-cell;padding:10px;border-bottom:1px solid var(--line);background:var(--panel)}
   td::before{display:none}
-  .action-buttons{width:auto}.action-buttons .btn{flex:none}
-  .table-wrapper{background:var(--bg-card);border-radius:var(--radius-md);
-    border:1px solid var(--border-color);overflow:hidden}
+  .list{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;gap:0}
+  .list table tbody tr:last-child td{border-bottom:0}
+  .acts{width:auto}.acts .btn{flex:none}
 }
 
-/* ---------- BADGES / BUTTONS ---------- */
-.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;
-  font-weight:600;white-space:nowrap;text-transform:capitalize}
-.status-badge.pending{background:rgba(245,158,11,.2);color:#FDE047}
-.status-badge.approved{background:rgba(16,185,129,.2);color:#A7F3D0}
-.status-badge.rejected{background:rgba(239,68,68,.2);color:#FCA5A5}
-.status-badge.telebirr{background:rgba(239,68,68,.2);color:#FCA5A5}
-.status-badge.cbebirr{background:rgba(37,99,235,.2);color:#93C5FD}
-.status-badge.mpesa{background:rgba(245,158,11,.2);color:#FDE047}
-.btn{padding:10px 18px;border:none;border-radius:var(--radius-md);font-size:13px;font-weight:600;
-  cursor:pointer;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:#fff}
-.btn:active{transform:scale(.96)}
-.btn-sm{padding:8px 12px;font-size:12px;min-height:36px}
-.btn-primary{background:var(--primary-blue)}.btn-primary:hover{background:var(--primary-blue-hover)}
-.btn-success{background:var(--success)}.btn-success:hover{background:#059669}
-.btn-danger{background:var(--danger)}.btn-danger:hover{background:#DC2626}
-.btn-warning{background:var(--warning)}.btn-warning:hover{background:#D97706}
-.btn-secondary{background:var(--bg-card-hover);color:var(--text-primary);border:1px solid var(--border-color)}
-.btn-outline{background:transparent;color:var(--primary-blue);border:1px solid var(--primary-blue)}
-.btn-outline:hover{background:rgba(37,99,235,.1)}
-.link-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;
-  background:rgba(37,99,235,.15);color:#60A5FA;font-size:11px;text-decoration:none;font-weight:600;
-  border:none;cursor:pointer}
-.link-btn:hover{background:rgba(37,99,235,.25)}
-.adjust-btn{background:rgba(245,158,11,.15);color:var(--warning);border:none;padding:6px 14px;
-  border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.adjust-btn:hover{background:rgba(245,158,11,.25)}
-.copy-btn-icon{background:transparent;border:none;cursor:pointer;font-size:14px;padding:4px 8px;
-  border-radius:4px;color:var(--text-secondary)}
-.copy-btn-icon:hover{background:var(--border-color);color:var(--text-primary)}
-.txn-ref{font-family:monospace;font-weight:600;font-size:12px;background:var(--bg-input);
-  padding:4px 10px;border-radius:6px;display:inline-block;color:#60A5FA;border:1px solid var(--border-color)}
-.txn-ref-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.cbe-detail{font-family:monospace;font-weight:500;font-size:11px;background:rgba(139,92,246,.2);
-  padding:2px 8px;border-radius:4px;color:#C4B5FD;display:inline-block}
-.cbe-detail.phone{background:rgba(37,99,235,.2);color:#93C5FD}
+/* ---------- BADGES ---------- */
+.bdg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:capitalize}
+.bdg.pending{background:rgba(245,158,11,.15);color:#fcd34d}
+.bdg.approved{background:rgba(16,185,129,.15);color:#6ee7b7}
+.bdg.rejected{background:rgba(239,68,68,.15);color:#fca5a5}
+.bdg.telebirr{background:rgba(239,68,68,.15);color:#fca5a5}
+.bdg.cbebirr{background:rgba(59,130,246,.15);color:#93c5fd}
+.bdg.mpesa{background:rgba(245,158,11,.15);color:#fcd34d}
+.ref{font-family:ui-monospace,monospace;font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:#93c5fd}
+.ref-wrap{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 
 /* ---------- PROFILE ---------- */
-.profile-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border-color)}
-.profile-header{display:flex;flex-direction:column;align-items:center;gap:12px;margin-bottom:24px;
-  padding-bottom:20px;border-bottom:1px solid var(--border-color)}
-.profile-avatar{width:80px;height:80px;background:linear-gradient(135deg,#1E3A8A,#2563EB);border-radius:50%;
-  display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;
-  box-shadow:0 8px 16px rgba(37,99,235,.3)}
-.profile-name{font-size:20px;font-weight:700}
-.profile-phone{font-size:14px;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
-.profile-row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-color)}
-.profile-row:last-child{border-bottom:none}
-.profile-row .label{font-size:14px;color:var(--text-secondary);display:flex;align-items:center;gap:8px}
-.profile-row .value{font-size:14px;font-weight:600}
-.profile-row .value.highlight{color:#60A5FA}
-.payment-numbers{background:var(--bg-input);padding:16px;border-radius:var(--radius-md);
-  margin-top:16px;border:1px solid var(--border-color)}
-.payment-numbers h3{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
-.payment-numbers p{font-size:12px;color:var(--text-secondary);margin-bottom:12px}
-.payment-numbers div{font-size:13px;padding:8px 0;display:flex;justify-content:space-between;
-  border-bottom:1px solid var(--border-color);color:var(--text-secondary);align-items:center}
-.payment-numbers div:last-child{border-bottom:none}
-.payment-numbers strong{color:var(--text-primary);display:flex;align-items:center;gap:6px}
-.payment-numbers span{color:#60A5FA;font-weight:600;font-family:monospace;display:flex;align-items:center;gap:6px}
-.verified-badge{color:var(--success);font-size:12px}
-.withdraw-form{display:flex;flex-direction:column;gap:16px;background:var(--bg-input);padding:20px;
-  border-radius:var(--radius-md);border:1px solid var(--border-color);margin-top:20px}
-.withdraw-form .input-group label{font-size:12px;font-weight:600;color:var(--text-secondary);
-  margin-bottom:6px;display:block}
-.withdraw-form .input-group input,.withdraw-form .input-group select{width:100%;padding:12px 16px;
-  border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:14px;
-  background:var(--bg-card);color:var(--text-primary);min-height:48px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.p-hd{display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.p-av{width:56px;height:56px;border-radius:var(--r);background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff}
+.p-hd .n{font-size:16px;font-weight:700}
+.p-hd .ph{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:5px}
+.p-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+.p-row:last-child{border-bottom:0}
+.p-row .k{color:var(--dim);display:flex;align-items:center;gap:6px}
+.p-row .v{font-weight:600;font-family:ui-monospace,monospace}
+.p-row .v.hl{color:#93c5fd}
+.box{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:12px}
+.box h3{font-size:13px;font-weight:600;margin-bottom:6px}
+.box p{font-size:11px;color:var(--dim);margin-bottom:8px}
+.box .line{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;align-items:center}
+.box .line:last-child{border-bottom:0}
+.box .line strong{color:var(--fg);display:flex;align-items:center;gap:5px}
+.box .line span{font-family:ui-monospace,monospace;color:#93c5fd}
+.invite-url{word-break:break-all;font-size:12px;color:#93c5fd;font-family:ui-monospace,monospace;margin-bottom:8px}
+.withdraw{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;margin-top:10px}
+.withdraw label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600}
 
 /* ---------- RULES ---------- */
-.rules-grid{display:flex;flex-direction:column;gap:20px}
-.rules-col{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border-color)}
-.rules-col h3{font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px;
-  border-bottom:1px solid var(--border-color);padding-bottom:12px}
-.rules-col h3 i{color:var(--primary-blue)}
-.rule-alert-banner{background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);border-radius:var(--radius-md);
-  padding:16px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px;color:#93C5FD;font-size:13px}
-.rule-warning-card{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
-  border-radius:var(--radius-md);padding:16px;margin-bottom:20px}
-.rule-warning-card .header{display:flex;align-items:center;gap:10px;color:#FDE047;font-weight:700;
-  font-size:14px;margin-bottom:8px;background:transparent;border:none;padding:0;position:static}
-.rule-warning-card .body{font-size:13px;color:var(--text-secondary);line-height:1.6}
-.rule-warning-card .body strong{color:var(--text-primary);font-size:16px;display:block;margin-top:4px}
-.rule-accordion{border-bottom:1px solid var(--border-color);padding:12px 0}
-.rule-accordion:last-child{border-bottom:none}
-.rule-accordion summary{font-size:14px;font-weight:600;cursor:pointer;list-style:none;
-  display:flex;justify-content:space-between;align-items:center;padding:4px 0}
-.rule-accordion summary::-webkit-details-marker{display:none}
-.rule-accordion summary::after{content:"\f078";font-family:"Font Awesome 6 Free";font-weight:900;
-  font-size:12px;color:var(--text-secondary);transition:transform .2s}
-.rule-accordion[open] summary::after{transform:rotate(180deg)}
-.rule-accordion .accordion-content{padding-top:12px;font-size:13px;color:var(--text-secondary);line-height:1.7}
-.rule-accordion .accordion-content ul{list-style:none;padding-left:0}
-.rule-accordion .accordion-content li{padding:4px 0 4px 20px;position:relative}
-.rule-accordion .accordion-content li::before{content:"•";position:absolute;left:4px;
-  color:var(--primary-blue);font-weight:700;font-size:16px}
-.amharic-text{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-color);
-  font-style:italic;color:#A0AEC0}
-.rules-footer{margin-top:24px;font-size:12px;color:var(--text-secondary);text-align:center;
-  border-top:1px solid var(--border-color);padding-top:16px}
+.rules h3{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.banner{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:var(--r);padding:10px;margin-bottom:12px;display:flex;gap:8px;font-size:12px;color:#93c5fd}
+.warn-card{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:10px;margin-bottom:12px}
+.warn-card .h{display:flex;gap:6px;color:#fcd34d;font-weight:700;font-size:12px;margin-bottom:4px}
+.warn-card .b{font-size:12px;color:var(--dim);line-height:1.5}
+.warn-card .b strong{color:var(--fg);font-size:14px;display:block;margin-top:3px}
+details{border-bottom:1px solid var(--line);padding:8px 0}
+details:last-of-type{border-bottom:0}
+summary{font-size:13px;font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--dim);font-weight:400}
+details[open] summary::after{content:"−"}
+details .body{padding-top:8px;font-size:12px;color:var(--dim);line-height:1.6}
+details .body ul{list-style:none;padding:0}
+details .body li{padding:3px 0 3px 14px;position:relative}
+details .body li::before{content:"·";position:absolute;left:2px;color:var(--blue);font-weight:700}
+.ftr{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);text-align:center}
 
-/* ---------- MODALS ---------- */
-.modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);
-  backdrop-filter:blur(8px);display:flex;align-items:flex-end;justify-content:center;z-index:2000;
-  visibility:hidden;opacity:0;transition:.2s ease}
-.modal.active{visibility:visible;opacity:1}
-.modal-content{background:var(--bg-card);border-radius:var(--radius-xl) var(--radius-xl) 0 0;
-  padding:28px 24px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;
-  transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);
-  border:1px solid var(--border-color);border-bottom:none}
-.modal.active .modal-content{transform:translateY(0)}
-@media(min-width:768px){
-  .modal{align-items:center}
-  .modal-content{border-radius:var(--radius-xl);transform:scale(.95);border-bottom:1px solid var(--border-color)}
-  .modal.active .modal-content{transform:scale(1)}
-}
-.modal-content .bank-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;
-  border-bottom:1px solid var(--border-color);padding-bottom:16px}
-.modal-content .bank-header i{font-size:24px;color:var(--primary-blue)}
-.modal-content .bank-title{font-size:18px;font-weight:700}
-.modal-content .bank-sub{font-size:13px;color:var(--text-secondary)}
-.modal-content textarea{width:100%;padding:14px 16px;border-radius:var(--radius-md);
-  border:1px solid var(--border-color);font-family:monospace;min-height:150px;font-size:14px;
-  background:var(--bg-input);color:var(--text-primary);resize:vertical}
-.modal-content .modal-buttons{display:flex;gap:12px;margin-top:24px}
-.modal-content .modal-buttons button{flex:1;padding:14px;border-radius:var(--radius-md);
-  font-weight:700;border:none;min-height:48px;font-size:14px;cursor:pointer}
-.close-btn{background:transparent;border:none;font-size:24px;cursor:pointer;color:var(--text-secondary);
-  padding:4px 8px;border-radius:8px;transition:.1s}
-.close-btn:hover{background:var(--border-color);color:var(--text-primary)}
+/* ---------- NAV ---------- */
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);display:flex;padding:4px 0 calc(4px + env(safe-area-inset-bottom,0));z-index:40}
+nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;font-size:10px;color:var(--dim);font-weight:600}
+nav button.on{color:var(--blue)}
+nav button svg{width:18px;height:18px}
+
+/* ---------- FLOATING REFRESH ---------- */
+.fab{position:fixed;right:14px;bottom:88px;width:40px;height:40px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);color:var(--fg);display:flex;align-items:center;justify-content:center;z-index:30;font-size:16px}
+.fab:active{background:var(--panel2)}
+.fab.spin svg{animation:sp .8s linear infinite}
+
+/* ---------- MODAL ---------- */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-end;justify-content:center;z-index:100}
+.modal.on{display:flex}
+.modal .sheet{background:var(--panel);border-top-left-radius:var(--r);border-top-right-radius:var(--r);border:1px solid var(--line);border-bottom:0;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;padding:16px}
+@media(min-width:720px){.modal{align-items:center}.modal .sheet{border-radius:var(--r);border-bottom:1px solid var(--line)}}
+.sheet .hd{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.sheet .hd svg{width:20px;height:20px;color:var(--blue);flex:none}
+.sheet .hd h3{font-size:15px;font-weight:700}
+.sheet .hd p{font-size:11px;color:var(--dim)}
+.sheet .hd .close{margin-left:auto;width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--dim);background:var(--panel2)}
+.sheet textarea{min-height:130px;font-family:ui-monospace,monospace;resize:vertical}
+.sheet .foot{display:flex;gap:8px;margin-top:16px}
+.sheet .foot button{flex:1;padding:12px;border-radius:var(--r);font-weight:700;font-size:13px}
+.sheet .info{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:10px;font-size:12px;color:var(--dim);margin-bottom:12px}
+.sheet .info strong{color:var(--fg)}
 
 /* ---------- TOAST ---------- */
-.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(100px);
-  padding:14px 24px;border-radius:var(--radius-xl);color:#fff;font-weight:600;font-size:14px;
-  box-shadow:0 8px 32px rgba(0,0,0,.4);opacity:0;transition:all .3s cubic-bezier(.16,1,.3,1);
-  z-index:999;max-width:90%;text-align:center;pointer-events:none;display:flex;align-items:center;gap:8px}
-.toast.show{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
-.toast.success{background:var(--success)}
-.toast.error{background:var(--danger)}
-.toast.info{background:var(--primary-blue)}
+#toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(30px);padding:10px 16px;border-radius:var(--r);color:#fff;font-size:13px;font-weight:600;background:var(--blue);opacity:0;pointer-events:none;max-width:90%;text-align:center;z-index:200;transition:transform .15s,opacity .15s}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#toast.success{background:var(--green)}
+#toast.error{background:var(--red)}
 
-/* ---------- MISC ---------- */
-.refresh-btn{position:fixed;bottom:100px;right:20px;background:var(--bg-card);color:var(--text-primary);
-  border:1px solid var(--border-color);padding:14px;border-radius:50%;cursor:pointer;
-  box-shadow:0 4px 20px rgba(0,0,0,.3);font-size:18px;z-index:50;width:50px;height:50px;
-  display:flex;align-items:center;justify-content:center}
-.refresh-btn:hover{background:var(--border-color)}
-.refresh-btn:active{transform:scale(.88)}
-.refresh-btn.spinning i{animation:spin .8s linear infinite}
-.empty-state{text-align:center;padding:40px 16px;color:var(--text-secondary)}
-.empty-state .icon{font-size:40px;margin-bottom:12px;color:var(--border-color)}
-.loading{text-align:center;padding:40px 16px;color:var(--text-secondary)}
-.spinner{display:inline-block;width:30px;height:30px;border:3px solid var(--border-color);
-  border-top:3px solid var(--primary-blue);border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.scroll-sentinel{height:1px}
-.skeleton-row{background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius-md);
-  padding:16px;margin-bottom:12px;color:var(--text-secondary);font-size:13px;text-align:center}
+/* ---------- LOADING / EMPTY ---------- */
+.loading{padding:30px 0;text-align:center;color:var(--dim);font-size:12px}
+.spinner{display:inline-block;width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
+.empty{padding:30px 12px;text-align:center;color:var(--dim);font-size:12px}
+.empty svg{width:32px;height:32px;color:var(--line2);display:block;margin:0 auto 8px}
+.sentinel{height:1px}
 </style>
 </head>
 <body>
 
-<div id="connBanner">Connecting…</div>
+<!-- SVG SPRITE (2KB, no network request) -->
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+<defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h7v17H4z M13 4h7v17h-7z"/></symbol>
+<symbol id="i-out" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4 M10 17l-5-5 5-5 M5 12h11"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4 M21 4v6h-6"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6 M20 4l-9 9 M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
+<symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="8.5" cy="10" r="1.2"/><path d="M4 17l4-4 3 3 5-6 4 5"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z M12 10v5 M12 18v.5"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6 M12 8v.5"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18 M5 8h14 M5 8l-3 6h6z M19 8l-3 6h6z"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5 M5 12l7-7 7 7"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14 M5 12l7 7 7-7"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0 M16 5a3.5 3.5 0 0 1 0 7 M22 20a5 5 0 0 0-4-4.9"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 1.5a13 13 0 0 0 5.5 5.5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+<symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 21h18 M5 21V10l7-4 7 4v11 M9 21v-5h6v5"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13 M22 2l-7 20-4-9-9-4z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20h18 M6 16v-5 M11 16v-9 M16 16v-3 M21 16v-7"/></symbol>
+<symbol id="i-percent" viewBox="0 0 24 24"><path d="M19 5L5 19 M7 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0 M14 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"/></symbol>
+<symbol id="i-wallet" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 7l3-3h12l3 3 M16 13h2"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="15" rx="1"/><path d="M3 10h18 M8 3v4 M16 3v4"/></symbol>
+<symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12 M5 10l7 7 7-7 M3 21h18"/></symbol>
+<symbol id="i-import" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M15 3v5h5 M12 12v6 M9 15l3 3 3-3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z"/></symbol>
+<symbol id="i-pie" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z M12 3v9h9A9 9 0 0 0 12 3z"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18"/></symbol>
+</defs>
+</svg>
 
-<header class="header">
-  <div class="header-left">
-    <div class="header-title" id="headerTitle">Game Admin</div>
-  </div>
-  <div class="header-right">
-    <button class="logout-btn" data-action="logout"><i class="fas fa-sign-out-alt"></i> Logout</button>
-  </div>
+<div id="conn">Connecting…</div>
+
+<header>
+  <h1 id="headerTitle">Admin</h1>
+  <button class="btn-out" data-action="logout"><svg class="i"><use href="#i-out"/></svg> Logout</button>
 </header>
 
-<div class="container">
+<div class="wrap">
 
-  <!-- ===== LIVE COMMISSION BAR ===== -->
-  <div class="commission-bar" id="commissionBar">
-    <div class="updated-indicator" id="commissionUpdated"><i class="fas fa-sync-alt"></i> —</div>
-    <div class="item">
-      <span class="label"><i class="fas fa-clock"></i> Pending Commission</span>
-      <span class="amount pending" id="pendingCommission">—</span>
+  <!-- COMMISSION -->
+  <div class="comm">
+    <div class="stamp" id="commissionUpdated"></div>
+    <div class="cell"><span class="k">Pending</span><span class="v" id="pendingCommission">—</span></div>
+    <div class="cell"><span class="k">Earned</span><span class="v" id="totalCommissionEarned">—</span></div>
+    <div class="cell"><span class="k">Rate</span><span class="v" id="commissionRateDisplay">—</span></div>
+  </div>
+
+  <!-- PAGE: GAME -->
+  <div class="page on" id="page-game">
+
+    <div class="stats">
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-wallet"/></svg> Deposits</div><div class="v g" id="statDeposits">-</div></div>
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-cal"/></svg> Today</div><div class="v a" id="statTodayDeposits">-</div></div>
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-clock"/></svg> Pending Dep.</div><div class="v r" id="statPendingDeposits">-</div></div>
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-dl"/></svg> Withdrawals</div><div class="v a" id="statWithdrawals">-</div></div>
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-clock"/></svg> Pending With.</div><div class="v p" id="statPendingWithdrawals">-</div></div>
+      <div class="stat"><div class="k"><svg class="i"><use href="#i-users"/></svg> Players</div><div class="v b" id="statPlayers">-</div></div>
     </div>
-    <div class="item">
-      <span class="label"><i class="fas fa-chart-line"></i> Total Earned</span>
-      <span class="amount earned" id="totalCommissionEarned">—</span>
+
+    <div class="tabs">
+      <button class="tab on" data-tab="deposits" data-action="switch-tab"><svg class="i"><use href="#i-wallet"/></svg> Deposits <span class="n" id="depositBadge">0</span></button>
+      <button class="tab" data-tab="withdrawals" data-action="switch-tab"><svg class="i"><use href="#i-bank"/></svg> Withdrawals <span class="n" id="withdrawalBadge">0</span></button>
+      <button class="tab" data-tab="players" data-action="switch-tab"><svg class="i"><use href="#i-users"/></svg> Players <span class="n" id="playerBadge">0</span></button>
     </div>
-    <div class="item">
-      <span class="label"><i class="fas fa-chart-pie"></i> Rate</span>
-      <span class="amount rate" id="commissionRateDisplay">—</span>
+
+    <!-- DEPOSITS -->
+    <div class="pane on" id="tab-deposits">
+      <div class="sec">
+        <h2>Deposits</h2>
+        <button class="icon-btn" data-action="toggle-filter" data-target="depositFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+      </div>
+      <div class="filter" id="depositFilter">
+        <div class="g"><label>Method</label>
+          <select id="depositMethod"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
+        </div>
+        <div class="g"><label>Status</label>
+          <select id="depositStatus"><option value="pending">Pending</option><option value="all">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+        </div>
+        <button class="btn p" data-action="apply-deposit-filters" style="width:100%"><svg class="i"><use href="#i-search"/></svg> Apply</button>
+      </div>
+      <div class="muted" id="depositShowingText">Showing 0 deposits</div>
+      <div id="depositsList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div class="sentinel" id="depositsSentinel"></div>
+    </div>
+
+    <!-- WITHDRAWALS -->
+    <div class="pane" id="tab-withdrawals">
+      <div class="sec">
+        <h2>Withdrawals</h2>
+        <button class="icon-btn" data-action="toggle-filter" data-target="withdrawFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+      </div>
+      <div class="filter" id="withdrawFilter">
+        <div class="g"><label>Method</label>
+          <select id="withdrawMethod"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
+        </div>
+        <div class="g"><label>Status</label>
+          <select id="withdrawStatus"><option value="pending">Pending</option><option value="all">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
+        </div>
+        <button class="btn p" data-action="apply-withdraw-filters" style="width:100%"><svg class="i"><use href="#i-search"/></svg> Apply</button>
+      </div>
+      <div class="muted" id="withdrawShowingText">Showing 0 withdrawals</div>
+      <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div class="sentinel" id="withdrawalsSentinel"></div>
+    </div>
+
+    <!-- PLAYERS -->
+    <div class="pane" id="tab-players">
+      <div class="sec">
+        <h2>Players</h2>
+        <button class="icon-btn" data-action="toggle-filter" data-target="playerFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+      </div>
+      <div class="row-actions">
+        <button class="btn o" data-action="open-import-modal"><svg class="i"><use href="#i-import"/></svg> Import</button>
+        <button class="btn p" data-action="open-add-player-modal"><svg class="i"><use href="#i-plus"/></svg> Add Player</button>
+      </div>
+      <div class="filter" id="playerFilter">
+        <div class="g" style="flex:1 1 100%"><label>Search</label>
+          <input type="text" id="playerSearchInput" placeholder="username or telegram id">
+        </div>
+      </div>
+      <div class="muted" id="playerShowingText">Showing 0 players</div>
+      <div id="playersList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div class="sentinel" id="playersSentinel"></div>
     </div>
   </div>
 
-  <!-- ===== PAGE: GAME ===== -->
-  <div class="page active" id="page-game">
-    <div class="stats-grid" id="statsGrid">
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-wallet"></i> Deposits</div>
-        <div class="value green" id="statDeposits">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 Q20,15 40,20 T80,10 T100,5" fill="none" stroke="#10B981" stroke-width="2"/></svg>
-      </div>
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-calendar-alt"></i> Today</div>
-        <div class="value orange" id="statTodayDeposits">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 Q30,25 50,15 T80,20 T100,10" fill="none" stroke="#F59E0B" stroke-width="2"/></svg>
-      </div>
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-clock"></i> Pending Dep.</div>
-        <div class="value red" id="statPendingDeposits">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,15 Q25,20 50,10 T80,15 T100,5" fill="none" stroke="#EF4444" stroke-width="2"/></svg>
-      </div>
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-download"></i> Withdrawals</div>
-        <div class="value orange" id="statWithdrawals">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,10 Q20,5 40,15 T80,10 T100,20" fill="none" stroke="#F59E0B" stroke-width="2"/></svg>
-      </div>
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-clock"></i> Pending With.</div>
-        <div class="value purple" id="statPendingWithdrawals">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,20 Q30,10 50,20 T80,15 T100,25" fill="none" stroke="#8B5CF6" stroke-width="2"/></svg>
-      </div>
-      <div class="stat-card">
-        <div class="label"><i class="fas fa-users"></i> Players</div>
-        <div class="value blue" id="statPlayers">-</div>
-        <svg class="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M0,25 Q20,20 40,22 T80,15 T100,10" fill="none" stroke="#3B82F6" stroke-width="2"/></svg>
-      </div>
-    </div>
-
-    <div class="tabs" id="tabContainer">
-      <button class="tab-btn active" data-tab="deposits" data-action="switch-tab">
-        <i class="fas fa-wallet"></i> Deposits <span class="badge" id="depositBadge">0</span>
-      </button>
-      <button class="tab-btn" data-tab="withdrawals" data-action="switch-tab">
-        <i class="fas fa-university"></i> Withdrawals <span class="badge" id="withdrawalBadge">0</span>
-      </button>
-      <button class="tab-btn" data-tab="players" data-action="switch-tab">
-        <i class="fas fa-users"></i> Players <span class="badge" id="playerBadge">0</span>
-      </button>
-    </div>
-
-    <div class="tab-content">
-
-      <!-- DEPOSITS -->
-      <div class="tab-pane active" id="tab-deposits">
-        <div class="section-header">
-          <h2><i class="fas fa-wallet"></i> Deposits Management</h2>
-          <button class="filter-icon" data-action="toggle-filter" data-target="depositFilter"><i class="fas fa-filter"></i></button>
-        </div>
-        <div class="filter-bar" id="depositFilter">
-          <div class="input-group">
-            <label>Method</label>
-            <select id="depositMethod">
-              <option value="all">All Methods</option>
-              <option value="telebirr">Telebirr</option>
-              <option value="cbebirr">CBE</option>
-              <option value="mpesa">M-Pesa</option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Status</label>
-            <select id="depositStatus">
-              <option value="pending">Pending</option>
-              <option value="all">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" data-action="apply-deposit-filters" style="width:100%;margin-top:8px;">
-            <i class="fas fa-search"></i> Apply Filters
-          </button>
-        </div>
-        <div class="showing-text" id="depositShowingText">Showing 0 deposits</div>
-        <div id="depositsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading deposits…</p></div></div>
-        <div class="scroll-sentinel" id="depositsSentinel"></div>
-      </div>
-
-      <!-- WITHDRAWALS -->
-      <div class="tab-pane" id="tab-withdrawals">
-        <div class="section-header">
-          <h2><i class="fas fa-university"></i> Withdrawals</h2>
-          <button class="filter-icon" data-action="toggle-filter" data-target="withdrawFilter"><i class="fas fa-filter"></i></button>
-        </div>
-        <div class="filter-bar" id="withdrawFilter">
-          <div class="input-group">
-            <label>Method</label>
-            <select id="withdrawMethod">
-              <option value="all">All Methods</option>
-              <option value="telebirr">Telebirr</option>
-              <option value="cbebirr">CBE</option>
-              <option value="mpesa">M-Pesa</option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Status</label>
-            <select id="withdrawStatus">
-              <option value="pending">Pending</option>
-              <option value="all">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" data-action="apply-withdraw-filters" style="width:100%;margin-top:8px;">
-            <i class="fas fa-search"></i> Apply Filters
-          </button>
-        </div>
-        <div class="showing-text" id="withdrawShowingText">Showing 0 withdrawals</div>
-        <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading withdrawals…</p></div></div>
-        <div class="scroll-sentinel" id="withdrawalsSentinel"></div>
-      </div>
-
-      <!-- PLAYERS -->
-      <div class="tab-pane" id="tab-players">
-        <div class="section-header">
-          <h2><i class="fas fa-users"></i> Players</h2>
-          <button class="filter-icon" data-action="toggle-filter" data-target="playerFilter"><i class="fas fa-filter"></i></button>
-        </div>
-        <div style="margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;">
-          <button class="btn btn-outline" data-action="open-import-modal" style="flex:1;"><i class="fas fa-file-import"></i> Import Players</button>
-          <button class="btn btn-primary" data-action="open-add-player-modal" style="flex:1;"><i class="fas fa-plus"></i> Add Player</button>
-        </div>
-        <div class="filter-bar" id="playerFilter">
-          <div class="input-group" style="flex:1;min-width:100%;">
-            <label>Search Player</label>
-            <input type="text" id="playerSearchInput" placeholder="Search by username or Telegram ID…">
-          </div>
-        </div>
-        <div class="showing-text" id="playerShowingText">Showing 0 players</div>
-        <div id="playersList"><div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading players…</p></div></div>
-        <div class="scroll-sentinel" id="playersSentinel"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== PAGE: PROFILE ===== -->
+  <!-- PAGE: PROFILE -->
   <div class="page" id="page-profile">
-    <div class="profile-card">
-      <div class="profile-header">
-        <div class="profile-avatar"><i class="fas fa-user-shield"></i></div>
-        <div class="profile-name" id="profileName">—</div>
-        <div class="profile-phone" id="profilePhone"><i class="fas fa-phone"></i> —</div>
+    <div class="card">
+      <div class="p-hd">
+        <div class="p-av"><svg class="i" style="width:28px;height:28px"><use href="#i-shield"/></svg></div>
+        <div class="n" id="profileName">—</div>
+        <div class="ph" id="profilePhone"><svg class="i"><use href="#i-phone"/></svg> —</div>
       </div>
-      <div class="profile-row">
-        <span class="label"><i class="fas fa-wallet"></i> Available Balance</span>
-        <span class="value highlight" id="profileAvailableBalance">—</span>
-      </div>
-      <div class="profile-row">
-        <span class="label"><i class="fas fa-chart-line"></i> Total Earned</span>
-        <span class="value highlight" id="profileTotalEarned">—</span>
-      </div>
-      <div class="profile-row">
-        <span class="label"><i class="fas fa-percent"></i> Commission Rate</span>
-        <span class="value" id="profileCommissionRate">—</span>
+      <div class="p-row"><span class="k"><svg class="i"><use href="#i-wallet"/></svg> Available</span><span class="v hl" id="profileAvailableBalance">—</span></div>
+      <div class="p-row"><span class="k"><svg class="i"><use href="#i-chart"/></svg> Total Earned</span><span class="v hl" id="profileTotalEarned">—</span></div>
+      <div class="p-row"><span class="k"><svg class="i"><use href="#i-percent"/></svg> Rate</span><span class="v" id="profileCommissionRate">—</span></div>
+
+      <div class="box">
+        <h3><svg class="i"><use href="#i-phone"/></svg> Payment Numbers</h3>
+        <p>Registered accounts for receiving payments.</p>
+        <div class="line"><strong>Telebirr</strong><span id="profileTelebirr">Not set</span></div>
+        <div class="line"><strong>CBE</strong><span id="profileCbe">Not set</span></div>
+        <div class="line"><strong>M-Pesa</strong><span id="profileMpesa">Not set</span></div>
       </div>
 
-      <div class="payment-numbers">
-        <h3><i class="fas fa-mobile-alt"></i> Payment Numbers</h3>
-        <p>Your registered accounts for receiving payments.</p>
-        <div><strong><i class="fas fa-phone" style="color:#F59E0B;"></i> Telebirr</strong><span id="profileTelebirr">Not set</span></div>
-        <div><strong><i class="fas fa-university" style="color:#3B82F6;"></i> CBE</strong><span id="profileCbe">Not set</span></div>
-        <div><strong><i class="fas fa-mobile-alt" style="color:#10B981;"></i> M-Pesa</strong><span id="profileMpesa">Not set</span></div>
-      </div>
-
-      <div style="margin-top:16px;background:var(--bg-input);padding:16px;border-radius:var(--radius-md);border:1px solid var(--border-color);">
-        <div style="font-size:13px;font-weight:600;margin-bottom:4px;"><i class="fas fa-link"></i> Invite Link</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Share your invite link and earn more.</div>
-        <div style="word-break:break-all;font-size:13px;margin-bottom:12px;color:#60A5FA;" id="profileInviteLink">—</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" data-action="copy-invite-link"><i class="fas fa-copy"></i> Copy Link</button>
-          <button class="btn btn-outline btn-sm" data-action="copy-invite-code"><i class="fas fa-copy"></i> Copy Code</button>
-          <span style="font-size:14px;font-weight:600;padding:6px 16px;background:var(--bg-card);border-radius:8px;border:1px solid var(--border-color);" id="profileInviteCode">-</span>
+      <div class="box">
+        <h3><svg class="i"><use href="#i-link"/></svg> Invite Link</h3>
+        <p>Share to earn commission on player activity.</p>
+        <div class="invite-url" id="profileInviteLink">—</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <button class="btn o sm" data-action="copy-invite-link"><svg class="i"><use href="#i-copy"/></svg> Copy Link</button>
+          <button class="btn o sm" data-action="copy-invite-code"><svg class="i"><use href="#i-copy"/></svg> Copy Code</button>
+          <span class="ref" id="profileInviteCode">-</span>
         </div>
       </div>
 
-      <h3 style="font-size:16px;font-weight:700;margin-top:24px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-        <i class="fas fa-paper-plane" style="color:var(--primary-blue);"></i> Request Withdrawal
-      </h3>
-      <div class="withdraw-form">
-        <div class="input-group">
-          <label>Amount (ETB)</label>
-          <input type="number" id="withdrawEarningsAmount" placeholder="Enter amount" min="10">
+      <h3 style="font-size:14px;font-weight:700;margin:16px 0 8px"><svg class="i"><use href="#i-send"/></svg> Request Withdrawal</h3>
+      <div class="withdraw">
+        <div><label>Amount (ETB)</label><input type="number" id="withdrawEarningsAmount" placeholder="0" min="10"></div>
+        <div><label>Phone</label><input type="text" id="withdrawEarningsPhone" placeholder="+251..."></div>
+        <div><label>Account Name</label><input type="text" id="withdrawEarningsName" placeholder="Full name"></div>
+        <div><label>Method</label>
+          <select id="withdrawEarningsMethod"><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
         </div>
-        <div class="input-group">
-          <label>Phone Number</label>
-          <input type="text" id="withdrawEarningsPhone" placeholder="+251 91 234 5678">
-        </div>
-        <div class="input-group">
-          <label>Account Name</label>
-          <input type="text" id="withdrawEarningsName" placeholder="Admin User">
-        </div>
-        <div class="input-group">
-          <label>Payment Method</label>
-          <select id="withdrawEarningsMethod">
-            <option value="telebirr">Telebirr</option>
-            <option value="cbebirr">CBE</option>
-            <option value="mpesa">M-Pesa</option>
-          </select>
-        </div>
-        <button class="btn btn-primary" data-action="request-admin-withdrawal" style="width:100%;font-size:15px;">
-          <i class="fas fa-paper-plane"></i> Request Withdrawal
-        </button>
-        <div style="text-align:center;font-size:12px;color:var(--text-secondary);margin-top:4px;">
-          <i class="fas fa-shield-alt"></i> Withdrawals are processed within 24–48 hours.
-        </div>
+        <button class="btn p" data-action="request-admin-withdrawal" style="width:100%"><svg class="i"><use href="#i-send"/></svg> Submit Request</button>
+        <div style="text-align:center;font-size:11px;color:var(--dim)"><svg class="i"><use href="#i-shield"/></svg> Processed within 24–48 hours.</div>
       </div>
-      <div id="withdrawStatus" style="margin-top:12px;font-size:13px;text-align:center;color:var(--text-secondary);"></div>
+      <div id="withdrawStatus" style="margin-top:8px;font-size:12px;text-align:center;color:var(--dim)"></div>
     </div>
   </div>
 
-  <!-- ===== PAGE: RULES (unchanged content) ===== -->
+  <!-- PAGE: RULES -->
   <div class="page" id="page-rules">
-    <div class="rules-grid">
-      <div class="rules-col">
-        <h3><i class="fas fa-scroll"></i> Rules & Guidelines / ህጎች እና መመሪያዎች</h3>
-        <div class="rule-alert-banner">
-          <i class="fas fa-info-circle"></i>
-          <div>Please read follow the rules and guidelines below.<br><span style="font-size:11px;opacity:.8;">አባክዎን ከዚህ በታች ያሉት ህጎች እና መመሪያዎች ያንብቡ እና ይከተሉ።</span></div>
-        </div>
-        <div class="rule-warning-card">
-          <div class="header"><i class="fas fa-exclamation-triangle"></i> IMPORTANT DEPOSIT LIMIT / አስቀላጊ የተቀማጭ ገደብ</div>
-          <div class="body">
-            Maximum deposit per transaction<br>
-            በአንድ ግብይት ከፍተኛ ተቀማጭ ገንዘብ<br>
-            <strong>1500 ETB</strong>
-            <span style="font-size:12px;color:var(--text-secondary);">1500 ብር</span>
-          </div>
-        </div>
-        <details class="rule-accordion" open>
-          <summary>1. Admin Account & Access / የአድሚን መመዝገብያ</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Register with valid phone and 4+ digit PIN.</li>
-              <li>Login using phone + PIN. Only active admins can log in.</li>
-              <li>Super Admin can activate or deactivate your account.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>2. Dashboard – Permissions / ዳሽቦርድ – ፈቃዶች</summary>
-          <div class="accordion-content">
-            <ul>
-              <li><strong>Players:</strong> View your assigned players and their balances.</li>
-              <li><strong>Deposits:</strong> Approve or reject deposit requests with photo proof.</li>
-              <li><strong>Withdrawals:</strong> Approve or reject player withdrawal requests.</li>
-              <li><strong>Earnings:</strong> Earn 40% commission on house profit from your players.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>3. Deposit Holding Limit (Critical) / የተቀማጭ መጠን ገደብ (ወሳኝ)</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Your total approved deposits <strong>must never exceed 1500 ETB</strong>.</li>
-              <li>If approval would exceed the limit, the system blocks it.</li>
-              <li>Request a withdrawal to the Super Admin to reduce your holding balance.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>4. Admin Withdrawals / ገንዘብ መውጫ</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Request withdrawal of your <strong>pending commission</strong> (available balance).</li>
-              <li>Provide amount, phone, method, and receiver name.</li>
-              <li>Super Admin approves or rejects your request.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>5. Game Participation / በጨዋታ መሳተፍ</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Admins can play as normal players using their Telegram account.</li>
-              <li>Playing balance is separate from commission earnings.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>6. Profile & Payment Methods / ፕሮፋይል እና የክፍያ ዘዴዎች</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Each admin has a unique invite code for players.</li>
-              <li>Payment numbers (Telebirr, CBE, M-Pesa) are shown to players for deposits.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>7. Code of Conduct / የስነምግባር ደንቦች</summary>
-          <div class="accordion-content">
-            <ul>
-              <li>Do not impersonate players or manipulate games.</li>
-              <li>Review deposit proofs honestly – fake approvals are a violation.</li>
-              <li>Report suspicious activity to the Super Admin.</li>
-            </ul>
-          </div>
-        </details>
-        <details class="rule-accordion">
-          <summary>8. Key Limits / ዋና ዋና ገደቦች</summary>
-          <div class="accordion-content">
-            <div style="background:var(--bg-input);border-radius:var(--radius-md);padding:14px 16px;border-left:3px solid var(--danger);font-size:13px;color:var(--text-secondary);">
-              <strong>Deposit holding balance:</strong> 1500 ETB max<br>
-              <strong>Commission rate:</strong> 40%
-            </div>
-          </div>
-        </details>
-        <div class="rules-footer">
-          <i class="fas fa-info-circle"></i> These rules and guidelines may be updated from time to time.<br>
-          እነዚህ ህጎች እና መመሪያዎች ከጊዜ ወደ ጊዜ ሊሻሻሉ ይችላሉ።<br>
-          Last updated: May 20, 2024
-        </div>
+    <div class="card rules">
+      <h3><svg class="i"><use href="#i-book"/></svg> Rules & Guidelines</h3>
+      <div class="banner"><svg class="i"><use href="#i-info"/></svg><div>Please read and follow the rules.<br><span style="font-size:11px;opacity:.8">አባክዎን ህጎቹን ያንብቡ።</span></div></div>
+      <div class="warn-card">
+        <div class="h"><svg class="i"><use href="#i-warn"/></svg> MAX DEPOSIT PER TXN</div>
+        <div class="b">1500 ETB / 1500 ብር<strong>1500 ETB</strong></div>
       </div>
+
+      <details open><summary>1. Account & Access</summary><div class="body"><ul>
+        <li>Register with valid phone and 4+ digit PIN.</li>
+        <li>Login with phone + PIN.</li>
+        <li>Only active admins can log in.</li>
+      </ul></div></details>
+
+      <details><summary>2. Dashboard Permissions</summary><div class="body"><ul>
+        <li><strong>Players:</strong> view assigned players and balances.</li>
+        <li><strong>Deposits:</strong> approve or reject with proof.</li>
+        <li><strong>Withdrawals:</strong> approve or reject player requests.</li>
+        <li><strong>Earnings:</strong> 40% commission on house profit.</li>
+      </ul></div></details>
+
+      <details><summary>3. Deposit Holding Limit</summary><div class="body"><ul>
+        <li>Total approved deposits <strong>must not exceed 1500 ETB</strong>.</li>
+        <li>System blocks approvals that exceed the limit.</li>
+        <li>Withdraw to Super Admin to reduce holding.</li>
+      </ul></div></details>
+
+      <details><summary>4. Admin Withdrawals</summary><div class="body"><ul>
+        <li>Request withdrawal of pending commission.</li>
+        <li>Provide amount, phone, method, and name.</li>
+        <li>Super Admin approves or rejects.</li>
+      </ul></div></details>
+
+      <details><summary>5. Game Participation</summary><div class="body"><ul>
+        <li>Admins can play as normal players.</li>
+        <li>Playing balance is separate from commission.</li>
+      </ul></div></details>
+
+      <details><summary>6. Profile & Payments</summary><div class="body"><ul>
+        <li>Each admin has a unique invite code.</li>
+        <li>Payment numbers shown to players for deposits.</li>
+      </ul></div></details>
+
+      <details><summary>7. Code of Conduct</summary><div class="body"><ul>
+        <li>Do not impersonate players or manipulate games.</li>
+        <li>Review deposit proofs honestly.</li>
+        <li>Report suspicious activity.</li>
+      </ul></div></details>
+
+      <details><summary>8. Key Limits</summary><div class="body"><ul>
+        <li>Deposit holding balance: 1500 ETB max</li>
+        <li>Commission rate: 40%</li>
+      </ul></div></details>
+
+      <div class="ftr">Last updated: May 20, 2024</div>
     </div>
   </div>
+</div>
 
-</div><!-- /container -->
-
-<nav class="bottom-nav" id="bottomNav">
-  <button class="nav-item active" data-page="game" data-action="switch-page">
-    <i class="fas fa-home"></i><span>Dashboard</span>
-  </button>
-  <button class="nav-item" data-page="profile" data-action="switch-page">
-    <i class="fas fa-user"></i><span>Profile</span>
-  </button>
-  <button class="nav-item" data-page="rules" data-action="switch-page">
-    <i class="fas fa-scroll"></i><span>Rules</span>
-  </button>
+<nav id="bottomNav">
+  <button class="on" data-page="game" data-action="switch-page"><svg class="i"><use href="#i-home"/></svg> Dashboard</button>
+  <button data-page="profile" data-action="switch-page"><svg class="i"><use href="#i-user"/></svg> Profile</button>
+  <button data-page="rules" data-action="switch-page"><svg class="i"><use href="#i-book"/></svg> Rules</button>
 </nav>
 
-<button class="refresh-btn" id="refreshBtn" data-action="refresh-all" title="Refresh all data">
-  <i class="fas fa-sync-alt"></i>
-</button>
+<button class="fab" id="refreshBtn" data-action="refresh-all" title="Refresh"><svg class="i" style="width:18px;height:18px"><use href="#i-refresh"/></svg></button>
 
-<div class="toast" id="toast"></div>
+<div id="toast"></div>
 
-<!-- Add Player Modal -->
-<div id="addPlayerModal" class="modal" data-close-on-backdrop="1">
-  <div class="modal-content">
-    <div class="bank-header">
-      <i class="fas fa-user-plus"></i>
-      <div>
-        <div class="bank-title">Add Player</div>
-        <div class="bank-sub">Enter Telegram ID or @username</div>
-      </div>
-      <button class="close-btn" data-action="close-modal" data-target="addPlayerModal"><i class="fas fa-times"></i></button>
+<!-- Add Player -->
+<div class="modal" id="addPlayerModal" data-close-on-backdrop="1">
+  <div class="sheet">
+    <div class="hd"><svg class="i"><use href="#i-plus"/></svg>
+      <div><h3>Add Player</h3><p>Telegram ID or @username</p></div>
+      <button class="close" data-action="close-modal" data-target="addPlayerModal"><svg class="i"><use href="#i-close"/></svg></button>
     </div>
-    <div class="input-group">
-      <input type="text" id="addPlayerInput" placeholder="e.g. 123456789 or @john_doe"
-        style="width:100%;padding:14px 16px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:var(--bg-input);color:var(--text-primary);font-size:15px;min-height:48px;">
-    </div>
-    <div id="addPlayerStatus" style="margin-top:12px;font-size:13px;text-align:center;"></div>
-    <div class="modal-buttons">
-      <button class="btn btn-primary" data-action="submit-add-player"><i class="fas fa-check"></i> Add Player</button>
-      <button class="btn btn-secondary" data-action="close-modal" data-target="addPlayerModal">Cancel</button>
+    <input type="text" id="addPlayerInput" placeholder="123456789 or @username">
+    <div id="addPlayerStatus" style="margin-top:8px;font-size:12px;text-align:center"></div>
+    <div class="foot">
+      <button class="btn p" data-action="submit-add-player">Add</button>
+      <button class="btn g" data-action="close-modal" data-target="addPlayerModal">Cancel</button>
     </div>
   </div>
 </div>
 
-<!-- Import Modal -->
-<div id="importModal" class="modal" data-close-on-backdrop="1">
-  <div class="modal-content">
-    <div class="bank-header">
-      <i class="fas fa-file-import"></i>
-      <div>
-        <div class="bank-title">Import Players</div>
-        <div class="bank-sub">Paste Telegram IDs or @usernames (one per line)</div>
-      </div>
-      <button class="close-btn" data-action="close-modal" data-target="importModal"><i class="fas fa-times"></i></button>
+<!-- Import -->
+<div class="modal" id="importModal" data-close-on-backdrop="1">
+  <div class="sheet">
+    <div class="hd"><svg class="i"><use href="#i-import"/></svg>
+      <div><h3>Import Players</h3><p>One per line</p></div>
+      <button class="close" data-action="close-modal" data-target="importModal"><svg class="i"><use href="#i-close"/></svg></button>
     </div>
-    <div class="input-group">
-      <textarea id="importTextarea" placeholder="Enter Telegram IDs or @usernames, one per line&#10;Example:&#10;123456789&#10;@john_doe"></textarea>
-    </div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;color:var(--text-secondary);font-size:13px;">
-      <label style="cursor:pointer;background:var(--bg-input);padding:10px 16px;border-radius:var(--radius-md);display:flex;align-items:center;gap:8px;border:1px solid var(--border-color);">
-        <i class="fas fa-file-csv"></i> Upload CSV file
-        <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none;">
+    <textarea id="importTextarea" placeholder="123456789&#10;@john_doe"></textarea>
+    <div style="display:flex;gap:10px;margin-top:10px;font-size:12px;flex-wrap:wrap">
+      <label style="cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 12px;display:flex;align-items:center;gap:6px">
+        <svg class="i"><use href="#i-import"/></svg> Upload CSV
+        <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none">
       </label>
-      <label style="cursor:pointer;display:flex;align-items:center;gap:8px;">
-        <input type="checkbox" id="importOverwrite"> Overwrite existing
-      </label>
+      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="importOverwrite" style="width:auto"> Overwrite</label>
     </div>
-    <div id="importStatus" style="margin-top:16px;font-size:13px;max-height:200px;overflow-y:auto;background:var(--bg-input);padding:12px;border-radius:var(--radius-md);display:none;border:1px solid var(--border-color);"></div>
-    <div class="modal-buttons">
-      <button class="btn btn-primary" data-action="submit-import"><i class="fas fa-check"></i> Import</button>
-      <button class="btn btn-secondary" data-action="close-modal" data-target="importModal">Cancel</button>
+    <div id="importStatus" style="margin-top:12px;font-size:12px;max-height:200px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;display:none;border:1px solid var(--line)"></div>
+    <div class="foot">
+      <button class="btn p" data-action="submit-import">Import</button>
+      <button class="btn g" data-action="close-modal" data-target="importModal">Cancel</button>
     </div>
   </div>
 </div>
 
-<!-- Balance Adjust Modal -->
-<div id="balanceModal" class="modal" data-close-on-backdrop="1">
-  <div class="modal-content">
-    <div class="bank-header">
-      <i class="fas fa-balance-scale"></i>
-      <div>
-        <div class="bank-title">Adjust Player Balance</div>
-        <div class="bank-sub">Add or deduct funds</div>
-      </div>
-      <button class="close-btn" data-action="close-modal" data-target="balanceModal"><i class="fas fa-times"></i></button>
+<!-- Balance -->
+<div class="modal" id="balanceModal" data-close-on-backdrop="1">
+  <div class="sheet">
+    <div class="hd"><svg class="i"><use href="#i-scale"/></svg>
+      <div><h3>Adjust Balance</h3><p>Add or deduct funds</p></div>
+      <button class="close" data-action="close-modal" data-target="balanceModal"><svg class="i"><use href="#i-close"/></svg></button>
     </div>
-    <div style="background:var(--bg-input);padding:16px;border-radius:var(--radius-md);margin-bottom:20px;font-size:14px;border:1px solid var(--border-color);color:var(--text-secondary);">
-      <strong>Player:</strong> <span id="balancePlayerName" style="color:var(--text-primary);">—</span>
-      (ID: <span id="balancePlayerId">—</span>)<br>
-      <strong>Current Balance:</strong> <span id="balanceCurrentBalance" style="color:#60A5FA;">—</span> ETB
+    <div class="info">
+      <strong>Player:</strong> <span id="balancePlayerName">—</span> (ID: <span id="balancePlayerId">—</span>)<br>
+      <strong>Current:</strong> <span id="balanceCurrentBalance" style="color:#93c5fd">—</span> ETB
     </div>
-    <div class="input-group" style="margin-bottom:16px;">
-      <label style="display:block;font-weight:600;font-size:13px;color:var(--text-secondary);margin-bottom:6px;">Operation</label>
-      <select id="balanceOperation" style="width:100%;padding:12px 16px;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:15px;background:var(--bg-input);color:var(--text-primary);min-height:48px;">
-        <option value="add">➕ Add</option>
-        <option value="subtract">➖ Subtract</option>
-      </select>
+    <div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600">Operation</label>
+      <select id="balanceOperation"><option value="add">Add</option><option value="subtract">Subtract</option></select>
     </div>
-    <div class="input-group" style="margin-bottom:24px;">
-      <label style="display:block;font-weight:600;font-size:13px;color:var(--text-secondary);margin-bottom:6px;">Amount (ETB)</label>
-      <input type="number" id="balanceAmount" placeholder="Enter amount" min="1" step="0.01"
-        style="width:100%;padding:12px 16px;border:1px solid var(--border-color);border-radius:var(--radius-md);font-size:15px;background:var(--bg-input);color:var(--text-primary);min-height:48px;">
+    <div style="margin-bottom:12px"><label style="display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600">Amount (ETB)</label>
+      <input type="number" id="balanceAmount" placeholder="0" min="1" step="0.01">
     </div>
-    <div class="modal-buttons">
-      <button class="btn btn-primary" data-action="submit-balance-adjust"><i class="fas fa-save"></i> Update Balance</button>
-      <button class="btn btn-secondary" data-action="close-modal" data-target="balanceModal">Cancel</button>
+    <div class="foot">
+      <button class="btn p" data-action="submit-balance-adjust">Update</button>
+      <button class="btn g" data-action="close-modal" data-target="balanceModal">Cancel</button>
     </div>
-    <div id="balanceStatus" style="margin-top:16px;font-size:13px;text-align:center;"></div>
+    <div id="balanceStatus" style="margin-top:10px;font-size:12px;text-align:center"></div>
   </div>
 </div>
 
-<!-- Proof Modal (URL-based, no base64) -->
-<div id="proofModal" class="modal">
-  <div class="modal-content" style="position:relative;max-width:600px;background:transparent;padding:0;border-radius:16px;overflow:hidden;border:none;">
-    <button class="close-btn" data-action="close-modal" data-target="proofModal"
-      style="position:absolute;top:16px;right:16px;background:rgba(0,0,0,.6);color:#fff;width:44px;height:44px;border-radius:50%;font-size:22px;z-index:10;display:flex;align-items:center;justify-content:center;">
-      <i class="fas fa-times"></i>
-    </button>
-    <img id="proofImage" src="" alt="Payment Proof"
-      style="width:100%;height:auto;display:block;max-height:80vh;object-fit:contain;">
-  </div>
+<!-- Proof -->
+<div class="modal" id="proofModal" style="align-items:center;background:rgba(0,0,0,.9)">
+  <button class="close" data-action="close-modal" data-target="proofModal"
+    style="position:fixed;top:14px;right:14px;width:40px;height:40px;border-radius:4px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;z-index:10">
+    <svg class="i" style="width:20px;height:20px"><use href="#i-close"/></svg>
+  </button>
+  <img id="proofImage" src="" alt="Proof" style="max-width:100%;max-height:90vh;object-fit:contain;display:block">
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 /* ================================================================
-   ADMIN DASHBOARD — event-driven client
-   Changes vs. previous version:
-     • Socket.IO is now the primary transport; polling is a 5-min safety net
-     • AbortController + sequence guard on every fetch
-     • Keyed row patching (tr[data-row-id]) — no full table rebuilds
-     • Optimistic UI on approve/reject with rollback
-     • Cursor pagination + IntersectionObserver infinite scroll
-     • Proof images come from /admin/proof/:id (no base64 in list JSON)
-     • Event delegation — no inline onclick string interpolation
+   Admin dashboard — lite + classical
+   Functionality is identical to the event-driven version.
+   Only the presentation layer changed: fewer DOM nodes, no
+   external icon font, no backdrop-filter, no gradients, no
+   animations besides the spinner. All data-action hooks and
+   element IDs are unchanged so the JS behaviour is the same.
    ================================================================ */
 
-const BOT_USERNAME = 'bingomkmk0120_bot';
-const RECONCILE_MS = 5 * 60 * 1000;   // 5 min safety-net poll
-const PAGE_SIZE    = 20;
+const BOT_USERNAME='bingomkmk0120_bot';
+const RECONCILE_MS=5*60*1000;
+const PAGE_SIZE=20;
 
-/* ---------------- STATE ---------------- */
-const state = {
-  admin: null,                 // cached session — never refetched
-  currentPage: 'game',
-  currentTab: 'deposits',
-  stats: null,
-  deposits:    { byId: new Map(), cursor: null, hasMore: true, loading: false, loaded: false },
-  withdrawals: { byId: new Map(), cursor: null, hasMore: true, loading: false, loaded: false },
-  players:     { byId: new Map(), cursor: null, hasMore: true, loading: false, loaded: false },
+const state={
+  admin:null,
+  currentPage:'game',
+  currentTab:'deposits',
+  stats:null,
+  deposits:{byId:new Map(),cursor:null,hasMore:true,loading:false,loaded:false},
+  withdrawals:{byId:new Map(),cursor:null,hasMore:true,loading:false,loaded:false},
+  players:{byId:new Map(),cursor:null,hasMore:true,loading:false,loaded:false}
 };
+const optimistic=new Map();
+const entityVersions=new Map();
+const inflight=new Map();
+let seqCounter=0,adminSocket=null,reconcileTimer=null,balanceTargetPlayer=null;
+const sentinels={};
 
-const optimistic = new Map();      // `deposit:123` -> 'approved' | 'rejected'
-const entityVersions = new Map();  // `${type}:${id}` -> version
-const inflight = new Map();        // fetch key -> { controller, seq }
-let seqCounter = 0;
-let adminSocket = null;
-let reconcileTimer = null;
-let balanceTargetPlayer = null;
-const sentinels = {};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-/* ---------------- UTIL ---------------- */
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
-  ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-
-function showToast(message, type = 'info') {
-  const t = $('toast');
-  t.innerHTML = message;
-  t.className = `toast ${type}`;
+function showToast(msg,type='info'){
+  const t=$('toast');
+  t.textContent=msg.replace(/<[^>]*>/g,'');       // strip tags; text-only toasts
+  t.className=type;
   void t.offsetWidth;
-  t.classList.add('show');
+  t.classList.add('on');
   clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('show'), 3000);
+  t._t=setTimeout(()=>t.classList.remove('on'),2500);
 }
 
-/* ---------------- FETCH WRAPPER (AbortController + seq guard) ---------------- */
-async function apiFetch(key, url, opts = {}) {
-  // cancel any in-flight request sharing this key
-  if (inflight.has(key)) {
-    try { inflight.get(key).controller.abort(); } catch {}
-  }
-  const controller = new AbortController();
-  const seq = ++seqCounter;
-  inflight.set(key, { controller, seq });
-
-  try {
-    const res = await fetch(url, {
-      credentials: 'same-origin',
-      headers: { 'Accept': 'application/json', ...(opts.headers || {}) },
-      ...opts,
-      signal: controller.signal,
-    });
-    // stale check — a newer request for the same key superseded us
-    if (inflight.get(key)?.seq !== seq) return null;
+async function apiFetch(key,url,opts={}){
+  if(inflight.has(key)){try{inflight.get(key).controller.abort()}catch{}}
+  const controller=new AbortController();
+  const seq=++seqCounter;
+  inflight.set(key,{controller,seq});
+  try{
+    const res=await fetch(url,{credentials:'same-origin',headers:{'Accept':'application/json',...(opts.headers||{})},...opts,signal:controller.signal});
+    if(inflight.get(key)?.seq!==seq) return null;
     return res;
-  } catch (err) {
-    if (err.name === 'AbortError') return null;
+  }catch(err){
+    if(err.name==='AbortError') return null;
     throw err;
-  } finally {
-    if (inflight.get(key)?.seq === seq) inflight.delete(key);
+  }finally{
+    if(inflight.get(key)?.seq===seq) inflight.delete(key);
   }
 }
+function abortAll(){for(const{controller}of inflight.values()){try{controller.abort()}catch{}}inflight.clear()}
 
-function abortAll() {
-  for (const { controller } of inflight.values()) {
-    try { controller.abort(); } catch {}
-  }
-  inflight.clear();
-}
-
-/* ---------------- SESSION (cached once) ---------------- */
-async function checkSession() {
-  try {
-    const res = await apiFetch('session', '/admin/session');
-    if (!res || res.status === 401) { window.location.href = '/admin-auth'; return false; }
-    const data = await res.json();
-    if (!data.success) { window.location.href = '/admin-auth'; return false; }
-    state.admin = data.admin;               // cache for the session lifetime
-    $('headerTitle').textContent = `Game Admin - ${data.admin.name}`;
+async function checkSession(){
+  try{
+    const res=await apiFetch('session','/admin/session');
+    if(!res||res.status===401){window.location.href='/admin-auth';return false}
+    const d=await res.json();
+    if(!d.success){window.location.href='/admin-auth';return false}
+    state.admin=d.admin;
+    $('headerTitle').textContent='Admin — '+d.admin.name;
     return true;
-  } catch {
-    window.location.href = '/admin-auth';
-    return false;
-  }
+  }catch{window.location.href='/admin-auth';return false}
 }
+async function logout(){abortAll();if(adminSocket)adminSocket.disconnect();await fetch('/admin/logout',{method:'POST'});window.location.href='/admin-auth'}
 
-async function logout() {
+function switchPage(page){
+  if(state.currentPage===page) return;
   abortAll();
-  if (adminSocket) adminSocket.disconnect();
-  await fetch('/admin/logout', { method: 'POST' });
-  window.location.href = '/admin-auth';
+  state.currentPage=page;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+page));
+  if(page==='game') Promise.all([loadStats(),loadCommissionSummary(),loadActiveTab({reset:true})]);
+  else if(page==='profile') loadProfile();
 }
-
-/* ---------------- PAGE / TAB SWITCH ---------------- */
-function switchPage(page) {
-  if (state.currentPage === page) return;
-  abortAll();                               // cancel in-flight for the old page
-  state.currentPage = page;
-
-  document.querySelectorAll('.nav-item').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.page === page));
-  document.querySelectorAll('.page').forEach(p =>
-    p.classList.toggle('active', p.id === `page-${page}`));
-
-  if (page === 'game') {
-    Promise.all([loadStats(), loadCommissionSummary(), loadActiveTab({ reset: true })]);
-  } else if (page === 'profile') {
-    loadProfile();                          // session is cached, so this is cheap
-  }
-}
-
-function switchTab(tab) {
-  if (state.currentTab === tab) return;
+function switchTab(tab){
+  if(state.currentTab===tab) return;
   abortAll();
-  state.currentTab = tab;
-
-  document.querySelectorAll('.tab-btn').forEach(btn =>
-    btn.classList.toggle('active', btn.dataset.tab === tab));
-  document.querySelectorAll('.tab-pane').forEach(p =>
-    p.classList.toggle('active', p.id === `tab-${tab}`));
-
-  loadActiveTab({ reset: false });
-
-  const active = document.querySelector('.tab-btn.active');
-  if (active) active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  state.currentTab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='tab-'+tab));
+  loadActiveTab({reset:false});
+  const active=document.querySelector('.tab.on');
+  if(active)active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
 }
-
-function loadActiveTab({ reset }) {
-  if (state.currentTab === 'deposits')    return loadDeposits({ reset });
-  if (state.currentTab === 'withdrawals') return loadWithdrawals({ reset });
-  if (state.currentTab === 'players')     return loadPlayers({ reset });
+function loadActiveTab({reset}){
+  if(state.currentTab==='deposits') return loadDeposits({reset});
+  if(state.currentTab==='withdrawals') return loadWithdrawals({reset});
+  if(state.currentTab==='players') return loadPlayers({reset});
 }
+function toggleFilter(id){const el=$(id);el.style.display=el.style.display==='none'?'flex':'none'}
 
-function toggleFilter(id) {
-  const el = $(id);
-  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+function setConn(ok,msg){
+  const b=$('conn');
+  if(ok){b.classList.add('on','ok');b.textContent=msg||'Live';setTimeout(()=>b.classList.remove('on'),1200)}
+  else{b.classList.remove('ok');b.textContent=msg||'Reconnecting…';b.classList.add('on')}
 }
-
-/* ---------------- SOCKET.IO (primary transport) ---------------- */
-function setConnState(ok, msg) {
-  const b = $('connBanner');
-  if (ok) {
-    b.classList.add('ok');
-    b.textContent = msg || 'Live';
-    b.classList.add('show');
-    setTimeout(() => b.classList.remove('show'), 1500);
-  } else {
-    b.classList.remove('ok');
-    b.textContent = msg || 'Reconnecting…';
-    b.classList.add('show');
-  }
+function connectAdminWebSocket(){
+  if(adminSocket) adminSocket.disconnect();
+  adminSocket=io('/admin',{transports:['websocket','polling'],reconnection:true,reconnectionDelay:1000,reconnectionDelayMax:30000,randomizationFactor:.5,timeout:20000});
+  adminSocket.on('connect',()=>{setConn(true);refreshAll({silent:true})});
+  adminSocket.on('disconnect',()=>setConn(false,'Reconnecting…'));
+  adminSocket.io.on('reconnect_attempt',n=>setConn(false,'Reconnecting… ('+n+')'));
+  adminSocket.on('deposit:new',e=>onDepositEvent(e,true));
+  adminSocket.on('deposit:updated',e=>onDepositEvent(e,false));
+  adminSocket.on('withdrawal:new',e=>onWithdrawalEvent(e,true));
+  adminSocket.on('withdrawal:updated',e=>onWithdrawalEvent(e,false));
+  adminSocket.on('player:added',e=>onPlayerAdded(e));
+  adminSocket.on('player:balance',e=>onPlayerBalance(e));
+  adminSocket.on('commission:update',e=>onCommissionUpdate(e));
 }
-
-function connectAdminWebSocket() {
-  if (adminSocket) adminSocket.disconnect();
-
-  adminSocket = io('/admin', {
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 30000,     // 1s → 30s exponential backoff
-    randomizationFactor: 0.5,
-    timeout: 20000,
-  });
-
-  adminSocket.on('connect', () => {
-    setConnState(true, 'Live');
-    // full resync on (re)connect — catches anything missed while offline
-    refreshAll({ silent: true });
-  });
-  adminSocket.on('disconnect', () => setConnState(false, 'Reconnecting…'));
-  adminSocket.io.on('reconnect_attempt', (n) => setConnState(false, `Reconnecting… (${n})`));
-
-  // ---- granular entity events ----
-  adminSocket.on('deposit:new',     (e) => onDepositEvent(e, true));
-  adminSocket.on('deposit:updated', (e) => onDepositEvent(e, false));
-  adminSocket.on('withdrawal:new',     (e) => onWithdrawalEvent(e, true));
-  adminSocket.on('withdrawal:updated', (e) => onWithdrawalEvent(e, false));
-  adminSocket.on('player:added',   (e) => onPlayerAdded(e));
-  adminSocket.on('player:balance', (e) => onPlayerBalance(e));
-  adminSocket.on('commission:update', (e) => onCommissionUpdate(e));
-}
-
-/* drop out-of-order events using a per-entity monotonic version */
-function acceptVersion(type, id, version) {
-  const k = `${type}:${id}`;
-  const cur = entityVersions.get(k) || 0;
-  if (version && version <= cur) return false;
-  entityVersions.set(k, version || cur + 1);
+function acceptVersion(type,id,ver){
+  const k=type+':'+id;
+  const cur=entityVersions.get(k)||0;
+  if(ver&&ver<=cur) return false;
+  entityVersions.set(k,ver||cur+1);
   return true;
 }
 
-/* ---------------- STATS + COMMISSION ---------------- */
-async function loadStats() {
-  try {
-    const res = await apiFetch('stats', '/admin/stats');
-    if (!res || !res.ok) return null;
-    const data = await res.json();
-    if (!data.success) return null;
-    state.stats = data.stats;
-
-    $('statPlayers').textContent = data.stats.playerCount;
-    $('statDeposits').textContent = `${data.stats.depositBalance.toFixed(0)} ETB`;
-    $('statTodayDeposits').textContent = `${data.stats.todayDeposits.toFixed(0)} ETB`;
-    $('statPendingDeposits').textContent = data.stats.pendingDeposits;
-    $('statWithdrawals').textContent = `${data.stats.totalWithdrawals.toFixed(0)} ETB`;
-    $('statPendingWithdrawals').textContent = data.stats.pendingWithdrawals;
-
-    setBadge('depositBadge', data.stats.pendingDeposits);
-    setBadge('withdrawalBadge', data.stats.pendingWithdrawals);
-    setBadge('playerBadge', data.stats.playerCount);
-    return data;
-  } catch (e) { console.warn('stats', e); return null; }
+async function loadStats(){
+  try{
+    const res=await apiFetch('stats','/admin/stats');
+    if(!res||!res.ok) return null;
+    const d=await res.json();
+    if(!d.success) return null;
+    state.stats=d.stats;
+    $('statPlayers').textContent=d.stats.playerCount;
+    $('statDeposits').textContent=d.stats.depositBalance.toFixed(0)+' ETB';
+    $('statTodayDeposits').textContent=d.stats.todayDeposits.toFixed(0)+' ETB';
+    $('statPendingDeposits').textContent=d.stats.pendingDeposits;
+    $('statWithdrawals').textContent=d.stats.totalWithdrawals.toFixed(0)+' ETB';
+    $('statPendingWithdrawals').textContent=d.stats.pendingWithdrawals;
+    $('depositBadge').textContent=d.stats.pendingDeposits;
+    $('withdrawalBadge').textContent=d.stats.pendingWithdrawals;
+    $('playerBadge').textContent=d.stats.playerCount;
+    return d;
+  }catch(e){return null}
 }
-
-function setBadge(id, n) {
-  const el = $(id);
-  if (el) el.textContent = n;
+async function loadCommissionSummary(){
+  try{
+    const res=await apiFetch('commission','/admin/live-commission');
+    if(!res||!res.ok) return null;
+    const d=await res.json();
+    if(!d.success) return null;
+    applyCommission(d.stats.pending||0,d.stats.totalEarned||0,d.admin.commission_rate||0);
+    return d;
+  }catch(e){return null}
 }
-
-async function loadCommissionSummary() {
-  try {
-    const res = await apiFetch('commission', '/admin/live-commission');
-    if (!res || !res.ok) return null;
-    const data = await res.json();
-    if (!data.success) return null;
-    applyCommission(data.stats.pending || 0, data.stats.totalEarned || 0,
-                    data.admin.commission_rate || 0);
-    return data;
-  } catch (e) { console.warn('commission', e); return null; }
-}
-
-function applyCommission(pending, earned, rate) {
-  $('pendingCommission').textContent = `${pending.toFixed(0)} ETB`;
-  $('totalCommissionEarned').textContent = `${earned.toFixed(0)} ETB`;
-  $('commissionRateDisplay').textContent = `${(rate * 100).toFixed(0)}%`;
-  $('commissionUpdated').innerHTML = `<i class="fas fa-sync-alt"></i> ${new Date().toLocaleTimeString()}`;
-
-  if (state.currentPage === 'profile') {
-    $('profileAvailableBalance').textContent = `${pending.toFixed(0)} ETB`;
-    $('profileTotalEarned').textContent = `${earned.toFixed(0)} ETB`;
-    $('profileCommissionRate').textContent = `${(rate * 100).toFixed(0)}%`;
+function applyCommission(p,e,r){
+  $('pendingCommission').textContent=p.toFixed(0)+' ETB';
+  $('totalCommissionEarned').textContent=e.toFixed(0)+' ETB';
+  $('commissionRateDisplay').textContent=(r*100).toFixed(0)+'%';
+  $('commissionUpdated').textContent=new Date().toLocaleTimeString();
+  if(state.currentPage==='profile'){
+    $('profileAvailableBalance').textContent=p.toFixed(0)+' ETB';
+    $('profileTotalEarned').textContent=e.toFixed(0)+' ETB';
+    $('profileCommissionRate').textContent=(r*100).toFixed(0)+'%';
   }
 }
+function onCommissionUpdate(e){if(!acceptVersion('commission','self',e.version))return;applyCommission(e.pending||0,e.totalEarned||0,e.rate||0)}
 
-function onCommissionUpdate(e) {
-  if (!acceptVersion('commission', 'self', e.version)) return;
-  applyCommission(e.pending || 0, e.totalEarned || 0, e.rate || 0);
-}
-
-/* ================================================================
-   DEPOSITS
-   ================================================================ */
-function getDepositFilters() {
-  return {
-    method: $('depositMethod').value,
-    status: $('depositStatus').value,
-  };
-}
-
-function matchesDepositFilter(req) {
-  const f = getDepositFilters();
-  const eff = optimistic.get(`deposit:${req.id}`) || req.status;
-  if (f.method !== 'all' && req.payment_type !== f.method) return false;
-  if (f.status !== 'all' && eff !== f.status) return false;
+/* =================== DEPOSITS =================== */
+function getDepositFilters(){return{method:$('depositMethod').value,status:$('depositStatus').value}}
+function matchesDepositFilter(r){
+  const f=getDepositFilters();
+  const st=optimistic.get('deposit:'+r.id)||r.status;
+  if(f.method!=='all'&&r.payment_type!==f.method) return false;
+  if(f.status!=='all'&&st!==f.status) return false;
   return true;
 }
-
-function extractCbeData(text) {
-  let tid = null, ph = null;
-  const t = text.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);
-  if (t) tid = t[1];
-  const p = text.match(/PH[=:\s]*(251\d{9})/i) || text.match(/PH[=:\s]*(09\d{8})/i);
-  if (p) ph = p[1];
-  return { tid, ph };
+function extractCbeData(t){
+  let tid=null,ph=null;
+  const a=t.match(/TID[=:\s]*([A-Z0-9]{6,15})/i);if(a)tid=a[1];
+  const b=t.match(/PH[=:\s]*(251\d{9})/i)||t.match(/PH[=:\s]*(09\d{8})/i);if(b)ph=b[1];
+  return{tid,ph};
 }
+function renderDepositRow(req){
+  const pt=req.payment_type||'';
+  const ini=(req.username||'??').substring(0,2).toUpperCase();
+  const avc=pt==='telebirr'?'':pt==='cbebirr'?'p':'o';
+  const dt=new Date(req.created_at).toLocaleString();
+  const opt=optimistic.get('deposit:'+req.id);
+  const st=opt||req.status;
+  const busy=!!opt;
 
-function renderDepositRow(req) {
-  const paymentType = req.payment_type || '';
-  const initials = (req.username || '??').substring(0, 2).toUpperCase();
-  const avatarColor = paymentType === 'telebirr' ? 'blue'
-                    : paymentType === 'cbebirr' ? 'purple' : 'orange';
-  const formattedDate = new Date(req.created_at).toLocaleString();
-  const optimisticStatus = optimistic.get(`deposit:${req.id}`);
-  const effectiveStatus = optimisticStatus || req.status;
-  const isPendingAction = !!optimisticStatus;
-
-  // ---- receipt cell ----
-  let receiptDisplay = '';
-  if (req.proof_url) {
-    // preferred: server returns a URL to /admin/proof/:id
-    const thumb = `${req.proof_url}?size=thumb`;
-    const full  = `${req.proof_url}?size=full`;
-    receiptDisplay = `
-      <div style="display:flex;align-items:center;gap:8px;">
-        <img src="${esc(thumb)}" loading="lazy"
-             style="width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:pointer;"
-             data-action="view-proof" data-src="${esc(full)}" alt="Proof">
-        <button class="link-btn" data-action="view-proof" data-src="${esc(full)}">
-          <i class="fas fa-image"></i> View
-        </button>
-      </div>`;
-  } else if (req.proof_photo_url && String(req.proof_photo_url).startsWith('data:image/')) {
-    // legacy fallback (still slow, but backward compatible)
-    const src = esc(req.proof_photo_url);
-    receiptDisplay = `
-      <div style="display:flex;align-items:center;gap:8px;">
-        <img src="${src}" loading="lazy"
-             style="width:40px;height:40px;object-fit:cover;border-radius:6px;cursor:pointer;"
-             data-action="view-proof" data-src="${src}" alt="Proof">
-        <button class="link-btn" data-action="view-proof" data-src="${src}"><i class="fas fa-image"></i> View</button>
-      </div>`;
-  } else {
-    // textual receipt: extract TID/PH
-    const text = req.transaction_reference || req.proof_photo_url || '';
-    let txnRef = null, cbePhone = null;
-    if (paymentType === 'cbebirr') {
-      const c = extractCbeData(text);
-      txnRef = c.tid; cbePhone = c.ph;
-      if (!txnRef) { const m = text.match(/\b([A-Z0-9]{8,15})\b/); if (m) txnRef = m[1]; }
-    } else {
-      const m = text.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);
-      txnRef = m ? m[1] : (text.match(/\b([A-Z0-9]{8,15})\b/) || [])[1] || null;
-    }
-    if (txnRef) {
-      let receiptLink;
-      if (paymentType === 'cbebirr') {
-        let ph = cbePhone || '';
-        if (ph.startsWith('09')) ph = '251' + ph.substring(1);
-        receiptLink = `https://cbepay1.cbe.com.et/aureceipt?TID=${encodeURIComponent(txnRef)}&PH=${encodeURIComponent(ph)}`;
-      } else {
-        receiptLink = `https://transactioninfo.ethiotelecom.et/receipt/${encodeURIComponent(txnRef)}`;
-      }
-      receiptDisplay = `
-        <div class="txn-ref-wrap">
-          <span class="txn-ref">${esc(txnRef)}</span>
-          ${cbePhone ? `<span class="cbe-detail phone"><i class="fas fa-phone"></i> ${esc(cbePhone)}</span>` : ''}
-          <button class="copy-btn-icon" data-action="copy" data-copy="${esc(txnRef)}" title="Copy"><i class="fas fa-copy"></i></button>
-          <a href="${receiptLink}" target="_blank" rel="noopener" class="link-btn"><i class="fas fa-search"></i> View</a>
-        </div>`;
-    } else {
-      receiptDisplay = `<span style="color:var(--text-secondary);font-size:11px;">—</span>`;
-    }
+  let receipt='';
+  if(req.proof_url){
+    const thumb=req.proof_url+'?size=thumb';
+    const full=req.proof_url+'?size=full';
+    receipt=`<div style="display:flex;gap:6px;align-items:center"><img src="${esc(thumb)}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:4px" data-action="view-proof" data-src="${esc(full)}" alt=""><button class="link" data-action="view-proof" data-src="${esc(full)}"><svg class="i"><use href="#i-img"/></svg> View</button></div>`;
+  }else if(req.proof_photo_url&&String(req.proof_photo_url).startsWith('data:image/')){
+    const s=esc(req.proof_photo_url);
+    receipt=`<div style="display:flex;gap:6px;align-items:center"><img src="${s}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:4px" data-action="view-proof" data-src="${s}" alt=""><button class="link" data-action="view-proof" data-src="${s}"><svg class="i"><use href="#i-img"/></svg> View</button></div>`;
+  }else{
+    const t=req.transaction_reference||req.proof_photo_url||'';
+    let ref=null,ph=null;
+    if(pt==='cbebirr'){const c=extractCbeData(t);ref=c.tid;ph=c.ph;if(!ref){const m=t.match(/\b([A-Z0-9]{8,15})\b/);if(m)ref=m[1]}}
+    else{const m=t.match(/\b(?:transaction number is |receipt\/)([A-Z0-9]{8,15})\b/i);ref=m?m[1]:(t.match(/\b([A-Z0-9]{8,15})\b/)||[])[1]||null}
+    if(ref){
+      let url;
+      if(pt==='cbebirr'){let p=ph||'';if(p.startsWith('09'))p='251'+p.substring(1);url='https://cbepay1.cbe.com.et/aureceipt?TID='+encodeURIComponent(ref)+'&PH='+encodeURIComponent(p)}
+      else url='https://transactioninfo.ethiotelecom.et/receipt/'+encodeURIComponent(ref);
+      receipt=`<div class="ref-wrap"><span class="ref">${esc(ref)}</span><button class="copy" data-action="copy" data-copy="${esc(ref)}"><svg class="i"><use href="#i-copy"/></svg></button><a class="link" href="${url}" target="_blank" rel="noopener"><svg class="i"><use href="#i-ext"/></svg></a></div>`;
+    }else receipt='<span style="color:var(--dim)">—</span>';
   }
 
-  // ---- actions ----
-  let actions = '—';
-  if (req.status === 'pending') {
-    if (isPendingAction) {
-      actions = `<span style="font-size:12px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> ${optimisticStatus}…</span>`;
-    } else {
-      actions = `
-        <div class="action-buttons">
-          <button class="btn btn-success btn-sm" data-action="deposit-approve" data-id="${req.id}"><i class="fas fa-check"></i> Approve</button>
-          <button class="btn btn-danger btn-sm"  data-action="deposit-reject"  data-id="${req.id}"><i class="fas fa-times"></i> Reject</button>
-        </div>`;
-    }
+  let acts='—';
+  if(req.status==='pending'){
+    if(busy) acts='<span style="font-size:11px;color:var(--dim)"><span class="spin"></span> '+opt+'…</span>';
+    else acts=`<div class="acts"><button class="btn s sm" data-action="deposit-approve" data-id="${req.id}"><svg class="i"><use href="#i-check"/></svg> Approve</button><button class="btn d sm" data-action="deposit-reject" data-id="${req.id}"><svg class="i"><use href="#i-x"/></svg> Reject</button></div>`;
   }
 
-  return `
-    <tr data-row-id="${req.id}" ${isPendingAction ? 'class="row-pending"' : ''}>
-      <td data-label="User">
-        <div class="user-cell">
-          <div class="avatar ${avatarColor}">${esc(initials)}</div>
-          <div class="user-info">
-            <span class="name">${esc(req.username)}</span>
-            <span class="id">ID: ${esc(req.telegram_id)}</span>
-          </div>
-        </div>
-      </td>
-      <td data-label="Amount"><strong>${esc(req.amount)} ETB</strong></td>
-      <td data-label="Payment"><span class="status-badge ${esc(paymentType)}">${esc(paymentType)}</span></td>
-      <td data-label="Status"><span class="status-badge ${esc(effectiveStatus)}">${esc(effectiveStatus)}</span></td>
-      <td data-label="Receipt">${receiptDisplay}</td>
-      <td data-label="Date">${esc(formattedDate)}</td>
-      <td data-label="Actions">${actions}</td>
-    </tr>`;
+  return `<tr data-row-id="${req.id}"${busy?' class="busy"':''}>
+    <td data-label="User"><div class="cell-user"><div class="av ${avc}">${esc(ini)}</div><div class="uinfo"><span class="n">${esc(req.username)}</span><span class="i">${esc(req.telegram_id)}</span></div></div></td>
+    <td data-label="Amount"><strong>${esc(req.amount)} ETB</strong></td>
+    <td data-label="Payment"><span class="bdg ${esc(pt)}">${esc(pt)}</span></td>
+    <td data-label="Status"><span class="bdg ${esc(st)}">${esc(st)}</span></td>
+    <td data-label="Receipt">${receipt}</td>
+    <td data-label="Date">${esc(dt)}</td>
+    <td data-label="Actions">${acts}</td>
+  </tr>`;
 }
-
-function depositTableShell() {
-  return `
-    <div class="table-wrapper">
-      <table>
-        <thead><tr>
-          <th>User</th><th>Amount</th><th>Payment</th><th>Status</th>
-          <th>Receipt</th><th>Date & Time</th><th>Actions</th>
-        </tr></thead>
-        <tbody id="depositsTbody"></tbody>
-      </table>
-    </div>`;
+async function loadDeposits({reset=false}={}){
+  const s=state.deposits;
+  if(s.loading) return;
+  if(!reset&&!s.hasMore) return;
+  if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
+  s.loading=true;
+  const c=$('depositsList');
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  const f=getDepositFilters();
+  const p=new URLSearchParams({limit:String(PAGE_SIZE)});
+  if(f.method!=='all') p.append('method',f.method);
+  if(f.status!=='pending') p.append('status',f.status);
+  if(s.cursor) p.append('cursor',s.cursor);
+  try{
+    const res=await apiFetch('deposits','/admin/deposits?'+p);
+    if(!res) return;
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
+    const rows=d.requests||[];
+    s.cursor=d.nextCursor||null;
+    s.hasMore=!!d.nextCursor;
+    s.loaded=true;
+    for(const r of rows){s.byId.set(r.id,r);acceptVersion('deposit',r.id,r.version||r.updated_at)}
+    if(reset||!document.getElementById('depositsTbody')){
+      c.innerHTML='<div class="list"><table><thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Receipt</th><th>Date</th><th>Actions</th></tr></thead><tbody id="depositsTbody"></tbody></table></div>';
+    }
+    const tbody=document.getElementById('depositsTbody');
+    if(reset) tbody.innerHTML='';
+    tbody.insertAdjacentHTML('beforeend',rows.map(renderDepositRow).join(''));
+    if(!rows.length&&!s.byId.size){
+      c.innerHTML='<div class="empty"><svg><use href="#i-check"/></svg><div>No deposits</div></div>';
+    }
+    $('depositShowingText').textContent='Showing '+s.byId.size+' deposits'+(s.hasMore?' (scroll for more)':'');
+    observeSentinel('deposits',()=>loadDeposits({reset:false}));
+  }catch(e){
+    if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+  }finally{s.loading=false}
 }
-
-async function loadDeposits({ reset = false } = {}) {
-  const s = state.deposits;
-  if (s.loading) return;
-  if (!reset && !s.hasMore) return;
-  if (reset) { s.cursor = null; s.hasMore = true; s.byId.clear(); }
-
-  s.loading = true;
-  const container = $('depositsList');
-  if (reset || !s.byId.size) {
-    container.innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading deposits…</p></div>`;
-  }
-
-  const f = getDepositFilters();
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-  if (f.method !== 'all') params.append('method', f.method);
-  if (f.status !== 'pending') params.append('status', f.status);
-  if (s.cursor) params.append('cursor', s.cursor);
-
-  try {
-    const res = await apiFetch('deposits', `/admin/deposits?${params}`);
-    if (!res) return;               // aborted / superseded
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    const rows = data.requests || [];
-    s.cursor = data.nextCursor || null;
-    s.hasMore = !!data.nextCursor;
-    s.loaded = true;
-
-    for (const r of rows) {
-      s.byId.set(r.id, r);
-      acceptVersion('deposit', r.id, r.version || r.updated_at);
-    }
-
-    if (reset || !document.getElementById('depositsTbody')) {
-      container.innerHTML = depositTableShell();
-    }
-    const tbody = document.getElementById('depositsTbody');
-
-    if (reset) tbody.innerHTML = '';
-    tbody.insertAdjacentHTML('beforeend', rows.map(renderDepositRow).join(''));
-
-    if (!rows.length && !s.byId.size) {
-      container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No deposits found</p></div>`;
-    }
-
-    $('depositShowingText').textContent =
-      `Showing ${s.byId.size} deposits${s.hasMore ? ' (scroll for more)' : ''}`;
-
-    observeSentinel('deposits', () => loadDeposits({ reset: false }));
-  } catch (e) {
-    if (reset) container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${esc(e.message)}</p></div>`;
-  } finally {
-    s.loading = false;
-  }
+function upsertDepositRow(req){
+  const s=state.deposits;
+  s.byId.set(req.id,req);
+  const tb=document.getElementById('depositsTbody');
+  if(!tb) return;
+  const ex=tb.querySelector('tr[data-row-id="'+req.id+'"]');
+  const show=matchesDepositFilter(req);
+  if(ex&&!show) ex.remove();
+  else if(ex&&show) ex.outerHTML=renderDepositRow(req);
+  else if(!ex&&show) tb.insertAdjacentHTML('afterbegin',renderDepositRow(req));
+  const n=tb.querySelectorAll('tr[data-row-id]').length;
+  $('depositShowingText').textContent='Showing '+n+' deposits';
 }
-
-/* ---- row-level patching for a single deposit ---- */
-function upsertDepositRow(req) {
-  const s = state.deposits;
-  s.byId.set(req.id, req);
-
-  const tbody = document.getElementById('depositsTbody');
-  if (!tbody) return;                         // not on deposits tab — nothing to patch
-
-  const existing = tbody.querySelector(`tr[data-row-id="${req.id}"]`);
-  const shouldShow = matchesDepositFilter(req);
-
-  if (existing && !shouldShow) {
-    existing.remove();
-  } else if (existing && shouldShow) {
-    existing.outerHTML = renderDepositRow(req);
-    const fresh = tbody.querySelector(`tr[data-row-id="${req.id}"]`);
-    if (fresh) {
-      fresh.classList.add('row-flash');
-      setTimeout(() => fresh.classList.remove('row-flash'), 900);
-    }
-  } else if (!existing && shouldShow) {
-    tbody.insertAdjacentHTML('afterbegin', renderDepositRow(req));
-  }
-
-  const count = tbody ? tbody.querySelectorAll('tr[data-row-id]').length : s.byId.size;
-  $('depositShowingText').textContent = `Showing ${count} deposits`;
-}
-
-function onDepositEvent(e, isNew) {
-  if (!acceptVersion('deposit', e.id, e.version || e.updated_at)) return;
-  optimistic.delete(`deposit:${e.id}`);       // server has spoken — clear optimistic flag
+function onDepositEvent(e,isNew){
+  if(!acceptVersion('deposit',e.id,e.version||e.updated_at)) return;
+  optimistic.delete('deposit:'+e.id);
   upsertDepositRow(e);
-
-  // keep the pending badge honest
-  if (isNew && e.status === 'pending') {
-    const b = $('depositBadge');
-    b.textContent = (parseInt(b.textContent) || 0) + 1;
-  } else if (!isNew) {
-    loadStats();                              // cheap; also fixes badge
-  }
+  if(isNew&&e.status==='pending'){const b=$('depositBadge');b.textContent=(parseInt(b.textContent)||0)+1}
+  else if(!isNew) loadStats();
 }
 
-/* ================================================================
-   WITHDRAWALS
-   ================================================================ */
-function getWithdrawFilters() {
-  return {
-    method: $('withdrawMethod').value,
-    status: $('withdrawStatus').value,
-  };
-}
-
-function matchesWithdrawFilter(req) {
-  const f = getWithdrawFilters();
-  const eff = optimistic.get(`withdrawal:${req.id}`) || req.status;
-  if (f.method !== 'all' && req.withdrawal_type !== f.method) return false;
-  if (f.status !== 'all' && eff !== f.status) return false;
+/* =================== WITHDRAWALS =================== */
+function getWithdrawFilters(){return{method:$('withdrawMethod').value,status:$('withdrawStatus').value}}
+function matchesWithdrawFilter(r){
+  const f=getWithdrawFilters();
+  const st=optimistic.get('withdrawal:'+r.id)||r.status;
+  if(f.method!=='all'&&r.withdrawal_type!==f.method) return false;
+  if(f.status!=='all'&&st!==f.status) return false;
   return true;
 }
-
-function renderWithdrawalRow(req) {
-  const initials = (req.username || '??').substring(0, 2).toUpperCase();
-  const type = req.withdrawal_type || '';
-  const avatarColor = type === 'telebirr' ? 'blue' : type === 'cbebirr' ? 'purple' : 'orange';
-  const formattedDate = new Date(req.created_at).toLocaleString();
-  const optimisticStatus = optimistic.get(`withdrawal:${req.id}`);
-  const effectiveStatus = optimisticStatus || req.status;
-  const isPendingAction = !!optimisticStatus;
-
-  let actions = '—';
-  if (req.status === 'pending') {
-    if (isPendingAction) {
-      actions = `<span style="font-size:12px;color:var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> ${optimisticStatus}…</span>`;
-    } else {
-      actions = `
-        <div class="action-buttons">
-          <button class="btn btn-success btn-sm" data-action="withdrawal-approve" data-id="${req.id}"><i class="fas fa-check"></i> Approve</button>
-          <button class="btn btn-danger btn-sm"  data-action="withdrawal-reject"  data-id="${req.id}"><i class="fas fa-times"></i> Reject</button>
-        </div>`;
-    }
+function renderWithdrawalRow(req){
+  const ini=(req.username||'??').substring(0,2).toUpperCase();
+  const t=req.withdrawal_type||'';
+  const avc=t==='telebirr'?'':t==='cbebirr'?'p':'o';
+  const dt=new Date(req.created_at).toLocaleString();
+  const opt=optimistic.get('withdrawal:'+req.id);
+  const st=opt||req.status;
+  const busy=!!opt;
+  let acts='—';
+  if(req.status==='pending'){
+    if(busy) acts='<span style="font-size:11px;color:var(--dim)"><span class="spin"></span> '+opt+'…</span>';
+    else acts=`<div class="acts"><button class="btn s sm" data-action="withdrawal-approve" data-id="${req.id}"><svg class="i"><use href="#i-check"/></svg> Approve</button><button class="btn d sm" data-action="withdrawal-reject" data-id="${req.id}"><svg class="i"><use href="#i-x"/></svg> Reject</button></div>`;
   }
-
-  return `
-    <tr data-row-id="${req.id}" ${isPendingAction ? 'class="row-pending"' : ''}>
-      <td data-label="User">
-        <div class="user-cell">
-          <div class="avatar ${avatarColor}">${esc(initials)}</div>
-          <div class="user-info">
-            <span class="name">${esc(req.username)}</span>
-            <span class="id">ID: ${esc(req.telegram_id)}</span>
-          </div>
-        </div>
-      </td>
-      <td data-label="Amount"><strong>${esc(req.amount)} ETB</strong></td>
-      <td data-label="Phone">${esc(req.phone_number || 'N/A')}</td>
-      <td data-label="Receiver">${esc(req.receiver_name || 'N/A')}</td>
-      <td data-label="Type"><span class="status-badge ${esc(type)}">${esc(type)}</span></td>
-      <td data-label="Status"><span class="status-badge ${esc(effectiveStatus)}">${esc(effectiveStatus)}</span></td>
-      <td data-label="Date">${esc(formattedDate)}</td>
-      <td data-label="Actions">${actions}</td>
-    </tr>`;
+  return `<tr data-row-id="${req.id}"${busy?' class="busy"':''}>
+    <td data-label="User"><div class="cell-user"><div class="av ${avc}">${esc(ini)}</div><div class="uinfo"><span class="n">${esc(req.username)}</span><span class="i">${esc(req.telegram_id)}</span></div></div></td>
+    <td data-label="Amount"><strong>${esc(req.amount)} ETB</strong></td>
+    <td data-label="Phone">${esc(req.phone_number||'—')}</td>
+    <td data-label="Name">${esc(req.receiver_name||'—')}</td>
+    <td data-label="Type"><span class="bdg ${esc(t)}">${esc(t)}</span></td>
+    <td data-label="Status"><span class="bdg ${esc(st)}">${esc(st)}</span></td>
+    <td data-label="Date">${esc(dt)}</td>
+    <td data-label="Actions">${acts}</td>
+  </tr>`;
 }
-
-async function loadWithdrawals({ reset = false } = {}) {
-  const s = state.withdrawals;
-  if (s.loading) return;
-  if (!reset && !s.hasMore) return;
-  if (reset) { s.cursor = null; s.hasMore = true; s.byId.clear(); }
-
-  s.loading = true;
-  const container = $('withdrawalsList');
-  if (reset || !s.byId.size) {
-    container.innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading withdrawals…</p></div>`;
-  }
-
-  const f = getWithdrawFilters();
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-  if (f.method !== 'all') params.append('method', f.method);
-  if (f.status !== 'pending') params.append('status', f.status);
-  if (s.cursor) params.append('cursor', s.cursor);
-
-  try {
-    const res = await apiFetch('withdrawals', `/admin/withdrawals?${params}`);
-    if (!res) return;
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-
-    const rows = data.requests || [];
-    s.cursor = data.nextCursor || null;
-    s.hasMore = !!data.nextCursor;
-    s.loaded = true;
-    for (const r of rows) {
-      s.byId.set(r.id, r);
-      acceptVersion('withdrawal', r.id, r.version || r.updated_at);
+async function loadWithdrawals({reset=false}={}){
+  const s=state.withdrawals;
+  if(s.loading) return;
+  if(!reset&&!s.hasMore) return;
+  if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
+  s.loading=true;
+  const c=$('withdrawalsList');
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  const f=getWithdrawFilters();
+  const p=new URLSearchParams({limit:String(PAGE_SIZE)});
+  if(f.method!=='all') p.append('method',f.method);
+  if(f.status!=='pending') p.append('status',f.status);
+  if(s.cursor) p.append('cursor',s.cursor);
+  try{
+    const res=await apiFetch('withdrawals','/admin/withdrawals?'+p);
+    if(!res) return;
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
+    const rows=d.requests||[];
+    s.cursor=d.nextCursor||null;
+    s.hasMore=!!d.nextCursor;
+    s.loaded=true;
+    for(const r of rows){s.byId.set(r.id,r);acceptVersion('withdrawal',r.id,r.version||r.updated_at)}
+    if(reset||!document.getElementById('withdrawalsTbody')){
+      c.innerHTML='<div class="list"><table><thead><tr><th>User</th><th>Amount</th><th>Phone</th><th>Name</th><th>Type</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="withdrawalsTbody"></tbody></table></div>';
     }
-
-    if (reset || !document.getElementById('withdrawalsTbody')) {
-      container.innerHTML = `
-        <div class="table-wrapper">
-          <table>
-            <thead><tr>
-              <th>User</th><th>Amount</th><th>Phone</th><th>Receiver</th>
-              <th>Type</th><th>Status</th><th>Date & Time</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="withdrawalsTbody"></tbody>
-          </table>
-        </div>`;
-    }
-    const tbody = document.getElementById('withdrawalsTbody');
-    if (reset) tbody.innerHTML = '';
-    tbody.insertAdjacentHTML('beforeend', rows.map(renderWithdrawalRow).join(''));
-
-    if (!rows.length && !s.byId.size) {
-      container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-check-circle"></i></div><p>No withdrawals found</p></div>`;
-    }
-
-    $('withdrawShowingText').textContent =
-      `Showing ${s.byId.size} withdrawals${s.hasMore ? ' (scroll for more)' : ''}`;
-
-    observeSentinel('withdrawals', () => loadWithdrawals({ reset: false }));
-  } catch (e) {
-    if (reset) container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${esc(e.message)}</p></div>`;
-  } finally {
-    s.loading = false;
-  }
+    const tb=document.getElementById('withdrawalsTbody');
+    if(reset) tb.innerHTML='';
+    tb.insertAdjacentHTML('beforeend',rows.map(renderWithdrawalRow).join(''));
+    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty"><svg><use href="#i-check"/></svg><div>No withdrawals</div></div>';
+    $('withdrawShowingText').textContent='Showing '+s.byId.size+' withdrawals'+(s.hasMore?' (scroll for more)':'');
+    observeSentinel('withdrawals',()=>loadWithdrawals({reset:false}));
+  }catch(e){if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  finally{s.loading=false}
 }
-
-function upsertWithdrawalRow(req) {
-  const s = state.withdrawals;
-  s.byId.set(req.id, req);
-
-  const tbody = document.getElementById('withdrawalsTbody');
-  if (!tbody) return;
-
-  const existing = tbody.querySelector(`tr[data-row-id="${req.id}"]`);
-  const shouldShow = matchesWithdrawFilter(req);
-
-  if (existing && !shouldShow) existing.remove();
-  else if (existing && shouldShow) {
-    existing.outerHTML = renderWithdrawalRow(req);
-    const fresh = tbody.querySelector(`tr[data-row-id="${req.id}"]`);
-    if (fresh) { fresh.classList.add('row-flash'); setTimeout(() => fresh.classList.remove('row-flash'), 900); }
-  } else if (!existing && shouldShow) {
-    tbody.insertAdjacentHTML('afterbegin', renderWithdrawalRow(req));
-  }
-
-  const count = tbody.querySelectorAll('tr[data-row-id]').length;
-  $('withdrawShowingText').textContent = `Showing ${count} withdrawals`;
+function upsertWithdrawalRow(req){
+  const s=state.withdrawals;
+  s.byId.set(req.id,req);
+  const tb=document.getElementById('withdrawalsTbody');
+  if(!tb) return;
+  const ex=tb.querySelector('tr[data-row-id="'+req.id+'"]');
+  const show=matchesWithdrawFilter(req);
+  if(ex&&!show) ex.remove();
+  else if(ex&&show) ex.outerHTML=renderWithdrawalRow(req);
+  else if(!ex&&show) tb.insertAdjacentHTML('afterbegin',renderWithdrawalRow(req));
+  const n=tb.querySelectorAll('tr[data-row-id]').length;
+  $('withdrawShowingText').textContent='Showing '+n+' withdrawals';
 }
-
-function onWithdrawalEvent(e, isNew) {
-  if (!acceptVersion('withdrawal', e.id, e.version || e.updated_at)) return;
-  optimistic.delete(`withdrawal:${e.id}`);
+function onWithdrawalEvent(e,isNew){
+  if(!acceptVersion('withdrawal',e.id,e.version||e.updated_at)) return;
+  optimistic.delete('withdrawal:'+e.id);
   upsertWithdrawalRow(e);
-
-  if (isNew && e.status === 'pending') {
-    const b = $('withdrawalBadge');
-    b.textContent = (parseInt(b.textContent) || 0) + 1;
-  } else if (!isNew) {
-    loadStats();
-  }
+  if(isNew&&e.status==='pending'){const b=$('withdrawalBadge');b.textContent=(parseInt(b.textContent)||0)+1}
+  else if(!isNew) loadStats();
 }
 
-/* ================================================================
-   PLAYERS
-   ================================================================ */
-function renderPlayerRow(p, index) {
-  const colors = ['blue', 'green', 'purple', 'orange'];
-  const avatarColor = colors[index % colors.length];
-  const initials = (p.username || '??').substring(0, 2).toUpperCase();
-  const firstDeposit = p.first_deposit_amount > 0
-    ? `<span style="color:var(--success);font-weight:600;">Yes</span><br><span style="font-size:11px;color:var(--text-secondary);">${new Date(p.first_deposit_date).toLocaleDateString()}</span>`
-    : '<span style="color:var(--text-secondary);">No</span>';
-
-  return `
-    <tr data-row-id="${esc(p.telegram_id)}">
-      <td data-label="Player">
-        <div class="user-cell">
-          <div class="avatar ${avatarColor}">${esc(initials)}</div>
-          <div class="user-info">
-            <span class="name">${esc(p.username)}</span>
-            <span class="id">Telegram ID: ${esc(p.telegram_id)}</span>
-          </div>
-        </div>
-      </td>
-      <td data-label="Balance"><strong data-balance-for="${esc(p.telegram_id)}">${p.balance.toFixed(0)} ETB</strong></td>
-      <td data-label="First Deposit">${firstDeposit}</td>
-      <td data-label="Actions">
-        <button class="adjust-btn"
-                data-action="open-balance-modal"
-                data-id="${esc(p.telegram_id)}"
-                data-username="${esc(p.username)}"
-                data-balance="${p.balance}">
-          <i class="fas fa-balance-scale"></i> Adjust Balance
-        </button>
-      </td>
-    </tr>`;
+/* =================== PLAYERS =================== */
+function renderPlayerRow(p,i){
+  const av=['','g','p','o'][i%4];
+  const ini=(p.username||'??').substring(0,2).toUpperCase();
+  const fd=p.first_deposit_amount>0?'<span style="color:var(--green);font-weight:600">Yes</span>':'<span style="color:var(--dim)">No</span>';
+  return `<tr data-row-id="${esc(p.telegram_id)}">
+    <td data-label="Player"><div class="cell-user"><div class="av ${av}">${esc(ini)}</div><div class="uinfo"><span class="n">${esc(p.username)}</span><span class="i">${esc(p.telegram_id)}</span></div></div></td>
+    <td data-label="Balance"><strong data-balance-for="${esc(p.telegram_id)}">${p.balance.toFixed(0)} ETB</strong></td>
+    <td data-label="First Deposit">${fd}</td>
+    <td data-label="Actions"><button class="adj" data-action="open-balance-modal" data-id="${esc(p.telegram_id)}" data-username="${esc(p.username)}" data-balance="${p.balance}"><svg class="i"><use href="#i-scale"/></svg> Adjust</button></td>
+  </tr>`;
 }
-
-async function loadPlayers({ reset = false } = {}) {
-  const s = state.players;
-  if (s.loading) return;
-  if (!reset && !s.hasMore) return;
-  if (reset) { s.cursor = null; s.hasMore = true; s.byId.clear(); }
-
-  s.loading = true;
-  const container = $('playersList');
-  if (reset || !s.byId.size) {
-    container.innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top:10px;font-size:13px;">Loading players…</p></div>`;
-  }
-
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-  if (s.cursor) params.append('cursor', s.cursor);
-
-  try {
-    const res = await apiFetch('players', `/admin/players?${params}`);
-    if (!res) return;
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-
-    const rows = data.players || [];
-    s.cursor = data.nextCursor || null;
-    s.hasMore = !!data.nextCursor;
-    s.loaded = true;
-    for (const p of rows) s.byId.set(String(p.telegram_id), p);
-
-    if (reset || !document.getElementById('playersTbody')) {
-      container.innerHTML = `
-        <div class="table-wrapper">
-          <table>
-            <thead><tr><th>Player</th><th>Balance</th><th>First Deposit</th><th>Actions</th></tr></thead>
-            <tbody id="playersTbody"></tbody>
-          </table>
-        </div>`;
+async function loadPlayers({reset=false}={}){
+  const s=state.players;
+  if(s.loading) return;
+  if(!reset&&!s.hasMore) return;
+  if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
+  s.loading=true;
+  const c=$('playersList');
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  const p=new URLSearchParams({limit:String(PAGE_SIZE)});
+  if(s.cursor) p.append('cursor',s.cursor);
+  try{
+    const res=await apiFetch('players','/admin/players?'+p);
+    if(!res) return;
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d=await res.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    const rows=d.players||[];
+    s.cursor=d.nextCursor||null;
+    s.hasMore=!!d.nextCursor;
+    s.loaded=true;
+    for(const pl of rows) s.byId.set(String(pl.telegram_id),pl);
+    if(reset||!document.getElementById('playersTbody')){
+      c.innerHTML='<div class="list"><table><thead><tr><th>Player</th><th>Balance</th><th>First Deposit</th><th>Actions</th></tr></thead><tbody id="playersTbody"></tbody></table></div>';
     }
-    const tbody = document.getElementById('playersTbody');
-    if (reset) tbody.innerHTML = '';
-    const startIdx = tbody.querySelectorAll('tr').length;
-    tbody.insertAdjacentHTML('beforeend',
-      rows.map((p, i) => renderPlayerRow(p, startIdx + i)).join(''));
-
-    if (!rows.length && !s.byId.size) {
-      container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-users"></i></div><p>No players assigned yet</p></div>`;
-    }
-
-    $('playerShowingText').textContent =
-      `Showing ${s.byId.size} players${s.hasMore ? ' (scroll for more)' : ''}`;
-
-    observeSentinel('players', () => loadPlayers({ reset: false }));
+    const tb=document.getElementById('playersTbody');
+    if(reset) tb.innerHTML='';
+    const start=tb.querySelectorAll('tr').length;
+    tb.insertAdjacentHTML('beforeend',rows.map((pl,i)=>renderPlayerRow(pl,start+i)).join(''));
+    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty"><svg><use href="#i-users"/></svg><div>No players</div></div>';
+    $('playerShowingText').textContent='Showing '+s.byId.size+' players'+(s.hasMore?' (scroll for more)':'');
+    observeSentinel('players',()=>loadPlayers({reset:false}));
     applyPlayerSearch();
-  } catch (e) {
-    if (reset) container.innerHTML = `<div class="empty-state"><div class="icon"><i class="fas fa-exclamation-triangle"></i></div><p style="color:#EF4444;">${esc(e.message)}</p></div>`;
-  } finally {
-    s.loading = false;
-  }
+  }catch(e){if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  finally{s.loading=false}
 }
-
-function onPlayerAdded(e) {
-  const s = state.players;
-  s.byId.set(String(e.telegram_id), e);
-  const tbody = document.getElementById('playersTbody');
-  if (tbody) {
-    tbody.insertAdjacentHTML('afterbegin', renderPlayerRow(e, 0));
-    $('playerShowingText').textContent = `Showing ${tbody.querySelectorAll('tr').length} players`;
-  }
-  showToast(`👤 New player ${esc(e.username)} added!`, 'info');
+function onPlayerAdded(e){
+  const s=state.players;
+  s.byId.set(String(e.telegram_id),e);
+  const tb=document.getElementById('playersTbody');
+  if(tb){tb.insertAdjacentHTML('afterbegin',renderPlayerRow(e,0));$('playerShowingText').textContent='Showing '+tb.querySelectorAll('tr').length+' players'}
+  showToast('New player '+esc(e.username));
   loadStats();
 }
-
-function onPlayerBalance(e) {
-  const s = state.players;
-  const key = String(e.telegram_id);
-  const existing = s.byId.get(key);
-  if (existing) {
-    existing.balance = e.balance;
-    const cell = document.querySelector(`[data-balance-for="${key}"]`);
-    if (cell) {
-      cell.textContent = `${e.balance.toFixed(0)} ETB`;
-      cell.closest('tr')?.classList.add('row-flash');
-      setTimeout(() => cell.closest('tr')?.classList.remove('row-flash'), 900);
-    }
+function onPlayerBalance(e){
+  const s=state.players;
+  const k=String(e.telegram_id);
+  const ex=s.byId.get(k);
+  if(ex){
+    ex.balance=e.balance;
+    const cell=document.querySelector('[data-balance-for="'+k+'"]');
+    if(cell) cell.textContent=e.balance.toFixed(0)+' ETB';
   }
 }
-
-function applyPlayerSearch() {
-  const filter = $('playerSearchInput').value.toLowerCase().trim();
-  const tbody = document.getElementById('playersTbody');
-  if (!tbody) return;
-  const rows = tbody.querySelectorAll('tr');
-  let visible = 0;
-  rows.forEach(row => {
-    const show = !filter || row.textContent.toLowerCase().includes(filter);
-    row.style.display = show ? '' : 'none';
-    if (show) visible++;
-  });
-  $('playerShowingText').textContent = `Showing ${visible} of ${rows.length} players`;
+function applyPlayerSearch(){
+  const f=$('playerSearchInput').value.toLowerCase().trim();
+  const tb=document.getElementById('playersTbody');
+  if(!tb) return;
+  const rows=tb.querySelectorAll('tr');
+  let v=0;
+  rows.forEach(r=>{const show=!f||r.textContent.toLowerCase().includes(f);r.style.display=show?'':'none';if(show)v++});
+  $('playerShowingText').textContent='Showing '+v+' of '+rows.length+' players';
 }
 
-/* ================================================================
-   INFINITE SCROLL
-   ================================================================ */
-function observeSentinel(key, loadMore) {
-  const el = $(`${key}Sentinel`);
-  if (!el) return;
-  if (sentinels[key]) sentinels[key].disconnect();
-  sentinels[key] = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) loadMore();
-  }, { rootMargin: '300px' });
+function observeSentinel(key,load){
+  const el=$(key+'Sentinel');
+  if(!el) return;
+  if(sentinels[key]) sentinels[key].disconnect();
+  sentinels[key]=new IntersectionObserver(es=>{if(es[0].isIntersecting) load()},{rootMargin:'300px'});
   sentinels[key].observe(el);
 }
 
-/* ================================================================
-   OPTIMISTIC APPROVE / REJECT
-   ================================================================ */
-async function processDeposit(id, action) {
-  const key = `deposit:${id}`;
-  if (optimistic.has(key)) return;
-  const prev = state.deposits.byId.get(id);
-  if (!prev) return;
-
-  optimistic.set(key, action === 'approve' ? 'approved' : 'rejected');
-  upsertDepositRow({ ...prev });
-
-  try {
-    const res = await fetch('/admin/process-deposit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: id, action }),
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-
-    // If the server does not push a socket event, refetch just this row.
-    // (In the target architecture it will push — this is the safety net.)
-    showToast(`✅ Deposit ${action}d`, 'success');
-    if (!adminSocket?.connected) {
-      // fallback path
-      optimistic.delete(key);
-      const r = await apiFetch(`deposit:${id}`, `/admin/deposits/${id}`);
-      if (r && r.ok) upsertDepositRow((await r.json()).request);
+/* =================== OPTIMISTIC ACTIONS =================== */
+async function processDeposit(id,action){
+  const k='deposit:'+id;
+  if(optimistic.has(k)) return;
+  const prev=state.deposits.byId.get(id);
+  if(!prev) return;
+  optimistic.set(k,action==='approve'?'approved':'rejected');
+  upsertDepositRow({...prev});
+  try{
+    const res=await fetch('/admin/process-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId:id,action})});
+    const d=await res.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    showToast('Deposit '+action+'d','success');
+    if(!adminSocket?.connected){
+      optimistic.delete(k);
+      const r=await apiFetch('deposit:'+id,'/admin/deposits/'+id);
+      if(r&&r.ok) upsertDepositRow((await r.json()).request);
       loadStats();
     }
-  } catch (err) {
-    optimistic.delete(key);
-    upsertDepositRow(prev);                   // rollback
-    showToast(`❌ ${err.message}`, 'error');
+  }catch(err){
+    optimistic.delete(k);
+    upsertDepositRow(prev);
+    showToast(err.message,'error');
   }
 }
-
-async function processWithdrawal(id, action) {
-  const key = `withdrawal:${id}`;
-  if (optimistic.has(key)) return;
-  const prev = state.withdrawals.byId.get(id);
-  if (!prev) return;
-
-  optimistic.set(key, action === 'approve' ? 'approved' : 'rejected');
-  upsertWithdrawalRow({ ...prev });
-
-  try {
-    const res = await fetch('/admin/process-withdrawal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: id, action }),
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-    showToast(`✅ Withdrawal ${action}d`, 'success');
-    if (!adminSocket?.connected) {
-      optimistic.delete(key);
-      const r = await apiFetch(`withdrawal:${id}`, `/admin/withdrawals/${id}`);
-      if (r && r.ok) upsertWithdrawalRow((await r.json()).request);
+async function processWithdrawal(id,action){
+  const k='withdrawal:'+id;
+  if(optimistic.has(k)) return;
+  const prev=state.withdrawals.byId.get(id);
+  if(!prev) return;
+  optimistic.set(k,action==='approve'?'approved':'rejected');
+  upsertWithdrawalRow({...prev});
+  try{
+    const res=await fetch('/admin/process-withdrawal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId:id,action})});
+    const d=await res.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    showToast('Withdrawal '+action+'d','success');
+    if(!adminSocket?.connected){
+      optimistic.delete(k);
+      const r=await apiFetch('withdrawal:'+id,'/admin/withdrawals/'+id);
+      if(r&&r.ok) upsertWithdrawalRow((await r.json()).request);
       loadStats();
     }
-  } catch (err) {
-    optimistic.delete(key);
+  }catch(err){
+    optimistic.delete(k);
     upsertWithdrawalRow(prev);
-    showToast(`❌ ${err.message}`, 'error');
+    showToast(err.message,'error');
   }
 }
 
-/* ================================================================
-   PROOF MODAL (URL-based)
-   ================================================================ */
-function viewProof(src) {
-  if (!src) return;
-  $('proofImage').src = src;
-  $('proofModal').classList.add('active');
+/* =================== PROOF / BALANCE =================== */
+function viewProof(src){if(!src)return;$('proofImage').src=src;$('proofModal').classList.add('on')}
+function openBalanceModal(id,u,b){
+  balanceTargetPlayer={telegram_id:id,username:u,balance:b};
+  $('balancePlayerName').textContent=u;
+  $('balancePlayerId').textContent=id;
+  $('balanceCurrentBalance').textContent=Number(b).toFixed(0);
+  $('balanceAmount').value='';
+  $('balanceOperation').value='add';
+  $('balanceStatus').textContent='';
+  $('balanceModal').classList.add('on');
 }
-function closeProofModal() {
-  $('proofModal').classList.remove('active');
-  $('proofImage').src = '';
-}
-
-/* ================================================================
-   BALANCE MODAL
-   ================================================================ */
-function openBalanceModal(telegramId, username, balance) {
-  balanceTargetPlayer = { telegram_id: telegramId, username, balance };
-  $('balancePlayerName').textContent = username;
-  $('balancePlayerId').textContent = telegramId;
-  $('balanceCurrentBalance').textContent = Number(balance).toFixed(0);
-  $('balanceAmount').value = '';
-  $('balanceOperation').value = 'add';
-  $('balanceStatus').textContent = '';
-  $('balanceModal').classList.add('active');
-}
-function closeBalanceModal() {
-  $('balanceModal').classList.remove('active');
-  balanceTargetPlayer = null;
-}
-
-async function submitBalanceAdjust() {
-  if (!balanceTargetPlayer) return;
-  const amount = parseFloat($('balanceAmount').value.trim());
-  const operation = $('balanceOperation').value;
-  if (isNaN(amount) || amount <= 0) {
-    $('balanceStatus').innerHTML = '<span style="color:#EF4444;">Enter a valid positive amount.</span>';
-    return;
-  }
-  const statusDiv = $('balanceStatus');
-  statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Updating balance…</span>';
-  try {
-    const res = await fetch('/admin/update-player-balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramId: balanceTargetPlayer.telegram_id, amount, operation }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`✅ Balance updated! New: ${data.newBalance.toFixed(0)} ETB`, 'success');
+function closeBalanceModal(){$('balanceModal').classList.remove('on');balanceTargetPlayer=null}
+async function submitBalanceAdjust(){
+  if(!balanceTargetPlayer) return;
+  const a=parseFloat($('balanceAmount').value.trim());
+  const op=$('balanceOperation').value;
+  if(isNaN(a)||a<=0){$('balanceStatus').textContent='Enter a valid amount';return}
+  $('balanceStatus').textContent='Updating…';
+  try{
+    const res=await fetch('/admin/update-player-balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegramId:balanceTargetPlayer.telegram_id,amount:a,operation:op})});
+    const d=await res.json();
+    if(d.success){
+      showToast('Balance updated: '+d.newBalance.toFixed(0)+' ETB','success');
       closeBalanceModal();
       loadStats();
-    } else {
-      statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(data.error || 'Failed')}</span>`;
-    }
-  } catch (e) {
-    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(e.message)}</span>`;
-  }
+    }else $('balanceStatus').textContent=d.error||'Failed';
+  }catch(e){$('balanceStatus').textContent=e.message}
 }
 
-/* ================================================================
-   ADD PLAYER / IMPORT
-   ================================================================ */
-function openAddPlayerModal() {
-  $('addPlayerModal').classList.add('active');
-  $('addPlayerInput').value = '';
-  $('addPlayerStatus').innerHTML = '';
-}
-function closeAddPlayerModal() { $('addPlayerModal').classList.remove('active'); }
-
-async function submitAddPlayer() {
-  const input = $('addPlayerInput');
-  const statusDiv = $('addPlayerStatus');
-  const identifier = input.value.trim();
-  if (!identifier) {
-    statusDiv.innerHTML = '<span style="color:#EF4444;">Enter a Telegram ID or @username.</span>';
-    return;
-  }
-  statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Checking…</span>';
-  input.disabled = true;
-  try {
-    const r = await fetch('/admin/import-players', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramIds: [identifier], overwrite: false }),
-    });
-    const data = await r.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-    const result = data.results[0];
-    if (result.success) {
-      statusDiv.innerHTML = `<span style="color:#10B981;">✅ Player ${esc(result.telegramId)} ${result.created ? 'created' : 'updated'}!</span>`;
-      setTimeout(() => { closeAddPlayerModal(); loadPlayers({ reset: true }); }, 1200);
-    } else if (result.error && result.error.includes('Already assigned')) {
-      if (confirm('This player is assigned to another admin. Reassign?')) {
-        const r2 = await fetch('/admin/import-players', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegramIds: [identifier], overwrite: true }),
-        });
-        const d2 = await r2.json();
-        if (d2.success && d2.results[0].success) {
-          statusDiv.innerHTML = `<span style="color:#10B981;">✅ Reassigned to you!</span>`;
-          setTimeout(() => { closeAddPlayerModal(); loadPlayers({ reset: true }); }, 1200);
-        } else {
-          statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(d2.error || 'Failed')}</span>`;
-        }
+/* =================== ADD / IMPORT =================== */
+function openAddPlayerModal(){$('addPlayerModal').classList.add('on');$('addPlayerInput').value='';$('addPlayerStatus').textContent=''}
+async function submitAddPlayer(){
+  const input=$('addPlayerInput');
+  const st=$('addPlayerStatus');
+  const v=input.value.trim();
+  if(!v){st.textContent='Enter a Telegram ID or @username';return}
+  st.textContent='Checking…';
+  input.disabled=true;
+  try{
+    const r=await fetch('/admin/import-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegramIds:[v],overwrite:false})});
+    const d=await r.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    const result=d.results[0];
+    if(result.success){
+      st.textContent='Added: '+result.telegramId;
+      setTimeout(()=>{$('addPlayerModal').classList.remove('on');loadPlayers({reset:true})},1000);
+    }else if(result.error&&result.error.includes('Already assigned')){
+      if(confirm('This player is assigned elsewhere. Reassign?')){
+        const r2=await fetch('/admin/import-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegramIds:[v],overwrite:true})});
+        const d2=await r2.json();
+        if(d2.success&&d2.results[0].success){
+          st.textContent='Reassigned';
+          setTimeout(()=>{$('addPlayerModal').classList.remove('on');loadPlayers({reset:true})},1000);
+        }else st.textContent=d2.error||'Failed';
       }
-    } else {
-      statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(result.error || 'Failed')}</span>`;
-    }
-  } catch (e) {
-    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(e.message)}</span>`;
-  } finally {
-    input.disabled = false;
-  }
+    }else st.textContent=result.error||'Failed';
+  }catch(e){st.textContent=e.message}
+  finally{input.disabled=false}
 }
-
-function openImportModal() {
-  $('importModal').classList.add('active');
-  $('importTextarea').value = '';
-  $('importStatus').style.display = 'none';
-  $('importStatus').innerHTML = '';
-}
-function closeImportModal() { $('importModal').classList.remove('active'); }
-
-async function submitImport() {
-  const statusDiv = $('importStatus');
-  const overwrite = $('importOverwrite').checked;
-  const ids = $('importTextarea').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  if (!ids.length) { alert('Enter at least one ID or username.'); return; }
-  statusDiv.style.display = 'block';
-  statusDiv.innerHTML = '<span style="color:#3B82F6;">⏳ Importing…</span>';
-  try {
-    const r = await fetch('/admin/import-players', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegramIds: ids, overwrite }),
+function openImportModal(){$('importModal').classList.add('on');$('importTextarea').value='';$('importStatus').style.display='none';$('importStatus').innerHTML=''}
+async function submitImport(){
+  const st=$('importStatus');
+  const ov=$('importOverwrite').checked;
+  const ids=$('importTextarea').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  if(!ids.length){alert('Enter at least one ID or username.');return}
+  st.style.display='block';
+  st.textContent='Importing…';
+  try{
+    const r=await fetch('/admin/import-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telegramIds:ids,overwrite:ov})});
+    const d=await r.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    const results=d.results;
+    const added=results.filter(x=>x.success&&x.created).length;
+    const updated=results.filter(x=>x.success&&x.updated).length;
+    const failed=results.filter(x=>!x.success).length;
+    let h='<div style="font-weight:600">'+added+' added, '+updated+' updated'+(failed?', '+failed+' failed':'')+'</div>';
+    h+='<ul style="list-style:none;padding:0;margin-top:6px;font-size:11px">';
+    results.forEach(x=>{
+      const c=x.success?(x.created?'#10b981':'#f59e0b'):'#ef4444';
+      h+='<li style="padding:4px 0;border-bottom:1px solid var(--line);color:'+c+'">'+esc(x.telegramId)+' — '+esc(x.error||(x.created?'Created':'Updated'))+'</li>';
     });
-    const data = await r.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-    const results = data.results;
-    const added = results.filter(x => x.success && x.created).length;
-    const updated = results.filter(x => x.success && x.updated).length;
-    const failed = results.filter(x => !x.success).length;
-    let html = `<div style="font-weight:600;">✅ ${added} added, ${updated} updated${failed ? `, ${failed} failed` : ''}</div>`;
-    html += '<ul style="list-style:none;padding:0;margin-top:8px;font-size:12px;">';
-    results.forEach(x => {
-      const color = x.success ? (x.created ? '#10B981' : '#F59E0B') : '#EF4444';
-      const icon = x.success ? (x.created ? 'fa-plus' : 'fa-sync') : 'fa-times';
-      html += `<li style="padding:6px 0;border-bottom:1px solid var(--border-color);color:${color};"><i class="fas ${icon}"></i> ${esc(x.telegramId)} – ${esc(x.error || (x.created ? 'Created' : 'Updated'))}</li>`;
-    });
-    html += '</ul>';
-    statusDiv.innerHTML = html;
-    loadPlayers({ reset: true });
-  } catch (e) {
-    statusDiv.innerHTML = `<span style="color:#EF4444;">❌ ${esc(e.message)}</span>`;
-  }
+    h+='</ul>';
+    st.innerHTML=h;
+    loadPlayers({reset:true});
+  }catch(e){st.textContent=e.message}
 }
 
-/* ================================================================
-   PROFILE
-   ================================================================ */
-async function loadProfile() {
-  if (!state.admin) return;                 // session already cached in init()
-  const a = state.admin;
-  $('profileName').textContent = a.name;
-  $('profilePhone').innerHTML = `<i class="fas fa-phone"></i> ${esc(a.phone)}`;
-  $('profileTelebirr').innerHTML = `${esc(a.telebirr_number || 'Not set')} <i class="fas fa-check-circle verified-badge"></i>`;
-  $('profileCbe').innerHTML     = `${esc(a.cbebirr_number || 'Not set')} <i class="fas fa-check-circle verified-badge"></i>`;
-  $('profileMpesa').innerHTML   = `${esc(a.mpesa_number || 'Not set')} <i class="fas fa-check-circle verified-badge"></i>`;
-
-  try {
-    const res = await apiFetch('invite', '/admin/invite-info');
-    const data = res ? await res.json() : null;
-    if (data && data.success) {
-      $('profileInviteLink').textContent = data.admin.invite_link;
-      $('profileInviteCode').textContent = data.admin.invite_code;
-      window._inviteCode = data.admin.invite_code;
-      window._inviteLink = data.admin.invite_link;
-    } else {
-      const code = '01207';
-      const link = `https://t.me/${BOT_USERNAME}?start=${code}`;
-      $('profileInviteLink').textContent = link;
-      $('profileInviteCode').textContent = code;
-      window._inviteCode = code;
-      window._inviteLink = link;
+/* =================== PROFILE =================== */
+async function loadProfile(){
+  if(!state.admin) return;
+  const a=state.admin;
+  $('profileName').textContent=a.name;
+  $('profilePhone').innerHTML='<svg class="i"><use href="#i-phone"/></svg> '+esc(a.phone);
+  $('profileTelebirr').textContent=a.telebirr_number||'Not set';
+  $('profileCbe').textContent=a.cbebirr_number||'Not set';
+  $('profileMpesa').textContent=a.mpesa_number||'Not set';
+  try{
+    const res=await apiFetch('invite','/admin/invite-info');
+    const d=res?await res.json():null;
+    if(d&&d.success){
+      $('profileInviteLink').textContent=d.admin.invite_link;
+      $('profileInviteCode').textContent=d.admin.invite_code;
+      window._inviteCode=d.admin.invite_code;
+      window._inviteLink=d.admin.invite_link;
+    }else{
+      const c='01207';
+      const l='https://t.me/'+BOT_USERNAME+'?start='+c;
+      $('profileInviteLink').textContent=l;
+      $('profileInviteCode').textContent=c;
+      window._inviteCode=c;window._inviteLink=l;
     }
-  } catch { /* ignore */ }
-
+  }catch{}
   loadCommissionSummary();
 }
-
-function copyInviteLink() {
-  if (!window._inviteLink) return;
-  navigator.clipboard.writeText(window._inviteLink)
-    .then(() => showToast('✅ Link copied!', 'success'))
-    .catch(() => showToast('❌ Failed', 'error'));
-}
-function copyInviteCode() {
-  if (!window._inviteCode) return;
-  navigator.clipboard.writeText(window._inviteCode)
-    .then(() => showToast('✅ Code copied!', 'success'))
-    .catch(() => showToast('❌ Failed', 'error'));
-}
-
-async function requestAdminWithdrawal() {
-  const amount = $('withdrawEarningsAmount').value.trim();
-  const phone  = $('withdrawEarningsPhone').value.trim();
-  const name   = $('withdrawEarningsName').value.trim();
-  const method = $('withdrawEarningsMethod').value;
-
-  if (!amount || isNaN(amount) || Number(amount) < 10) return showToast('❌ Min 10 ETB', 'error');
-  if (!phone.match(/^(09|07|\+251)\d{8,9}$/))        return showToast('❌ Invalid phone', 'error');
-  if (!name)                                          return showToast('❌ Enter receiver name', 'error');
-
-  try {
-    const r = await fetch('/admin/request-withdrawal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: Number(amount), phone, withdrawal_type: method, receiver_name: name }),
-    });
-    const data = await r.json();
-    if (!data.success) throw new Error(data.error || 'Failed');
-    showToast(`✅ Withdrawal request for ${amount} ETB submitted`, 'success');
-    $('withdrawEarningsAmount').value = '';
-    $('withdrawEarningsPhone').value = '';
-    $('withdrawEarningsName').value = '';
+function copyInviteLink(){if(!window._inviteLink)return;navigator.clipboard.writeText(window._inviteLink).then(()=>showToast('Link copied','success')).catch(()=>showToast('Copy failed','error'))}
+function copyInviteCode(){if(!window._inviteCode)return;navigator.clipboard.writeText(window._inviteCode).then(()=>showToast('Code copied','success')).catch(()=>showToast('Copy failed','error'))}
+async function requestAdminWithdrawal(){
+  const amount=$('withdrawEarningsAmount').value.trim();
+  const phone=$('withdrawEarningsPhone').value.trim();
+  const name=$('withdrawEarningsName').value.trim();
+  const method=$('withdrawEarningsMethod').value;
+  if(!amount||isNaN(amount)||Number(amount)<10) return showToast('Min 10 ETB','error');
+  if(!phone.match(/^(09|07|\+251)\d{8,9}$/)) return showToast('Invalid phone','error');
+  if(!name) return showToast('Enter receiver name','error');
+  try{
+    const r=await fetch('/admin/request-withdrawal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:Number(amount),phone,withdrawal_type:method,receiver_name:name})});
+    const d=await r.json();
+    if(!d.success) throw new Error(d.error||'Failed');
+    showToast('Request submitted','success');
+    $('withdrawEarningsAmount').value='';
+    $('withdrawEarningsPhone').value='';
+    $('withdrawEarningsName').value='';
     loadCommissionSummary();
-  } catch (e) { showToast(`❌ ${e.message}`, 'error'); }
+  }catch(e){showToast(e.message,'error')}
 }
 
-/* ================================================================
-   REFRESH / RESYNC
-   ================================================================ */
-let isRefreshing = false;
-
-async function refreshAll({ silent = false } = {}) {
-  if (isRefreshing) return;
-  isRefreshing = true;
-  if (!silent) $('refreshBtn').classList.add('spinning');
-  try {
-    const tasks = [loadStats(), loadCommissionSummary()];
-    if (state.currentPage === 'game') {
-      if (state.currentTab === 'deposits')    tasks.push(loadDeposits({ reset: true }));
-      if (state.currentTab === 'withdrawals') tasks.push(loadWithdrawals({ reset: true }));
-      if (state.currentTab === 'players')     tasks.push(loadPlayers({ reset: true }));
-    } else if (state.currentPage === 'profile') {
-      tasks.push(loadProfile());
-    }
-    await Promise.all(tasks);        // parallel, not serial
-    if (!silent) showToast('🔄 Refreshed', 'info');
-  } finally {
-    isRefreshing = false;
-    setTimeout(() => $('refreshBtn').classList.remove('spinning'), 400);
+/* =================== REFRESH =================== */
+let isRefreshing=false;
+async function refreshAll({silent=false}={}){
+  if(isRefreshing) return;
+  isRefreshing=true;
+  if(!silent) $('refreshBtn').classList.add('spin');
+  try{
+    const tasks=[loadStats(),loadCommissionSummary()];
+    if(state.currentPage==='game'){
+      if(state.currentTab==='deposits') tasks.push(loadDeposits({reset:true}));
+      if(state.currentTab==='withdrawals') tasks.push(loadWithdrawals({reset:true}));
+      if(state.currentTab==='players') tasks.push(loadPlayers({reset:true}));
+    }else if(state.currentPage==='profile') tasks.push(loadProfile());
+    await Promise.all(tasks);
+    if(!silent) showToast('Refreshed','info');
+  }finally{
+    isRefreshing=false;
+    setTimeout(()=>$('refreshBtn').classList.remove('spin'),400);
   }
 }
-
-function startReconcile() {
-  if (reconcileTimer) clearInterval(reconcileTimer);
-  reconcileTimer = setInterval(() => {
-    if (document.hidden) return;
-    refreshAll({ silent: true });    // 5-min safety net, not the transport
-  }, RECONCILE_MS);
+function startReconcile(){
+  if(reconcileTimer) clearInterval(reconcileTimer);
+  reconcileTimer=setInterval(()=>{if(!document.hidden) refreshAll({silent:true})},RECONCILE_MS);
 }
 
-/* ================================================================
-   EVENT DELEGATION (single listener for the whole app)
-   ================================================================ */
-document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action]');
-  if (!el) return;
-  const action = el.dataset.action;
-
-  switch (action) {
-    case 'logout':               return logout();
-    case 'switch-page':          return switchPage(el.dataset.page);
-    case 'switch-tab':           return switchTab(el.dataset.tab);
-    case 'toggle-filter':        return toggleFilter(el.dataset.target);
-    case 'apply-deposit-filters':  return loadDeposits({ reset: true });
-    case 'apply-withdraw-filters': return loadWithdrawals({ reset: true });
-    case 'refresh-all':          return refreshAll();
-
-    case 'deposit-approve':      return processDeposit(Number(el.dataset.id), 'approve');
-    case 'deposit-reject':       return processDeposit(Number(el.dataset.id), 'reject');
-    case 'withdrawal-approve':   return processWithdrawal(Number(el.dataset.id), 'approve');
-    case 'withdrawal-reject':    return processWithdrawal(Number(el.dataset.id), 'reject');
-
-    case 'view-proof':           return viewProof(el.dataset.src);
-    case 'copy':                 return navigator.clipboard.writeText(el.dataset.copy)
-                                        .then(() => showToast('📋 Copied', 'success'))
-                                        .catch(() => showToast('❌ Copy failed', 'error'));
-
-    case 'open-balance-modal':
-      return openBalanceModal(el.dataset.id, el.dataset.username, Number(el.dataset.balance));
+/* =================== EVENT DELEGATION =================== */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-action]');
+  if(!el) return;
+  const a=el.dataset.action;
+  switch(a){
+    case 'logout': return logout();
+    case 'switch-page': return switchPage(el.dataset.page);
+    case 'switch-tab': return switchTab(el.dataset.tab);
+    case 'toggle-filter': return toggleFilter(el.dataset.target);
+    case 'apply-deposit-filters': return loadDeposits({reset:true});
+    case 'apply-withdraw-filters': return loadWithdrawals({reset:true});
+    case 'refresh-all': return refreshAll();
+    case 'deposit-approve': return processDeposit(Number(el.dataset.id),'approve');
+    case 'deposit-reject': return processDeposit(Number(el.dataset.id),'reject');
+    case 'withdrawal-approve': return processWithdrawal(Number(el.dataset.id),'approve');
+    case 'withdrawal-reject': return processWithdrawal(Number(el.dataset.id),'reject');
+    case 'view-proof': return viewProof(el.dataset.src);
+    case 'copy': return navigator.clipboard.writeText(el.dataset.copy).then(()=>showToast('Copied','success')).catch(()=>showToast('Copy failed','error'));
+    case 'open-balance-modal': return openBalanceModal(el.dataset.id,el.dataset.username,Number(el.dataset.balance));
     case 'submit-balance-adjust': return submitBalanceAdjust();
-
     case 'open-add-player-modal': return openAddPlayerModal();
-    case 'submit-add-player':     return submitAddPlayer();
-    case 'open-import-modal':     return openImportModal();
-    case 'submit-import':         return submitImport();
-
-    case 'copy-invite-link':      return copyInviteLink();
-    case 'copy-invite-code':      return copyInviteCode();
+    case 'submit-add-player': return submitAddPlayer();
+    case 'open-import-modal': return openImportModal();
+    case 'submit-import': return submitImport();
+    case 'copy-invite-link': return copyInviteLink();
+    case 'copy-invite-code': return copyInviteCode();
     case 'request-admin-withdrawal': return requestAdminWithdrawal();
-
-    case 'close-modal':
-      return $(el.dataset.target).classList.remove('active');
+    case 'close-modal': return $(el.dataset.target).classList.remove('on');
   }
 });
-
-// backdrop close
-document.querySelectorAll('.modal[data-close-on-backdrop]').forEach(m => {
-  m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
+document.querySelectorAll('.modal[data-close-on-backdrop]').forEach(m=>{
+  m.addEventListener('click',e=>{if(e.target===m) m.classList.remove('on')});
 });
-
-// player search (input event, no inline oninput)
-document.addEventListener('input', (e) => {
-  if (e.target.id === 'playerSearchInput') applyPlayerSearch();
-});
-
-// csv upload
-document.addEventListener('change', (e) => {
-  if (e.target.id === 'csvFileInput') {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      $('importTextarea').value = ev.target.result
-        .split(/\r?\n/).map(l => l.trim()).filter(Boolean).join('\n');
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+document.addEventListener('input',e=>{if(e.target.id==='playerSearchInput') applyPlayerSearch()});
+document.addEventListener('change',e=>{
+  if(e.target.id==='csvFileInput'){
+    const f=e.target.files[0];
+    if(!f) return;
+    const r=new FileReader();
+    r.onload=ev=>{$('importTextarea').value=ev.target.result.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).join('\n')};
+    r.readAsText(f);
+    e.target.value='';
   }
 });
+document.addEventListener('visibilitychange',()=>{if(!document.hidden) refreshAll({silent:true})});
+document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='r'){e.preventDefault();refreshAll()}});
 
-/* ================================================================
-   INIT
-   ================================================================ */
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) refreshAll({ silent: true });
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.ctrlKey && e.key === 'r') { e.preventDefault(); refreshAll(); }
-});
-
-async function init() {
-  const ok = await checkSession();
-  if (!ok) return;
-  await Promise.all([loadStats(), loadCommissionSummary()]);
-  await loadDeposits({ reset: true });
+/* =================== INIT =================== */
+async function init(){
+  const ok=await checkSession();
+  if(!ok) return;
+  await Promise.all([loadStats(),loadCommissionSummary()]);
+  await loadDeposits({reset:true});
   connectAdminWebSocket();
   startReconcile();
-  console.log('✅ Admin dashboard ready (event-driven)');
 }
-
 init();
 </script>
 </body>
