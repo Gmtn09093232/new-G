@@ -2,7 +2,7 @@
 //  server.js – Full Bingo Server
 //             with invite tracking (invite_code, admin_name)
 //             & FORCE INVITE ONLY (no invite → no account)
-//             & Base64 Screenshot Upload Support
+//             & Base64 Screenshot Upload Support (decoded + stored in Supabase Storage)
 // ================================================================
 
 require('dotenv').config();
@@ -81,7 +81,7 @@ const upload = multer({
   }
 });
 
-// 🔥 UPDATED: Increased JSON limit to handle Base64 image strings from the frontend
+// 🔥 Increased JSON limit to handle Base64 image strings from the frontend
 app.use(express.json({ limit: '10mb' }));
 
 const sessionMiddleware = session({
@@ -1833,7 +1833,7 @@ async function endGameWithWinners(stake) {
 
     const winnerNames = game.winners.map(w => w.username);
 
-    // ✅ NEW: Build winnerCards array mapping each winner to their card number
+    // ✅ Build winnerCards array mapping each winner to their card number
     const winnerCards = game.winners.map(w => {
       const player = game.players.find(p => p.telegramId === w.telegramId);
       return player ? player.cardNumber : null;
@@ -1943,7 +1943,49 @@ app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bo
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ============================================================
-//  🔥 UPDATED: Player deposit endpoints – Supports Base64 Image
+//  🔥 SHARED HELPER – ensure bucket + upload buffer to storage
+// ============================================================
+async function uploadToDepositBucket(buffer, mimeType) {
+  const bucketName = 'deposit-photos';
+
+  // Ensure bucket exists
+  const { data: buckets } = await supabase.storage.listBuckets();
+  const bucketExists = buckets.some(b => b.name === bucketName);
+  if (!bucketExists) {
+    await supabase.storage.createBucket(bucketName, {
+      public: true,
+      file_size_limit: 5242880,
+      allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
+    });
+  }
+
+  const ext = (mimeType.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  const fileName = `${uuidv4()}.${ext}`;
+  const filePath = `deposit-proofs/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(bucketName)
+    .upload(filePath, buffer, {
+      contentType: mimeType,
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (uploadError) {
+    console.error('Storage upload error:', uploadError);
+    throw new Error('Failed to upload photo proof: ' + uploadError.message);
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from(bucketName)
+    .getPublicUrl(filePath);
+
+  return publicUrlData?.publicUrl || null;
+}
+
+// ============================================================
+//  🔥 FIXED: Player deposit endpoint – decodes Base64 and
+//     uploads to Supabase Storage instead of storing raw text
 // ============================================================
 const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
@@ -1957,7 +1999,7 @@ const handleDepositRequest = async (req, res) => {
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
-  // Check if the incoming reference is a Base64 image from the updated frontend
+  // Detect Base64 image from frontend
   const isBase64Image = transaction_reference && transaction_reference.startsWith('data:image/');
 
   if (!photoFile && !transaction_reference) {
@@ -1968,8 +2010,26 @@ const handleDepositRequest = async (req, res) => {
   let photoUrl = null;
 
   if (isBase64Image) {
-    // It's a Base64 image from the frontend, save it directly
-    photoUrl = transaction_reference;
+    // ✅ Decode Base64 → upload to Supabase Storage → store only the URL
+    try {
+      const matches = transaction_reference.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (!matches) {
+        return res.status(400).json({ error: 'Invalid image format' });
+      }
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      // Sanity check: reject > 5MB
+      if (buffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Image too large (max 5MB after compression)' });
+      }
+
+      photoUrl = await uploadToDepositBucket(buffer, mimeType);
+    } catch (err) {
+      console.error('Base64 upload error:', err.message);
+      return res.status(500).json({ error: 'Failed to process image: ' + err.message });
+    }
   } else if (transaction_reference) {
     // It's a text transaction reference, extract the number
     extractedTxn = extractTransactionNumber(transaction_reference);
@@ -2011,40 +2071,14 @@ const handleDepositRequest = async (req, res) => {
 
     // Handle multer file upload if present (backward compatibility)
     if (photoFile) {
-      const fileExt = photoFile.originalname.split('.').pop() || 'jpg';
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `deposit-proofs/${fileName}`;
-
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const bucketExists = buckets.some(b => b.name === 'deposit-photos');
-      if (!bucketExists) {
-        await supabase.storage.createBucket('deposit-photos', {
-          public: true,
-          file_size_limit: 5242880,
-          allowed_mime_types: ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp']
-        });
+      try {
+        photoUrl = await uploadToDepositBucket(photoFile.buffer, photoFile.mimetype);
+      } catch (err) {
+        return res.status(500).json({ error: err.message });
       }
-
-      const { error: uploadError } = await supabase.storage
-        .from('deposit-photos')
-        .upload(filePath, photoFile.buffer, {
-          contentType: photoFile.mimetype,
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        return res.status(500).json({ error: 'Failed to upload photo proof', details: uploadError.message });
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('deposit-photos')
-        .getPublicUrl(filePath);
-      photoUrl = publicUrlData?.publicUrl || null;
     }
 
-    // Insert into database: save text reference in transaction_reference, image in proof_photo_url
+    // Insert into database: save text reference in transaction_reference, image URL in proof_photo_url
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -2052,8 +2086,8 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: extractedTxn, // Will be null if it's an image
-      proof_photo_url: photoUrl,           // Holds the Base64 string or Supabase URL
+      transaction_reference: extractedTxn, // null if it's an image
+      proof_photo_url: photoUrl,           // Supabase Storage URL (or null)
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
     }).select().single();
@@ -3252,6 +3286,7 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ============================================================
 //  SUPER ADMIN – Send Telegram Message to Player
 // ============================================================
@@ -3264,7 +3299,6 @@ app.post('/super-admin/send-telegram-message', async (req, res) => {
     return res.status(400).json({ error: 'Missing userId or message' });
   }
 
-  // ✅ Use the same bot token from environment variables
   const BOT_TOKEN = process.env.BOT_TOKEN;
   if (!BOT_TOKEN) {
     return res.status(500).json({ success: false, error: 'BOT_TOKEN not configured in environment' });
@@ -3485,6 +3519,7 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 // ============================================================
 //  GET ALL REGISTERED PLAYERS (with admin info) – DEBUG VERSION
 // ============================================================
@@ -3496,7 +3531,6 @@ app.get('/super-admin/players', async (req, res) => {
     const { adminId, search, limit = 100, page = 1 } = req.query;
     console.log(`📥 /super-admin/players called with: adminId=${adminId}, search=${search}, page=${page}`);
 
-    // ─── STEP 1: SIMPLE COUNT – just to verify the table has rows ───
     const { count: totalCount, error: countErr } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
@@ -3506,10 +3540,8 @@ app.get('/super-admin/players', async (req, res) => {
     }
     console.log(`📊 Total users in table: ${totalCount}`);
 
-    // ─── STEP 2: BUILD QUERY WITHOUT ANY FILTERS FIRST ───
     let query = supabase.from('users').select('*', { count: 'exact' });
 
-    // Apply filters only if provided
     if (adminId && adminId !== 'all') {
       query = query.eq('admin_id', adminId);
       console.log(`🔍 Filtering by admin_id = ${adminId}`);
@@ -3523,15 +3555,11 @@ app.get('/super-admin/players', async (req, res) => {
     const pageNum = Math.max(parseInt(page) || 1, 1);
     const offset = (pageNum - 1) * limitNum;
 
-    // ─── STEP 3: EXECUTE WITH PAGINATION (NO ORDERING) ───
-    // Ordering can cause issues if the column doesn't exist or is not indexed.
-    // We'll try without ordering first, then add it optionally.
     const { data, error, count } = await query
       .range(offset, offset + limitNum - 1);
 
     if (error) {
       console.error('❌ Supabase query error:', error);
-      // If error, try a plain select without any filters
       const { data: fallbackData, error: fallbackErr, count: fallbackCount } = await supabase
         .from('users')
         .select('*', { count: 'exact' })
@@ -3553,7 +3581,6 @@ app.get('/super-admin/players', async (req, res) => {
 
     console.log(`✅ Query returned ${data?.length || 0} rows (total: ${count})`);
 
-    // ─── STEP 4: FETCH ADMIN NAMES ───
     const adminIds = [...new Set(data.map(u => u.admin_id).filter(id => id))];
     let adminsMap = {};
     if (adminIds.length) {
@@ -3594,7 +3621,6 @@ app.get('/super-admin/analysis', async (req, res) => {
   try {
     const { from, to, adminId } = req.query;
 
-    // 1. Build query for contributions joined with game rounds
     let query = supabase
       .from('game_admin_contributions')
       .select(`
@@ -3607,7 +3633,6 @@ app.get('/super-admin/analysis', async (req, res) => {
         )
       `);
 
-    // Apply date filters
     if (from) {
       const fromDate = new Date(from);
       fromDate.setHours(0,0,0,0);
@@ -3619,7 +3644,6 @@ app.get('/super-admin/analysis', async (req, res) => {
       query = query.lte('game_rounds.created_at', toDate.toISOString());
     }
 
-    // Admin filter
     if (adminId && adminId !== 'all') {
       query = query.eq('admin_id', adminId);
     }
@@ -3630,7 +3654,6 @@ app.get('/super-admin/analysis', async (req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    // 2. Group by admin_id and stake
     const grouped = {};
     for (const row of contributions) {
       const adminId = row.admin_id;
@@ -3641,13 +3664,11 @@ app.get('/super-admin/analysis', async (req, res) => {
           admin_id: adminId,
           stake: stake,
           total_commission: 0,
-          // We'll count players later
         };
       }
       grouped[key].total_commission += Number(row.house_profit_share) || 0;
     }
 
-    // 3. Fetch admin names and player counts
     const adminIds = [...new Set(Object.values(grouped).map(g => g.admin_id))];
     let adminsMap = {};
     if (adminIds.length) {
@@ -3660,7 +3681,6 @@ app.get('/super-admin/analysis', async (req, res) => {
       }
     }
 
-    // 4. Fetch player counts per admin (total users assigned to that admin)
     const playerCounts = {};
     if (adminIds.length) {
       const { data: users, error: userErr } = await supabase
@@ -3676,25 +3696,21 @@ app.get('/super-admin/analysis', async (req, res) => {
       }
     }
 
-    // 5. Build result rows
     const result = [];
     for (const key of Object.keys(grouped)) {
       const g = grouped[key];
       const adminName = adminsMap[g.admin_id] || `Admin ${g.admin_id}`;
       const playerCount = playerCounts[g.admin_id] || 0;
-      // For "game_name", use stake as a label
       const gameName = `Bingo ${g.stake} ETB`;
-      // Admin share = total_commission (since it's already the admin's share)
       result.push({
         game_name: gameName,
         admin_name: adminName,
         player_count: playerCount,
         total_commission: g.total_commission,
-        admin_share: g.total_commission   // same as commission because it's already the admin's cut
+        admin_share: g.total_commission
       });
     }
 
-    // Sort by game name then admin
     result.sort((a, b) => a.game_name.localeCompare(b.game_name) || a.admin_name.localeCompare(b.admin_name));
 
     res.json({ success: true, data: result });
@@ -3718,7 +3734,6 @@ app.delete('/super-admin/delete-player', async (req, res) => {
   }
 
   try {
-    // 1. Check if user exists
     const { data: user, error: findErr } = await supabase
       .from('users')
       .select('telegram_id, username, admin_id')
@@ -3729,7 +3744,6 @@ app.delete('/super-admin/delete-player', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Player not found' });
     }
 
-    // 2. Delete the user from users table
     const { error: deleteErr } = await supabase
       .from('users')
       .delete()
@@ -3737,12 +3751,10 @@ app.delete('/super-admin/delete-player', async (req, res) => {
 
     if (deleteErr) throw deleteErr;
 
-    // 3. Remove from in-memory cache
     if (users[String(telegramId)]) {
       delete users[String(telegramId)];
     }
 
-    // 4. Remove from any active games
     for (const stake of [10, 20, 30]) {
       const game = getGame(stake);
       if (!game) continue;
@@ -3763,7 +3775,6 @@ app.delete('/super-admin/delete-player', async (req, res) => {
       }
     }
 
-    // 5. Audit log
     await Audit.adminAction('SUPER_ADMIN_DELETE_PLAYER', auth.adminId || 'secret', req.ip, {
       targetUserId: telegramId,
       username: user.username,
@@ -3791,7 +3802,6 @@ app.post('/super-admin/transfer-player', async (req, res) => {
   }
 
   try {
-    // 1. Check if user exists
     const { data: user, error: findErr } = await supabase
       .from('users')
       .select('telegram_id, username, admin_id, admin_name, invite_code')
@@ -3802,7 +3812,6 @@ app.post('/super-admin/transfer-player', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Player not found' });
     }
 
-    // 2. Check if target admin exists and is active
     const { data: targetAdmin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, invite_code')
@@ -3814,7 +3823,6 @@ app.post('/super-admin/transfer-player', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
     }
 
-    // 3. Update user with new admin
     const { error: updateErr } = await supabase
       .from('users')
       .update({
@@ -3826,13 +3834,11 @@ app.post('/super-admin/transfer-player', async (req, res) => {
 
     if (updateErr) throw updateErr;
 
-    // 4. Update in-memory cache
     if (users[String(telegramId)]) {
       users[String(telegramId)].admin_id = targetAdmin.id;
       users[String(telegramId)].admin_name = targetAdmin.name;
     }
 
-    // 5. Update invite_tracking
     const { data: existingTrack, error: trackFindErr } = await supabase
       .from('invite_tracking')
       .select('id')
@@ -3864,7 +3870,6 @@ app.post('/super-admin/transfer-player', async (req, res) => {
         });
     }
 
-    // 6. Audit log
     await Audit.adminAction('SUPER_ADMIN_TRANSFER_PLAYER', auth.adminId || 'secret', req.ip, {
       targetUserId: telegramId,
       username: user.username,
@@ -3907,7 +3912,6 @@ app.post('/super-admin/transfer-players', async (req, res) => {
   }
 
   try {
-    // 1. Verify target admin exists and is active
     const { data: targetAdmin, error: adminErr } = await supabase
       .from('admins')
       .select('id, name, invite_code')
@@ -3919,20 +3923,18 @@ app.post('/super-admin/transfer-players', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
     }
 
-    // 2. Fetch all selected users
-    const { data: users, error: usersErr } = await supabase
+    const { data: usersList, error: usersErr } = await supabase
       .from('users')
       .select('telegram_id, username, admin_id, admin_name, invite_code')
       .in('telegram_id', telegramIds.map(id => String(id)));
 
     if (usersErr) throw usersErr;
-    if (!users || users.length === 0) {
+    if (!usersList || usersList.length === 0) {
       return res.status(404).json({ success: false, error: 'No valid players found' });
     }
 
-    // 3. Update each user's admin
     const updatedUsers = [];
-    for (const user of users) {
+    for (const user of usersList) {
       const { error: updateErr } = await supabase
         .from('users')
         .update({
@@ -3944,16 +3946,14 @@ app.post('/super-admin/transfer-players', async (req, res) => {
 
       if (updateErr) {
         console.error(`Failed to update user ${user.telegram_id}:`, updateErr.message);
-        continue; // skip this user, but continue with others
+        continue;
       }
 
-      // Update in-memory cache
       if (users[user.telegram_id]) {
         users[user.telegram_id].admin_id = targetAdmin.id;
         users[user.telegram_id].admin_name = targetAdmin.name;
       }
 
-      // Update invite_tracking
       const { data: existingTrack, error: trackFindErr } = await supabase
         .from('invite_tracking')
         .select('id')
@@ -3991,7 +3991,6 @@ app.post('/super-admin/transfer-players', async (req, res) => {
       });
     }
 
-    // 4. Audit log
     await Audit.adminAction('SUPER_ADMIN_BULK_TRANSFER_PLAYERS', auth.adminId || 'secret', req.ip, {
       targetAdminId: targetAdmin.id,
       targetAdminName: targetAdmin.name,
@@ -4260,7 +4259,6 @@ if (!botToken) {
       const startParam = match[1] ? match[1].trim() : '';
       const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
 
-      // Pass start parameter to web app URL
       const webAppUrlWithParam = startParam 
         ? `${webAppUrl}?start_param=${startParam}` 
         : webAppUrl;
@@ -4271,7 +4269,6 @@ if (!botToken) {
 
         console.log(`🔗 User ${userId} opened invite link with code: ${startParam}`);
 
-        // Look up admin by invite code
         let adminId = null;
         let adminName = null;
         try {
@@ -4289,7 +4286,6 @@ if (!botToken) {
           console.error('Error looking up admin:', e.message);
         }
 
-        // Insert/Update invite_tracking
         try {
           const { data: existing } = await supabase
             .from('invite_tracking')
@@ -4327,7 +4323,6 @@ if (!botToken) {
           console.error('Error with invite_tracking:', e.message);
         }
 
-        // Update users table (if user exists)
         try {
           const { data: user } = await supabase
             .from('users')
@@ -4354,7 +4349,6 @@ if (!botToken) {
         }
       }
 
-      // Send message with web app button
       const messageText = startParam
         ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
         : '🎯 Welcome! Click below to start playing.';
@@ -4436,7 +4430,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // checkAndAddThirdBot is removed – no longer needed
   });
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
@@ -4459,7 +4452,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // checkAndAddThirdBot removed
   });
   socket.on('markNumber', (number) => {
     if (!currentStake) return;
