@@ -413,7 +413,7 @@ html.lite .modal { background:rgba(0,0,0,.88); }
         </div>
         <div class="rules-text" style="max-height:400px; overflow-y:auto; padding-right:8px;">
             <h3 data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
-            <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
+            <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
             <h3 data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
             <p data-key="rulesWinningPatterns">✅ 1 አግድም መስመር (Row)<br>✅ 1 ቁመት መስመር (Column)<br>✅ 1 ሰያፍ መስመር (Diagonal)<br>✅ 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>💡 ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
             <h3 data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
@@ -1624,8 +1624,11 @@ function goStake() {
 }
 
 function showWinner(d) {
+    // Extract the last called number (fallback to '—' if undefined)
+    const lastCall = d.winningNumber || (d.calledNumbers && d.calledNumbers.length > 0 ? d.calledNumbers[d.calledNumbers.length - 1] : '—');
+
     if (d.noWinner) {
-        if (state.currentGameId) addRecord(false, 0, 0);
+        if (state.currentGameId) addRecord(false, 0, 0, lastCall, []);
         toast('No winner this round.', 'info');
         return;
     }
@@ -1653,11 +1656,11 @@ function showWinner(d) {
     $('winPrize').innerHTML = each + ' <small>ETB</small>';
     $('winnerOverlay').classList.add('active');
 
-    if (state.currentGameId) addRecord(true, each, d.totalPrize || 0);
+    if (state.currentGameId) addRecord(true, each, d.totalPrize || 0, lastCall, d.winnerCards);
     unlockSpeech();
 }
 
-function addRecord(win, prize, totalPrize) {
+function addRecord(win, prize, totalPrize, winningNumber, winnerCards) {
     state.totalGames++;
     state.recentGames.unshift({
         gameId: state.currentGameId,
@@ -1665,7 +1668,9 @@ function addRecord(win, prize, totalPrize) {
         result: win ? 'Win' : 'Lost',
         stake: state.stake,
         playerPrize: prize,
-        totalPrize
+        totalPrize,
+        winningNumber: winningNumber || '—',
+        winnerCards: winnerCards || []
     });
     if (state.recentGames.length > 10) state.recentGames.pop();
     saveStats();
@@ -1705,9 +1710,21 @@ function updateStats() {
         const prize = g.result === 'Win'
             ? `${g.totalPrize || g.playerPrize} ETB`
             : '—';
+        
+        // Format winning cards (e.g., "Card #42, Card #15")
+        let cardsStr = '—';
+        if (g.winnerCards && g.winnerCards.length > 0) {
+            cardsStr = g.winnerCards.map(c => `Card #${c}`).join(', ');
+        }
+
+        // Format last called number
+        const callStr = g.winningNumber && g.winningNumber !== '—' ? formatCall(Number(g.winningNumber)) : '—';
+
         return `<div class="history-card">
             <div><strong>🎮 Game ID:</strong> <span style="color:var(--text);">${g.gameId || '—'}</span></div>
             <div><strong>🏆 Result:</strong> <span style="color:var(--text);">${g.result}</span></div>
+            <div><strong>🔢 Last Call:</strong> <span style="color:var(--accent); font-weight:700;">${callStr}</span></div>
+            <div><strong>🎴 Winning Card(s):</strong> <span style="color:var(--text);">${cardsStr}</span></div>
             <div><strong>💰 Prize:</strong> <span style="color:var(--accent); font-weight:700;">${prize}</span></div>
             <div style="font-size:.7rem;color:var(--text-dim); margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div>
         </div>`;
