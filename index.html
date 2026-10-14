@@ -704,14 +704,10 @@ state.selectedMethod=null;state.pendingAmount=0;state.savedPhone='';state.savedA
 ['depositPhone','depositAmount','paymentProof','withdrawName','withdrawPhone','withdrawAmount'].forEach(id=>{const el=$(id);if(el)el.value=''});
 const preview=$('proofPreview');if(preview){preview.src='';preview.style.display='none'}
 ['depositDetailsModal','methodListModal','howToPayModal','withdrawModal'].forEach(id=>$(id)?.classList.remove('active'));
-const btn=$('confirmPaymentBtn');if(btn){btn.disabled=false;btn.innerText=t('confirmPayment')}
 updatePaymentAmountDisplay();
 }
 function closeMethodList(){$('methodListModal')?.classList.remove('active');resetDepositState()}
 
-/* ============================================================
-   ✅ FIXED: loadAdmins now caches for 30 seconds
-   ============================================================ */
 let _adminsCache={data:null,at:0};
 async function loadAdmins(){
 const now=Date.now();
@@ -725,26 +721,16 @@ state.depositAdmins=_adminsCache.data;
 return state.depositAdmins;
 }
 
-/* ============================================================
-   ✅ FIXED: openDeposit shows the modal FIRST (instant),
-   then populates methods when the fetch resolves.
-   ============================================================ */
 async function openDeposit(){
 resetDepositState();
 state.methodMode='deposit';
-
-// 1) Show the modal immediately
 modalZ++;
 $('methodListModal').style.zIndex=String(modalZ);
 $('methodListModal').classList.add('active');
 unlockSpeech();
-
-// 2) Show loading state
 $('methodListContainer').innerHTML='<div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>';
 $('methodListTitle').innerHTML=t('selectMethod');
 $('methodListStepLabel').textContent='Step 1/2';
-
-// 3) Fetch and populate
 const admins=await loadAdmins();
 const methods=[];
 admins.forEach(a=>{
@@ -755,26 +741,16 @@ if(a.mpesa)methods.push({type:'mpesa',number:a.mpesa,adminId:a.id});
 renderMethodList(methods,'deposit');
 }
 
-/* ============================================================
-   ✅ FIXED: openWithdraw shows the modal FIRST (instant),
-   then populates methods when the fetch resolves.
-   ============================================================ */
 async function openWithdraw(){
 resetDepositState();
 state.methodMode='withdraw';
-
-// 1) Show the modal immediately
 modalZ++;
 $('methodListModal').style.zIndex=String(modalZ);
 $('methodListModal').classList.add('active');
 unlockSpeech();
-
-// 2) Show loading state
 $('methodListContainer').innerHTML='<div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>';
 $('methodListTitle').innerHTML=t('selectWithdraw');
 $('methodListStepLabel').textContent='';
-
-// 3) Fetch and populate
 const admins=await loadAdmins();
 const map={};
 admins.forEach(a=>{
@@ -832,6 +808,10 @@ reader.onerror=(err)=>reject(err);
 });
 }
 
+/* ============================================================
+   ✅ FIXED: submitDeposit — no visible loading state.
+   Button stays "Confirm Payment →". Silent background submit.
+   ============================================================ */
 async function submitDeposit(){
 if(state.submitting)return;
 const phone=$('depositPhone')?.value.trim()||'';
@@ -842,36 +822,50 @@ if(!phone.match(/^(09|07)\d{8}$/))return toast('Invalid phone number','error');
 if(!amount||Number(amount)<10)return toast('Minimum deposit is 10 ETB','error');
 if(!file)return toast('Please upload a payment screenshot','error');
 if(!state.selectedMethod){toast('Please pick a payment method again','info');transitionModal('depositDetailsModal','methodListModal');return}
-state.submitting=true;state.savedPhone=phone;state.savedAmount=amount;state.pendingAmount=Number(amount);
-const btn=$('confirmPaymentBtn');const orig=btn.innerText;
-btn.disabled=true;btn.innerText='⏳ Compressing...';
+state.submitting=true;
+state.savedPhone=phone;
+state.savedAmount=amount;
+state.pendingAmount=Number(amount);
+// ⚡ NO button text change, NO disable
 try{
 const base64Image=await compressImage(file);
-btn.innerText='⏳ Uploading...';
 const r=await fetch('/api/request-deposit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:state.savedPhone,amount:state.pendingAmount,payment_type:state.selectedMethod.type,admin_id:state.selectedMethod.adminId,transaction_reference:base64Image})});
 const d=await r.json();
-if(d.success){toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`,'success');resetDepositState();if(socket)socket.emit('getBalance');else fetchBalance()}
-else{toast('❌ '+(d.error||'Submission failed'),'error')}
+if(d.success){
+toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`,'success');
+resetDepositState();
+if(socket)socket.emit('getBalance');else fetchBalance();
+}else{toast('❌ '+(d.error||'Submission failed'),'error')}
 }catch(err){console.error(err);toast('⚠️ Network error or image too large','error')}
-finally{state.submitting=false;btn.disabled=false;btn.innerText=orig}
+finally{state.submitting=false}
 }
 
+/* ============================================================
+   ✅ FIXED: submitWithdraw — no visible loading state.
+   Button stays "✔ Request Withdrawal". Silent background submit.
+   ============================================================ */
 async function submitWithdraw(){
+if(state.submitting)return;
 const name=$('withdrawName').value.trim();
 const phone=$('withdrawPhone').value.trim();
 const amount=$('withdrawAmount').value.trim();
 if(!name)return toast('Full name required','error');
 if(!amount||Number(amount)<20)return toast('Minimum withdrawal is 20 ETB','error');
 if(!phone.match(/^(09|07)\d{8}$/))return toast('Invalid phone number','error');
-const btn=$('submitWithdrawBtn');const orig=btn.innerText;
-btn.disabled=true;btn.innerText='⏳ Processing...';
+if(!state.selectedMethod){toast('Please pick a payment method again','info');return}
+state.submitting=true;
+// ⚡ NO button text change, NO disable
 try{
 const r=await fetch('/api/request-withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:Number(amount),phone,withdrawal_type:state.selectedMethod.type,name,admin_id:state.selectedMethod.adminId})});
 const d=await r.json();
-if(d.success){toast('✅ Withdrawal request submitted!','success');$('withdrawModal').classList.remove('active');resetDepositState();if(socket)socket.emit('getBalance');else fetchBalance()}
-else{toast('❌ '+(d.error||'Submission failed'),'error')}
+if(d.success){
+toast('✅ Withdrawal request submitted!','success');
+$('withdrawModal').classList.remove('active');
+resetDepositState();
+if(socket)socket.emit('getBalance');else fetchBalance();
+}else{toast('❌ '+(d.error||'Submission failed'),'error')}
 }catch{toast('⚠️ Network error','error')}
-finally{btn.disabled=false;btn.innerText=orig}
+finally{state.submitting=false}
 }
 
 const cardCache=new Map();
