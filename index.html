@@ -7,1108 +7,136 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* ===== RESET & BASE ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            min-height: 100vh;
-            background: #0a1428;
-            color: #e2e8f0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .page {
-            max-width: 600px;
-            width: 100%;
-            margin: 0 auto;
-            background: #0f1e3a;
-            border-radius: 20px;
-            padding: 20px 16px 24px;
-            border: 1px solid #1e3358;
-        }
-        .page.hidden {
-            display: none;
-        }
-
-        /* ===== LANGUAGE TOGGLE ===== */
-        .lang-toggle {
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            background: #f97316;
-            color: #ffffff;
-            border: none;
-            border-radius: 40px;
-            padding: 8px 18px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 1000;
-            font-size: 0.8rem;
-        }
-        @media (max-width:550px) {
-            .lang-toggle {
-                top: 8px;
-                left: 8px;
-                padding: 6px 14px;
-                font-size: 0.7rem;
-            }
-        }
-
-        /* ===== MODALS ===== */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.75);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            opacity: 0;
-            visibility: hidden;
-        }
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        .modal-content {
-            background: #0f1e3a;
-            border-radius: 20px;
-            padding: 24px 20px;
-            max-width: 92%;
-            width: 400px;
-            border: 1px solid #1e3358;
-            max-height: 92vh;
-            overflow-y: auto;
-            color: #e2e8f0;
-        }
-        @media (max-width:480px) {
-            .modal-content {
-                padding: 18px 14px;
-                width: 95%;
-            }
-        }
-
-        /* ===== MODAL COMPONENTS ===== */
-        .bank-header {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 18px;
-            border-bottom: 2px solid #1e3358;
-            padding-bottom: 12px;
-        }
-        .bank-header .bank-icon {
-            font-size: 1.8rem;
-            flex-shrink: 0;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #142647;
-            border-radius: 12px;
-            color: #f97316;
-            font-weight: 700;
-        }
-        .bank-header .bank-icon img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-        .bank-header .bank-icon .fallback-icon {
-            font-size: 1.2rem;
-        }
-        .bank-header .bank-title {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: #f1f5f9;
-        }
-        .bank-header .bank-sub {
-            font-size: 0.75rem;
-            color: #94a3b8;
-            font-weight: 400;
-        }
-
-        .input-group {
-            margin: 14px 0;
-        }
-        .input-group label {
-            font-weight: 600;
-            font-size: 0.82rem;
-            color: #cbd5e1;
-            display: block;
-            margin-bottom: 6px;
-        }
-        .input-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 60px;
-            border: 1.5px solid #1e3358;
-            background: #142647;
-            color: #f1f5f9;
-            font-size: 0.95rem;
-            font-family: inherit;
-        }
-        .input-group input::placeholder {
-            color: #64748b;
-        }
-        .input-group input:focus {
-            outline: none;
-            border-color: #f97316;
-        }
-
-        .transaction-summary {
-            background: #142647;
-            border-radius: 16px;
-            padding: 12px 14px;
-            font-size: 0.78rem;
-            color: #fbbf24;
-            margin: 12px 0;
-            text-align: center;
-            border: 1px solid #1e3358;
-        }
-
-        .modal-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        .modal-buttons button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 60px;
-            font-weight: 700;
-            border: none;
-            min-height: 48px;
-            font-size: 0.95rem;
-            cursor: pointer;
-        }
-        .btn-primary {
-            background: #f97316;
-            color: #ffffff;
-        }
-        .btn-primary:hover {
-            background: #ea580c;
-        }
-        .btn-secondary {
-            background: #1e3358;
-            color: #e2e8f0;
-            border: 1px solid #2d4066;
-        }
-        .btn-secondary:hover {
-            background: #2d4066;
-        }
-
-        .deposit-step {
-            background: #142647;
-            border-radius: 16px;
-            padding: 16px;
-            margin: 12px 0;
-            border: 1px solid #1e3358;
-        }
-        .deposit-step .step-number {
-            font-weight: 700;
-            color: #f97316;
-            font-size: 0.85rem;
-        }
-        .deposit-step .step-title {
-            font-weight: 600;
-            color: #f1f5f9;
-            margin-top: 4px;
-            font-size: 0.92rem;
-        }
-        .deposit-step .step-content {
-            margin-top: 10px;
-        }
-        .deposit-step .recipient-number {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            background: #0a1428;
-            padding: 10px 16px;
-            border-radius: 60px;
-            border: 1px solid #1e3358;
-            justify-content: space-between;
-        }
-        .deposit-step .recipient-number .number {
-            font-weight: 700;
-            font-size: 1rem;
-            font-family: monospace;
-            color: #f1f5f9;
-        }
-        .deposit-step .recipient-number .copy-btn {
-            background: #1e3358;
-            border: none;
-            color: #e2e8f0;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-weight: 600;
-            font-size: 0.72rem;
-            cursor: pointer;
-        }
-        .deposit-step .recipient-number .copy-btn:active {
-            background: #2d4066;
-        }
-        .deposit-step .invoice-input input {
-            width: 100%;
-            padding: 12px 16px;
-            border-radius: 60px;
-            border: 1px solid #1e3358;
-            background: #0a1428;
-            color: #f1f5f9;
-            font-size: 0.9rem;
-        }
-
-        .amount-display {
-            text-align: center;
-            font-size: 2.2rem;
-            font-weight: 800;
-            color: #f97316;
-            margin: 10px 0 16px;
-        }
-
-        .method-list-item {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            background: #142647;
-            border-radius: 16px;
-            padding: 14px 18px;
-            margin: 10px 0;
-            border: 1.5px solid #1e3358;
-            cursor: pointer;
-        }
-        .method-list-item:active {
-            background: #1a2f52;
-            border-color: #f97316;
-        }
-        .method-list-item .method-icon {
-            flex-shrink: 0;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #0a1428;
-            border-radius: 12px;
-            color: #f97316;
-            font-weight: 800;
-            font-size: 1.1rem;
-        }
-        .method-list-item .method-icon img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        .method-list-item .method-icon .fallback-icon {
-            font-size: 1.2rem;
-        }
-        .method-list-item .method-info {
-            flex: 1;
-            text-align: left;
-        }
-        .method-list-item .method-name {
-            font-weight: 700;
-            font-size: 0.95rem;
-            color: #f1f5f9;
-        }
-        .method-list-item .method-number {
-            font-size: 0.75rem;
-            color: #94a3b8;
-            font-family: monospace;
-            margin-top: 2px;
-        }
-        .method-list-item .method-select-badge {
-            background: #f97316;
-            color: #ffffff;
-            padding: 4px 14px;
-            border-radius: 40px;
-            font-size: 0.68rem;
-            font-weight: 700;
-        }
-
-        .deposit-step-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .deposit-step-header .step-back {
-            background: #1e3358;
-            color: #e2e8f0;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .deposit-step-header .step-back:active {
-            background: #2d4066;
-        }
-        .deposit-step-header .step-title {
-            font-weight: 700;
-            font-size: 1.05rem;
-            color: #f1f5f9;
-            flex: 1;
-        }
-        .deposit-step-header .step-sub {
-            background: #1e3358;
-            padding: 4px 12px;
-            border-radius: 30px;
-            font-size: 0.62rem;
-            color: #94a3b8;
-        }
-
-        .type-btn {
-            background: #1e3358;
-            color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 12px;
-            border-radius: 60px;
-            margin: 10px 0;
-            font-weight: 600;
-            border: 1px solid #2d4066;
-            width: 100%;
-            cursor: pointer;
-        }
-        .type-btn:active {
-            background: #2d4066;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #64748b;
-        }
-        .empty-state .empty-icon {
-            font-size: 2.4rem;
-            margin-bottom: 12px;
-        }
-
-        /* ===== CARD CONTAINER ===== */
-        .card-container {
-            margin: 16px 0 14px;
-            display: flex;
-            justify-content: center;
-            background: #0a1428;
-            border-radius: 20px;
-            padding: 14px 6px;
-            border: 1px solid #1e3358;
-            overflow-x: auto;
-            min-height: 180px;
-        }
-        .card-container table {
-            border-collapse: separate;
-            border-spacing: 10px;
-            margin: 0 auto;
-        }
-        .card-container thead tr th {
-            font-family: monospace;
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: #f97316;
-            padding: 6px 0;
-            text-align: center;
-            width: 54px;
-            letter-spacing: 2px;
-        }
-        .card-container td {
-            width: 54px;
-            height: 54px;
-            background: #142647;
-            border-radius: 16px;
-            text-align: center;
-            vertical-align: middle;
-            font-weight: 700;
-            font-size: 1rem;
-            font-family: monospace;
-            color: #f1f5f9;
-            border: 1px solid #1e3358;
-            cursor: pointer;
-        }
-        .card-container td.free {
-            background: #1a2f52;
-            color: #f97316;
-            font-size: 1.4rem;
-            border-color: #2d4066;
-        }
-        .card-container td.marked {
-            background: #f97316;
-            color: #ffffff;
-            border-color: #fbbf24;
-        }
-        @media (max-width:550px) {
-            .card-container td {
-                width: 46px;
-                height: 46px;
-                border-radius: 12px;
-                font-size: 0.9rem;
-            }
-            .card-container thead tr th {
-                width: 46px;
-                font-size: 1.1rem;
-            }
-            .card-container table {
-                border-spacing: 6px;
-            }
-        }
-
-        /* ===== GRID 1-100 ===== */
-        .grid-100 {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 6px;
-            margin: 16px 0;
-            background: #0a1428;
-            padding: 12px;
-            border-radius: 20px;
-            border: 1px solid #1e3358;
-        }
-        .grid-cell {
-            background: #142647;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.75rem;
-            color: #cbd5e1;
-            border: 1px solid #1e3358;
-            cursor: pointer;
-            min-height: 28px;
-        }
-        .grid-cell.taken {
-            background: #059669;
-            color: #ffffff;
-            border-color: #10b981;
-            cursor: not-allowed;
-        }
-        .grid-cell.own-card {
-            background: #dc2626;
-            color: #ffffff;
-            border-color: #ef4444;
-            cursor: not-allowed;
-        }
-
-        /* ===== BINGO BUTTON ===== */
-        #bingoBtn {
-            display: block;
-            width: 90%;
-            max-width: 340px;
-            margin: 20px auto 18px;
-            background: #f97316;
-            color: #ffffff;
-            font-size: 1.3rem;
-            font-weight: 800;
-            padding: 14px 12px;
-            border-radius: 80px;
-            border: none;
-            letter-spacing: 1.5px;
-            cursor: pointer;
-        }
-        #bingoBtn:active {
-            background: #ea580c;
-        }
-
-        /* ===== TAB BAR ===== */
-        .tab-bar {
-            display: flex;
-            background: #142647;
-            border-radius: 100px;
-            margin-top: 16px;
-            padding: 5px 6px;
-            gap: 4px;
-            border: 1px solid #1e3358;
-        }
-        .tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            padding: 9px 0;
-            border-radius: 80px;
-            font-weight: 600;
-            font-size: 0.72rem;
-            color: #94a3b8;
-            cursor: pointer;
-        }
-        .tab-btn.active {
-            background: #f97316;
-            color: #ffffff;
-        }
-        .tab-btn:active {
-            background: #ea580c;
-            color: #ffffff;
-        }
-
-        /* ===== STAKE OPTIONS ===== */
-        .stake-page-buttons {
-            display: flex;
-            gap: 14px;
-            justify-content: center;
-            margin: 18px 0 14px;
-            flex-wrap: wrap;
-        }
-        .stake-option {
-            background: #142647;
-            border: 1px solid #1e3358;
-            padding: 16px 22px;
-            border-radius: 60px;
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: #f97316;
-            cursor: pointer;
-            width: 130px;
-            text-align: center;
-        }
-        .stake-option:active {
-            background: #1a2f52;
-            border-color: #f97316;
-        }
-        .player-count-badge {
-            display: block;
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: #fbbf24;
-            margin-top: 8px;
-            background: #0a1428;
-            padding: 4px 10px;
-            border-radius: 40px;
-            border: 1px solid #1e3358;
-        }
-
-        /* ===== PLAYER TABLE ===== */
-        .stake-table-wrap {
-            background: #142647;
-            border-radius: 16px;
-            padding: 12px 14px 16px;
-            margin: 8px 0 18px;
-            border: 1px solid #1e3358;
-        }
-        .stake-table-wrap .table-title {
-            font-weight: 700;
-            font-size: 0.85rem;
-            color: #cbd5e1;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        .stake-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        .stake-table th {
-            background: #f97316;
-            color: #ffffff;
-            font-weight: 700;
-            padding: 10px 6px;
-            text-align: center;
-            font-size: 0.75rem;
-        }
-        .stake-table td {
-            padding: 10px 6px;
-            text-align: center;
-            background: #0f1e3a;
-            border-bottom: 1px solid #1e3358;
-            font-weight: 600;
-            color: #e2e8f0;
-        }
-        .stake-table tr:last-child td {
-            border-bottom: none;
-        }
-        .stake-table .stake-amount {
-            font-weight: 800;
-            color: #f97316;
-        }
-        .stake-table .stake-players {
-            font-weight: 700;
-            color: #f1f5f9;
-        }
-        .stake-table .stake-players .count-num {
-            display: inline-block;
-            background: #1e3358;
-            padding: 2px 12px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            min-width: 24px;
-            border: 1px solid #2d4066;
-        }
-        .stake-table .stake-bar-wrap {
-            width: 100%;
-            height: 8px;
-            background: #0a1428;
-            border-radius: 20px;
-            overflow: hidden;
-            max-width: 110px;
-            margin: 0 auto;
-        }
-        .stake-table .stake-bar {
-            height: 100%;
-            background: #f97316;
-            border-radius: 20px;
-            width: 0%;
-        }
-        @media (max-width:500px) {
-            .stake-table {
-                font-size: 0.72rem;
-            }
-            .stake-table th,
-            .stake-table td {
-                padding: 8px 4px;
-            }
-            .stake-table .stake-bar-wrap {
-                max-width: 60px;
-            }
-        }
-
-        /* ===== RULES TEXT ===== */
-        .rules-text {
-            background: #142647;
-            border-radius: 16px;
-            padding: 18px;
-            margin-top: 18px;
-            font-size: 0.85rem;
-            line-height: 1.6;
-            color: #cbd5e1;
-            border: 1px solid #1e3358;
-        }
-        .rules-text p {
-            margin-bottom: 8px;
-        }
-        .rules-text a {
-            color: #f97316;
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .players-badge {
-            background: #f97316;
-            padding: 5px 16px;
-            border-radius: 40px;
-            color: #ffffff;
-            font-weight: 600;
-            font-size: 0.7rem;
-        }
-
-        .timer-badge {
-            font-size: 1.2rem;
-            font-weight: 700;
-            font-family: monospace;
-            color: #f97316;
-            background: #142647;
-            padding: 4px 16px;
-            border-radius: 50px;
-            letter-spacing: 1px;
-            border: 1px solid #1e3358;
-        }
-
-        .balance-top {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 8px;
-            background: #142647;
-            padding: 8px 14px;
-            border-radius: 60px;
-            margin-bottom: 16px;
-            border: 1px solid #1e3358;
-        }
-        .balance-top > div {
-            font-weight: 600;
-            font-size: 0.82rem;
-            color: #e2e8f0;
-        }
-
-        .last-call-area {
-            background: #0a1428;
-            border-radius: 20px;
-            padding: 14px 18px;
-            margin: 12px 0 18px;
-            text-align: center;
-            border: 1px solid #1e3358;
-        }
-        .last-call-label {
-            font-size: 0.65rem;
-            letter-spacing: 3px;
-            font-weight: 600;
-            color: #fbbf24;
-            text-transform: uppercase;
-            background: #142647;
-            display: inline-block;
-            padding: 4px 16px;
-            border-radius: 40px;
-        }
-        .last-call-number {
-            font-size: 2.4rem;
-            font-weight: 800;
-            font-family: monospace;
-            color: #fbbf24;
-            letter-spacing: 5px;
-            margin: 10px 0 6px;
-            background: #142647;
-            border-radius: 40px;
-            padding: 8px;
-        }
-        .called-history {
-            background: #142647;
-            border-radius: 40px;
-            font-size: 0.72rem;
-            color: #fbbf24;
-            font-weight: 500;
-            overflow-x: auto;
-            white-space: nowrap;
-            font-family: monospace;
-            text-align: center;
-            margin-top: 10px;
-            border: 1px solid #1e3358;
-            padding: 10px 14px;
-        }
-
-        .prize-pool {
-            background: #142647;
-            border-radius: 40px;
-            text-align: center;
-            padding: 8px 16px;
-            margin: 6px 0 12px;
-            border: 1px solid #1e3358;
-        }
-        .prize-pool span {
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: #94a3b8;
-            letter-spacing: 0.5px;
-        }
-        .prize-pool div {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: #f97316;
-            line-height: 1.4;
-        }
-
-        /* ===== WINNER OVERLAY ===== */
-        .winner-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            opacity: 0;
-            visibility: hidden;
-        }
-        .winner-modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        .winner-card {
-            background: #0f1e3a;
-            border-radius: 24px;
-            padding: 28px 24px;
-            text-align: center;
-            width: 90%;
-            max-width: 340px;
-            border: 2px solid #f97316;
-        }
-        .winner-trophy {
-            font-size: 3.2rem;
-            margin-bottom: 8px;
-            color: #f97316;
-            font-weight: 800;
-        }
-        .winner-title {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: #f97316;
-            margin-bottom: 12px;
-        }
-        .winners-avatars {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 8px;
-            margin: 14px 0;
-            max-height: 130px;
-            overflow-y: auto;
-            padding: 6px;
-            background: #142647;
-            border-radius: 40px;
-        }
-        .winner-badge {
-            background: #f97316;
-            color: #ffffff;
-            padding: 6px 14px;
-            border-radius: 40px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .prize-amount {
-            background: #142647;
-            border-radius: 40px;
-            padding: 12px;
-            margin: 16px 0 14px;
-            border: 1px solid #1e3358;
-        }
-        .prize-amount .prize-label {
-            color: #94a3b8;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-        .prize-number {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #f97316;
-        }
-        .celebrate-btn {
-            background: #f97316;
-            border: none;
-            width: 80%;
-            padding: 14px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1rem;
-            color: #ffffff;
-            margin-top: 8px;
-            cursor: pointer;
-        }
-        .celebrate-btn:active {
-            background: #ea580c;
-        }
-
-        /* ===== OTHER ===== */
-        .telegram-links {
-            text-align: center;
-            margin-top: 18px;
-            font-size: 0.7rem;
-            color: #94a3b8;
-        }
-        .telegram-links a {
-            color: #f97316;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        .telegram-links a:hover {
-            text-decoration: underline;
-        }
-
-        .mute-btn {
-            background: #1e3358 !important;
-            color: #e2e8f0;
-            font-size: 0.9rem !important;
-            padding: 4px 12px !important;
-            min-width: 44px;
-            border: none;
-            border-radius: 40px;
-            cursor: pointer;
-        }
-        .mute-btn:active {
-            background: #2d4066;
-        }
-
-        .history-card {
-            background: #142647;
-            border-radius: 16px;
-            padding: 14px;
-            margin-bottom: 12px;
-            border-left: 4px solid #f97316;
-            border-top: 1px solid #1e3358;
-            border-right: 1px solid #1e3358;
-            border-bottom: 1px solid #1e3358;
-            font-size: 0.82rem;
-            color: #cbd5e1;
-        }
-        .history-card strong {
-            color: #f97316;
-        }
-        .profile-stat {
-            background: #142647;
-            border-radius: 16px;
-            padding: 16px;
-            text-align: center;
-            margin: 12px 0;
-            border: 1px solid #1e3358;
-            color: #cbd5e1;
-        }
-
-        @media (max-width:550px) {
-            .stake-option {
-                width: 110px;
-                font-size: 1.1rem;
-                padding: 14px 12px;
-            }
-            .player-count-badge {
-                font-size: 0.58rem;
-            }
-            #bingoBtn {
-                font-size: 1.15rem;
-            }
-            .grid-100 {
-                gap: 4px;
-            }
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            left: 0;
-            right: 0;
-            margin: 0 auto;
-            padding: 14px 28px;
-            border-radius: 60px;
-            color: #ffffff;
-            font-weight: 600;
-            font-size: 0.9rem;
-            opacity: 0;
-            z-index: 999;
-            max-width: 90%;
-            text-align: center;
-            pointer-events: none;
-        }
-        .toast.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .toast.success {
-            background: #059669;
-        }
-        .toast.error {
-            background: #dc2626;
-        }
-        .toast.info {
-            background: #2563eb;
-        }
-
-        .back-btn {
-            background: #1e3358;
-            border: 1px solid #2d4066;
-            padding: 8px 20px;
-            border-radius: 40px;
-            color: #e2e8f0;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 0.8rem;
-        }
-        .back-btn:active {
-            background: #2d4066;
-        }
-
-        .invite-info {
-            background: #142647;
-            border-radius: 16px;
-            padding: 12px 16px;
-            margin: 8px 0;
-            border: 1px solid #1e3358;
-            font-size: 0.78rem;
-            color: #cbd5e1;
-        }
-        .invite-info strong {
-            color: #f97316;
-        }
-        .invite-code-display {
-            background: #0a1428;
-            color: #fbbf24;
-            padding: 4px 12px;
-            border-radius: 40px;
-            font-family: monospace;
-            font-weight: 700;
-            font-size: 0.8rem;
-            display: inline-block;
-            border: 1px solid #1e3358;
-        }
-
-        /* ===== INVITE REQUIRED OVERLAY ===== */
-        #inviteRequiredOverlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #0a1428;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            padding: 24px;
-            text-align: center;
-            color: #e2e8f0;
-        }
-        #inviteRequiredOverlay.hidden {
-            display: none;
-        }
-        #inviteRequiredOverlay .overlay-icon {
-            font-size: 3.2rem;
-            margin-bottom: 16px;
-            color: #f97316;
-            font-weight: 800;
-        }
-        #inviteRequiredOverlay h2 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #f1f5f9;
-        }
-        #inviteRequiredOverlay p {
-            font-size: 0.95rem;
-            max-width: 400px;
-            margin-bottom: 24px;
-            color: #94a3b8;
-        }
-        #inviteRequiredOverlay p a {
-            color: #f97316;
-            font-weight: 700;
-            text-decoration: none;
-        }
-        #inviteRequiredOverlay .btn-bot {
-            background: #f97316;
-            color: #ffffff;
-            border: none;
-            padding: 14px 36px;
-            border-radius: 60px;
-            font-weight: 700;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        #inviteRequiredOverlay .btn-bot:active {
-            background: #ea580c;
-        }
-
-        /* Utility */
-        .hidden {
-            display: none;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { min-height: 100vh; background: #0a1428; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
+        .page { max-width: 600px; width: 100%; margin: 0 auto; background: #0f1e3a; border-radius: 20px; padding: 20px 16px 24px; border: 1px solid #1e3358; }
+        .page.hidden { display: none; }
+        .lang-toggle { position: fixed; top: 16px; left: 16px; background: #f97316; color: #ffffff; border: none; border-radius: 40px; padding: 8px 18px; font-weight: 600; cursor: pointer; z-index: 1000; font-size: 0.8rem; }
+        @media (max-width:550px) { .lang-toggle { top: 8px; left: 8px; padding: 6px 14px; font-size: 0.7rem; } }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; }
+        .modal.active { opacity: 1; visibility: visible; }
+        .modal-content { background: #0f1e3a; border-radius: 20px; padding: 24px 20px; max-width: 92%; width: 400px; border: 1px solid #1e3358; max-height: 92vh; overflow-y: auto; color: #e2e8f0; }
+        @media (max-width:480px) { .modal-content { padding: 18px 14px; width: 95%; } }
+        .bank-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; border-bottom: 2px solid #1e3358; padding-bottom: 12px; }
+        .bank-header .bank-icon { font-size: 1.8rem; flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #142647; border-radius: 12px; color: #f97316; font-weight: 700; }
+        .bank-header .bank-icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+        .bank-header .bank-icon .fallback-icon { font-size: 1.2rem; }
+        .bank-header .bank-title { font-weight: 700; font-size: 1.1rem; color: #f1f5f9; }
+        .bank-header .bank-sub { font-size: 0.75rem; color: #94a3b8; font-weight: 400; }
+        .input-group { margin: 14px 0; }
+        .input-group label { font-weight: 600; font-size: 0.82rem; color: #cbd5e1; display: block; margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 12px 16px; border-radius: 60px; border: 1.5px solid #1e3358; background: #142647; color: #f1f5f9; font-size: 0.95rem; font-family: inherit; }
+        .input-group input::placeholder { color: #64748b; }
+        .input-group input:focus { outline: none; border-color: #f97316; }
+        .transaction-summary { background: #142647; border-radius: 16px; padding: 12px 14px; font-size: 0.78rem; color: #fbbf24; margin: 12px 0; text-align: center; border: 1px solid #1e3358; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-buttons button { flex: 1; padding: 12px; border-radius: 60px; font-weight: 700; border: none; min-height: 48px; font-size: 0.95rem; cursor: pointer; }
+        .btn-primary { background: #f97316; color: #ffffff; }
+        .btn-primary:hover { background: #ea580c; }
+        .btn-secondary { background: #1e3358; color: #e2e8f0; border: 1px solid #2d4066; }
+        .btn-secondary:hover { background: #2d4066; }
+        .deposit-step { background: #142647; border-radius: 16px; padding: 16px; margin: 12px 0; border: 1px solid #1e3358; }
+        .deposit-step .step-number { font-weight: 700; color: #f97316; font-size: 0.85rem; }
+        .deposit-step .step-title { font-weight: 600; color: #f1f5f9; margin-top: 4px; font-size: 0.92rem; }
+        .deposit-step .step-content { margin-top: 10px; }
+        .deposit-step .recipient-number { display: flex; align-items: center; gap: 12px; background: #0a1428; padding: 10px 16px; border-radius: 60px; border: 1px solid #1e3358; justify-content: space-between; }
+        .deposit-step .recipient-number .number { font-weight: 700; font-size: 1rem; font-family: monospace; color: #f1f5f9; }
+        .deposit-step .recipient-number .copy-btn { background: #1e3358; border: none; color: #e2e8f0; padding: 6px 14px; border-radius: 40px; font-weight: 600; font-size: 0.72rem; cursor: pointer; }
+        .deposit-step .invoice-input input { width: 100%; padding: 12px 16px; border-radius: 60px; border: 1px solid #1e3358; background: #0a1428; color: #f1f5f9; font-size: 0.9rem; }
+        .amount-display { text-align: center; font-size: 2.2rem; font-weight: 800; color: #f97316; margin: 10px 0 16px; }
+        .method-list-item { display: flex; align-items: center; gap: 14px; background: #142647; border-radius: 16px; padding: 14px 18px; margin: 10px 0; border: 1.5px solid #1e3358; cursor: pointer; }
+        .method-list-item:active { background: #1a2f52; border-color: #f97316; }
+        .method-list-item .method-icon { flex-shrink: 0; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: #0a1428; border-radius: 12px; color: #f97316; font-weight: 800; font-size: 1.1rem; }
+        .method-list-item .method-icon img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .method-list-item .method-info { flex: 1; text-align: left; }
+        .method-list-item .method-name { font-weight: 700; font-size: 0.95rem; color: #f1f5f9; }
+        .method-list-item .method-number { font-size: 0.75rem; color: #94a3b8; font-family: monospace; margin-top: 2px; }
+        .method-list-item .method-select-badge { background: #f97316; color: #ffffff; padding: 4px 14px; border-radius: 40px; font-size: 0.68rem; font-weight: 700; }
+        .deposit-step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+        .deposit-step-header .step-back { background: #1e3358; color: #e2e8f0; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .deposit-step-header .step-title { font-weight: 700; font-size: 1.05rem; color: #f1f5f9; flex: 1; }
+        .deposit-step-header .step-sub { background: #1e3358; padding: 4px 12px; border-radius: 30px; font-size: 0.62rem; color: #94a3b8; }
+        .type-btn { background: #1e3358; color: #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border-radius: 60px; margin: 10px 0; font-weight: 600; border: 1px solid #2d4066; width: 100%; cursor: pointer; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #64748b; }
+        .empty-state .empty-icon { font-size: 2.4rem; margin-bottom: 12px; }
+        .card-container { margin: 16px 0 14px; display: flex; justify-content: center; background: #0a1428; border-radius: 20px; padding: 14px 6px; border: 1px solid #1e3358; overflow-x: auto; min-height: 180px; }
+        .card-container table { border-collapse: separate; border-spacing: 10px; margin: 0 auto; }
+        .card-container thead tr th { font-family: monospace; font-size: 1.4rem; font-weight: 800; color: #f97316; padding: 6px 0; text-align: center; width: 54px; letter-spacing: 2px; }
+        .card-container td { width: 54px; height: 54px; background: #142647; border-radius: 16px; text-align: center; vertical-align: middle; font-weight: 700; font-size: 1rem; font-family: monospace; color: #f1f5f9; border: 1px solid #1e3358; cursor: pointer; }
+        .card-container td.free { background: #1a2f52; color: #f97316; font-size: 1.4rem; border-color: #2d4066; }
+        .card-container td.marked { background: #f97316; color: #ffffff; border-color: #fbbf24; }
+        @media (max-width:550px) { .card-container td { width: 46px; height: 46px; border-radius: 12px; font-size: 0.9rem; } .card-container thead tr th { width: 46px; font-size: 1.1rem; } .card-container table { border-spacing: 6px; } }
+        .grid-100 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 6px; margin: 16px 0; background: #0a1428; padding: 12px; border-radius: 20px; border: 1px solid #1e3358; }
+        .grid-cell { background: #142647; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: #cbd5e1; border: 1px solid #1e3358; cursor: pointer; min-height: 28px; }
+        .grid-cell.taken { background: #059669; color: #ffffff; border-color: #10b981; cursor: not-allowed; }
+        .grid-cell.own-card { background: #dc2626; color: #ffffff; border-color: #ef4444; cursor: not-allowed; }
+        #bingoBtn { display: block; width: 90%; max-width: 340px; margin: 20px auto 18px; background: #f97316; color: #ffffff; font-size: 1.3rem; font-weight: 800; padding: 14px 12px; border-radius: 80px; border: none; letter-spacing: 1.5px; cursor: pointer; }
+        .tab-bar { display: flex; background: #142647; border-radius: 100px; margin-top: 16px; padding: 5px 6px; gap: 4px; border: 1px solid #1e3358; }
+        .tab-btn { flex: 1; background: transparent; border: none; padding: 9px 0; border-radius: 80px; font-weight: 600; font-size: 0.72rem; color: #94a3b8; cursor: pointer; }
+        .tab-btn.active { background: #f97316; color: #ffffff; }
+        .stake-page-buttons { display: flex; gap: 14px; justify-content: center; margin: 18px 0 14px; flex-wrap: wrap; }
+        .stake-option { background: #142647; border: 1px solid #1e3358; padding: 16px 22px; border-radius: 60px; font-size: 1.3rem; font-weight: 800; color: #f97316; cursor: pointer; width: 130px; text-align: center; }
+        .player-count-badge { display: block; font-size: 0.65rem; font-weight: 600; color: #fbbf24; margin-top: 8px; background: #0a1428; padding: 4px 10px; border-radius: 40px; border: 1px solid #1e3358; }
+        .stake-table-wrap { background: #142647; border-radius: 16px; padding: 12px 14px 16px; margin: 8px 0 18px; border: 1px solid #1e3358; }
+        .stake-table-wrap .table-title { font-weight: 700; font-size: 0.85rem; color: #cbd5e1; text-align: center; margin-bottom: 10px; }
+        .stake-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; border-radius: 12px; overflow: hidden; }
+        .stake-table th { background: #f97316; color: #ffffff; font-weight: 700; padding: 10px 6px; text-align: center; font-size: 0.75rem; }
+        .stake-table td { padding: 10px 6px; text-align: center; background: #0f1e3a; border-bottom: 1px solid #1e3358; font-weight: 600; color: #e2e8f0; }
+        .stake-table .stake-amount { font-weight: 800; color: #f97316; }
+        .stake-table .stake-players { font-weight: 700; color: #f1f5f9; }
+        .stake-table .stake-players .count-num { display: inline-block; background: #1e3358; padding: 2px 12px; border-radius: 40px; font-size: 0.8rem; min-width: 24px; border: 1px solid #2d4066; }
+        .stake-table .stake-bar-wrap { width: 100%; height: 8px; background: #0a1428; border-radius: 20px; overflow: hidden; max-width: 110px; margin: 0 auto; }
+        .stake-table .stake-bar { height: 100%; background: #f97316; border-radius: 20px; width: 0%; }
+        .rules-text { background: #142647; border-radius: 16px; padding: 18px; margin-top: 18px; font-size: 0.85rem; line-height: 1.6; color: #cbd5e1; border: 1px solid #1e3358; }
+        .rules-text a { color: #f97316; text-decoration: none; font-weight: 600; }
+        .players-badge { background: #f97316; padding: 5px 16px; border-radius: 40px; color: #ffffff; font-weight: 600; font-size: 0.7rem; }
+        .timer-badge { font-size: 1.2rem; font-weight: 700; font-family: monospace; color: #f97316; background: #142647; padding: 4px 16px; border-radius: 50px; letter-spacing: 1px; border: 1px solid #1e3358; }
+        .balance-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; background: #142647; padding: 8px 14px; border-radius: 60px; margin-bottom: 16px; border: 1px solid #1e3358; }
+        .last-call-area { background: #0a1428; border-radius: 20px; padding: 14px 18px; margin: 12px 0 18px; text-align: center; border: 1px solid #1e3358; }
+        .last-call-label { font-size: 0.65rem; letter-spacing: 3px; font-weight: 600; color: #fbbf24; text-transform: uppercase; background: #142647; display: inline-block; padding: 4px 16px; border-radius: 40px; }
+        .last-call-number { font-size: 2.4rem; font-weight: 800; font-family: monospace; color: #fbbf24; letter-spacing: 5px; margin: 10px 0 6px; background: #142647; border-radius: 40px; padding: 8px; }
+        .called-history { background: #142647; border-radius: 40px; font-size: 0.72rem; color: #fbbf24; font-weight: 500; overflow-x: auto; white-space: nowrap; font-family: monospace; text-align: center; margin-top: 10px; border: 1px solid #1e3358; padding: 10px 14px; }
+        .prize-pool { background: #142647; border-radius: 40px; text-align: center; padding: 8px 16px; margin: 6px 0 12px; border: 1px solid #1e3358; }
+        .prize-pool span { font-size: 0.65rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.5px; }
+        .prize-pool div { font-size: 1.2rem; font-weight: 800; color: #f97316; line-height: 1.4; }
+        .winner-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; }
+        .winner-modal.active { opacity: 1; visibility: visible; }
+        .winner-card { background: #0f1e3a; border-radius: 24px; padding: 28px 24px; text-align: center; width: 90%; max-width: 340px; border: 2px solid #f97316; }
+        .winner-trophy { font-size: 2rem; margin-bottom: 8px; color: #f97316; font-weight: 800; letter-spacing: 3px; }
+        .winner-title { font-size: 1.8rem; font-weight: 800; color: #f97316; margin-bottom: 12px; }
+        .winners-avatars { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 14px 0; max-height: 130px; overflow-y: auto; padding: 6px; background: #142647; border-radius: 40px; }
+        .winner-badge { background: #f97316; color: #ffffff; padding: 6px 14px; border-radius: 40px; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .prize-amount { background: #142647; border-radius: 40px; padding: 12px; margin: 16px 0 14px; border: 1px solid #1e3358; }
+        .prize-amount .prize-label { color: #94a3b8; font-size: 0.7rem; font-weight: 600; }
+        .prize-number { font-size: 2rem; font-weight: 800; color: #f97316; }
+        .celebrate-btn { background: #f97316; border: none; width: 80%; padding: 14px; border-radius: 60px; font-weight: 700; font-size: 1rem; color: #ffffff; margin-top: 8px; cursor: pointer; }
+        .telegram-links { text-align: center; margin-top: 18px; font-size: 0.7rem; color: #94a3b8; }
+        .telegram-links a { color: #f97316; text-decoration: none; font-weight: 600; }
+        .mute-btn { background: #1e3358 !important; color: #e2e8f0; font-size: 0.9rem !important; padding: 4px 12px !important; min-width: 44px; border: none; border-radius: 40px; cursor: pointer; }
+        .history-card { background: #142647; border-radius: 16px; padding: 14px; margin-bottom: 12px; border-left: 4px solid #f97316; border-top: 1px solid #1e3358; border-right: 1px solid #1e3358; border-bottom: 1px solid #1e3358; font-size: 0.82rem; color: #cbd5e1; }
+        .history-card strong { color: #f97316; }
+        .profile-stat { background: #142647; border-radius: 16px; padding: 16px; text-align: center; margin: 12px 0; border: 1px solid #1e3358; color: #cbd5e1; }
+        @media (max-width:550px) { .stake-option { width: 110px; font-size: 1.1rem; padding: 14px 12px; } .player-count-badge { font-size: 0.58rem; } #bingoBtn { font-size: 1.15rem; } .grid-100 { gap: 4px; } }
+        .toast { position: fixed; bottom: 24px; left: 0; right: 0; margin: 0 auto; padding: 14px 28px; border-radius: 60px; color: #ffffff; font-weight: 600; font-size: 0.9rem; opacity: 0; z-index: 999; max-width: 90%; text-align: center; pointer-events: none; }
+        .toast.show { opacity: 1; pointer-events: auto; }
+        .toast.success { background: #059669; }
+        .toast.error { background: #dc2626; }
+        .toast.info { background: #2563eb; }
+        .back-btn { background: #1e3358; border: 1px solid #2d4066; padding: 8px 20px; border-radius: 40px; color: #e2e8f0; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+        .invite-info { background: #142647; border-radius: 16px; padding: 12px 16px; margin: 8px 0; border: 1px solid #1e3358; font-size: 0.78rem; color: #cbd5e1; }
+        .invite-info strong { color: #f97316; }
+        .invite-code-display { background: #0a1428; color: #fbbf24; padding: 4px 12px; border-radius: 40px; font-family: monospace; font-weight: 700; font-size: 0.8rem; display: inline-block; border: 1px solid #1e3358; }
+        #inviteRequiredOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0a1428; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; padding: 24px; text-align: center; color: #e2e8f0; }
+        #inviteRequiredOverlay.hidden { display: none; }
+        #inviteRequiredOverlay .overlay-icon { font-size: 2rem; margin-bottom: 16px; color: #f97316; font-weight: 800; letter-spacing: 3px; }
+        #inviteRequiredOverlay h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; color: #f1f5f9; }
+        #inviteRequiredOverlay p { font-size: 0.95rem; max-width: 400px; margin-bottom: 24px; color: #94a3b8; }
+        #inviteRequiredOverlay p a { color: #f97316; font-weight: 700; text-decoration: none; }
+        #inviteRequiredOverlay .btn-bot { background: #f97316; color: #ffffff; border: none; padding: 14px 36px; border-radius: 60px; font-weight: 700; font-size: 1rem; cursor: pointer; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <!-- ===== INVITE REQUIRED OVERLAY ===== -->
     <div id="inviteRequiredOverlay" class="hidden">
         <div class="overlay-icon">KEY</div>
         <h2>Invite Required</h2>
@@ -1118,7 +146,6 @@
 
     <button id="langToggleBtn" class="lang-toggle">English</button>
 
-    <!-- ===== DEPOSIT METHOD LIST ===== -->
     <div id="depositMethodListModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <div class="deposit-step-header">
@@ -1133,7 +160,6 @@
         </div>
     </div>
 
-    <!-- ===== COMBINED DEPOSIT & PAYMENT MODAL ===== -->
     <div id="depositPaymentModal" class="modal">
         <div class="modal-content" style="max-width:420px;">
             <div class="bank-header">
@@ -1144,7 +170,6 @@
                 </div>
             </div>
             <div class="amount-display" id="paymentAmountDisplay">0.00 ETB</div>
-
             <div class="deposit-step">
                 <div class="step-number">Step 1</div>
                 <div class="step-title" id="paymentStep1Label">Send <span id="paymentStepAmountLabel">0.00</span> ETB to this number</div>
@@ -1159,7 +184,6 @@
                     <div style="font-size:0.68rem; color:#94a3b8; margin-top:8px;">Open your payment app, Send Money, Paste the number, Make the transfer</div>
                 </div>
             </div>
-
             <div class="deposit-step">
                 <div class="step-number">Step 2</div>
                 <div class="step-title" data-key="enterDetails">Enter your details & amount</div>
@@ -1174,7 +198,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="deposit-step">
                 <div class="step-number">Step 3</div>
                 <div class="step-title" data-key="uploadProof">Upload Screenshot Proof</div>
@@ -1185,13 +208,11 @@
                     <input type="file" id="paymentScreenshot" accept="image/*" style="width:100%; padding:10px; border-radius:16px; border:1px dashed #2d4066; background:#0a1428; color:#cbd5e1; font-family:inherit; font-size:0.78rem;">
                 </div>
             </div>
-
             <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment</button>
             <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:10px;" data-key="back">Back</button>
         </div>
     </div>
 
-    <!-- ===== HOW TO PAY MODAL ===== -->
     <div id="howToPayModal" class="modal">
         <div class="modal-content" style="max-width:420px;">
             <div class="bank-header">
@@ -1206,7 +227,6 @@
         </div>
     </div>
 
-    <!-- ===== WITHDRAW DETAILS ===== -->
     <div id="withdrawDetailsModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
@@ -1227,7 +247,6 @@
         </div>
     </div>
 
-    <!-- ===== RULES MODAL ===== -->
     <div id="rulesModal" class="modal">
         <div class="modal-content">
             <div class="bank-header">
@@ -1239,26 +258,25 @@
             </div>
             <div class="rules-text" style="text-align:left; max-height:400px; overflow-y:auto; padding-right:8px;">
                 <h3 style="font-size:0.95rem; margin-top:0; color:#f1f5f9;" data-key="rulesHowToPlayTitle">እንዴት እንደሚጫወቱ</h3>
-                <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
+                <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ ይምረጡ.<br>2. ከ1–100 አንድ ካርድ ይምረጡ.<br>3. ቁጥሮች ይጠራሉ.<br>4. ሲጠራ mark ያድርጉ.<br>5. ቢንጎ ጠይቁ.</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesWinningPatternsTitle">የማሸነፊያ ሁኔታዎች</h3>
-                <p data-key="rulesWinningPatterns">- 1 አግድም መስመር (Row)<br>- 1 ቁመት መስመር (Column)<br>- 1 ሰያፍ መስመር (Diagonal)<br>- 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
+                <p data-key="rulesWinningPatterns">1 Row<br>1 Column<br>1 Diagonal<br>4 Corners</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesPrizeTitle">የሽልማት ህግ</h3>
-                <p data-key="rulesPrize">- 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።<br>- 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።<br>- ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።</p>
+                <p data-key="rulesPrize">2+ players: 80%<br>1 player: 100%</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesDepositTitle">ገንዘብ ማስገባት</h3>
-                <p data-key="rulesDeposit">1. <strong>Deposit</strong> ይጫኑ።<br>2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።<br>3. ገንዘብ ይላኩ።<br>4. <strong>Deposit ይጠይቁ</strong>።<br>5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን: 10 ብር</strong></p>
+                <p data-key="rulesDeposit">Min 10 Birr</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesWithdrawTitle">ገንዘብ ማውጣት</h3>
-                <p data-key="rulesWithdraw">1. <strong>Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን: 20 ብር</strong></p>
+                <p data-key="rulesWithdraw">Min 20 Birr</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesGameRulesTitle">የጨዋታ ህጎች</h3>
-                <p data-key="rulesGameRules">- ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>- ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>- ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>ቢንጎ!</strong> መጫን አለብዎት።<br>- ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>- ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>- ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
+                <p data-key="rulesGameRules">Fair play. No cheating.</p>
                 <h3 style="font-size:0.95rem; margin-top:16px; color:#f1f5f9;" data-key="rulesHelpTitle">እርዳታ</h3>
-                <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a> ይቀላቀሉ።</p>
-                <p style="margin-top:12px; font-weight:700; text-align:center; color:#f97316;" data-key="rulesGoodLuck">መልካም ዕድል!<br><span style="font-weight:400; color:#94a3b8;">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
+                <p data-key="rulesHelp">Join <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> or <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a>.</p>
+                <p style="margin-top:12px; font-weight:700; text-align:center; color:#f97316;" data-key="rulesGoodLuck">መልካም ዕድል!</p>
             </div>
             <button id="closeRulesBtn" class="btn-primary" data-key="gotIt">Got it</button>
         </div>
     </div>
 
-    <!-- ===== WINNER OVERLAY ===== -->
     <div id="winnerOverlay" class="winner-modal">
         <div class="winner-card">
             <div class="winner-trophy">WINNER</div>
@@ -1273,13 +291,11 @@
         </div>
     </div>
 
-    <!-- ===== STAKE PAGE ===== -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h2 style="font-weight:800; color:#f97316; font-size:1.3rem;">ዶት ቢንጎ</h2>
             <div class="players-badge">DOT BINGO</div>
         </div>
-
         <div id="inviteInfoContainer" class="invite-info hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
                 <div>
@@ -1288,37 +304,19 @@
                 </div>
             </div>
         </div>
-
         <div class="stake-table-wrap">
             <div class="table-title">ተጫዋቾች በውርርድ / Players by Stake</div>
             <table class="stake-table" id="stakeTable">
                 <thead>
-                    <tr>
-                        <th>Stake (ETB)</th>
-                        <th>Players</th>
-                        <th>Popularity</th>
-                    </tr>
+                    <tr><th>Stake (ETB)</th><th>Players</th><th>Popularity</th></tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td class="stake-amount">10</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td>
-                    </tr>
-                    <tr>
-                        <td class="stake-amount">20</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td>
-                    </tr>
-                    <tr>
-                        <td class="stake-amount">30</td>
-                        <td class="stake-players"><span class="count-num" id="stakeTable30Count">0</span></td>
-                        <td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30" style="width:0%;"></div></div></td>
-                    </tr>
+                    <tr><td class="stake-amount">10</td><td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td><td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td></tr>
+                    <tr><td class="stake-amount">20</td><td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td><td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td></tr>
+                    <tr><td class="stake-amount">30</td><td class="stake-players"><span class="count-num" id="stakeTable30Count">0</span></td><td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar30" style="width:0%;"></div></div></td></tr>
                 </tbody>
             </table>
         </div>
-
         <h3 style="text-align:center; margin:10px 0 6px; color:#f1f5f9; font-size:0.95rem;" data-key="chooseStake">Choose Your Stake</h3>
         <div class="stake-page-buttons">
             <div style="text-align:center;"><button id="stake10Btn" class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="stake10Count">0 players</div></div>
@@ -1333,7 +331,6 @@
         </div>
     </div>
 
-    <!-- ===== LOBBY PAGE ===== -->
     <div id="lobbyPage" class="page hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div></div>
@@ -1366,7 +363,6 @@
         <div class="telegram-links">Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
-    <!-- ===== HISTORY ===== -->
     <div id="historyPage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <h2 style="color:#f1f5f9; font-size:1.1rem;" data-key="gameHistory">Game History</h2>
@@ -1376,7 +372,6 @@
         <div id="recentGamesList" style="margin-top:16px;"></div>
     </div>
 
-    <!-- ===== WALLET ===== -->
     <div id="walletPage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <h2 style="color:#f1f5f9; font-size:1.1rem;" data-key="myWallet">My Wallet</h2>
@@ -1390,7 +385,6 @@
         </div>
     </div>
 
-    <!-- ===== PROFILE ===== -->
     <div id="profilePage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <h2 style="color:#f1f5f9; font-size:1.1rem;" data-key="myProfile">My Profile</h2>
@@ -1401,7 +395,6 @@
         <div class="profile-stat"><div data-key="inviteCodeLabel" style="color:#94a3b8; font-size:0.8rem;">Invite Code</div><div style="margin-top:6px;"><strong id="profileInviteCode" style="color:#f1f5f9;">—</strong></div></div>
     </div>
 
-    <!-- ===== GAME PAGE ===== -->
     <div id="gamePage" class="page hidden">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div></div>
@@ -1417,11 +410,9 @@
             <button id="rulesBtnGame" style="background:#1e3358; color:#e2e8f0; border:1px solid #2d4066; border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.72rem; font-weight:600;" data-key="rulesBtn">Rules</button>
         </div>
         <div class="prize-pool"><span data-key="prizePoolLabel">PRIZE POOL</span><div id="winningBalance">0 ETB</div></div>
-
         <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
             <button id="backToLobbyBtn" class="btn-secondary" data-key="backToLobby" style="padding:10px 24px; border-radius:40px; cursor:pointer;">Back to Lobby</button>
         </div>
-
         <div class="last-call-area">
             <div class="last-call-label" data-key="lastCall">LAST CALL</div>
             <div class="last-call-number" id="currentCall">0 - 75</div>
@@ -1438,10 +429,6 @@
     </div>
 
     <script>
-        // ============================================================
-        //  DOT BINGO - Frontend (no icons, blue-black theme)
-        // ============================================================
-
         const $ = id => document.getElementById(id);
         const lobbyBalance = $('lobbyBalance');
         const lobbyTimer = $('lobbyTimer');
@@ -1608,7 +595,7 @@
                 el.innerText = (lang === 'am' ? data.am[k] : data.en[k]) || el.innerText;
             });
             langBtn.textContent = lang === 'am' ? 'English' : 'አማርኛ';
-            if ($('depositMethodListTitle')) { $('depositMethodListTitle').innerHTML = lang === 'am' ? 'Select Deposit Method' : 'Select Deposit Method'; }
+            if ($('depositMethodListTitle')) { $('depositMethodListTitle').innerHTML = 'Select Deposit Method'; }
             updateInviteInfoUI();
         }
 
@@ -1867,19 +854,8 @@
                     <li>Upload that screenshot in the app and tap <strong>Confirm Payment</strong>.</li>
                 </ol>
                 <p style="margin-top:12px; background:#142647; padding:10px; border-radius:12px; border:1px solid #1e3358;">
-                    <strong>Important:</strong> Use the <strong>exact</strong> phone number and amount to ensure your deposit is credited automatically.
+                    <strong>Important:</strong> Use the <strong>exact</strong> phone number and amount.
                 </p>
-                ${method === 'telebirr' ? `
-                    <h4 style="margin-top:16px; color:#f1f5f9;">Telebirr Specific</h4>
-                    <ul style="padding-left:20px;"><li>Open Telebirr app, Send Money, To Individual.</li><li>Paste the admin's number (starting with 09).</li><li>After payment, you'll receive an SMS with a Transaction ID.</li></ul>
-                ` : method === 'cbebirr' ? `
-                    <h4 style="margin-top:16px; color:#f1f5f9;">CBE Birr Specific</h4>
-                    <ul style="padding-left:20px;"><li>Open CBE Birr app, Send Money.</li><li>Enter the admin's phone number.</li><li>Your confirmation screen will show a reference number.</li></ul>
-                ` : method === 'mpesa' ? `
-                    <h4 style="margin-top:16px; color:#f1f5f9;">M-Pesa Specific</h4>
-                    <ul style="padding-left:20px;"><li>Open M-Pesa, Send Money.</li><li>Enter the admin's phone number (starting with 07).</li><li>You will receive an SMS with a transaction code.</li></ul>
-                ` : ''}
-                <p style="margin-top:16px; font-size:0.8rem; color:#94a3b8;">Make sure the screenshot clearly shows the amount, recipient, and status.</p>
             `;
         }
 
@@ -2125,7 +1101,8 @@
             markedNumbers = [];
             if (socket) socket.emit('getBalance');
             startTimer(sec);
-            if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+            // Only render if there's an active card (userCard would be empty after reset)
+            if (userCard && userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
             updateStatsUI();
             const container = $('backToLobbyContainer');
             if (container) container.classList.add('hidden');
@@ -2269,6 +1246,9 @@
                 if (state.stake === currentStake) {
                     selectedCardNumber = null;
                     selectedNumber.textContent = '-';
+                    // Reset user card on new lobby
+                    userCard = [];
+                    markedNumbers = [];
                     showLobby(state.startsIn);
                     if (state.takenNumbers) updateGrid(state.takenNumbers);
                     updateCount(state.playersCount);
@@ -2326,16 +1306,36 @@
                 speakAmharic(num);
             });
             socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true); else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
+
+            // ========== FIXED: gameEnded now CLEARS the card completely ==========
             socket.on('gameEnded', data => {
                 if (data.stake !== currentStake) return;
                 if (data.winningNumber) currentCall.innerText = formatCall(data.winningNumber);
                 showWinner(data);
                 currentGameId = null;
+
+                // ---- RESET PLAYER'S CARD AND CARD NUMBER ----
                 markedNumbers = [];
-                if (userCard.length) renderCard(userCard, 'lobbyCardPreview', false);
+                userCard = [];                     // Clear the bingo card
+                selectedCardNumber = null;         // Reset card number selection
+                selectedNumber.textContent = '-';  // Reset display
+                serverTaken.clear();               // Reset taken numbers
+                displayTaken.clear();              // Reset taken numbers
+
+                // Clear both card containers so the old card disappears
+                const gameCont = $('gameCard');
+                if (gameCont) gameCont.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Select a card number to see your Bingo card</div>';
+                const previewCont = $('lobbyCardPreview');
+                if (previewCont) previewCont.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Select a card number to see your Bingo card</div>';
+
+                // Rebuild the grid with all numbers free
+                buildGrid();
+
                 const container = $('backToLobbyContainer');
                 if (container) container.classList.add('hidden');
             });
+            // ==================================================================
+
             socket.on('invalidBingo', () => alert('Not a valid bingo yet!'));
             socket.on('depositStatus', d => alert(d.status === 'approved' ? `Deposit +${d.amount} ETB approved!` : 'Deposit rejected.'));
             socket.on('withdrawStatus', d => alert(d.status === 'approved' ? `Withdrawal -${d.amount} ETB processed.` : 'Withdrawal rejected.'));
