@@ -99,15 +99,41 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- Audit Logger ----------
-async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
+// ---------- Audit Logger (Buffered - Fix #4) ----------
+let auditBuffer = [];
+const MAX_AUDIT_BUFFER = 500;
+
+async function flushAuditBuffer() {
+  if (auditBuffer.length === 0) return;
+  const batch = [...auditBuffer];
+  auditBuffer = [];
   try {
-    const { error } = await supabase
-      .from('audit_logs')
-      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: ipAddress, details });
-    if (error) throw error;
+    const { error } = await supabase.from('audit_logs').insert(batch);
+    if (error) console.error('❌ Failed to batch insert audit logs:', error.message);
   } catch (err) {
-    console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message);
+    console.error('❌ Audit flush error:', err.message);
+  }
+}
+
+// Flush every 5 seconds
+setInterval(flushAuditBuffer, 5000);
+
+// Handle graceful shutdown to flush remaining logs
+process.on('SIGTERM', async () => { await flushAuditBuffer(); process.exit(0); });
+process.on('SIGINT', async () => { await flushAuditBuffer(); process.exit(0); });
+
+async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
+  auditBuffer.push({
+    event_type: eventType,
+    room_id: roomId,
+    user_id: userId,
+    ip_address: ipAddress,
+    details,
+    timestamp: new Date().toISOString()
+  });
+
+  if (auditBuffer.length >= MAX_AUDIT_BUFFER) {
+    await flushAuditBuffer();
   }
 }
 
@@ -500,7 +526,7 @@ function extractTransactionNumber(text) {
   return null;
 }
 
-// ---------- Static endpoints ----------
+// ---------- Static endpoints (Fix #5: maxAge added) ----------
 app.get('/api/deposit-accounts', async (req, res) => {
   try {
     const userId = req.session?.userId;
@@ -553,28 +579,29 @@ app.get('/api/deposit-accounts', async (req, res) => {
 });
 
 app.get('/api/admin-phone', (req, res) => res.json({ phone: process.env.ADMIN_PHONE || '0924839730' }));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
-app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html')));
-app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html')));
-app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html')));
-app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html')));
-app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html')));
-app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
-app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
-app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
-app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html')));
-app.get('/invite-tracking-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-tracking-dashboard.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'admin.html'), { maxAge: 3600000 }));
+app.get('/audit', (req, res) => res.sendFile(path.join(__dirname, 'audit.html'), { maxAge: 3600000 }));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html'), { maxAge: 3600000 }));
+app.get('/live', (req, res) => res.sendFile(path.join(__dirname, 'live.html'), { maxAge: 3600000 }));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'dashboard.html'), { maxAge: 3600000 }));
+app.get('/users', (req, res) => res.sendFile(path.join(__dirname, 'users.html'), { maxAge: 3600000 }));
+app.get('/invite-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-dashboard.html'), { maxAge: 3600000 }));
+app.get('/bots', (req, res) => res.sendFile(path.join(__dirname, 'bots.html'), { maxAge: 3600000 }));
+app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html'), { maxAge: 3600000 }));
+app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html'), { maxAge: 3600000 }));
+app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html'), { maxAge: 3600000 }));
+app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html'), { maxAge: 3600000 }));
+app.get('/invite-tracking-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-tracking-dashboard.html'), { maxAge: 3600000 }));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
   if (secret !== process.env.ADMIN_SECRET) return res.status(403).send('Forbidden');
-  res.sendFile(path.join(__dirname, 'admin-live-players.html'));
+  res.sendFile(path.join(__dirname, 'admin-live-players.html'), { maxAge: 3600000 });
 });
 
-// ---------- User cache ----------
+// ---------- User cache (Fix #1: activeUserSockets Map) ----------
 const users = {};
+const activeUserSockets = new Map();
 
 // ============================================================
 //  loadUser – with FORCE INVITE ONLY
@@ -1201,8 +1228,7 @@ app.post('/admin/add-balance', async (req, res) => {
       processed_at: new Date().toISOString()
     });
     Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
-    const sockets = await io.fetchSockets();
-    const playerSocket = sockets.find(s => s.userId === strId);
+    const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
     res.json({ success: true, newBalance: user.balance });
   } catch (err) {
@@ -1546,11 +1572,11 @@ publicNamespace.on('connection', (socket) => {
   }
 });
 
+// Fix #3: Removed global io.emit to reduce idle traffic
 function broadcastPlayerCount(stake) {
   const game = getGame(stake);
   const count = game.players.length;
   io.to(`stake_${stake}`).emit('playersCount', { stake, count });
-  io.emit('playersCount', { stake, count });
   publicNamespace.emit('playersCount', { stake, count });
 }
 
@@ -1680,9 +1706,9 @@ async function startGame(stake) {
   startCalling(stake);
 }
 
+// Fix #1: Use the Map instead of io.fetchSockets()
 async function getSocketByUserId(userId) {
-  const sockets = await io.fetchSockets();
-  return sockets.find(s => s.userId === userId);
+  return activeUserSockets.get(userId) || null;
 }
 
 function startCalling(stake) {
@@ -2045,8 +2071,8 @@ app.get('/admin/bot-history', (req, res) => {
   res.json({ success: true, history, from: from || null, to: to || null });
 });
 
-app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
-app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
+app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html'), { maxAge: 3600000 }));
+app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html'), { maxAge: 3600000 }));
 
 // ============================================================
 //  🔥 UPDATED: Player deposit endpoints – Supports Base64 Image
@@ -4404,7 +4430,7 @@ app.post('/admin/import-players', async (req, res) => {
 });
 
 // ---------- Statistics ----------
-app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'stats.html')));
+app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'stats.html'), { maxAge: 3600000 }));
 
 app.get('/admin/stats-summary', async (req, res) => {
   const { secret, from, to } = req.query;
@@ -4665,6 +4691,10 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   let currentStake = null;
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
+  
+  // Fix #1: Register socket in the Map for fast lookups
+  activeUserSockets.set(socket.userId, socket);
+
   for (const stake of [10, 20, 30]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
@@ -4711,7 +4741,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // checkAndAddThirdBot is removed – no longer needed
   });
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
@@ -4734,7 +4763,6 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    // checkAndAddThirdBot removed
   });
   socket.on('markNumber', (number) => {
     if (!currentStake) return;
@@ -4759,10 +4787,14 @@ io.on('connection', async (socket) => {
     const u = await loadUser(socket.userId, socket.username, null, null, true);
     socket.emit('balanceUpdate', u.balance);
   });
+
+  // Fix #1: Clean up the Map on disconnect
+  socket.on('disconnect', () => {
+    activeUserSockets.delete(socket.userId);
+  });
 });
 
 // ---------- Admin namespace ----------
-// 🔥 UPDATED: session-based auth + per-admin rooms
 const adminNamespace = io.of('/admin');
 
 // Re-apply session parsing for this namespace
@@ -4837,9 +4869,7 @@ adminNamespace.on('connection', (socket) => {
   });
 });
 
-setInterval(() => {
-  notifyAdminClients();
-}, 2000);
+// Fix #2: Removed the 2-second admin broadcast interval entirely.
 
 // ---------- Error handler ----------
 app.use((err, req, res, next) => {
