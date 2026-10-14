@@ -708,27 +708,87 @@ const btn=$('confirmPaymentBtn');if(btn){btn.disabled=false;btn.innerText=t('con
 updatePaymentAmountDisplay();
 }
 function closeMethodList(){$('methodListModal')?.classList.remove('active');resetDepositState()}
+
+/* ============================================================
+   ✅ FIXED: loadAdmins now caches for 30 seconds
+   ============================================================ */
+let _adminsCache={data:null,at:0};
 async function loadAdmins(){
-try{const r=await fetch('/api/deposit-accounts');const d=await r.json();state.depositAdmins=d.success?(d.admins||[]):[]}catch{state.depositAdmins=[]}
+const now=Date.now();
+if(_adminsCache.data&&now-_adminsCache.at<30000){state.depositAdmins=_adminsCache.data;return state.depositAdmins}
+try{
+const r=await fetch('/api/deposit-accounts');
+const d=await r.json();
+_adminsCache={data:d.success?(d.admins||[]):[],at:now};
+}catch{_adminsCache={data:[],at:now}}
+state.depositAdmins=_adminsCache.data;
 return state.depositAdmins;
 }
+
+/* ============================================================
+   ✅ FIXED: openDeposit shows the modal FIRST (instant),
+   then populates methods when the fetch resolves.
+   ============================================================ */
 async function openDeposit(){
-resetDepositState();state.methodMode='deposit';
+resetDepositState();
+state.methodMode='deposit';
+
+// 1) Show the modal immediately
+modalZ++;
+$('methodListModal').style.zIndex=String(modalZ);
+$('methodListModal').classList.add('active');
+unlockSpeech();
+
+// 2) Show loading state
+$('methodListContainer').innerHTML='<div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>';
+$('methodListTitle').innerHTML=t('selectMethod');
+$('methodListStepLabel').textContent='Step 1/2';
+
+// 3) Fetch and populate
 const admins=await loadAdmins();
 const methods=[];
-admins.forEach(a=>{if(a.telebirr)methods.push({type:'telebirr',number:a.telebirr,adminId:a.id});if(a.cbebirr)methods.push({type:'cbebirr',number:a.cbebirr,adminId:a.id});if(a.mpesa)methods.push({type:'mpesa',number:a.mpesa,adminId:a.id})});
+admins.forEach(a=>{
+if(a.telebirr)methods.push({type:'telebirr',number:a.telebirr,adminId:a.id});
+if(a.cbebirr)methods.push({type:'cbebirr',number:a.cbebirr,adminId:a.id});
+if(a.mpesa)methods.push({type:'mpesa',number:a.mpesa,adminId:a.id});
+});
 renderMethodList(methods,'deposit');
-modalZ++;$('methodListModal').style.zIndex=String(modalZ);$('methodListModal').classList.add('active');unlockSpeech();
 }
+
+/* ============================================================
+   ✅ FIXED: openWithdraw shows the modal FIRST (instant),
+   then populates methods when the fetch resolves.
+   ============================================================ */
 async function openWithdraw(){
-resetDepositState();state.methodMode='withdraw';
+resetDepositState();
+state.methodMode='withdraw';
+
+// 1) Show the modal immediately
+modalZ++;
+$('methodListModal').style.zIndex=String(modalZ);
+$('methodListModal').classList.add('active');
+unlockSpeech();
+
+// 2) Show loading state
+$('methodListContainer').innerHTML='<div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>';
+$('methodListTitle').innerHTML=t('selectWithdraw');
+$('methodListStepLabel').textContent='';
+
+// 3) Fetch and populate
 const admins=await loadAdmins();
 const map={};
-admins.forEach(a=>{if(a.telebirr&&!map.telebirr)map.telebirr=a.id;if(a.cbebirr&&!map.cbebirr)map.cbebirr=a.id;if(a.mpesa&&!map.mpesa)map.mpesa=a.id});
-const methods=Object.entries(map).map(([type,adminId])=>{const admin=admins.find(a=>a.id===adminId);return {type,adminId,number:admin?.[type]||''}});
+admins.forEach(a=>{
+if(a.telebirr&&!map.telebirr)map.telebirr=a.id;
+if(a.cbebirr&&!map.cbebirr)map.cbebirr=a.id;
+if(a.mpesa&&!map.mpesa)map.mpesa=a.id;
+});
+const methods=Object.entries(map).map(([type,adminId])=>{
+const admin=admins.find(a=>a.id===adminId);
+return {type,adminId,number:admin?.[type]||''};
+});
 renderMethodList(methods,'withdraw');
-modalZ++;$('methodListModal').style.zIndex=String(modalZ);$('methodListModal').classList.add('active');unlockSpeech();
 }
+
 function openWithdrawDetails(method,number){
 $('withdrawTitle').innerHTML=`Withdraw via ${METHOD_LABELS[method]||method}`;
 $('withdrawPhone').placeholder=method==='mpesa'?'07xxxxxxxx':'09xxxxxxxx';
