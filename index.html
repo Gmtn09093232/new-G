@@ -332,7 +332,7 @@ input { font-family: inherit; }
 #inviteRequiredOverlay .btn-bot { background: linear-gradient(135deg, var(--accent), var(--accent-hi)); color: var(--bg); padding: 16px 40px; border-radius: var(--r-pill); font-weight: 700; font-size: 1.1rem; box-shadow: 0 4px 16px rgba(251,191,36,.3); }
 
 /* ============================================================
-   ⚡ OPT: Lite-mode overrides – kill blur, shadows, transforms, transitions
+   ⚡ OPT: Lite-mode overrides
    ============================================================ */
 html.lite-mode .modal.active { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(0,0,0,.92) !important; }
 html.lite-mode .page,
@@ -906,9 +906,7 @@ const state = {
     savedAmount: '',
     submitting: false,
     currentPage: 'lobby',
-    /* ⚡ OPT: local history of called numbers (server now sends compact updates) */
     calledHistory: [],
-    /* ⚡ OPT: previous paintGrid snapshot for diffing */
     _gridPrev: { own: null, taken: null }
 };
 
@@ -1784,7 +1782,7 @@ async function connectToGame(stake) {
         $('gameIdDisplay').textContent = state.currentGameId.replace('GAME_', '');
     });
 
-    /* ⚡ OPT: compact number event – server sends only {number, count} after this patch. */
+    /* ⚡ OPT: compact number event – server sends only {number, count}. */
     socket.on('numberCalled', d => {
         if (d.stake !== state.stake) return;
         if (Array.isArray(d.calledNumbers)) state.calledHistory = d.calledNumbers.slice();
@@ -1816,14 +1814,41 @@ async function connectToGame(stake) {
         }
     });
 
+    /* ⚡ FIX: after the round ends, drop the user straight back to the lobby
+       with a clean card — do not leave them stranded on the game page with
+       a stale card. The winner overlay is a fixed-position modal on top and
+       will still be visible while we switch the underlying page. */
     socket.on('gameEnded', d => {
         if (d.stake !== state.stake) return;
+
         if (d.winningNumber) $('currentCall').innerText = formatCall(d.winningNumber);
+
+        // Show the winner overlay first (it stays on top of everything)
         showWinner(d);
+
+        // Immediately clear game state so the old card can't linger
         state.currentGameId = null;
         state.markedNumbers = new Set();
-        if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
+        state.isGameActive = false;
+        state.userCard = [];
+        state.selectedCard = null;
+        state.serverTaken = new Set();
+        state.displayTaken = new Set();
+        state._gridPrev = { own: null, taken: null };
+        state.calledHistory = [];
+
+        $('selectedNumber').textContent = '-';
+        renderCard([], 'gameCard', false);
+        renderCard([], 'lobbyCardPreview', false);
+        paintGrid();
         updateBackToLobbyVisibility();
+
+        // Switch pages now — overlay sits above the lobby page
+        state.currentPage = 'lobby';
+        switchPage('lobbyPage');
+
+        // Short countdown; server's real lobbyState (~5s) will reset it to 45s
+        startTimer(5);
     });
 
     socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
@@ -2063,10 +2088,19 @@ if (rulesBtnGame) {
 }
 $('closeRulesBtn').addEventListener('click', () => $('rulesModal').classList.remove('active'));
 
+/* ⚡ FIX: closing the winner overlay must also leave you on the lobby,
+   not the game page. */
 const celebrateBtn = document.querySelector('.celebrate-btn');
 if (celebrateBtn) {
     celebrateBtn.addEventListener('click', () => {
         $('winnerOverlay').classList.remove('active');
+        // Ensure we're on the lobby page even if the user closes the overlay
+        // before the server's lobbyState arrives.
+        if (state.currentPage === 'game') {
+            state.currentPage = 'lobby';
+            switchPage('lobbyPage');
+            startTimer(5);
+        }
     });
 }
 
