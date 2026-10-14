@@ -3,6 +3,8 @@
 //             with invite tracking (invite_code, admin_name)
 //             & FORCE INVITE ONLY (no invite → no account)
 //             & Base64 Screenshot Upload Support
+//             & Realtime admin socket (per-admin rooms)
+//             & Slim list DTOs + cursor pagination + ETag
 // ================================================================
 
 require('dotenv').config();
@@ -146,6 +148,87 @@ function detectRapidWins(roomId, userId, ip) {
     return true;
   }
   return false;
+}
+
+// ============================================================
+//  🔥 REALTIME HELPERS — per-admin rooms + slim DTOs
+// ============================================================
+
+// Emit an event into a specific admin's room on the /admin namespace.
+function emitToAdmin(adminId, event, payload) {
+  if (!adminId) return;
+  try {
+    const room = `admin:${adminId}`;
+    io.of('/admin').to(room).emit(event, {
+      ...payload,
+      version: payload && payload.version ? payload.version : Date.now()
+    });
+  } catch (err) {
+    console.error('emitToAdmin error:', err.message);
+  }
+}
+
+// Compute (and emit) a fresh commission snapshot for an admin.
+async function emitCommissionUpdate(adminId) {
+  if (!adminId) return;
+  try {
+    const { data: adm } = await supabase
+      .from('admins')
+      .select('commission_rate')
+      .eq('id', adminId)
+      .maybeSingle();
+    const rate = adm?.commission_rate ?? 0.40;
+    const { pending, earned } = await getAdminEarnings(adminId);
+    emitToAdmin(adminId, 'commission:update', {
+      pending: Number(pending) || 0,
+      totalEarned: Number(earned) || 0,
+      rate: Number(rate) || 0
+    });
+  } catch (err) {
+    console.error('emitCommissionUpdate error:', err.message);
+  }
+}
+
+// DTO: strip base64 proof_photo_url out of list responses, expose /admin/proof/:id
+function toDepositDto(row) {
+  if (!row) return row;
+  const { proof_photo_url, ...rest } = row;
+  const hasProof = typeof proof_photo_url === 'string' && proof_photo_url.length > 0;
+  const v = row.updated_at
+    ? new Date(row.updated_at).getTime()
+    : (row.processed_at ? new Date(row.processed_at).getTime() : row.id);
+  return {
+    ...rest,
+    proof_url: hasProof ? `/admin/proof/${row.id}` : null,
+    version: v
+  };
+}
+
+function toWithdrawalDto(row) {
+  if (!row) return row;
+  const v = row.updated_at
+    ? new Date(row.updated_at).getTime()
+    : (row.processed_at ? new Date(row.processed_at).getTime() : row.id);
+  return { ...row, version: v };
+}
+
+function toPlayerDto(row) {
+  if (!row) return row;
+  return {
+    telegram_id: String(row.telegram_id),
+    username: row.username,
+    balance: Number(row.balance) || 0,
+    telegram_handle: row.telegram_handle || null,
+    invite_code: row.invite_code || null,
+    first_deposit_amount: Number(row.first_deposit_amount) || 0,
+    first_deposit_date: row.first_deposit_date || row.updated_at || row.created_at || null,
+    admin_id: row.admin_id,
+    admin_name: row.admin_name || null
+  };
+}
+
+function makeEtag(obj) {
+  return '"' + crypto.createHash('sha1').update(JSON.stringify(obj)).digest('hex').slice(0, 16) + '"';
 }
 
 // ---------- Admin Helper Functions ----------
@@ -679,6 +762,21 @@ async function loadUser(telegramId, username, telegramHandle = null, inviteCode 
         admin_name: newUser.admin_name
       };
       console.log(`✅ Created user ${id} with invite ${finalInviteCode}, admin ${finalAdminName || 'none'}`);
+
+      // 🔥 Realtime: notify the assigned admin's room of a new player
+      if (finalAdminId) {
+        emitToAdmin(finalAdminId, 'player:added', toPlayerDto({
+          telegram_id: id,
+          username: newUser.username,
+          balance: newUser.balance,
+          telegram_handle: newUser.telegram_handle,
+          invite_code: newUser.invite_code,
+          first_deposit_amount: 0,
+          admin_id: finalAdminId,
+          admin_name: finalAdminName
+        }));
+      }
+
       return users[id];
     }
   } catch (err) {
@@ -1708,6 +1806,8 @@ async function endGameWithWinners(stake) {
     console.error(`❌ Failed to insert game_round for stake ${stake}:`, err.message);
   }
 
+  const touchedAdminIds = new Set();
+
   if (gameRoundId && houseProfit > 0) {
     const adminGroups = {};
     for (const player of game.players) {
@@ -1753,11 +1853,17 @@ async function endGameWithWinners(stake) {
               house_profit_share: share
             });
           console.log(`💰 Admin ${adminId} earned ${share.toFixed(2)} ETB profit share from game ${gameRoundId}`);
+          touchedAdminIds.add(parseInt(adminId));
         } catch (err) {
           console.error(`❌ Failed to record admin contribution:`, err.message);
         }
       }
     }
+  }
+
+  // 🔥 Realtime: refresh commission bar for every affected admin
+  for (const adminId of touchedAdminIds) {
+    emitCommissionUpdate(adminId);
   }
 
   if (stake === 20) {
@@ -2072,6 +2178,9 @@ const handleDepositRequest = async (req, res) => {
       hasPhoto: !!photoUrl
     });
 
+    // 🔥 Realtime: push new deposit into the owning admin's room
+    emitToAdmin(admin.id, 'deposit:new', toDepositDto(data));
+
     res.json({
       success: true,
       requestId: data.id,
@@ -2154,6 +2263,11 @@ app.post('/api/request-withdraw', async (req, res) => {
       adminName
     });
 
+    // 🔥 Realtime: push new withdrawal into the owning admin's room
+    if (adminId) {
+      emitToAdmin(adminId, 'withdrawal:new', toWithdrawalDto(data));
+    }
+
     res.json({
       success: true,
       requestId: data.id,
@@ -2168,101 +2282,193 @@ app.post('/api/request-withdraw', async (req, res) => {
 // ---------- Admin endpoints (session-based) ----------
 
 app.get('/admin/deposits', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
-  let query = supabase
-    .from('deposit_requests')
-    .select('*')
-    .eq('admin_id', admin.id);
-
-  const { from, to, method, status } = req.query;
-
-  if (from) {
-    const fromDate = new Date(from);
-    fromDate.setHours(0,0,0,0);
-    query = query.gte('created_at', fromDate.toISOString());
-  }
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
-    query = query.lte('created_at', toDate.toISOString());
-  }
-  if (method && method !== 'all') {
-    query = query.eq('payment_type', method);
-  }
-  if (status && status !== 'all') {
-    query = query.eq('status', status);
-  } else {
-    query = query.eq('status', 'pending');
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const playerCount = await getAdminPlayerCount(admin.id);
-  const rawDeposits = await getAdminDeposits(admin.id);
-  const approvedToday = await getAdminDeposits(admin.id, 'approved');
-  const depositBalance = await getAdminHoldingBalance(admin.id);
-
-  res.json({
-    requests: data,
-    admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
-    stats: {
-      playerCount,
-      totalDeposits: depositBalance,
-      rawDeposits: rawDeposits,
-      depositBalance,
-      pendingCount: data.filter(d => d.status === 'pending').length,
-      approvedToday
+  try {
+    const admin = await getAdminFromSession(req);
+    if (!admin) {
+      req.session.destroy();
+      return res.status(401).json({ error: 'Session expired or deactivated' });
     }
-  });
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const cursor = req.query.cursor ? parseInt(req.query.cursor) : null;
+    const { from, to, method, status } = req.query;
+
+    let query = supabase
+      .from('deposit_requests')
+      .select('*')
+      .eq('admin_id', admin.id);
+
+    if (from) { const d = new Date(from); d.setHours(0,0,0,0);       query = query.gte('created_at', d.toISOString()); }
+    if (to)   { const d = new Date(to);   d.setHours(23,59,59,999);  query = query.lte('created_at', d.toISOString()); }
+    if (method && method !== 'all') query = query.eq('payment_type', method);
+    if (status && status !== 'all') query = query.eq('status', status);
+    else if (!status) query = query.eq('status', 'pending');
+
+    if (cursor) query = query.lt('id', cursor);
+    query = query.order('id', { ascending: false }).limit(limit + 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const hasMore = data.length > limit;
+    const rows = hasMore ? data.slice(0, limit) : data;
+    const nextCursor = hasMore ? rows[rows.length - 1].id : null;
+
+    const dtoRows = rows.map(toDepositDto);
+
+    const [playerCount, rawDeposits, approvedToday, depositBalance] = await Promise.all([
+      getAdminPlayerCount(admin.id),
+      getAdminDeposits(admin.id),
+      getAdminDeposits(admin.id, 'approved'),
+      getAdminHoldingBalance(admin.id)
+    ]);
+
+    const body = {
+      requests: dtoRows,
+      nextCursor,
+      admin: { id: admin.id, name: admin.name, phone: admin.phone, deposit_number: admin.deposit_number },
+      stats: {
+        playerCount,
+        totalDeposits: depositBalance,
+        rawDeposits,
+        depositBalance,
+        pendingCount: dtoRows.filter(d => d.status === 'pending').length,
+        approvedToday
+      }
+    };
+
+    const etag = makeEtag(body);
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'private, max-age=30');
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.json(body);
+  } catch (err) {
+    console.error('Error fetching /admin/deposits:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Single deposit (fallback when socket isn't connected)
+app.get('/admin/deposits/:id', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+  try {
+    const { data, error } = await supabase
+      .from('deposit_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('admin_id', admin.id)
+      .maybeSingle();
+    if (error || !data) return res.status(404).json({ error: 'Not found' });
+    res.json({ request: toDepositDto(data) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Slim proof image endpoint (base64 or redirect to Supabase URL)
+app.get('/admin/proof/:id', async (req, res) => {
+  try {
+    const admin = await getAdminFromSession(req);
+    if (!admin) { req.session.destroy(); return res.status(401).end(); }
+
+    const { data, error } = await supabase
+      .from('deposit_requests')
+      .select('proof_photo_url, admin_id')
+      .eq('id', req.params.id)
+      .maybeSingle();
+
+    if (error || !data) return res.status(404).end();
+    if (data.admin_id !== admin.id) return res.status(403).end();
+
+    const val = data.proof_photo_url;
+    if (!val) return res.status(404).end();
+
+    // Hosted URL → redirect
+    if (/^https?:\/\//i.test(val)) {
+      res.set('Cache-Control', 'private, max-age=300');
+      return res.redirect(302, val);
+    }
+
+    // Base64 data URI → decode and serve
+    const m = val.match(/^data:(image\/[a-zA-Z0-9+.\-]+);base64,(.+)$/);
+    if (!m) return res.status(415).end();
+    const buf = Buffer.from(m[2], 'base64');
+    res.set('Content-Type', m[1]);
+    res.set('Cache-Control', 'private, max-age=300, immutable');
+    res.send(buf);
+  } catch (err) {
+    console.error('Proof error:', err.message);
+    res.status(500).end();
+  }
 });
 
 app.get('/admin/withdrawals', async (req, res) => {
+  try {
+    const admin = await getAdminFromSession(req);
+    if (!admin) {
+      req.session.destroy();
+      return res.status(401).json({ error: 'Session expired or deactivated' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const cursor = req.query.cursor ? parseInt(req.query.cursor) : null;
+    const { from, to, method, status } = req.query;
+
+    let query = supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('admin_id', admin.id);
+
+    if (from) { const d = new Date(from); d.setHours(0,0,0,0);       query = query.gte('created_at', d.toISOString()); }
+    if (to)   { const d = new Date(to);   d.setHours(23,59,59,999);  query = query.lte('created_at', d.toISOString()); }
+    if (method && method !== 'all') query = query.eq('withdrawal_type', method);
+    if (status && status !== 'all') query = query.eq('status', status);
+    else if (!status) query = query.eq('status', 'pending');
+
+    if (cursor) query = query.lt('id', cursor);
+    query = query.order('id', { ascending: false }).limit(limit + 1);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const hasMore = data.length > limit;
+    const rows = hasMore ? data.slice(0, limit) : data;
+    const nextCursor = hasMore ? rows[rows.length - 1].id : null;
+
+    const body = {
+      requests: rows.map(toWithdrawalDto),
+      nextCursor,
+      admin: { id: admin.id, name: admin.name, phone: admin.phone }
+    };
+
+    const etag = makeEtag(body);
+    res.set('ETag', etag);
+    res.set('Cache-Control', 'private, max-age=30');
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.json(body);
+  } catch (err) {
+    console.error('Error fetching /admin/withdrawals:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Single withdrawal (fallback when socket isn't connected)
+app.get('/admin/withdrawals/:id', async (req, res) => {
   const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
+  if (!admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired' }); }
+  try {
+    const { data, error } = await supabase
+      .from('withdrawal_requests')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('admin_id', admin.id)
+      .maybeSingle();
+    if (error || !data) return res.status(404).json({ error: 'Not found' });
+    res.json({ request: toWithdrawalDto(data) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  let query = supabase
-    .from('withdrawal_requests')
-    .select('*')
-    .eq('admin_id', admin.id);
-
-  const { from, to, method, status } = req.query;
-
-  if (from) {
-    const fromDate = new Date(from);
-    fromDate.setHours(0,0,0,0);
-    query = query.gte('created_at', fromDate.toISOString());
-  }
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23,59,59,999);
-    query = query.lte('created_at', toDate.toISOString());
-  }
-  if (method && method !== 'all') {
-    query = query.eq('withdrawal_type', method);
-  }
-  if (status && status !== 'all') {
-    query = query.eq('status', status);
-  } else {
-    query = query.eq('status', 'pending');
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
 });
 
 app.get('/admin/holding-balance', async (req, res) => {
@@ -2313,10 +2519,14 @@ app.post('/admin/process-deposit', async (req, res) => {
       if (!user) return res.status(404).json({ error: 'User not found' });
       user.balance += reqData.amount;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-      await supabase.from('deposit_requests').update({
-        status: 'approved',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
+
+      const { data: updated, error: updErr } = await supabase
+        .from('deposit_requests')
+        .update({ status: 'approved', processed_at: new Date().toISOString() })
+        .eq('id', requestId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
 
       Audit.depositCompleted(reqData.telegram_id, req.ip, {
         transactionId: requestId.toString(),
@@ -2338,12 +2548,20 @@ app.post('/admin/process-deposit', async (req, res) => {
         playerSocket.emit('balanceUpdate', user.balance);
         playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount });
       }
+
+      // 🔥 Realtime: patch the row in the admin's own dashboard
+      emitToAdmin(admin.id, 'deposit:updated', toDepositDto(updated));
+
       res.json({ success: true, newBalance: user.balance });
     } else {
-      await supabase.from('deposit_requests').update({
-        status: 'rejected',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
+      const { data: updated, error: updErr } = await supabase
+        .from('deposit_requests')
+        .update({ status: 'rejected', processed_at: new Date().toISOString() })
+        .eq('id', requestId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+
       Audit.depositFailed(reqData.telegram_id, req.ip, {
         transactionId: requestId.toString(),
         amount: reqData.amount,
@@ -2351,8 +2569,13 @@ app.post('/admin/process-deposit', async (req, res) => {
         adminId: admin.id,
         adminName: admin.name
       });
+
       const playerSocket = await getSocketByUserId(reqData.telegram_id);
       if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
+
+      // 🔥 Realtime
+      emitToAdmin(admin.id, 'deposit:updated', toDepositDto(updated));
+
       res.json({ success: true });
     }
   } catch (err) {
@@ -2433,29 +2656,34 @@ app.get('/admin/stats', async (req, res) => {
 });
 
 app.get('/admin/players', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) {
-    req.session.destroy();
-    return res.status(401).json({ error: 'Session expired or deactivated' });
-  }
-
   try {
-    const players = await getAdminPlayers(admin.id);
-    const playersWithStats = await Promise.all(players.map(async (player) => {
-      const { data: deposits } = await supabase
-        .from('deposit_requests')
-        .select('amount, status, created_at, proof_photo_url')
-        .eq('telegram_id', player.telegram_id)
-        .eq('admin_id', admin.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      return { ...player, recentDeposits: deposits || [] };
-    }));
+    const admin = await getAdminFromSession(req);
+    if (!admin) {
+      req.session.destroy();
+      return res.status(401).json({ error: 'Session expired or deactivated' });
+    }
+
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = parseInt(req.query.cursor) || 0;
+
+    const { data, error, count } = await supabase
+      .from('users')
+      .select('*', { count: 'exact' })
+      .eq('admin_id', admin.id)
+      .order('username', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const hasMore = (offset + limit) < (count || 0);
+    const nextCursor = hasMore ? offset + limit : null;
+
     res.json({
       success: true,
       admin: { id: admin.id, name: admin.name, phone: admin.phone },
-      players: playersWithStats,
-      count: playersWithStats.length
+      players: (data || []).map(toPlayerDto),
+      count: count || 0,
+      nextCursor
     });
   } catch (err) {
     console.error('Error fetching admin players:', err.message);
@@ -2543,6 +2771,14 @@ app.post('/admin/update-player-balance', async (req, res) => {
       playerSocket.emit('balanceUpdate', newBalance);
     }
 
+    // 🔥 Realtime: patch balance in the admin's own dashboard
+    emitToAdmin(admin.id, 'player:balance', {
+      telegram_id: String(telegramId),
+      balance: newBalance
+    });
+    // Manual balance changes affect the admin's holding — refresh commission bar
+    emitCommissionUpdate(admin.id);
+
     res.json({ success: true, newBalance, message: `Balance ${operation}ed by ${amt} ETB` });
   } catch (err) {
     console.error('Error updating player balance:', err.message);
@@ -2569,15 +2805,21 @@ app.post('/admin/process-withdrawal', async (req, res) => {
       .single();
     if (fetchErr || !reqData) return res.status(404).json({ error: 'Request not found or not assigned to you' });
     if (reqData.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
+
     if (action === 'approve') {
       const user = await loadUser(reqData.telegram_id, null, null, null, false);
       if (!user || user.balance < reqData.amount) return res.status(400).json({ error: 'Insufficient balance now' });
       user.balance -= reqData.amount;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', reqData.telegram_id);
-      await supabase.from('withdrawal_requests').update({
-        status: 'approved',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
+
+      const { data: updated, error: updErr } = await supabase
+        .from('withdrawal_requests')
+        .update({ status: 'approved', processed_at: new Date().toISOString() })
+        .eq('id', requestId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+
       Audit.withdrawalCompleted(reqData.telegram_id, req.ip, {
         transactionId: requestId.toString(),
         amount: reqData.amount,
@@ -2587,17 +2829,25 @@ app.post('/admin/process-withdrawal', async (req, res) => {
         adminId: admin.id,
         adminName: admin.name
       });
+
       const playerSocket = await getSocketByUserId(reqData.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', user.balance);
         playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number });
       }
+
+      emitToAdmin(admin.id, 'withdrawal:updated', toWithdrawalDto(updated));
+
       res.json({ success: true, newBalance: user.balance });
     } else {
-      await supabase.from('withdrawal_requests').update({
-        status: 'rejected',
-        processed_at: new Date().toISOString()
-      }).eq('id', requestId);
+      const { data: updated, error: updErr } = await supabase
+        .from('withdrawal_requests')
+        .update({ status: 'rejected', processed_at: new Date().toISOString() })
+        .eq('id', requestId)
+        .select()
+        .single();
+      if (updErr) throw updErr;
+
       Audit.withdrawalRejected(reqData.telegram_id, req.ip, {
         transactionId: requestId.toString(),
         amount: reqData.amount,
@@ -2605,8 +2855,12 @@ app.post('/admin/process-withdrawal', async (req, res) => {
         adminId: admin.id,
         adminName: admin.name
       });
+
       const playerSocket = await getSocketByUserId(reqData.telegram_id);
       if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
+
+      emitToAdmin(admin.id, 'withdrawal:updated', toWithdrawalDto(updated));
+
       res.json({ success: true });
     }
   } catch (err) {
@@ -2955,6 +3209,9 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
         .eq('admin_id', reqData.admin_id)
         .eq('status', 'pending');
 
+      // 🔥 Realtime: refresh the affected admin's commission bar
+      await emitCommissionUpdate(reqData.admin_id);
+
       res.json({ success: true });
     } else {
       await supabase
@@ -3168,6 +3425,9 @@ app.post('/super-admin/update-commission', async (req, res) => {
       newCommissionRate: commissionRate
     });
 
+    // 🔥 Realtime: push updated rate to the admin's room
+    await emitCommissionUpdate(adminId);
+
     res.json({ success: true, message: 'Commission rate updated' });
   } catch (err) {
     console.error('Error updating commission:', err.message);
@@ -3362,6 +3622,9 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
         amount: reqData.amount,
         requestId
       });
+
+      // 🔥 Realtime: refresh the affected admin's commission bar
+      await emitCommissionUpdate(reqData.admin_id);
 
       res.json({ success: true, message: 'Withdrawal approved' });
     } else {
@@ -4102,6 +4365,18 @@ app.post('/admin/import-players', async (req, res) => {
           };
           results.push({ telegramId, success: true, created: true });
           successCount++;
+
+          // 🔥 Realtime: the admin who imported sees the new row immediately
+          emitToAdmin(admin.id, 'player:added', toPlayerDto({
+            telegram_id: telegramId,
+            username: newUser.username,
+            balance: newUser.balance,
+            telegram_handle: null,
+            invite_code: null,
+            first_deposit_amount: 0,
+            admin_id: null,
+            admin_name: null
+          }));
         } else {
           results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
         }
@@ -4487,15 +4762,37 @@ io.on('connection', async (socket) => {
 });
 
 // ---------- Admin namespace ----------
+// 🔥 UPDATED: session-based auth + per-admin rooms
 const adminNamespace = io.of('/admin');
-adminNamespace.use((socket, next) => {
+
+// Re-apply session parsing for this namespace
+adminNamespace.use((socket, next) => sessionMiddleware(socket.request, {}, next));
+
+adminNamespace.use(async (socket, next) => {
+  // Priority 1: session-based admin dashboard
+  const adminId = socket.request.session?.adminId;
+  if (adminId) {
+    socket.adminId = adminId;
+    socket.authMode = 'session';
+    return next();
+  }
+  // Priority 2: legacy secret-based live view
   const secret = socket.handshake.query.secret;
-  if (secret === process.env.ADMIN_SECRET) return next();
+  if (secret === process.env.ADMIN_SECRET) {
+    socket.authMode = 'secret';
+    return next();
+  }
   next(new Error('Unauthorized admin access'));
 });
 
 adminNamespace.on('connection', (socket) => {
-  console.log('Admin connected to live view');
+  console.log(`Admin connected (mode: ${socket.authMode}, adminId: ${socket.adminId || 'n/a'})`);
+
+  // Join the admin's private room for granular events
+  if (socket.adminId) {
+    socket.join(`admin:${socket.adminId}`);
+  }
+
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
     gameStatus: {
@@ -4504,6 +4801,7 @@ adminNamespace.on('connection', (socket) => {
       30: games[30].status
     }
   });
+
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
@@ -4514,6 +4812,7 @@ adminNamespace.on('connection', (socket) => {
       }
     });
   });
+
   socket.on('admin:getAllRegisteredPlayers', async () => {
     try {
       const { data: allUsers, error } = await supabase
