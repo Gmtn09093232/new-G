@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
 
-<!-- ⚡ OPT: Lite-mode detection (low-end device / reduced motion / data-saver) -->
+<!-- ⚡ OPT: Lite-mode detection -->
 <script>
 (function(){
   try {
@@ -34,9 +34,6 @@
 <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"></noscript>
 
 <style>
-/* ============================================================
-   1. DESIGN TOKENS
-   ============================================================ */
 :root {
     --bg:            #0A1128;
     --bg-card:       #0F172A;
@@ -1417,9 +1414,7 @@ function renderCard(card, containerId, clickable) {
     }
 }
 
-/* ⚡ FIX: force-clear the yellow "marked" highlight from every card cell.
-   This is a belt-and-braces helper – it works even if state.markedNumbers
-   got out of sync with the DOM. */
+/* ⚡ FIX: strip every "marked" class from both card containers. */
 function clearAllCardMarks() {
     ['gameCard', 'lobbyCardPreview'].forEach(id => {
         const cont = document.getElementById(id);
@@ -1469,6 +1464,18 @@ function applyCell(i, own, taken) {
              : taken.has(i) ? 'grid-cell taken'
              : 'grid-cell';
     if (cell.className !== cls) cell.className = cls;
+}
+
+/* ⚡ FIX: wipe every grid cell back to neutral AND reset the diff baseline.
+   This is the reliable way to clear the 1–100 grid between rounds —
+   paintGrid() alone can't clear stale cells if _gridPrev was reset first. */
+function resetGrid() {
+    if (!gridBuilt) return;
+    for (let i = 1; i <= 100; i++) {
+        const cell = gridCells[i];
+        if (cell && cell.className !== 'grid-cell') cell.className = 'grid-cell';
+    }
+    state._gridPrev = { own: null, taken: null };
 }
 
 /* ============================================================
@@ -1542,7 +1549,7 @@ function goStake() {
     state.currentGameId = null;
     state.awaitingStakeCheck = false;
     state.calledHistory = [];
-    state._gridPrev = { own: null, taken: null };
+    resetGrid();                    // ⚡ wipe grid cells
     localStorage.removeItem('dot_bingo_stake');
     clearInterval(lobbyTimer);
     clearAllCardMarks();
@@ -1698,13 +1705,13 @@ async function connectToGame(stake) {
         state.userCard = [];
         state.markedNumbers = new Set();
         state.calledHistory = [];
-        state._gridPrev = { own: null, taken: null };
+        resetGrid();                                    // ⚡ wipe old cells first
         $('selectedNumber').textContent = '-';
-        clearAllCardMarks();          // ⚡ FIX: force clear old marks
+        clearAllCardMarks();
         showLobby(s.startsIn);
         renderCard([], 'lobbyCardPreview', false);
         renderCard([], 'gameCard', false);
-        if (s.takenNumbers) updateGrid(s.takenNumbers);
+        if (s.takenNumbers) updateGrid(s.takenNumbers); // now correct fresh set
         updateCount(s.playersCount);
     });
 
@@ -1736,14 +1743,14 @@ async function connectToGame(stake) {
         updateStakeTable(d.stake, d.count);
     });
 
-    /* ⚡ FIX: reset markedNumbers AND force-clear DOM marks on every game start. */
     socket.on('gameStarted', d => {
         if (d.stake !== state.stake) return;
         if (d.prizePool) $('winningBalance').innerText = d.prizePool;
         if (d.playersCount) updateCount(d.playersCount);
         state.calledHistory = [];
-        state.markedNumbers = new Set();   // ← NEW GAME: no marks
-        clearAllCardMarks();               // ← DOM failsafe
+        state.markedNumbers = new Set();   // ⚡ fresh slate for the new round
+        resetGrid();                       // ⚡ clear stale red cells
+        clearAllCardMarks();
         showGame();
         state.currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
         $('gameIdDisplay').textContent = state.currentGameId.replace('GAME_', '');
@@ -1779,8 +1786,6 @@ async function connectToGame(stake) {
         }
     });
 
-    /* ⚡ FIX: gameEnded clears DOM marks and does NOT start a competing timer.
-       Wait for the server's real lobbyState to bring us back. */
     socket.on('gameEnded', d => {
         if (d.stake !== state.stake) return;
 
@@ -1795,10 +1800,10 @@ async function connectToGame(stake) {
         state.selectedCard = null;
         state.serverTaken = new Set();
         state.displayTaken = new Set();
-        state._gridPrev = { own: null, taken: null };
         state.calledHistory = [];
+        resetGrid();                        // ⚡ wipe grid cells
+        clearAllCardMarks();
 
-        clearAllCardMarks();                    // ⚡ DOM failsafe
         $('selectedNumber').textContent = '-';
         renderCard([], 'gameCard', false);
         renderCard([], 'lobbyCardPreview', false);
@@ -1808,8 +1813,7 @@ async function connectToGame(stake) {
         state.currentPage = 'lobby';
         switchPage('lobbyPage');
 
-        // ⚡ No competing timer. Show "..." until the server's lobbyState arrives
-        // (it will reset the real 45 s countdown).
+        // Wait for the server's real lobbyState to bring us back.
         clearInterval(lobbyTimer);
         $('lobbyTimer').textContent = '...';
     });
