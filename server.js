@@ -5,6 +5,7 @@
 //             & Base64 Screenshot Upload Support
 //             & Realtime admin socket (per-admin rooms)
 //             & Slim list DTOs + cursor pagination + ETag
+//             & CPU Optimizations (Map sockets, Buffered Audit)
 // ================================================================
 
 require('dotenv').config();
@@ -1228,7 +1229,7 @@ app.post('/admin/add-balance', async (req, res) => {
       processed_at: new Date().toISOString()
     });
     Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
-    const playerSocket = await getSocketByUserId(strId);
+    const playerSocket = getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
     res.json({ success: true, newBalance: user.balance });
   } catch (err) {
@@ -1254,7 +1255,7 @@ app.post('/admin/set-balance', async (req, res) => {
     if (users[strId]) users[strId].balance = newBal;
     else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
     await Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal });
-    const playerSocket = await getSocketByUserId(strId);
+    const playerSocket = getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
     res.json({ success: true, newBalance: newBal });
   } catch (err) {
@@ -1688,7 +1689,7 @@ async function startGame(stake) {
     if (user) {
       user.balance -= game.entryFee;
       await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', p.telegramId);
-      const playerSocket = await getSocketByUserId(p.telegramId);
+      const playerSocket = getSocketByUserId(p.telegramId);
       if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
       Audit.adminAction('ENTRY_FEE_PAID', 'system', null, { userId: p.telegramId, amount: game.entryFee, currency: 'ETB', stake });
     }
@@ -1707,7 +1708,7 @@ async function startGame(stake) {
 }
 
 // Fix #1: Use the Map instead of io.fetchSockets()
-async function getSocketByUserId(userId) {
+function getSocketByUserId(userId) {
   return activeUserSockets.get(userId) || null;
 }
 
@@ -1928,7 +1929,7 @@ async function endGameWithWinners(stake) {
       if (user) {
         user.balance += prizeEachReal;
         await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
-        const winnerSocket = await getSocketByUserId(w.telegramId);
+        const winnerSocket = getSocketByUserId(w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
         Audit.winPaidOut(`stake_${stake}`, w.telegramId, null, {
           amount: prizeEachReal,
@@ -1982,7 +1983,12 @@ async function endGameWithWinners(stake) {
       winningNumber: game.winningNumber
     });
   } else {
-    io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
+    // ✅ FIXED: Send winningNumber even when there is no winner
+    io.to(`stake_${stake}`).emit('gameEnded', { 
+        stake, 
+        noWinner: true, 
+        winningNumber: game.winningNumber || (game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null)
+    });
   }
 
   game.winners = [];
@@ -2569,7 +2575,7 @@ app.post('/admin/process-deposit', async (req, res) => {
         await supabase.from('users').update({ first_deposit_amount: user.first_deposit_amount }).eq('telegram_id', reqData.telegram_id);
       }
 
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
+      const playerSocket = getSocketByUserId(reqData.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', user.balance);
         playerSocket.emit('depositStatus', { status: 'approved', amount: reqData.amount });
@@ -2596,7 +2602,7 @@ app.post('/admin/process-deposit', async (req, res) => {
         adminName: admin.name
       });
 
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
+      const playerSocket = getSocketByUserId(reqData.telegram_id);
       if (playerSocket) playerSocket.emit('depositStatus', { status: 'rejected', amount: reqData.amount });
 
       // 🔥 Realtime
@@ -2792,7 +2798,7 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance
     });
 
-    const playerSocket = await getSocketByUserId(telegramId);
+    const playerSocket = getSocketByUserId(telegramId);
     if (playerSocket) {
       playerSocket.emit('balanceUpdate', newBalance);
     }
@@ -2856,7 +2862,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
         adminName: admin.name
       });
 
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
+      const playerSocket = getSocketByUserId(reqData.telegram_id);
       if (playerSocket) {
         playerSocket.emit('balanceUpdate', user.balance);
         playerSocket.emit('withdrawStatus', { status: 'approved', amount: reqData.amount, phone: reqData.phone_number });
@@ -2882,7 +2888,7 @@ app.post('/admin/process-withdrawal', async (req, res) => {
         adminName: admin.name
       });
 
-      const playerSocket = await getSocketByUserId(reqData.telegram_id);
+      const playerSocket = getSocketByUserId(reqData.telegram_id);
       if (playerSocket) playerSocket.emit('withdrawStatus', { status: 'rejected', amount: reqData.amount });
 
       emitToAdmin(admin.id, 'withdrawal:updated', toWithdrawalDto(updated));
