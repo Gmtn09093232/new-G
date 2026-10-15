@@ -1206,18 +1206,14 @@
         }
 
         // ⚡ OPTIMIZED: optimistic local mark + debounced socket emit
-        let _lastMarkSent = 0;
         function markCardCell(val, td) {
-            if (!isGameActive || !socket) return;
-            if (val === 'FREE') return;
+    if (!isGameActive || !socket) return;
+    if (val === 'FREE') return;
 
-            // 🚫 number not called yet -> refuse the mark
-            if (!isNumberCalled(val)) {
-                showToast(data[lang].notCalledYet, 'error');
-                return;
-            }
+    // 🚫 uncalled number → silently ignored (no UI)
+    if (!isNumberCalled(val)) return;
 
-            const now = Date.now();
+    const now = Date.now();
             if (now - _lastMarkSent < 80) return;
             _lastMarkSent = now;
             if (!markedNumbers.includes(val)) {
@@ -1282,10 +1278,9 @@
             if (serverTaken.has(i)) return;         // taken by somebody else
 
             const prev = selectedCardNumber;
-            if (prev !== null && prev !== i) {
-                releaseCard(prev);
-                showToast(data[lang].cardReleased, 'info');
-            }
+if (prev !== null && prev !== i) {
+    releaseCard(prev);   // 🔇 silent
+}
 
             pendingSelection = i;
             selectedCardNumber = i;
