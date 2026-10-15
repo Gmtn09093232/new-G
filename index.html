@@ -173,7 +173,7 @@
         #inviteRequiredOverlay .btn-bot { display: flex; align-items: center; justify-content: center; gap: 8px; background: #fbbf24; color: #0a1428; border: none; padding: 14px 36px; border-radius: 60px; font-weight: 800; font-size: 1rem; cursor: pointer; }
         .hidden { display: none; }
 
-        /* ⚡ NEW: Reconnecting indicator */
+        /* ⚡ Reconnecting indicator */
         #reconnectBanner { position: fixed; top: 0; left: 0; right: 0; background: #dc2626; color: white; text-align: center; padding: 8px; font-size: 0.8rem; font-weight: 600; z-index: 5000; transform: translateY(-100%); transition: transform 0.3s ease; }
         #reconnectBanner.show { transform: translateY(0); }
     </style>
@@ -687,6 +687,9 @@
                 submitting: "በማስገባት ላይ...",
                 invalidBingo: "ቢንጎ አልተሟላም!",
                 bingoNotReady: "የቢንጎ መስመር ገና አልተሟላም!",
+                notCalledYet: "ይህ ቁጥር ገና አልተጠራም!",
+                oneCardOnly: "አንድ ተጫዋች አንድ ካርድ ብቻ ሊይዝ ይችላል!",
+                cardReleased: "የቀድሞ ካርድ ተለቋል።",
                 reconnecting: "እንደገና በመገናኘት ላይ...",
                 connected: "ተገናኝቷል"
             },
@@ -759,6 +762,9 @@
                 submitting: "Processing...",
                 invalidBingo: "Not completed Bingo!",
                 bingoNotReady: "Your bingo line is not complete yet!",
+                notCalledYet: "This number has not been called yet!",
+                oneCardOnly: "One player can only hold one card!",
+                cardReleased: "Previous card released.",
                 reconnecting: "Reconnecting...",
                 connected: "Connected"
             }
@@ -1198,10 +1204,25 @@
             tbl.appendChild(tb); cont.appendChild(tbl);
         }
 
+        // ⚡ Only numbers that were actually called can be marked
+        function isNumberCalled(val) {
+            const n = Number(val);
+            if (!Number.isFinite(n)) return false;
+            return localCalledNumbers.includes(n);
+        }
+
         // ⚡ OPTIMIZED: optimistic local mark + debounced socket emit
         let _lastMarkSent = 0;
         function markCardCell(val, td) {
             if (!isGameActive || !socket) return;
+            if (val === 'FREE') return;
+
+            // 🚫 number not called yet -> refuse the mark
+            if (!isNumberCalled(val)) {
+                showToast(data[lang].notCalledYet, 'error');
+                return;
+            }
+
             const now = Date.now();
             if (now - _lastMarkSent < 80) return;
             _lastMarkSent = now;
@@ -1234,24 +1255,55 @@
             else cell.classList.remove('taken');
         }
 
+        // ⚡ Re-paint a single cell from the current state (own / taken / free)
+        function refreshGridCell(num) {
+            if (!numberGrid || num === null || num === undefined) return;
+            const cell = numberGrid.querySelector(`[data-number="${num}"]`);
+            if (!cell) return;
+            cell.classList.remove('taken', 'own-card');
+            if (num === selectedCardNumber) cell.classList.add('own-card');
+            else if (displayTaken.has(num)) cell.classList.add('taken');
+        }
+
+        // ⚡ ONE PLAYER = ONE CARD → free the old card before taking a new one
+        function releaseCard(num) {
+            if (num === null || num === undefined) return;
+            serverTaken.delete(num);
+            displayTaken.delete(num);
+            if (selectedCardNumber === num) selectedCardNumber = null;
+            if (socket) socket.emit('releaseCardNumber', num); // server must free it
+            refreshGridCell(num);
+        }
+
         // ⚡ OPTIMIZED: event delegation for the grid
+        // ⚡ ONE PLAYER = ONE CARD: switching cards releases the previous one first
         numberGrid.addEventListener('click', (e) => {
             const cell = e.target.closest('.grid-cell');
             if (!cell) return;
-            if (cell.classList.contains('taken') || cell.classList.contains('own-card')) return;
             if (isGameActive || !socket) return;
+
             const i = parseInt(cell.dataset.number);
-            if (displayTaken.has(i) || serverTaken.has(i)) return;
-            if (selectedCardNumber !== null && selectedCardNumber !== i) {
-                serverTaken.delete(selectedCardNumber);
-                displayTaken.delete(selectedCardNumber);
-                updateGridCell(selectedCardNumber, false);
+            if (!i) return;
+            if (i === selectedCardNumber) return;   // already ours
+            if (serverTaken.has(i)) return;         // taken by somebody else
+
+            const prev = selectedCardNumber;
+            if (prev !== null && prev !== i) {
+                releaseCard(prev);
+                showToast(data[lang].cardReleased, 'info');
             }
+
             pendingSelection = i;
             selectedCardNumber = i;
             selectedNumber.textContent = i;
             cell.classList.remove('taken');
             cell.classList.add('own-card');
+
+            // clear the stale preview until the server confirms the new card
+            userCard = [];
+            markedNumbers = [];
+            renderCard(userCard, 'lobbyCardPreview', false);
+
             socket.emit('selectCardNumber', i);
             updateBackToLobbyVisibility();
         });
@@ -1448,28 +1500,31 @@
             });
             socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true); else renderCard(card, 'lobbyCardPreview', false); });
 
-            // ⚡ OPTIMIZED: incremental grid update
+            // ⚡ Server is authoritative for taken numbers -> full grid resync
             socket.on('cardTaken', data => {
                 if (data.stake !== currentStake) return;
+
                 serverTaken = new Set(data.takenNumbers);
-                const disp = new Set(data.takenNumbers);
-                if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
-                displayTaken = disp;
-                // Incremental: only toggle the changed cell
-                updateGridCell(data.number, true);
-                if (selectedCardNumber === data.number) {
-                    const cell = numberGrid.querySelector(`[data-number="${data.number}"]`);
-                    if (cell) { cell.classList.remove('taken'); cell.classList.add('own-card'); }
-                }
-                updateCount(serverTaken.size);
+
                 if (pendingSelection && data.number === pendingSelection) {
-                    selectedCardNumber = data.number; selectedNumber.textContent = data.number; pendingSelection = null;
+                    selectedCardNumber = data.number;
+                    selectedNumber.textContent = data.number;
+                    pendingSelection = null;
                     updateBackToLobbyVisibility();
                 }
                 if (pendingRandom && data.number) {
-                    selectedCardNumber = data.number; selectedNumber.textContent = data.number; pendingRandom = false;
+                    selectedCardNumber = data.number;
+                    selectedNumber.textContent = data.number;
+                    pendingRandom = false;
                     updateBackToLobbyVisibility();
                 }
+
+                const disp = new Set(serverTaken);
+                if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
+                displayTaken = disp;
+
+                buildGrid();               // repaint own-card / taken / free
+                updateCount(serverTaken.size);
             });
             socket.on('cardSelectionFailed', msg => {
                 alert(msg);
@@ -1541,7 +1596,7 @@
             socket.on('withdrawStatus', d => alert(d.status === 'approved' ? `Withdrawal -${d.amount} ETB processed.` : 'Withdrawal rejected.'));
         }
 
-        // ⚡ OPTIMIZED: pause socket when app is backgrounded
+        // ⚡ Pause socket when app is backgrounded
         document.addEventListener('visibilitychange', () => {
             if (!socket) return;
             if (document.hidden) {
@@ -1606,7 +1661,21 @@
         $('stake10Btn')?.addEventListener('click', () => { loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
         $('stake20Btn')?.addEventListener('click', () => { loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
         $('stake30Btn')?.addEventListener('click', () => { loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
-        $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumber.textContent = '...'; updateBackToLobbyVisibility(); } unlockSpeech(); });
+        $('randomCardBtn')?.addEventListener('click', () => {
+            if (!isGameActive && socket) {
+                // ⚡ one player = one card
+                releaseCard(selectedCardNumber);
+                pendingRandom = true;
+                socket.emit('newCardNumber');
+                selectedCardNumber = null;
+                selectedNumber.textContent = '...';
+                userCard = [];
+                markedNumbers = [];
+                renderCard(userCard, 'lobbyCardPreview', false);
+                updateBackToLobbyVisibility();
+            }
+            unlockSpeech();
+        });
 
         $('bingoBtn')?.addEventListener('click', () => {
             if (!socket || !isGameActive) return;
