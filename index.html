@@ -13,13 +13,7 @@
         .page.hidden { display: none; }
 
         /* ===== SVG Global Sizing ===== */
-        svg {
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
-            display: inline-block;
-            vertical-align: middle;
-        }
+        svg { width: 16px; height: 16px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
         .winner-trophy svg { width: 56px; height: 56px; }
         #inviteRequiredOverlay .overlay-icon svg { width: 64px; height: 64px; }
         .bank-header .bank-icon svg { width: 24px; height: 24px; }
@@ -108,7 +102,48 @@
         .grid-cell { background: #142647; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: #cbd5e1; border: 1px solid #1e3358; cursor: pointer; min-height: 28px; }
         .grid-cell.taken { background: #059669; color: #ffffff; border-color: #10b981; cursor: not-allowed; }
         .grid-cell.own-card { background: #dc2626; color: #ffffff; border-color: #ef4444; cursor: not-allowed; }
-        #bingoBtn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 90%; max-width: 340px; margin: 20px auto 18px; background: #fbbf24; color: #0a1428; font-size: 1.3rem; font-weight: 800; padding: 14px 12px; border-radius: 80px; border: none; letter-spacing: 1.5px; cursor: pointer; }
+
+        /* ===== BINGO BUTTON ===== */
+        #bingoBtn {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 90%; max-width: 340px; margin: 20px auto 18px;
+            background: #fbbf24; color: #0a1428;
+            font-size: 1.3rem; font-weight: 800;
+            padding: 14px 12px; border-radius: 80px; border: none;
+            letter-spacing: 1.5px; cursor: pointer;
+            transition: background 0.15s ease;
+            position: relative;
+        }
+        #bingoBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ✅ NEW: Shake + red feedback for invalid bingo */
+        @keyframes bingoShake {
+            0%, 100% { transform: translateX(0); }
+            15% { transform: translateX(-8px); }
+            30% { transform: translateX(8px); }
+            45% { transform: translateX(-6px); }
+            60% { transform: translateX(6px); }
+            75% { transform: translateX(-3px); }
+            90% { transform: translateX(3px); }
+        }
+        #bingoBtn.shake {
+            animation: bingoShake 0.55s ease;
+            background: #dc2626 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25);
+        }
+        #bingoBtn.shake svg { color: #ffffff !important; }
+
+        /* ✅ NEW: Green success flash */
+        @keyframes bingoSuccess {
+            0% { background: #fbbf24; }
+            50% { background: #10b981; color: #ffffff; }
+            100% { background: #fbbf24; }
+        }
+        #bingoBtn.success {
+            animation: bingoSuccess 0.8s ease;
+        }
+
         .tab-bar { display: flex; background: #142647; border-radius: 100px; margin-top: 16px; padding: 5px 6px; gap: 4px; border: 1px solid #1e3358; }
         .tab-btn { flex: 1; background: transparent; border: none; padding: 9px 0; border-radius: 80px; font-weight: 600; font-size: 0.72rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .tab-btn.active { background: #fbbf24; color: #0a1428; }
@@ -686,7 +721,6 @@
         const stake20Count = $('stake20Count');
         const stake30Count = $('stake30Count');
 
-        // ✅ FIX #1: WebSocket-only transport for public namespace
         const stakeSocket = io('/public', { transports: ['websocket'] });
 
         stakeSocket.on('playersCount', d => {
@@ -748,8 +782,6 @@
         let withdrawMethodMap = {};
         let userInviteData = { invite_code: null, admin_id: null, admin_name: null };
         let isAuthenticated = false;
-
-        // ✅ FIX #2: Local called-numbers history (server no longer sends the full array)
         let localCalledNumbers = [];
 
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
@@ -825,7 +857,10 @@
                 adminNotFound: "አስተዳዳሪ አልተገኘም",
                 noMethods: "ምንም የክፍያ ዘዴ የለም",
                 networkError: "የኔትወርክ ስህተት።",
-                submitting: "በማስገባት ላይ..."
+                submitting: "በማስገባት ላይ...",
+                // ✅ NEW: invalid bingo messages
+                invalidBingo: "ቢንጎ አልተሟላም!",
+                bingoNotReady: "የቢንጎ መስመር ገና አልተሟላም!"
             },
             en: {
                 back: "Back", cancel: "Cancel", gotIt: "Got it",
@@ -893,7 +928,10 @@
                 adminNotFound: "Admin not found",
                 noMethods: "No payment methods available",
                 networkError: "Network error.",
-                submitting: "Processing..."
+                submitting: "Processing...",
+                // ✅ NEW: invalid bingo messages
+                invalidBingo: "Not completed Bingo!",
+                bingoNotReady: "Your bingo line is not complete yet!"
             }
         };
 
@@ -927,7 +965,6 @@
         else lang = 'am';
         applyLang();
 
-        // Set invite overlay SVG
         const overlayIconEl = $('inviteOverlayIcon');
         if (overlayIconEl) overlayIconEl.innerHTML = SVG_ICONS['lock'];
 
@@ -1262,27 +1299,15 @@
             btn.disabled = true;
             btn.innerHTML = SVG_ICONS['check'] + '<span>' + data[lang].submitting + '</span>';
             try {
-                // ✅ FIX #3: Add client_request_id for idempotency
                 const clientRequestId = (crypto.randomUUID ? crypto.randomUUID() :
                     'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
-
                 const r = await fetch('/api/request-withdraw', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        amount: Number(amt),
-                        phone: rec,
-                        withdrawal_type: selectedWithdrawType,
-                        name,
-                        admin_id: selectedAdminId,
-                        client_request_id: clientRequestId
-                    })
+                    body: JSON.stringify({ amount: Number(amt), phone: rec, withdrawal_type: selectedWithdrawType, name, admin_id: selectedAdminId, client_request_id: clientRequestId })
                 });
                 const d = await r.json();
-                if (d.success) {
-                    alert(data[lang].withdrawSubmitted);
-                    $('withdrawDetailsModal').classList.remove('active');
-                    resetDepositState();
-                } else { alert('Error: ' + (d.error || 'Submission failed')); }
+                if (d.success) { alert(data[lang].withdrawSubmitted); $('withdrawDetailsModal').classList.remove('active'); resetDepositState(); }
+                else { alert('Error: ' + (d.error || 'Submission failed')); }
             } catch (err) { alert(data[lang].networkError); }
             finally { submittingW = false; btn.disabled = false; btn.innerHTML = orig; unlockSpeech(); }
         }
@@ -1306,21 +1331,11 @@
                 btn.disabled = true;
                 btn.innerHTML = SVG_ICONS['check'] + '<span>' + data[lang].sending + '</span>';
                 try {
-                    // ✅ FIX #3: Add client_request_id for idempotency
                     const clientRequestId = (crypto.randomUUID ? crypto.randomUUID() :
                         'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
-
                     const r = await fetch('/api/request-deposit', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            phone,
-                            amount: Number(amount),
-                            payment_type: selectedDepositType,
-                            admin_id: selectedAdminId,
-                            transaction_reference: b64,
-                            proof_type: 'image',
-                            client_request_id: clientRequestId
-                        })
+                        body: JSON.stringify({ phone, amount: Number(amount), payment_type: selectedDepositType, admin_id: selectedAdminId, transaction_reference: b64, proof_type: 'image', client_request_id: clientRequestId })
                     });
                     const d = await r.json();
                     if (d.success) {
@@ -1516,6 +1531,46 @@
 
         function syncBalance(v) { balance = v; lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($('profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $('gameBalanceDisplay').innerText = v; }
 
+        // ✅ NEW: Client-side bingo validation
+        function checkLocalBingo() {
+            if (!userCard || !userCard.length) return false;
+            const marked = [...markedNumbers, 'FREE'];
+            const lines = [];
+            // Rows
+            for (let r = 0; r < 5; r++) lines.push([userCard[r][0], userCard[r][1], userCard[r][2], userCard[r][3], userCard[r][4]]);
+            // Columns
+            for (let c = 0; c < 5; c++) lines.push([userCard[0][c], userCard[1][c], userCard[2][c], userCard[3][c], userCard[4][c]]);
+            // Diagonals
+            lines.push([userCard[0][0], userCard[1][1], userCard[2][2], userCard[3][3], userCard[4][4]]);
+            lines.push([userCard[0][4], userCard[1][3], userCard[2][2], userCard[3][1], userCard[4][0]]);
+            // Corners
+            lines.push([userCard[0][0], userCard[0][4], userCard[4][0], userCard[4][4]]);
+
+            for (const line of lines) {
+                if (line.every(v => v === 'FREE' || marked.includes(v))) return true;
+            }
+            return false;
+        }
+
+        // ✅ NEW: Shake animation + error toast
+        function triggerInvalidBingo() {
+            const btn = $('bingoBtn');
+            if (!btn) return;
+            btn.classList.remove('shake');
+            void btn.offsetWidth;              // force reflow to restart animation
+            btn.classList.add('shake');
+            setTimeout(() => btn.classList.remove('shake'), 650);
+            showToast(lang === 'am' ? data.am.invalidBingo : data.en.invalidBingo, 'error');
+        }
+
+        // ✅ NEW: Success flash
+        function triggerValidBingo() {
+            const btn = $('bingoBtn');
+            if (!btn) return;
+            btn.classList.add('success');
+            setTimeout(() => btn.classList.remove('success'), 800);
+        }
+
         async function connectToGame(stake) {
             if (!isAuthenticated) await authenticateUser();
             currentStake = stake;
@@ -1524,7 +1579,6 @@
             if (!initData) { alert('Open inside Telegram'); return; }
             if (socket) socket.disconnect();
 
-            // ✅ FIX #1: WebSocket-only transport
             socket = io({ transports: ['websocket'] });
 
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
@@ -1533,7 +1587,7 @@
                 if (state.stake === currentStake) {
                     selectedCardNumber = null; selectedNumber.textContent = '-';
                     userCard = []; markedNumbers = [];
-                    localCalledNumbers = [];   // ✅ FIX #4: Reset called history
+                    localCalledNumbers = [];
                     showLobby(state.startsIn);
                     if (state.takenNumbers) updateGrid(state.takenNumbers);
                     updateCount(state.playersCount);
@@ -1571,13 +1625,12 @@
                 if (data.stake !== currentStake) return;
                 if (data?.prizePool) winningBalance.innerText = data.prizePool;
                 if (data?.playersCount) updateCount(data.playersCount);
-                localCalledNumbers = [];   // ✅ FIX #4: Reset called history on new game
+                localCalledNumbers = [];
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
                 updateBackToLobbyVisibility();
             });
 
-            // ✅ FIX #5: Use local history instead of server-sent array
             socket.on('numberCalled', data => {
                 if (data.stake !== currentStake) return;
                 const num = data.number;
@@ -1604,7 +1657,12 @@
                 buildGrid();
                 const c = $('backToLobbyContainer'); if (c) c.classList.add('hidden');
             });
-            socket.on('invalidBingo', () => alert('Not a valid bingo yet!'));
+
+            // ✅ NEW: Server invalidBingo triggers shake instead of alert
+            socket.on('invalidBingo', () => {
+                triggerInvalidBingo();
+            });
+
             socket.on('depositStatus', d => alert(d.status === 'approved' ? `Deposit +${d.amount} ETB approved!` : 'Deposit rejected.'));
             socket.on('withdrawStatus', d => alert(d.status === 'approved' ? `Withdrawal -${d.amount} ETB processed.` : 'Withdrawal rejected.'));
         }
@@ -1665,7 +1723,22 @@
         $('stake20Btn')?.addEventListener('click', () => { loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
         $('stake30Btn')?.addEventListener('click', () => { loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
         $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumber.textContent = '...'; buildGrid(); updateBackToLobbyVisibility(); } unlockSpeech(); });
-        $('bingoBtn')?.addEventListener('click', () => { if (socket && isGameActive) socket.emit('claimBingo'); unlockSpeech(); });
+
+        // ✅ UPDATED: Client-side validation + shake feedback
+        $('bingoBtn')?.addEventListener('click', () => {
+            if (!socket || !isGameActive) return;
+            // Client-side check first — avoids unnecessary network round-trip
+            if (!checkLocalBingo()) {
+                triggerInvalidBingo();
+                unlockSpeech();
+                return;
+            }
+            // Valid bingo — flash green and send to server
+            triggerValidBingo();
+            socket.emit('claimBingo');
+            unlockSpeech();
+        });
+
         $('muteToggleBtn')?.addEventListener('click', toggleMute);
         $('backToStakeBtn')?.addEventListener('click', goStake);
         $('backToLobbyBtn')?.addEventListener('click', goStake);
