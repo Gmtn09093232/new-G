@@ -1,10 +1,7 @@
 // ================================================================
-//  server.js – Full Bingo Server with Admin Link Open Tracking
-//             & Manual Balance Adjustments Affecting Deposit Stats
-//             & 1500 ETB Limit for Manual Additions
-//             & Import Players by Username/Handle
-//             & DUPLICATE TRANSACTION NUMBER CHECK
-//             & SMART TRANSACTION NUMBER EXTRACTION
+//  server.js – Full Bingo Server
+//             with invite tracking (invite_code, admin_name)
+//             & FORCE INVITE ONLY (no invite → no account)
 // ================================================================
 
 require('dotenv').config();
@@ -125,36 +122,6 @@ const Audit = {
   adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details: d }),
   suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
 };
-
-// ================================================================
-//  Log Admin Link Open (for tracking invite link clicks)
-// ================================================================
-async function logAdminLinkOpen(inviteCode, userId, ip, userAgent) {
-  try {
-    let adminId = null;
-    if (inviteCode) {
-      const { data: admin } = await supabase
-        .from('admins')
-        .select('id')
-        .eq('invite_code', inviteCode)
-        .maybeSingle();
-      if (admin) adminId = admin.id;
-    }
-
-    const { error } = await supabase
-      .from('admin_link_opens')
-      .insert({
-        admin_id: adminId,
-        invite_code: inviteCode || null,
-        user_id: userId || null,
-        ip_address: ip,
-        user_agent: userAgent || null
-      });
-    if (error) console.error('Failed to log admin link open:', error.message);
-  } catch (err) {
-    console.error('Error logging admin link open:', err.message);
-  }
-}
 
 // ---------- Suspicious Activity Detector ----------
 const winTimestamps = new Map();
@@ -422,30 +389,26 @@ async function getAdminFromSession(req) {
 function extractTransactionNumber(text) {
   if (!text) return null;
   const trimmed = text.trim();
-  // 1. Check if it's a URL containing "receipt/"
   const urlMatch = trimmed.match(/https?:\/\/[^\s]+\/receipt\/([A-Za-z0-9]+)/i);
   if (urlMatch) return urlMatch[1].toUpperCase();
 
-  // 2. Look for "transaction number is", "transaction number:", "TID:", etc.
   const patterns = [
     /transaction\s+number\s+is\s+([A-Za-z0-9]+)/i,
     /transaction\s+number\s*[:]\s*([A-Za-z0-9]+)/i,
     /TID\s*[:=]\s*([A-Za-z0-9]+)/i,
     /reference\s*[:=]\s*([A-Za-z0-9]+)/i,
     /receipt\/([A-Za-z0-9]+)/i,
-    /\b([A-Za-z0-9]{8,16})\b/ // fallback: any 8-16 alphanumeric sequence
+    /\b([A-Za-z0-9]{8,16})\b/
   ];
   for (const pattern of patterns) {
     const match = trimmed.match(pattern);
     if (match) return match[1].toUpperCase();
   }
 
-  // 3. If the text itself looks like a transaction number (alphanumeric, 8+ chars)
   if (/^[A-Za-z0-9]{8,16}$/.test(trimmed)) {
     return trimmed.toUpperCase();
   }
 
-  // 4. Try to find any alphanumeric sequence of 8-16 chars
   const fallback = trimmed.match(/\b([A-Za-z0-9]{8,16})\b/);
   if (fallback) return fallback[1].toUpperCase();
 
@@ -469,46 +432,17 @@ app.get('/api/deposit-accounts', async (req, res) => {
       }
     }
 
-    let admins;
+    let admins = [];
     if (adminId) {
       const { data: admin, error } = await supabase
         .from('admins')
-        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits, is_fallback')
+        .select('id, name, telebirr_number, cbebirr_number, mpesa_number, accept_deposits')
         .eq('id', adminId)
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw error;
-
-      if (admin) {
-        if (admin.accept_deposits !== false) {
-          admins = [admin];
-        } else {
-          const { data: fallback, error: fallbackErr } = await supabase
-            .from('admins')
-            .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-            .eq('is_fallback', true)
-            .eq('is_active', true)
-            .maybeSingle();
-          if (fallbackErr) throw fallbackErr;
-          if (fallback) {
-            admins = [fallback];
-          } else {
-            admins = [];
-          }
-        }
-      } else {
-        const { data: fallback, error: fallbackErr } = await supabase
-          .from('admins')
-          .select('id, name, telebirr_number, cbebirr_number, mpesa_number')
-          .eq('is_fallback', true)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (fallbackErr) throw fallbackErr;
-        if (fallback) {
-          admins = [fallback];
-        } else {
-          admins = [];
-        }
+      if (admin && admin.accept_deposits !== false) {
+        admins = [admin];
       }
     } else {
       const { data: allAdmins, error: allErr } = await supabase
@@ -546,6 +480,7 @@ app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'adm
 app.get('/admin-auth', (req, res) => res.sendFile(path.join(__dirname, 'admin-auth.html')));
 app.get('/super-admin', (req, res) => res.sendFile(path.join(__dirname, 'super-admin.html')));
 app.get('/welcome', (req, res) => res.sendFile(path.join(__dirname, 'welcome.html')));
+app.get('/invite-tracking-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'invite-tracking-dashboard.html')));
 
 app.get('/admin/live-players', (req, res) => {
   const { secret } = req.query;
@@ -556,113 +491,192 @@ app.get('/admin/live-players', (req, res) => {
 // ---------- User cache ----------
 const users = {};
 
-// ---------- loadUser ----------
- async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
+// ============================================================
+//  loadUser – with FORCE INVITE ONLY
+// ============================================================
+async function loadUser(telegramId, username, telegramHandle = null, inviteCode = null, refresh = false, adminId = null) {
   const id = String(telegramId);
   if (!refresh && users[id]) {
     console.log(`👤 Cache hit for ${id}`);
     return users[id];
   }
   try {
-    const { data, error } = await supabase
+    // 1. Fetch user from DB
+    let { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('telegram_id', id)
       .maybeSingle();
     if (error) throw error;
 
+    // 2. If user exists, update with any missing invite info from invite_tracking
     if (data) {
-      // ─── NEW: If user has no admin and we have an invite code, assign the admin ───
       let needUpdate = false;
-      if (!data.admin_id && inviteCode) {
-        const { data: adminData, error: adminErr } = await supabase
-          .from('admins')
-          .select('id, name')
-          .eq('invite_code', inviteCode)
-          .eq('is_active', true)
+      // Check if we are missing invite_code or admin_id
+      if (!data.invite_code || !data.admin_id) {
+        // Look up the most recent invite_tracking entry for this user
+        const { data: inviteTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('invite_code, admin_id, admin_name')
+          .eq('telegram_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
-        if (!adminErr && adminData) {
-          data.admin_id = adminData.id;
-          data.assigned_admin_name = adminData.name;
-          needUpdate = true;
-          console.log(`🔗 User ${id} assigned to admin ${adminData.name} via invite code on login`);
+        if (!trackErr && inviteTrack) {
+          if (!data.invite_code && inviteTrack.invite_code) {
+            data.invite_code = inviteTrack.invite_code;
+            needUpdate = true;
+          }
+          if (!data.admin_id && inviteTrack.admin_id) {
+            data.admin_id = inviteTrack.admin_id;
+            data.admin_name = inviteTrack.admin_name || null;
+            needUpdate = true;
+          }
         }
       }
+
+      // Also, if we received an inviteCode via parameter, use that if not set
+      if (inviteCode && !data.invite_code) {
+        data.invite_code = inviteCode;
+        needUpdate = true;
+      }
+
+      // If admin not set but we have an invite code, try to assign admin from admins table
+      if (!data.admin_id && data.invite_code) {
+        const { data: admin, error: adminErr } = await supabase
+          .from('admins')
+          .select('id, name')
+          .eq('invite_code', data.invite_code)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (!adminErr && admin) {
+          data.admin_id = admin.id;
+          data.admin_name = admin.name;
+          needUpdate = true;
+        }
+      }
+
       if (needUpdate) {
         const { error: updateErr } = await supabase
           .from('users')
-          .update({ admin_id: data.admin_id, assigned_admin_name: data.assigned_admin_name })
+          .update({
+            invite_code: data.invite_code,
+            admin_id: data.admin_id,
+            admin_name: data.admin_name
+          })
           .eq('telegram_id', id);
-        if (updateErr) console.error('Failed to update admin_id:', updateErr.message);
+        if (updateErr) console.error('Failed to update user:', updateErr.message);
+        else console.log(`✅ Updated user ${id} with invite info (invite: ${data.invite_code}, admin: ${data.admin_name})`);
       }
-      // ─── End of new block ───
 
+      // Update cache and return
       users[id] = {
         id,
         username: data.username,
         balance: Number(data.balance),
         telegram_handle: data.telegram_handle,
-        referred_by: data.referred_by,
+        invite_code: data.invite_code,
         first_deposit_amount: data.first_deposit_amount || 0,
         admin_id: data.admin_id,
-        assigned_admin_name: data.assigned_admin_name
+        admin_name: data.admin_name
       };
-      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.assigned_admin_name || 'none'})`);
+      console.log(`✅ Loaded/refreshed user ${id} (balance: ${users[id].balance}, admin: ${data.admin_name || 'none'})`);
       return users[id];
     } else {
-      // ─── User does not exist – create new ───
+      // 3. User does not exist – create new
       console.log(`🆕 Creating new user ${id} with inviteCode: ${inviteCode || 'none'}`);
-      
+
+      // First, try to get invite data from invite_tracking
+      let finalInviteCode = inviteCode || null;
       let finalAdminId = adminId || null;
-      let adminName = null;
-      
-      if (!finalAdminId && inviteCode) {
-        const { data: adminData, error: adminErr } = await supabase
+      let finalAdminName = null;
+
+      if (!finalInviteCode || !finalAdminId) {
+        const { data: inviteTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('invite_code, admin_id, admin_name')
+          .eq('telegram_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!trackErr && inviteTrack) {
+          if (!finalInviteCode) finalInviteCode = inviteTrack.invite_code;
+          if (!finalAdminId) {
+            finalAdminId = inviteTrack.admin_id;
+            finalAdminName = inviteTrack.admin_name;
+          }
+        }
+      }
+
+      // If still no admin, try to find admin from the invite code
+      if (!finalAdminId && finalInviteCode) {
+        const { data: admin, error: adminErr } = await supabase
           .from('admins')
           .select('id, name')
-          .eq('invite_code', inviteCode)
+          .eq('invite_code', finalInviteCode)
           .eq('is_active', true)
           .maybeSingle();
-        if (!adminErr && adminData) {
-          finalAdminId = adminData.id;
-          adminName = adminData.name;
-          console.log(`🔗 User ${id} assigned to admin ${adminName} via invite code: ${inviteCode}`);
+        if (!adminErr && admin) {
+          finalAdminId = admin.id;
+          finalAdminName = admin.name;
         }
-      } else if (adminId) {
-        const { data: adminData, error: adminErr } = await supabase
-          .from('admins')
-          .select('name')
-          .eq('id', adminId)
-          .maybeSingle();
-        if (!adminErr && adminData) adminName = adminData.name;
       }
-      
+
+      // 🔒 FORCE INVITE ONLY – if no invite code, reject creation
+      if (!finalInviteCode) {
+        console.log(`❌ Blocked user creation for ${id} – no invite code provided.`);
+        throw new Error('Invite required. Please use an invite link from an admin to create an account.');
+      }
+
+      // Proceed with creation
       const newUser = {
         telegram_id: id,
         username: username || 'Player',
         telegram_handle: telegramHandle || null,
         balance: 10,
-        referred_by: inviteCode || null,
+        invite_code: finalInviteCode,
         first_deposit_amount: 0,
         admin_id: finalAdminId,
-        assigned_admin_name: adminName
+        admin_name: finalAdminName
       };
-      
+
       const { error: insertError } = await supabase.from('users').insert(newUser);
       if (insertError) throw insertError;
-      
-      // Note: invite_stats tracking has been removed per request
-      
+
+      // Optionally, update invite_tracking to link admin if missing
+      if (finalInviteCode && finalAdminId) {
+        const { data: existingTrack, error: trackErr } = await supabase
+          .from('invite_tracking')
+          .select('id')
+          .eq('telegram_id', id)
+          .eq('invite_code', finalInviteCode)
+          .maybeSingle();
+        if (!trackErr && !existingTrack) {
+          await supabase
+            .from('invite_tracking')
+            .insert({
+              telegram_id: id,
+              username: username || 'Player',
+              invite_code: finalInviteCode,
+              admin_id: finalAdminId,
+              admin_name: finalAdminName,
+              ip_address: null,
+              user_agent: null
+            });
+        }
+      }
+
       users[id] = {
         id,
         username: newUser.username,
         balance: 10,
         telegram_handle: newUser.telegram_handle,
-        referred_by: newUser.referred_by,
+        invite_code: newUser.invite_code,
         first_deposit_amount: 0,
         admin_id: newUser.admin_id,
-        assigned_admin_name: newUser.assigned_admin_name
+        admin_name: newUser.admin_name
       };
+      console.log(`✅ Created user ${id} with invite ${finalInviteCode}, admin ${finalAdminName || 'none'}`);
       return users[id];
     }
   } catch (err) {
@@ -670,6 +684,7 @@ const users = {};
     throw err;
   }
 }
+
 // ---------- Telegram verification ----------
 function verifyTelegram(initData) {
   try {
@@ -680,7 +695,7 @@ function verifyTelegram(initData) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join('\n');
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.TELEGRAM_BOT_TOKEN).digest();
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
     const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
     return calculatedHash === hash;
   } catch (err) {
@@ -689,7 +704,7 @@ function verifyTelegram(initData) {
   }
 }
 
-// ---------- Telegram auth (with link open logging) ----------
+// ---------- Telegram auth (with invite tracking) ----------
 app.post('/api/telegram-miniapp-auth', async (req, res) => {
   const { initData } = req.body;
   if (!initData || !verifyTelegram(initData)) {
@@ -705,9 +720,9 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
 
     const ip = req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress;
     const userAgent = req.headers['user-agent'] || null;
-    await logAdminLinkOpen(startParam, id, ip, userAgent);
 
-    const user = await loadUser(id, displayName, handle, startParam, false);
+    // Load user – this will now enforce invite for new users
+    const user = await loadUser(id, displayName, handle, startParam, !!startParam);
     req.session.userId = id;
     req.session.save((err) => {
       if (err) {
@@ -721,10 +736,15 @@ app.post('/api/telegram-miniapp-auth', async (req, res) => {
         balance: user.balance,
         telegram_handle: user.telegram_handle,
         admin_id: user.admin_id,
-        assigned_admin_name: user.assigned_admin_name
+        admin_name: user.admin_name,
+        invite_code: user.invite_code
       });
     });
   } catch (err) {
+    // Catch the "invite required" error and return a friendly message
+    if (err.message === 'Invite required. Please use an invite link from an admin to create an account.') {
+      return res.status(403).json({ success: false, error: 'Invite required. Please use an invite link from an admin.' });
+    }
     console.error('❌ Auth error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
@@ -796,8 +816,7 @@ app.post('/admin/register', async (req, res) => {
         telebirr_number: telebirr_number || null,
         cbebirr_number: cbebirr_number || null,
         mpesa_number: mpesa_number || null,
-        accept_deposits: true,
-        is_fallback: false
+        accept_deposits: true
       })
       .select()
       .single();
@@ -862,6 +881,200 @@ app.get('/admin/invite-info', async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching invite info:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Get User Invite Code ----------
+app.get('/api/user/invite-code', async (req, res) => {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'Not logged in' });
+  }
+
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('invite_code, admin_id, admin_name')
+      .eq('telegram_id', String(userId))
+      .maybeSingle();
+
+    if (error || !user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    // Get invite tracking info
+    const { data: inviteTrack, error: trackErr } = await supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('telegram_id', String(userId))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Also get admin info
+    let adminInfo = null;
+    if (user.admin_id) {
+      const { data: admin, error: adminErr } = await supabase
+        .from('admins')
+        .select('name, invite_code')
+        .eq('id', user.admin_id)
+        .maybeSingle();
+      if (!adminErr && admin) {
+        adminInfo = admin;
+      }
+    }
+
+    res.json({
+      success: true,
+      invite_code: user.invite_code,
+      admin_id: user.admin_id,
+      admin_name: user.admin_name,
+      admin: adminInfo,
+      invite_tracking: inviteTrack || null
+    });
+  } catch (err) {
+    console.error('Error fetching invite code:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------- Get Invite Tracking Stats ----------
+app.get('/admin/invite-tracking', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  try {
+    const { from, to, limit = 100 } = req.query;
+
+    let query = supabase
+      .from('invite_tracking')
+      .select('*')
+      .eq('admin_id', admin.id)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(parseInt(limit), 1000));
+
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', toDate.toISOString());
+    }
+
+    const { data: invites, error } = await query;
+    if (error) throw error;
+
+    // Get stats
+    const { data: allInvites, error: statsErr } = await supabase
+      .from('invite_tracking')
+      .select('telegram_id, created_at')
+      .eq('admin_id', admin.id);
+
+    if (statsErr) throw statsErr;
+
+    const totalInvites = allInvites.length;
+    const uniqueUsers = new Set(allInvites.map(i => i.telegram_id)).size;
+    
+    // Get daily stats
+    const dailyStats = {};
+    allInvites.forEach(invite => {
+      const date = new Date(invite.created_at).toISOString().split('T')[0];
+      if (!dailyStats[date]) dailyStats[date] = 0;
+      dailyStats[date]++;
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        totalInvites,
+        uniqueUsers,
+        dailyStats
+      },
+      invites: invites
+    });
+  } catch (err) {
+    console.error('Error fetching invite tracking:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- Admin endpoint to update user's invite code ----------
+app.post('/admin/update-invite-code', async (req, res) => {
+  const admin = await getAdminFromSession(req);
+  if (!admin) {
+    req.session.destroy();
+    return res.status(401).json({ error: 'Session expired or deactivated' });
+  }
+
+  const { telegramId, inviteCode } = req.body;
+  if (!telegramId || !inviteCode) {
+    return res.status(400).json({ error: 'Telegram ID and invite code required' });
+  }
+
+  try {
+    // Verify the user belongs to this admin
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('id, admin_id, username')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.admin_id !== admin.id) {
+      return res.status(403).json({ error: 'User not assigned to you' });
+    }
+
+    // Update user
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({ invite_code: inviteCode })
+      .eq('telegram_id', String(telegramId));
+
+    if (updateErr) throw updateErr;
+
+    // Update or insert invite tracking
+    const { data: existingTrack, error: trackFindErr } = await supabase
+      .from('invite_tracking')
+      .select('id')
+      .eq('telegram_id', String(telegramId))
+      .eq('invite_code', inviteCode)
+      .maybeSingle();
+
+    if (!trackFindErr && !existingTrack) {
+      await supabase
+        .from('invite_tracking')
+        .insert({
+          telegram_id: String(telegramId),
+          username: user.username,
+          invite_code: inviteCode,
+          admin_id: admin.id,
+          admin_name: admin.name
+        });
+    }
+
+    // Update cache
+    if (users[String(telegramId)]) {
+      users[String(telegramId)].invite_code = inviteCode;
+    }
+
+    await Audit.adminAction('UPDATE_INVITE_CODE', admin.id, req.ip, {
+      targetUserId: telegramId,
+      newInviteCode: inviteCode
+    });
+
+    res.json({ success: true, message: 'Invite code updated' });
+  } catch (err) {
+    console.error('Error updating invite code:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -1018,8 +1231,11 @@ const games = {
   30: createGameState(30)
 };
 
-// Bot constants
-const BOT_IDS = ['1945854', '8696548', '78963521', '45896872', '1236584'];
+// Bot constants – now 9 bots
+const BOT_IDS = [
+  '1945854', '8696548', '78963521', '45896872', '1236584',
+  '4567890', '9876543', '3216549', '7539512'
+];
 const botBalances = new Map();
 BOT_IDS.forEach(id => botBalances.set(id, 1000));
 
@@ -1120,20 +1336,7 @@ function removeBotFromGame(botId, stake) {
 }
 
 function checkAndAddThirdBot(stake) {
-  if (stake !== 20) return;
-  const game = getGame(stake);
-  if (!game || game.status !== 'lobby') return;
-  if (game.bot3Added) return;
-  const realPlayers = game.players.filter(p => !p.isBot);
-  if (realPlayers.length >= 3) {
-    game.bot3Added = true;
-    setTimeout(() => {
-      if (game.status !== 'lobby') return;
-      if (game.players.find(p => p.telegramId === BOT_IDS[2])) return;
-      addSingleBotToGame(BOT_IDS[2], stake);
-      console.log(`🤖 Third bot (${BOT_IDS[2]}) added because 3 real players joined.`);
-    }, 500);
-  }
+  return;
 }
 
 function updateBotsOnNumber(stake, number) {
@@ -1270,32 +1473,25 @@ function resetGame(stake) {
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
 
-  if (stake === 20 && forceBotWinNextGame[20]) {
-    game.forceActive = true;
-    game.forcedBotId = globalForcedBotId;
-    game.forcedCallCounter = 0;
-    console.log(`⏳ Forced win active for bot ${game.forcedBotId} on 21st call.`);
-  } else {
-    game.forceActive = false;
-    game.forcedBotId = null;
-  }
-
+  // ---- NEW BOT JOINING LOGIC FOR 20 ETB ----
   if (stake === 20) {
-    const scheduleBotAtRemaining = (botIndex, remainingSeconds) => {
-      if (botIndex >= BOT_IDS.length) return;
-      const absoluteTime = game.lobbyEndTime - remainingSeconds * 1000;
-      const delay = absoluteTime - Date.now();
-      if (delay <= 0) return;
+    const lobbyDuration = 45000;
+    const botsToSchedule = BOT_IDS;
+    for (const botId of botsToSchedule) {
+      const delay = 1000 + Math.random() * (lobbyDuration - 2000);
       const timeout = setTimeout(() => {
-        if (game.status !== 'lobby') return;
-        const botId = BOT_IDS[botIndex];
-        if (game.players.find(p => p.telegramId === botId)) return;
-        addSingleBotToGame(botId, stake);
+        if (game.status === 'lobby' && !game.players.find(p => p.telegramId === botId)) {
+          addSingleBotToGame(botId, stake);
+        }
       }, delay);
       game.botTimeouts.push(timeout);
-    };
-    scheduleBotAtRemaining(0, 41);
-    scheduleBotAtRemaining(1, 39);
+    }
+  }
+  // -----------------------------------------
+
+  if (stake === 20) {
+    game.forceActive = false;
+    game.forcedBotId = null;
   }
 
   io.to(`stake_${stake}`).emit('lobbyState', {
@@ -1737,7 +1933,6 @@ app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bo
 app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ---------- Player deposit endpoints ----------
-// Custom handler for deposit with optional photo and invoice number
 const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
@@ -1750,12 +1945,10 @@ const handleDepositRequest = async (req, res) => {
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
-  // Require either a photo or a transaction reference (invoice)
   if (!photoFile && !transaction_reference) {
     return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
   }
 
-  // --- EXTRACT TRANSACTION NUMBER ---
   let extractedTxn = null;
   if (transaction_reference) {
     extractedTxn = extractTransactionNumber(transaction_reference);
@@ -1764,7 +1957,6 @@ const handleDepositRequest = async (req, res) => {
     }
   }
 
-  // --- DUPLICATE CHECK ON EXTRACTED NUMBER ---
   if (extractedTxn) {
     const { data: existing, error: dupErr } = await supabase
       .from('deposit_requests')
@@ -1796,18 +1988,6 @@ const handleDepositRequest = async (req, res) => {
 
     const user = await loadUser(userId, null, null, null, false);
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Assign admin if not set
-    if (!user.admin_id) {
-      await supabase
-        .from('users')
-        .update({ admin_id: admin.id, assigned_admin_name: admin.name })
-        .eq('telegram_id', userId);
-      if (users[userId]) {
-        users[userId].admin_id = admin.id;
-        users[userId].assigned_admin_name = admin.name;
-      }
-    }
 
     let photoUrl = null;
     if (photoFile) {
@@ -1852,7 +2032,6 @@ const handleDepositRequest = async (req, res) => {
       photoUrl = publicUrlData?.publicUrl || null;
     }
 
-    // Insert deposit request with extracted transaction number
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId,
       username: user.username,
@@ -1860,7 +2039,7 @@ const handleDepositRequest = async (req, res) => {
       status: 'pending',
       phone: phone || null,
       payment_type,
-      transaction_reference: extractedTxn, // store only the extracted number
+      transaction_reference: extractedTxn,
       proof_photo_url: photoUrl,
       admin_id: admin.id,
       assigned_deposit_number: admin[methodField]
@@ -1893,25 +2072,19 @@ const handleDepositRequest = async (req, res) => {
   }
 };
 
-// Use multer with single file, but we handle errors to make it optional
 const uploadSingle = upload.single('photo');
 app.post('/api/request-deposit', (req, res, next) => {
   uploadSingle(req, res, function(err) {
     if (err) {
-      // If it's a multer error related to file size or unexpected file, return error
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'File too large (max 5MB)' });
       }
       if (err.code === 'LIMIT_UNEXPECTED_FILE') {
         return res.status(400).json({ error: 'Unexpected file field' });
       }
-      // For other errors (e.g., invalid file type), we can still continue if it's not a file error?
-      // But if it's a file type error, we should reject.
       if (err.message && err.message.includes('Only images are allowed')) {
         return res.status(400).json({ error: err.message });
       }
-      // Otherwise, if no file is present, multer may throw a 'LIMIT_FILE_COUNT'? Actually it won't.
-      // We'll just proceed; req.file will be undefined.
     }
     handleDepositRequest(req, res);
   });
@@ -1937,7 +2110,7 @@ app.post('/api/request-withdraw', async (req, res) => {
     if (!user || user.balance < amt) return res.status(400).json({ error: 'Insufficient balance' });
 
     let adminId = user.admin_id;
-    let adminName = user.assigned_admin_name;
+    let adminName = user.admin_name;
     if (!adminId) {
       const admins = await getAllAdmins();
       if (admins.length > 0) { adminId = admins[0].id; adminName = admins[0].name; }
@@ -1952,7 +2125,7 @@ app.post('/api/request-withdraw', async (req, res) => {
       withdrawal_type,
       receiver_name: receiverName,
       admin_id: adminId,
-      assigned_admin_name: adminName
+      admin_name: adminName
     }).select().single();
 
     if (error) throw error;
@@ -1981,9 +2154,6 @@ app.post('/api/request-withdraw', async (req, res) => {
 
 // ---------- Admin endpoints (session-based) ----------
 
-// ============================================================
-//  UPDATED: /admin/deposits with date, method, status filters + depositBalance + photoUrl
-// ============================================================
 app.get('/admin/deposits', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2041,9 +2211,6 @@ app.get('/admin/deposits', async (req, res) => {
   });
 });
 
-// ============================================================
-//  UPDATED: /admin/withdrawals with date, method, status filters
-// ============================================================
 app.get('/admin/withdrawals', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2085,8 +2252,6 @@ app.get('/admin/withdrawals', async (req, res) => {
   res.json({ requests: data, admin: { id: admin.id, name: admin.name, phone: admin.phone } });
 });
 
-// ---------- Other Admin Endpoints ----------
-// ---- GET admin holding balance ----
 app.get('/admin/holding-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2102,7 +2267,6 @@ app.get('/admin/holding-balance', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/process-deposit with holding limit 1500 ETB ----
 app.post('/admin/process-deposit', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2184,7 +2348,6 @@ app.post('/admin/process-deposit', async (req, res) => {
   }
 });
 
-// ---- UPDATED: /admin/stats – includes positive adjustments in deposit totals ----
 app.get('/admin/stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2256,7 +2419,6 @@ app.get('/admin/stats', async (req, res) => {
   }
 });
 
-// ---- Other admin endpoints (players) unchanged ----
 app.get('/admin/players', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2288,10 +2450,6 @@ app.get('/admin/players', async (req, res) => {
   }
 });
 
-// ============================================================
-//  UPDATED: MANUAL PLAYER BALANCE ADJUSTMENT 
-//  – now checks 1500 ETB holding limit for additions
-// ============================================================
 app.post('/admin/update-player-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -2306,7 +2464,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
   if (!['add', 'subtract'].includes(operation)) return res.status(400).json({ error: 'Operation must be "add" or "subtract"' });
 
   try {
-    // 1. Verify the player exists and is assigned to this admin
     const { data: user, error: userErr } = await supabase
       .from('users')
       .select('*')
@@ -2317,7 +2474,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
       return res.status(403).json({ error: 'This player is not assigned to you' });
     }
 
-    // 2. Enforce 1500 ETB holding limit for additions
     if (operation === 'add') {
       const currentHolding = await getAdminHoldingBalance(admin.id);
       if (currentHolding + amt > 1500) {
@@ -2336,14 +2492,12 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance -= amt;
     }
 
-    // 3. Update the balance in the database
     const { error: updateErr } = await supabase
       .from('users')
       .update({ balance: newBalance })
       .eq('telegram_id', telegramId);
     if (updateErr) throw updateErr;
 
-    // 4. Record the adjustment in admin_deposit_adjustments
     const adjustmentAmount = operation === 'add' ? amt : -amt;
     const { error: adjErr } = await supabase
       .from('admin_deposit_adjustments')
@@ -2357,14 +2511,12 @@ app.post('/admin/update-player-balance', async (req, res) => {
       });
     if (adjErr) console.error('Failed to record adjustment:', adjErr.message);
 
-    // 5. Update in‑memory cache
     if (users[telegramId]) {
       users[telegramId].balance = newBalance;
     } else {
       await loadUser(telegramId, user.username, user.telegram_handle, null, true);
     }
 
-    // 6. Audit log
     await Audit.adminAction('ADMIN_MANUAL_BALANCE_ADJUST', admin.id, req.ip, {
       targetUserId: telegramId,
       operation,
@@ -2373,7 +2525,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
       newBalance
     });
 
-    // 7. Notify the player via WebSocket if connected
     const playerSocket = await getSocketByUserId(telegramId);
     if (playerSocket) {
       playerSocket.emit('balanceUpdate', newBalance);
@@ -2385,8 +2536,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// ============================================================
 
 app.post('/admin/process-withdrawal', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -2811,7 +2960,6 @@ app.post('/admin/process-admin-withdrawal', async (req, res) => {
 //  SUPER ADMIN ENDPOINTS – with secret support and filters
 // ============================================================
 
-// Helper: accept secret OR session
 async function authSuperAdmin(req, res) {
   const secret = req.query.secret || req.body.secret;
   const validSecret = process.env.ADMIN_SECRET || '01207';
@@ -2830,7 +2978,6 @@ async function authSuperAdmin(req, res) {
   return { success: false, error: 'Unauthorized – valid secret or super admin session required' };
 }
 
-// ---------- GET all admins (includes adjusted deposit balance) ----------
 app.get('/super-admin/admins', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2889,7 +3036,6 @@ app.get('/super-admin/admins', async (req, res) => {
   }
 });
 
-// ---------- GET admin detail (includes adjustments) ----------
 app.get('/super-admin/admin/:adminId', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2960,7 +3106,6 @@ app.get('/super-admin/admin/:adminId', async (req, res) => {
   }
 });
 
-// ---------- Toggle admin ----------
 app.post('/super-admin/toggle-admin', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -2990,7 +3135,6 @@ app.post('/super-admin/toggle-admin', async (req, res) => {
   }
 });
 
-// ---------- Update commission ----------
 app.post('/super-admin/update-commission', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3018,7 +3162,6 @@ app.post('/super-admin/update-commission', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin toggle deposit acceptance ----------
 app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3046,38 +3189,6 @@ app.post('/super-admin/toggle-deposit-acceptance', async (req, res) => {
   }
 });
 
-// ---------- NEW: Super admin set fallback admin ----------
-app.post('/super-admin/set-fallback-admin', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-
-  const { adminId } = req.body;
-  if (!adminId) return res.status(400).json({ error: 'Admin ID required' });
-
-  try {
-    // Reset all admins' is_fallback to false, then set the chosen one
-    await supabase
-      .from('admins')
-      .update({ is_fallback: false });
-
-    const { error } = await supabase
-      .from('admins')
-      .update({ is_fallback: true })
-      .eq('id', adminId);
-    if (error) throw error;
-
-    Audit.adminAction('SUPER_ADMIN_SET_FALLBACK', auth.adminId || 'secret', req.ip, {
-      targetAdminId: adminId
-    });
-
-    res.json({ success: true, message: `Admin ${adminId} set as fallback` });
-  } catch (err) {
-    console.error('Error setting fallback admin:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ---------- Super admin adjust deposit balance ----------
 app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3128,8 +3239,52 @@ app.post('/super-admin/adjust-deposit-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ============================================================
+//  SUPER ADMIN – Send Telegram Message to Player
+// ============================================================
+app.post('/super-admin/send-telegram-message', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
 
-// ---------- GET admin withdrawal requests (with filters) ----------
+  const { userId, message } = req.body;
+  if (!userId || !message) {
+    return res.status(400).json({ error: 'Missing userId or message' });
+  }
+
+  // ✅ Use the same bot token from environment variables
+  const BOT_TOKEN = process.env.BOT_TOKEN;
+  if (!BOT_TOKEN) {
+    return res.status(500).json({ success: false, error: 'BOT_TOKEN not configured in environment' });
+  }
+
+  const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+
+    const data = await response.json();
+    if (data.ok) {
+      res.json({ success: true, result: data.result });
+    } else {
+      let errorMsg = data.description || 'Telegram API error';
+      if (errorMsg.includes('chat not found')) {
+        errorMsg = 'User has not started the bot yet. Ask them to open the game first.';
+      }
+      throw new Error(errorMsg);
+    }
+  } catch (error) {
+    console.error('Telegram send error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 app.get('/super-admin/admin-withdrawals', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3165,7 +3320,6 @@ app.get('/super-admin/admin-withdrawals', async (req, res) => {
   }
 });
 
-// ---------- Process admin withdrawal (FIXED) ----------
 app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3217,7 +3371,6 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   }
 });
 
-// ---------- GET platform stats (with filters) ----------
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
@@ -3319,9 +3472,534 @@ app.get('/super-admin/platform-stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// ============================================================
+//  GET ALL REGISTERED PLAYERS (with admin info) – DEBUG VERSION
+// ============================================================
+app.get('/super-admin/players', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  try {
+    const { adminId, search, limit = 100, page = 1 } = req.query;
+    console.log(`📥 /super-admin/players called with: adminId=${adminId}, search=${search}, page=${page}`);
+
+    // ─── STEP 1: SIMPLE COUNT – just to verify the table has rows ───
+    const { count: totalCount, error: countErr } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+    if (countErr) {
+      console.error('❌ Count error:', countErr);
+      return res.status(500).json({ success: false, error: countErr.message });
+    }
+    console.log(`📊 Total users in table: ${totalCount}`);
+
+    // ─── STEP 2: BUILD QUERY WITHOUT ANY FILTERS FIRST ───
+    let query = supabase.from('users').select('*', { count: 'exact' });
+
+    // Apply filters only if provided
+    if (adminId && adminId !== 'all') {
+      query = query.eq('admin_id', adminId);
+      console.log(`🔍 Filtering by admin_id = ${adminId}`);
+    }
+    if (search) {
+      query = query.or(`username.ilike.%${search}%,telegram_handle.ilike.%${search}%,telegram_id.ilike.%${search}%`);
+      console.log(`🔍 Searching for "${search}"`);
+    }
+
+    const limitNum = Math.min(parseInt(limit) || 100, 1000);
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const offset = (pageNum - 1) * limitNum;
+
+    // ─── STEP 3: EXECUTE WITH PAGINATION (NO ORDERING) ───
+    // Ordering can cause issues if the column doesn't exist or is not indexed.
+    // We'll try without ordering first, then add it optionally.
+    const { data, error, count } = await query
+      .range(offset, offset + limitNum - 1);
+
+    if (error) {
+      console.error('❌ Supabase query error:', error);
+      // If error, try a plain select without any filters
+      const { data: fallbackData, error: fallbackErr, count: fallbackCount } = await supabase
+        .from('users')
+        .select('*', { count: 'exact' })
+        .range(offset, offset + limitNum - 1);
+      if (fallbackErr) {
+        console.error('❌ Fallback error:', fallbackErr);
+        return res.status(500).json({ success: false, error: fallbackErr.message });
+      }
+      console.log(`✅ Fallback returned ${fallbackData?.length || 0} rows`);
+      return res.json({
+        success: true,
+        players: fallbackData || [],
+        total: fallbackCount || 0,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil((fallbackCount || 0) / limitNum)
+      });
+    }
+
+    console.log(`✅ Query returned ${data?.length || 0} rows (total: ${count})`);
+
+    // ─── STEP 4: FETCH ADMIN NAMES ───
+    const adminIds = [...new Set(data.map(u => u.admin_id).filter(id => id))];
+    let adminsMap = {};
+    if (adminIds.length) {
+      const { data: admins, error: adminErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .in('id', adminIds);
+      if (!adminErr) {
+        adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
+      }
+    }
+
+    const players = data.map(u => ({
+      ...u,
+      admin_name: u.admin_id ? adminsMap[u.admin_id] || null : null
+    }));
+
+    res.json({
+      success: true,
+      players,
+      total: count,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(count / limitNum)
+    });
+  } catch (err) {
+    console.error('❌ Error in /super-admin/players:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+// ============================================================
+//  SUPER ADMIN – ANALYSIS (per admin & game)
+// ============================================================
+app.get('/super-admin/analysis', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  try {
+    const { from, to, adminId } = req.query;
+
+    // 1. Build query for contributions joined with game rounds
+    let query = supabase
+      .from('game_admin_contributions')
+      .select(`
+        admin_id,
+        house_profit_share,
+        game_rounds!inner (
+          id,
+          stake,
+          created_at
+        )
+      `);
+
+    // Apply date filters
+    if (from) {
+      const fromDate = new Date(from);
+      fromDate.setHours(0,0,0,0);
+      query = query.gte('game_rounds.created_at', fromDate.toISOString());
+    }
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23,59,59,999);
+      query = query.lte('game_rounds.created_at', toDate.toISOString());
+    }
+
+    // Admin filter
+    if (adminId && adminId !== 'all') {
+      query = query.eq('admin_id', adminId);
+    }
+
+    const { data: contributions, error: contribErr } = await query;
+    if (contribErr) throw contribErr;
+    if (!contributions || contributions.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    // 2. Group by admin_id and stake
+    const grouped = {};
+    for (const row of contributions) {
+      const adminId = row.admin_id;
+      const stake = row.game_rounds.stake;
+      const key = `${adminId}-${stake}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          admin_id: adminId,
+          stake: stake,
+          total_commission: 0,
+          // We'll count players later
+        };
+      }
+      grouped[key].total_commission += Number(row.house_profit_share) || 0;
+    }
+
+    // 3. Fetch admin names and player counts
+    const adminIds = [...new Set(Object.values(grouped).map(g => g.admin_id))];
+    let adminsMap = {};
+    if (adminIds.length) {
+      const { data: admins, error: adminErr } = await supabase
+        .from('admins')
+        .select('id, name')
+        .in('id', adminIds);
+      if (!adminErr) {
+        adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
+      }
+    }
+
+    // 4. Fetch player counts per admin (total users assigned to that admin)
+    const playerCounts = {};
+    if (adminIds.length) {
+      const { data: users, error: userErr } = await supabase
+        .from('users')
+        .select('admin_id')
+        .in('admin_id', adminIds);
+      if (!userErr && users) {
+        for (const u of users) {
+          const id = u.admin_id;
+          if (!playerCounts[id]) playerCounts[id] = 0;
+          playerCounts[id]++;
+        }
+      }
+    }
+
+    // 5. Build result rows
+    const result = [];
+    for (const key of Object.keys(grouped)) {
+      const g = grouped[key];
+      const adminName = adminsMap[g.admin_id] || `Admin ${g.admin_id}`;
+      const playerCount = playerCounts[g.admin_id] || 0;
+      // For "game_name", use stake as a label
+      const gameName = `Bingo ${g.stake} ETB`;
+      // Admin share = total_commission (since it's already the admin's share)
+      result.push({
+        game_name: gameName,
+        admin_name: adminName,
+        player_count: playerCount,
+        total_commission: g.total_commission,
+        admin_share: g.total_commission   // same as commission because it's already the admin's cut
+      });
+    }
+
+    // Sort by game name then admin
+    result.sort((a, b) => a.game_name.localeCompare(b.game_name) || a.admin_name.localeCompare(b.admin_name));
+
+    res.json({ success: true, data: result });
+
+  } catch (err) {
+    console.error('❌ Analysis error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // ============================================================
-//  UPDATED: IMPORT PLAYERS – accepts username/handle as well as numeric ID
+//  SUPER ADMIN – DELETE PLAYER (single)
+// ============================================================
+app.delete('/super-admin/delete-player', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramId } = req.body;
+  if (!telegramId) {
+    return res.status(400).json({ error: 'telegramId is required' });
+  }
+
+  try {
+    // 1. Check if user exists
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    // 2. Delete the user from users table
+    const { error: deleteErr } = await supabase
+      .from('users')
+      .delete()
+      .eq('telegram_id', String(telegramId));
+
+    if (deleteErr) throw deleteErr;
+
+    // 3. Remove from in-memory cache
+    if (users[String(telegramId)]) {
+      delete users[String(telegramId)];
+    }
+
+    // 4. Remove from any active games
+    for (const stake of [10, 20, 30]) {
+      const game = getGame(stake);
+      if (!game) continue;
+      const idx = game.players.findIndex(p => p.telegramId === String(telegramId));
+      if (idx !== -1) {
+        const player = game.players[idx];
+        if (player.cardNumber) {
+          game.takenCardNumbers.delete(player.cardNumber);
+        }
+        game.players.splice(idx, 1);
+        io.to(`stake_${stake}`).emit('cardTaken', {
+          stake,
+          number: player.cardNumber,
+          takenNumbers: Array.from(game.takenCardNumbers)
+        });
+        broadcastPlayerCount(stake);
+        notifyAdminClients();
+      }
+    }
+
+    // 5. Audit log
+    await Audit.adminAction('SUPER_ADMIN_DELETE_PLAYER', auth.adminId || 'secret', req.ip, {
+      targetUserId: telegramId,
+      username: user.username,
+      adminId: user.admin_id
+    });
+
+    res.json({ success: true, message: `Player ${telegramId} deleted successfully` });
+
+  } catch (err) {
+    console.error('❌ Error deleting player:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+//  SUPER ADMIN – TRANSFER PLAYER (single)
+// ============================================================
+app.post('/super-admin/transfer-player', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramId, targetAdminId } = req.body;
+  if (!telegramId || !targetAdminId) {
+    return res.status(400).json({ error: 'telegramId and targetAdminId are required' });
+  }
+
+  try {
+    // 1. Check if user exists
+    const { data: user, error: findErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id, admin_name, invite_code')
+      .eq('telegram_id', String(telegramId))
+      .maybeSingle();
+
+    if (findErr || !user) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    // 2. Check if target admin exists and is active
+    const { data: targetAdmin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, invite_code')
+      .eq('id', targetAdminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !targetAdmin) {
+      return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
+    }
+
+    // 3. Update user with new admin
+    const { error: updateErr } = await supabase
+      .from('users')
+      .update({
+        admin_id: targetAdmin.id,
+        admin_name: targetAdmin.name,
+        invite_code: targetAdmin.invite_code || user.invite_code
+      })
+      .eq('telegram_id', String(telegramId));
+
+    if (updateErr) throw updateErr;
+
+    // 4. Update in-memory cache
+    if (users[String(telegramId)]) {
+      users[String(telegramId)].admin_id = targetAdmin.id;
+      users[String(telegramId)].admin_name = targetAdmin.name;
+    }
+
+    // 5. Update invite_tracking
+    const { data: existingTrack, error: trackFindErr } = await supabase
+      .from('invite_tracking')
+      .select('id')
+      .eq('telegram_id', String(telegramId))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!trackFindErr && existingTrack) {
+      await supabase
+        .from('invite_tracking')
+        .update({
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          invite_code: targetAdmin.invite_code || user.invite_code
+        })
+        .eq('id', existingTrack.id);
+    } else {
+      await supabase
+        .from('invite_tracking')
+        .insert({
+          telegram_id: String(telegramId),
+          username: user.username,
+          invite_code: targetAdmin.invite_code || user.invite_code,
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          ip_address: req.ip || null,
+          user_agent: req.headers['user-agent'] || null
+        });
+    }
+
+    // 6. Audit log
+    await Audit.adminAction('SUPER_ADMIN_TRANSFER_PLAYER', auth.adminId || 'secret', req.ip, {
+      targetUserId: telegramId,
+      username: user.username,
+      fromAdminId: user.admin_id,
+      fromAdminName: user.admin_name,
+      toAdminId: targetAdmin.id,
+      toAdminName: targetAdmin.name
+    });
+
+    res.json({
+      success: true,
+      message: `Player ${telegramId} transferred to ${targetAdmin.name}`,
+      player: {
+        telegram_id: telegramId,
+        username: user.username,
+        admin_id: targetAdmin.id,
+        admin_name: targetAdmin.name
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ Error transferring player:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+//  SUPER ADMIN – BULK TRANSFER PLAYERS
+// ============================================================
+app.post('/super-admin/transfer-players', async (req, res) => {
+  const auth = await authSuperAdmin(req, res);
+  if (!auth.success) return res.status(401).json({ error: auth.error });
+
+  const { telegramIds, targetAdminId } = req.body;
+  if (!telegramIds || !Array.isArray(telegramIds) || telegramIds.length === 0) {
+    return res.status(400).json({ error: 'telegramIds array is required' });
+  }
+  if (!targetAdminId) {
+    return res.status(400).json({ error: 'targetAdminId is required' });
+  }
+
+  try {
+    // 1. Verify target admin exists and is active
+    const { data: targetAdmin, error: adminErr } = await supabase
+      .from('admins')
+      .select('id, name, invite_code')
+      .eq('id', targetAdminId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (adminErr || !targetAdmin) {
+      return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
+    }
+
+    // 2. Fetch all selected users
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('telegram_id, username, admin_id, admin_name, invite_code')
+      .in('telegram_id', telegramIds.map(id => String(id)));
+
+    if (usersErr) throw usersErr;
+    if (!users || users.length === 0) {
+      return res.status(404).json({ success: false, error: 'No valid players found' });
+    }
+
+    // 3. Update each user's admin
+    const updatedUsers = [];
+    for (const user of users) {
+      const { error: updateErr } = await supabase
+        .from('users')
+        .update({
+          admin_id: targetAdmin.id,
+          admin_name: targetAdmin.name,
+          invite_code: targetAdmin.invite_code || user.invite_code
+        })
+        .eq('telegram_id', user.telegram_id);
+
+      if (updateErr) {
+        console.error(`Failed to update user ${user.telegram_id}:`, updateErr.message);
+        continue; // skip this user, but continue with others
+      }
+
+      // Update in-memory cache
+      if (users[user.telegram_id]) {
+        users[user.telegram_id].admin_id = targetAdmin.id;
+        users[user.telegram_id].admin_name = targetAdmin.name;
+      }
+
+      // Update invite_tracking
+      const { data: existingTrack, error: trackFindErr } = await supabase
+        .from('invite_tracking')
+        .select('id')
+        .eq('telegram_id', user.telegram_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!trackFindErr && existingTrack) {
+        await supabase
+          .from('invite_tracking')
+          .update({
+            admin_id: targetAdmin.id,
+            admin_name: targetAdmin.name,
+            invite_code: targetAdmin.invite_code || user.invite_code
+          })
+          .eq('id', existingTrack.id);
+      } else {
+        await supabase
+          .from('invite_tracking')
+          .insert({
+            telegram_id: user.telegram_id,
+            username: user.username,
+            invite_code: targetAdmin.invite_code || user.invite_code,
+            admin_id: targetAdmin.id,
+            admin_name: targetAdmin.name,
+            ip_address: req.ip || null,
+            user_agent: req.headers['user-agent'] || null
+          });
+      }
+
+      updatedUsers.push({
+        telegram_id: user.telegram_id,
+        username: user.username
+      });
+    }
+
+    // 4. Audit log
+    await Audit.adminAction('SUPER_ADMIN_BULK_TRANSFER_PLAYERS', auth.adminId || 'secret', req.ip, {
+      targetAdminId: targetAdmin.id,
+      targetAdminName: targetAdmin.name,
+      playersTransferred: updatedUsers.length,
+      playerIds: updatedUsers.map(u => u.telegram_id)
+    });
+
+    res.json({
+      success: true,
+      message: `${updatedUsers.length} player(s) transferred to ${targetAdmin.name}`,
+      transferred: updatedUsers
+    });
+
+  } catch (err) {
+    console.error('❌ Error in bulk transfer:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+//  UPDATED: IMPORT PLAYERS – DOES NOT ASSIGN ADMIN
 // ============================================================
 app.post('/admin/import-players', async (req, res) => {
   const admin = await getAdminFromSession(req);
@@ -3348,11 +4026,9 @@ app.post('/admin/import-players', async (req, res) => {
       }
 
       let telegramId = null;
-      // Check if it's a numeric ID
       if (/^\d+$/.test(identifier)) {
         telegramId = identifier;
       } else {
-        // Try to find by telegram_handle or username (case-insensitive)
         const searchTerm = identifier.startsWith('@') ? identifier.slice(1) : identifier;
         const { data: user, error } = await supabase
           .from('users')
@@ -3370,7 +4046,6 @@ app.post('/admin/import-players', async (req, res) => {
         telegramId = user.telegram_id;
       }
 
-      // Proceed with assignment/creation using the resolved telegramId
       try {
         let { data: existingUser, error: findErr } = await supabase
           .from('users')
@@ -3393,10 +4068,8 @@ app.post('/admin/import-players', async (req, res) => {
             telegram_id: telegramId,
             username: `Player_${telegramId.slice(-4)}`,
             balance: 10,
-            referred_by: null,
+            invite_code: null,
             first_deposit_amount: 0,
-            admin_id: admin.id,
-            assigned_admin_name: admin.name,
             telegram_handle: null
           };
           const { error: insertErr } = await supabase.from('users').insert(newUser);
@@ -3409,31 +4082,15 @@ app.post('/admin/import-players', async (req, res) => {
             username: newUser.username,
             balance: newUser.balance,
             telegram_handle: null,
-            referred_by: null,
+            invite_code: null,
             first_deposit_amount: 0,
-            admin_id: newUser.admin_id,
-            assigned_admin_name: newUser.assigned_admin_name
+            admin_id: null,
+            admin_name: null
           };
           results.push({ telegramId, success: true, created: true });
           successCount++;
         } else {
-          const { error: updateErr } = await supabase
-            .from('users')
-            .update({
-              admin_id: admin.id,
-              assigned_admin_name: admin.name
-            })
-            .eq('telegram_id', telegramId);
-          if (updateErr) {
-            results.push({ telegramId, success: false, error: updateErr.message });
-            continue;
-          }
-          if (users[telegramId]) {
-            users[telegramId].admin_id = admin.id;
-            users[telegramId].assigned_admin_name = admin.name;
-          }
-          results.push({ telegramId, success: true, updated: true });
-          successCount++;
+          results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
         }
       } catch (err) {
         results.push({ telegramId, success: false, error: err.message });
@@ -3503,9 +4160,6 @@ app.get('/admin/stats-summary', async (req, res) => {
   }
 });
 
-// ---------- Referral endpoints (removed invite_stats) ----------
-// (Invite stats endpoints have been removed per request)
-
 // ---------- Audit endpoints ----------
 app.get('/admin/audit', async (req, res) => {
   const { secret } = req.query;
@@ -3546,7 +4200,6 @@ app.get('/admin/audit-summary', async (req, res) => {
   }
 });
 
-// ---------- NEW: Admin link stats endpoint (optional) ----------
 app.get('/admin/link-stats', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) {
@@ -3576,6 +4229,142 @@ app.get('/admin/link-stats', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ================================================================
+//  TELEGRAM BOT (Integrated) – FIXED with invite tracking
+// ================================================================
+const botToken = process.env.BOT_TOKEN;
+if (!botToken) {
+  console.warn('⚠️ BOT_TOKEN is not set – Telegram bot disabled');
+} else {
+  try {
+    const TelegramBot = require('node-telegram-bot-api');
+    const bot = new TelegramBot(botToken, { polling: true });
+    console.log('🤖 Telegram bot started (polling)');
+
+    bot.onText(/\/start(.+)?/, async (msg, match) => {
+      const chatId = msg.chat.id;
+      const startParam = match[1] ? match[1].trim() : '';
+      const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
+
+      // Pass start parameter to web app URL
+      const webAppUrlWithParam = startParam 
+        ? `${webAppUrl}?start_param=${startParam}` 
+        : webAppUrl;
+
+      if (startParam) {
+        const userId = msg.from.id.toString();
+        const username = msg.from.username || msg.from.first_name || 'Unknown';
+
+        console.log(`🔗 User ${userId} opened invite link with code: ${startParam}`);
+
+        // Look up admin by invite code
+        let adminId = null;
+        let adminName = null;
+        try {
+          const { data: admin } = await supabase
+            .from('admins')
+            .select('id, name')
+            .eq('invite_code', startParam)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (admin) {
+            adminId = admin.id;
+            adminName = admin.name;
+          }
+        } catch (e) {
+          console.error('Error looking up admin:', e.message);
+        }
+
+        // Insert/Update invite_tracking
+        try {
+          const { data: existing } = await supabase
+            .from('invite_tracking')
+            .select('id')
+            .eq('telegram_id', userId)
+            .eq('invite_code', startParam)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase
+              .from('invite_tracking')
+              .update({
+                username: username,
+                admin_id: adminId,
+                admin_name: adminName,
+                user_agent: 'telegram_bot'
+              })
+              .eq('id', existing.id);
+            console.log(`✅ Updated invite_tracking for ${userId}`);
+          } else {
+            await supabase
+              .from('invite_tracking')
+              .insert({
+                telegram_id: userId,
+                username: username,
+                invite_code: startParam,
+                admin_id: adminId,
+                admin_name: adminName,
+                ip_address: null,
+                user_agent: 'telegram_bot'
+              });
+            console.log(`✅ Inserted invite_tracking for ${userId}`);
+          }
+        } catch (e) {
+          console.error('Error with invite_tracking:', e.message);
+        }
+
+        // Update users table (if user exists)
+        try {
+          const { data: user } = await supabase
+            .from('users')
+            .select('id, admin_id')
+            .eq('telegram_id', userId)
+            .maybeSingle();
+
+          if (user) {
+            const updates = { invite_code: startParam };
+            if (adminId && !user.admin_id) {
+              updates.admin_id = adminId;
+              updates.admin_name = adminName;
+            }
+            await supabase
+              .from('users')
+              .update(updates)
+              .eq('telegram_id', userId);
+            console.log(`✅ Updated users table for ${userId} with invite ${startParam}`);
+          } else {
+            console.log(`ℹ️ User ${userId} not yet in users table, will be created on first app open.`);
+          }
+        } catch (e) {
+          console.error('Error updating users table:', e.message);
+        }
+      }
+
+      // Send message with web app button
+      const messageText = startParam
+        ? `🎯 Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
+        : '🎯 Welcome! Click below to start playing.';
+
+      const options = {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🎮 Open Game', web_app: { url: webAppUrlWithParam } }]
+          ]
+        }
+      };
+
+      bot.sendMessage(chatId, messageText, options)
+        .then(() => console.log(`✅ Sent web_app button to ${chatId} (param: ${startParam || 'none'})`))
+        .catch(err => console.error(`❌ Failed to send message to ${chatId}:`, err.message));
+    });
+
+    bot.on('polling_error', (err) => console.error('Polling error:', err.message));
+  } catch (err) {
+    console.error('❌ Failed to initialize Telegram bot:', err.message);
+    console.warn('⚠️ The server will continue without the bot.');
+  }
+}
 
 // ---------- Socket.IO (main namespace) ----------
 io.use((socket, next) => {
@@ -3634,7 +4423,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
+    // checkAndAddThirdBot is removed – no longer needed
   });
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
@@ -3657,7 +4446,7 @@ io.on('connection', async (socket) => {
     broadcastPlayerCount(currentStake);
     socket.emit('yourCard', player.card);
     notifyAdminClients();
-    if (currentStake === 20) checkAndAddThirdBot(currentStake);
+    // checkAndAddThirdBot removed
   });
   socket.on('markNumber', (number) => {
     if (!currentStake) return;
@@ -3716,17 +4505,17 @@ adminNamespace.on('connection', (socket) => {
     try {
       const { data: allUsers, error } = await supabase
         .from('users')
-        .select('telegram_id, username, balance, telegram_handle, referred_by, first_deposit_amount, admin_id, assigned_admin_name');
+        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, admin_name');
       if (error) throw error;
       const usersList = (allUsers || []).map(u => ({
         telegramId: u.telegram_id,
         username: u.username,
         balance: u.balance,
         telegram_handle: u.telegram_handle,
-        referred_by: u.referred_by,
+        invite_code: u.invite_code,
         first_deposit_amount: u.first_deposit_amount || 0,
         admin_id: u.admin_id,
-        assigned_admin_name: u.assigned_admin_name
+        admin_name: u.admin_name
       }));
       socket.emit('admin:allRegisteredPlayers', { users: usersList });
     } catch (err) {
