@@ -4,909 +4,233 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, maximum-scale=1.0" />
 <meta name="color-scheme" content="dark" />
-<title>✨ DOT BINGO · ዶት ቢንጎ ✨</title>
+<title>DOT BINGO</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://telegram.org">
-<link rel="dns-prefetch" href="https://upload.wikimedia.org">
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
-      rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet"></noscript>
-
 <style>
 /* ============================================================
-   1. DESIGN TOKENS
+   BASE — flat, no icons, no modern CSS
    ============================================================ */
-:root {
-    --bg:            #0B132B;
-    --bg-card:       #0F172A;
-    --bg-elevated:   #1E293B;
-    --bg-input:      rgba(15, 23, 42, 0.6);
-    --bg-soft:       rgba(255, 255, 255, 0.05);
-    --bg-soft-2:     rgba(255, 255, 255, 0.1);
-
-    --accent:        #FBBF24;
-    --accent-hi:     #F59E0B;
-    --accent-deep:   #B45309;
-    --accent-soft:   rgba(251, 191, 36, 0.15);
-    --accent-line:   rgba(251, 191, 36, 0.3);
-
-    --text:          #F8FAFC;
-    --text-mid:      #CBD5E1;
-    --text-dim:      #94A3B8;
-    --text-faint:    #64748B;
-
-    --success:       rgba(5, 150, 105, 0.95);
-    --danger:        rgba(220, 38, 38, 0.95);
-    --info:          rgba(37, 99, 235, 0.95);
-
-    --border:        rgba(255, 255, 255, 0.05);
-    --border-strong: rgba(255, 255, 255, 0.1);
-
-    --r-sm: 12px;
-    --r-md: 16px;
-    --r-lg: 20px;
-    --r-xl: 24px;
-    --r-2xl: 32px;
-    --r-pill: 60px;
-
-    --t-fast: 0.12s;
-    --t-med:  0.16s;
-    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:#0f1419;color:#e6e9ef;
+  font:14px/1.5 Arial,Helvetica,sans-serif;
+  min-height:100vh;padding:12px;
+  display:block;
 }
+h2{font-size:1.1rem;font-weight:bold;color:#fbbf24}
+h3{font-size:1rem;font-weight:bold}
+button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid #2d3540;background:#232a33;color:#e6e9ef;padding:8px 12px}
+button:active{background:#2d3540}
+input{font-family:inherit;width:100%;padding:10px;background:#0f1419;border:1px solid #2d3540;color:#e6e9ef;font-size:14px}
+input:focus,select:focus{outline:none;border-color:#3b82f6}
+a{color:#3b82f6;text-decoration:none}
+.hidden{display:none!important}
+.mono{font-family:"Courier New",monospace}
 
 /* ============================================================
-   2. BASE
+   PAGE SHELL
    ============================================================ */
-* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-
-body {
-    min-height: 100vh;
-    background: var(--bg);
-    background-image:
-        radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: #fff;
-    padding: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-h2 { font-weight: 800; color: var(--accent); letter-spacing: 1px; }
-h3 { font-weight: 700; }
-
-button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
-button:active { transform: scale(0.96); }
-input  { font-family: inherit; }
-
-.hidden { display: none !important; }
-.mono   { font-family: 'Inter', monospace; }
+.page{max-width:600px;margin:0 auto;background:#1a1f26;border:1px solid #2d3540;padding:16px}
+.page-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 
 /* ============================================================
-   3. PAGE SHELL
+   LANGUAGE TOGGLE
    ============================================================ */
-.page {
-    max-width: 600px;
-    width: 100%;
-    margin: 0 auto;
-    background: var(--bg-card);
-    border-radius: var(--r-2xl);
-    padding: 20px 16px 24px;
-    box-shadow: 0 20px 40px -12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
-    border: 1px solid var(--border);
-    contain: layout paint style;
-}
-
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
+.lang-toggle{position:fixed;top:8px;left:8px;background:#232a33;color:#fbbf24;border:1px solid #2d3540;padding:6px 14px;font-size:12px;font-weight:bold;z-index:1000}
 
 /* ============================================================
-   4. LANGUAGE TOGGLE
+   MODALS
    ============================================================ */
-.lang-toggle {
-    position: fixed;
-    top: 16px;
-    left: 16px;
-    background: var(--bg-elevated);
-    color: var(--accent);
-    border: 1px solid var(--accent-line);
-    border-radius: 40px;
-    padding: 8px 18px;
-    font-weight: 600;
-    z-index: 1000;
-    font-size: .8rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,.3);
-    transition: background var(--t-fast), transform .1s;
-}
-@media (max-width: 550px) { .lang-toggle { top: 8px; left: 8px; padding: 6px 14px; font-size: .7rem; } }
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;display:none;overflow-y:auto;z-index:2000}
+.modal.active{display:block}
+
+.modal-content{background:#1a1f26;border:1px solid #2d3540;padding:16px;max-width:480px;margin:20px auto;color:#e6e9ef}
+
+.modal-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;border-bottom:1px solid #2d3540;padding-bottom:12px}
+.modal-header .title{font-weight:bold;font-size:1rem}
+.modal-header .sub{font-size:12px;color:#8b95a3}
+
+.modal-buttons{display:flex;gap:8px;margin-top:16px}
+.modal-buttons button{flex:1;padding:12px;font-weight:bold;font-size:14px}
+.btn-primary{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.btn-secondary{background:#232a33;color:#e6e9ef;border-color:#2d3540}
+
+.step-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.step-header .back{width:40px;padding:8px 0;text-align:center;background:#232a33;border:1px solid #2d3540;color:#e6e9ef;font-size:14px}
+.step-header .title{flex:1;font-weight:bold;font-size:1rem}
+.step-header .badge{background:#232a33;border:1px solid #2d3540;padding:3px 10px;font-size:11px;color:#8b95a3}
+
+.field{margin:12px 0}
+.field label{display:block;font-weight:bold;font-size:12px;color:#8b95a3;margin-bottom:4px}
+
+.notice{background:#1a1f26;border:1px solid #2d3540;padding:12px;font-size:12px;color:#fcd34d;margin:12px 0;text-align:center}
+
+.step{background:#0f1419;border:1px solid #2d3540;padding:14px;margin:12px 0}
+.step .num{font-weight:bold;color:#fbbf24;font-size:13px}
+.step .head{font-weight:bold;color:#e6e9ef;margin-top:4px}
+.step .body{margin-top:8px}
+.step .hint{font-size:12px;color:#8b95a3;margin-bottom:6px}
+.step .hint-lg{font-size:12px;color:#8b95a3;margin-bottom:8px}
+.step .micro{font-size:11px;color:#8b95a3;margin-top:8px}
+
+.recipient{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f1419;border:1px solid #2d3540;padding:10px 12px}
+.recipient .number{font-weight:bold;font-size:1rem;color:#e6e9ef}
+.copy-btn{background:#232a33;border:1px solid #2d3540;padding:5px 12px;font-weight:bold;font-size:12px;color:#fbbf24}
+
+.amount-big{text-align:center;font-size:1.8rem;font-weight:bold;color:#fbbf24;margin:10px 0 16px}
+
+.how-to-link{color:#3b82f6;text-decoration:underline;cursor:pointer;font-size:12px}
+
+.method-list{max-height:380px;overflow-y:auto;padding:4px 0}
+.method-item{display:flex;align-items:center;gap:12px;background:#0f1419;border:1px solid #2d3540;padding:12px 14px;margin:10px 0;cursor:pointer}
+.method-item:active{background:#232a33}
+.method-item .info{flex:1;text-align:left}
+.method-item .name{font-weight:bold;font-size:1rem;color:#e6e9ef}
+.method-item .num{font-size:12px;color:#8b95a3;margin-top:2px}
+.method-item .badge{background:#3b82f6;color:#fff;padding:3px 12px;font-size:11px;font-weight:bold}
+
+.cancel-btn{width:100%;margin-top:10px;padding:12px;background:#232a33;font-weight:bold;color:#e6e9ef;border:1px solid #2d3540}
+
+.empty-state{text-align:center;padding:30px 16px;color:#8b95a3}
 
 /* ============================================================
-   5. MODALS
+   CARD & GRID
    ============================================================ */
-.modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* z-index is set dynamically in JS so the newest modal always
-       wins the stack — no DOM reordering needed. */
-    z-index: 2000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity var(--t-fast) ease, visibility var(--t-fast) ease;
-}
-.modal.active { opacity: 1; visibility: visible; }
-@supports (backdrop-filter: blur(6px)) { .modal.active { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); } }
+.card-container{margin:16px 0 12px;display:block;background:#0f1419;border:1px solid #2d3540;padding:12px 8px;overflow-x:auto;min-height:180px}
+.card-container table{border-collapse:separate;border-spacing:6px;margin:0 auto}
+.card-container thead th{font-family:"Courier New",monospace;font-size:1.2rem;font-weight:bold;color:#fbbf24;padding:6px 0;width:52px;letter-spacing:1px}
+.card-container td{width:52px;height:52px;background:#232a33;text-align:center;vertical-align:middle;font-weight:bold;font-size:1rem;font-family:"Courier New",monospace;color:#e6e9ef;border:1px solid #2d3540;cursor:pointer}
+.card-container td.free{background:#fbbf24;color:#111;font-size:1.2rem;border-color:#fbbf24}
+.card-container td.marked{background:#fbbf24;color:#111;border-color:#fbbf24}
 
-.modal-content {
-    background: var(--bg-elevated);
-    border-radius: var(--r-2xl);
-    padding: 28px 24px;
-    max-width: 92%;
-    width: 400px;
-    border: 1px solid var(--border-strong);
-    box-shadow: 0 30px 60px -20px rgba(0,0,0,.5);
-    transform: scale(.94) translateY(8px);
-    opacity: 0;
-    transition: transform var(--t-med) var(--ease-out), opacity .14s ease;
-    max-height: 92vh;
-    overflow-y: auto;
-    color: #F1F5F9;
-    contain: layout paint style;
-    -webkit-overflow-scrolling: touch;
-}
-.modal.active .modal-content { transform: scale(1) translateY(0); opacity: 1; }
-@media (max-width: 480px) { .modal-content { padding: 20px 16px; width: 95%; } }
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid var(--border-strong);
-    padding-bottom: 14px;
-}
-.modal-header .icon {
-    flex-shrink: 0;
-    width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--bg-soft);
-    border-radius: var(--r-md);
-    font-size: 2rem;
-}
-.modal-header .icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
-.modal-header .title { font-weight: 700; font-size: 1.2rem; color: var(--text); letter-spacing: -.02em; }
-.modal-header .sub   { font-size: .8rem; color: var(--text-dim); font-weight: 400; }
-
-.modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
-.modal-buttons button { flex: 1; padding: 14px; border-radius: var(--r-pill); font-weight: 700; min-height: 52px; font-size: 1rem; }
-.btn-primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    box-shadow: 0 4px 12px rgba(251,191,36,.3);
-}
-.btn-primary:hover { background: linear-gradient(135deg, var(--accent-hi), #D97706); }
-.btn-secondary { background: var(--bg-soft-2); color: #F1F5F9; border: 1px solid var(--border-strong); }
-.btn-secondary:hover { background: rgba(255,255,255,.15); }
-
-.step-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-.step-header .back {
-    width: 44px; height: 44px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--bg-soft);
-    border-radius: 50%;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-.step-header .back:active { background: var(--bg-soft-2); }
-.step-header .title { flex: 1; font-weight: 700; font-size: 1.2rem; color: var(--text); }
-.step-header .badge {
-    background: var(--bg-soft);
-    padding: 4px 14px;
-    border-radius: 30px;
-    font-size: .65rem;
-    color: var(--text-dim);
-}
-
-.field { margin: 16px 0; }
-.field label {
-    display: block;
-    font-weight: 600;
-    font-size: .85rem;
-    color: var(--text-mid);
-    margin-bottom: 6px;
-}
-.field input {
-    width: 100%;
-    padding: 14px 18px;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--border-strong);
-    background: var(--bg-input);
-    font-size: .95rem;
-    color: var(--text);
-    transition: border-color var(--t-fast), box-shadow var(--t-fast);
-}
-.field input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px rgba(251,191,36,.1);
-}
-
-.notice {
-    background: rgba(30, 41, 59, 0.6);
-    border-radius: var(--r-lg);
-    padding: 14px 16px;
-    font-size: .8rem;
-    color: #FCD34D;
-    margin: 14px 0;
-    text-align: center;
-    border: 1px solid rgba(251,191,36,.2);
-}
-
-.step {
-    background: rgba(15,23,42,.5);
-    border-radius: var(--r-xl);
-    padding: 18px;
-    margin: 14px 0;
-    border: 1px solid var(--border);
-}
-.step .num   { font-weight: 700; color: var(--accent); font-size: .9rem; }
-.step .head  { font-weight: 600; color: var(--text); margin-top: 4px; }
-.step .body  { margin-top: 10px; }
-.step .hint  { font-size: .75rem; color: var(--text-dim); margin-bottom: 6px; }
-.step .hint-lg { font-size: .75rem; color: var(--text-dim); margin-bottom: 8px; }
-.step .micro { font-size: .7rem; color: var(--text-dim); margin-top: 8px; }
-
-.recipient {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    background: var(--bg-input);
-    padding: 12px 18px;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--border-strong);
-}
-.recipient .number { font-weight: 700; font-size: 1.1rem; color: var(--text); }
-.copy-btn {
-    background: var(--bg-soft-2);
-    padding: 6px 16px;
-    border-radius: 40px;
-    font-weight: 600;
-    font-size: .75rem;
-    color: var(--accent);
-}
-
-.amount-big {
-    text-align: center;
-    font-size: 2.4rem;
-    font-weight: 800;
-    color: var(--accent);
-    margin: 10px 0 18px;
-}
-
-.how-to-link { color: var(--accent); text-decoration: underline; cursor: pointer; font-size: .75rem; }
-
-.method-list { max-height: 380px; overflow-y: auto; padding: 4px 0; }
-.method-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: rgba(15,23,42,.5);
-    border-radius: var(--r-lg);
-    padding: 16px 20px;
-    margin: 12px 0;
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: transform .15s ease, background .15s ease, border-color .15s ease;
-}
-.method-item:active { transform: scale(.97); background: rgba(30,41,59,.8); border-color: var(--accent); }
-.method-item .ico {
-    flex-shrink: 0;
-    width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--bg-soft);
-    border-radius: var(--r-md);
-}
-.method-item .ico img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.method-item .info { flex: 1; text-align: left; }
-.method-item .name { font-weight: 700; font-size: 1rem; color: var(--text); }
-.method-item .num  { font-size: .8rem; color: var(--text-dim); margin-top: 2px; }
-.method-item .badge {
-    background: linear-gradient(135deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    padding: 4px 16px;
-    border-radius: 40px;
-    font-size: .7rem;
-    font-weight: 700;
-}
-
-.fallback-icon {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    color: var(--bg);
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.6rem;
-}
-
-.cancel-btn {
-    width: 100%;
-    margin-top: 12px;
-    padding: 14px;
-    background: var(--bg-soft);
-    border-radius: var(--r-pill);
-    font-weight: 600;
-    color: #F1F5F9;
-    border: 1px solid var(--border);
-}
-
-.empty-state { text-align: center; padding: 40px 20px; color: var(--text-faint); }
-.empty-state .ico { font-size: 3.2rem; margin-bottom: 12px; }
+.grid-100{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:16px 0;background:#0f1419;padding:10px;border:1px solid #2d3540}
+.grid-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#232a33;font-weight:bold;font-size:.75rem;color:#e6e9ef;border:1px solid #2d3540;cursor:pointer}
+.grid-cell.taken{background:#ef4444;color:#fff;border-color:#ef4444;cursor:not-allowed}
+.grid-cell.own-card{background:#fbbf24;color:#111;border-color:#fbbf24;cursor:not-allowed}
 
 /* ============================================================
-   6. CARD & GRID
+   BUTTONS & BADGES
    ============================================================ */
-.card-container {
-    margin: 20px 0 16px;
-    display: flex;
-    justify-content: center;
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-xl);
-    padding: 16px 8px;
-    border: 1px solid var(--border);
-    overflow-x: auto;
-    min-height: 200px;
-    contain: layout paint style;
-    -webkit-overflow-scrolling: touch;
-}
-.card-container table { border-collapse: separate; border-spacing: 8px; margin: 0 auto; }
-.card-container thead th {
-    font-family: 'Inter', monospace;
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: var(--accent);
-    padding: 8px 0;
-    width: 56px;
-    letter-spacing: 1px;
-}
-.card-container td {
-    width: 56px; height: 56px;
-    background: rgba(30,41,59,.8);
-    border-radius: var(--r-md);
-    text-align: center;
-    vertical-align: middle;
-    font-weight: 700;
-    font-size: 1.1rem;
-    font-family: 'Inter', monospace;
-    color: var(--text);
-    border: 1px solid var(--border);
-    transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
-    cursor: pointer;
-}
-.card-container td.free   { background: linear-gradient(135deg, var(--accent), var(--accent-hi)); color: var(--bg); font-size: 1.4rem; border-color: #FCD34D; }
-.card-container td.marked { background: linear-gradient(135deg, var(--accent), var(--accent-hi)); color: var(--bg); box-shadow: 0 0 0 2px rgba(251,191,36,.4); border-color: #FCD34D; transform: scale(.92); }
-@media (max-width: 550px) {
-    .card-container td { width: 48px; height: 48px; border-radius: var(--r-sm); font-size: .9rem; }
-    .card-container thead th { width: 48px; font-size: 1.1rem; }
-    .card-container table { border-spacing: 5px; }
-}
+#bingoBtn{display:block;width:90%;max-width:340px;margin:16px auto;background:#fbbf24;color:#111;font-size:1.2rem;font-weight:bold;padding:14px 12px;border:1px solid #fbbf24;letter-spacing:1px}
+#bingoBtn:active{background:#f59e0b}
 
-.grid-100 {
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    gap: 6px;
-    margin: 20px 0;
-    background: rgba(15,23,42,.6);
-    padding: 12px;
-    border-radius: var(--r-xl);
-    border: 1px solid var(--border);
-    contain: layout paint style;
-}
-.grid-cell {
-    aspect-ratio: 1/1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(30,41,59,.8);
-    border-radius: var(--r-sm);
-    font-weight: 600;
-    font-size: .75rem;
-    color: var(--text-mid);
-    border: 1px solid var(--border);
-    cursor: pointer;
-    transition: background var(--t-fast), color var(--t-fast);
-    contain: layout style paint;
-}
-.grid-cell.taken    { background: #EF4444; color: #fff; border-color: #F87171; cursor: not-allowed; }
-.grid-cell.own-card { background: var(--accent); color: var(--bg); border-color: #FCD34D; box-shadow: 0 0 8px rgba(251,191,36,.4); cursor: not-allowed; }
+.badge-pill{background:#232a33;border:1px solid #2d3540;padding:4px 12px;color:#fbbf24;font-weight:bold;font-size:12px}
+
+.timer-badge{font-size:1.4rem;font-weight:bold;font-family:"Courier New",monospace;color:#fbbf24;background:#0f1419;padding:6px 18px;border:1px solid #2d3540;display:inline-block;letter-spacing:2px}
+
+.btn-ghost{background:#232a33;color:#e6e9ef;border:1px solid #2d3540;padding:8px 16px;font-weight:bold}
 
 /* ============================================================
-   7. BUTTONS & BADGES
+   TABS
    ============================================================ */
-#bingoBtn {
-    display: block;
-    width: 90%;
-    max-width: 340px;
-    margin: 20px auto;
-    background: linear-gradient(105deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    font-size: 1.4rem;
-    font-weight: 800;
-    padding: 16px 12px;
-    border-radius: var(--r-pill);
-    box-shadow: 0 8px 0 var(--accent-deep), 0 8px 24px rgba(251,191,36,.3);
-    letter-spacing: 1px;
-    transition: .08s linear;
-}
-#bingoBtn:active { transform: translateY(4px); box-shadow: 0 4px 0 var(--accent-deep); }
-
-.badge-pill {
-    background: var(--accent-soft);
-    padding: 4px 16px;
-    border-radius: 40px;
-    color: var(--accent);
-    font-weight: 600;
-    font-size: .75rem;
-    border: 1px solid rgba(251,191,36,.2);
-}
-
-.timer-badge {
-    font-size: 1.6rem;
-    font-weight: 800;
-    font-family: 'Inter', monospace;
-    color: var(--accent);
-    background: rgba(251,191,36,.1);
-    padding: 6px 24px;
-    border-radius: 50px;
-    letter-spacing: 2px;
-    border: 1px solid rgba(251,191,36,.2);
-    display: inline-block;
-}
-
-.btn-ghost {
-    background: var(--bg-soft);
-    color: var(--text-dim);
-    border: 1px solid var(--border-strong);
-    border-radius: 40px;
-    padding: 8px 22px;
-    font-weight: 600;
-}
+.tab-bar{display:flex;background:#0f1419;border:1px solid #2d3540;margin-top:14px;padding:4px;gap:4px}
+.tab-btn{flex:1;padding:9px 0;font-weight:bold;font-size:12px;color:#8b95a3;background:none;border:1px solid transparent}
+.tab-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
 
 /* ============================================================
-   8. TABS
+   STAKE PAGE
    ============================================================ */
-.tab-bar {
-    display: flex;
-    background: var(--bg-card);
-    border-radius: var(--r-pill);
-    margin-top: 16px;
-    padding: 4px 6px;
-    gap: 4px;
-    border: 1px solid var(--border);
-}
-.tab-btn {
-    flex: 1;
-    padding: 10px 0;
-    border-radius: var(--r-pill);
-    font-weight: 600;
-    font-size: .7rem;
-    color: var(--text-dim);
-    transition: background .15s, color .15s;
-}
-.tab-btn.active { background: var(--accent-soft); color: var(--accent); }
+.stake-buttons{display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap}
+.stake-option{background:#232a33;border:2px solid #2d3540;padding:12px 18px;font-size:1.2rem;font-weight:bold;color:#e6e9ef;width:96px;text-align:center}
+.stake-option.selected{border-color:#fbbf24;background:#0f1419;color:#fbbf24}
+.player-count-badge{display:block;font-size:11px;font-weight:bold;color:#8b95a3;margin-top:5px;background:#0f1419;border:1px solid #2d3540;padding:2px 8px}
+
+.stake-table-wrap{background:#0f1419;border:1px solid #2d3540;padding:12px 10px 14px;margin:8px 0 14px}
+.stake-table-wrap .table-title{font-weight:bold;font-size:12px;color:#8b95a3;text-align:center;margin-bottom:10px}
+.stake-table{width:100%;border-collapse:collapse;font-size:13px}
+.stake-table th{background:#232a33;color:#8b95a3;font-weight:bold;padding:8px 6px;text-align:center;font-size:11px;border:1px solid #2d3540}
+.stake-table td{padding:8px 6px;text-align:center;background:#0f1419;border:1px solid #2d3540;font-weight:bold;color:#e6e9ef}
+.stake-table .stake-amount{font-weight:bold;color:#fbbf24}
+.stake-table .count-num{display:inline-block;background:#232a33;border:1px solid #2d3540;padding:2px 10px;font-size:12px}
+.stake-bar-wrap{width:100%;max-width:100px;height:6px;margin:0 auto;background:#232a33;border:1px solid #2d3540;overflow:hidden}
+.stake-bar{height:100%;background:#fbbf24;transform-origin:left center;transform:scaleX(0)}
+
+.rules-text{background:#0f1419;border:1px solid #2d3540;padding:16px;margin-top:14px;font-size:13px;line-height:1.7;color:#cbd5e1}
+.rules-text p{margin-bottom:8px}
+.rules-text h3{font-size:1rem;margin-top:14px;color:#fbbf24}
+.rules-text h3:first-child{margin-top:0}
+.rules-text a{color:#3b82f6}
 
 /* ============================================================
-   9. STAKE PAGE
+   BALANCE / LOBBY HEADER
    ============================================================ */
-.stake-buttons { display: flex; gap: 12px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
-.stake-option {
-    background: rgba(30,41,59,.8);
-    border: 2px solid var(--border-strong);
-    padding: 14px 20px;
-    border-radius: var(--r-md);
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: var(--text);
-    width: 100px;
-    text-align: center;
-    transition: transform .15s, border-color .15s, background .15s, color .15s;
-}
-.stake-option.selected { border-color: var(--accent); background: rgba(251,191,36,.1); color: var(--accent); }
-.player-count-badge {
-    display: block;
-    font-size: .65rem;
-    font-weight: 600;
-    color: var(--text-dim);
-    margin-top: 6px;
-    background: rgba(15,23,42,.8);
-    padding: 2px 10px;
-    border-radius: 40px;
-}
-
-.stake-table-wrap {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-xl);
-    padding: 14px 12px 16px;
-    margin: 8px 0 16px;
-    border: 1px solid var(--border);
-}
-.stake-table-wrap .table-title {
-    font-weight: 700;
-    font-size: .85rem;
-    color: var(--text-dim);
-    text-align: center;
-    margin-bottom: 12px;
-    letter-spacing: .5px;
-}
-.stake-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-.stake-table th {
-    background: var(--bg-soft);
-    color: var(--text-dim);
-    font-weight: 600;
-    padding: 10px 6px;
-    text-align: center;
-    font-size: .7rem;
-    letter-spacing: .5px;
-}
-.stake-table td {
-    padding: 10px 6px;
-    text-align: center;
-    background: rgba(30,41,59,.4);
-    border-bottom: 1px solid var(--border);
-    font-weight: 600;
-    color: var(--text);
-}
-.stake-table tr:last-child td { border-bottom: none; }
-.stake-table .stake-amount { font-weight: 800; color: var(--accent); }
-.stake-table .count-num {
-    display: inline-block;
-    background: var(--bg-soft);
-    padding: 2px 10px;
-    border-radius: 40px;
-    font-size: .8rem;
-}
-.stake-bar-wrap {
-    width: 100%;
-    max-width: 100px;
-    height: 6px;
-    margin: 0 auto;
-    background: rgba(255,255,255,.1);
-    border-radius: 20px;
-    overflow: hidden;
-}
-.stake-bar {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent-hi));
-    border-radius: 20px;
-    transform-origin: left center;
-    transform: scaleX(0);
-    transition: transform .3s ease;
-}
-
-.rules-text {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-xl);
-    padding: 20px;
-    margin-top: 16px;
-    font-size: .85rem;
-    line-height: 1.7;
-    color: var(--text-mid);
-    border: 1px solid var(--border);
-}
-.rules-text p { margin-bottom: 8px; }
-.rules-text h3 { font-size: 1rem; margin-top: 16px; color: var(--accent); }
-.rules-text h3:first-child { margin-top: 0; }
-.rules-text a { color: var(--accent); }
+.balance-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;background:#0f1419;border:1px solid #2d3540;padding:8px 14px;margin-bottom:16px}
+.balance-top > div{font-weight:bold;font-size:13px;color:#e6e9ef}
 
 /* ============================================================
-   10. BALANCE / LOBBY HEADER
+   GAME PAGE
    ============================================================ */
-.balance-top {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    background: rgba(15,23,42,.6);
-    padding: 8px 16px;
-    border-radius: var(--r-pill);
-    margin-bottom: 18px;
-    border: 1px solid var(--border);
-}
-.balance-top > div { font-weight: 600; font-size: .9rem; color: var(--text); }
+.last-call{background:#0f1419;border:1px solid #2d3540;padding:16px;margin:14px 0 16px;text-align:center}
+.last-call-label{font-size:11px;letter-spacing:3px;font-weight:bold;color:#fbbf24;text-transform:uppercase;background:#1a1f26;border:1px solid #2d3540;display:inline-block;padding:4px 16px}
+.last-call-number{font-size:2.4rem;font-weight:bold;font-family:"Courier New",monospace;color:#fbbf24;letter-spacing:6px;margin:12px 0 8px}
+.called-history{background:#0f1419;border:1px solid #2d3540;font-size:12px;color:#8b95a3;font-weight:bold;overflow-x:auto;white-space:nowrap;font-family:"Courier New",monospace;text-align:center;margin-top:10px;padding:8px 14px}
+
+.prize-pool{background:#0f1419;border:1px solid #2d3540;text-align:center;padding:12px 16px;margin:8px 0 14px}
+.prize-pool .label{font-size:11px;font-weight:bold;color:#8b95a3;letter-spacing:.5px;display:block}
+.prize-pool .value{font-size:1.3rem;font-weight:bold;color:#fbbf24;line-height:1.4}
 
 /* ============================================================
-   11. GAME PAGE
+   WINNER OVERLAY
    ============================================================ */
-.last-call {
-    background: linear-gradient(135deg, var(--bg-elevated), var(--bg-card));
-    border-radius: var(--r-xl);
-    padding: 20px;
-    margin: 16px 0 20px;
-    text-align: center;
-    box-shadow: 0 12px 28px -8px rgba(0,0,0,.5);
-    border: 1px solid var(--border);
-}
-.last-call-label {
-    font-size: .7rem;
-    letter-spacing: 4px;
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    background: rgba(15,23,42,.6);
-    display: inline-block;
-    padding: 4px 20px;
-    border-radius: 40px;
-}
-.last-call-number {
-    font-size: 3rem;
-    font-weight: 800;
-    font-family: 'Inter', monospace;
-    color: var(--accent);
-    text-shadow: 0 0 20px rgba(251,191,36,.3);
-    letter-spacing: 8px;
-    margin: 12px 0 8px;
-}
-.called-history {
-    background: rgba(15,23,42,.8);
-    border-radius: 40px;
-    font-size: .75rem;
-    color: var(--text-dim);
-    font-weight: 500;
-    overflow-x: auto;
-    white-space: nowrap;
-    font-family: 'Inter', monospace;
-    text-align: center;
-    margin-top: 10px;
-    border: 1px solid var(--border);
-    padding: 10px 16px;
-    -webkit-overflow-scrolling: touch;
-}
-
-.prize-pool {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-lg);
-    text-align: center;
-    padding: 12px 16px;
-    margin: 8px 0 16px;
-    border: 1px solid var(--border);
-}
-.prize-pool .label { font-size: .7rem; font-weight: 600; color: var(--text-dim); letter-spacing: .5px; display: block; }
-.prize-pool .value { font-size: 1.4rem; font-weight: 800; color: var(--accent); line-height: 1.4; }
+.winner-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;display:none;align-items:center;justify-content:center;z-index:3000}
+.winner-modal.active{display:flex}
+.winner-card{background:#1a1f26;border:1px solid #2d3540;padding:24px 20px;text-align:center;width:90%;max-width:360px}
+.winner-title{font-size:1.6rem;font-weight:bold;color:#fbbf24;margin-bottom:12px}
+.winners-avatars{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:14px 0;max-height:120px;overflow-y:auto;padding:8px;background:#0f1419;border:1px solid #2d3540}
+.winner-badge{background:#fbbf24;color:#111;padding:6px 14px;font-size:12px;font-weight:bold}
+.prize-amount{background:#0f1419;border:1px solid #2d3540;padding:14px;margin:16px 0 14px}
+.prize-amount .label{font-size:11px;color:#8b95a3;letter-spacing:1px}
+.prize-number{font-size:1.8rem;font-weight:bold;color:#fbbf24}
+.celebrate-btn{width:100%;padding:14px;background:#fbbf24;color:#111;font-weight:bold;font-size:1.1rem;margin-top:8px;border:1px solid #fbbf24}
 
 /* ============================================================
-   12. WINNER OVERLAY
+   TOAST / MISC
    ============================================================ */
-.winner-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity .2s ease, visibility .2s;
-}
-.winner-modal.active { opacity: 1; visibility: visible; }
-.winner-card {
-    background: var(--bg-elevated);
-    border-radius: 40px;
-    padding: 32px 24px;
-    text-align: center;
-    width: 90%;
-    max-width: 360px;
-    box-shadow: 0 40px 60px -20px rgba(0,0,0,.8);
-    border: 1px solid var(--border-strong);
-    transform: scale(.92) translateY(12px);
-    opacity: 0;
-    transition: transform .25s cubic-bezier(.34,1.2,.64,1), opacity .2s ease;
-}
-.winner-modal.active .winner-card { transform: scale(1) translateY(0); opacity: 1; }
-.winner-trophy {
-    font-size: 4rem;
-    margin-bottom: 8px;
-    will-change: transform;
-    animation: float 1.4s infinite alternate;
-}
-@keyframes float {
-    from { transform: translate3d(0,0,0); }
-    to   { transform: translate3d(0,-10px,0); }
-}
-.winner-title { font-size: 2rem; font-weight: 800; color: var(--accent); margin-bottom: 12px; }
-.winners-avatars {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-    margin: 16px 0;
-    max-height: 120px;
-    overflow-y: auto;
-    padding: 8px;
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-lg);
-}
-.winner-badge {
-    background: linear-gradient(135deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    padding: 6px 16px;
-    border-radius: 40px;
-    font-size: .8rem;
-    font-weight: 700;
-}
-.prize-amount {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-lg);
-    padding: 16px;
-    margin: 18px 0 16px;
-    border: 1px solid rgba(251,191,36,.2);
-}
-.prize-amount .label { font-size: .7rem; color: var(--text-dim); letter-spacing: 1px; }
-.prize-number { font-size: 2.2rem; font-weight: 800; color: var(--accent); }
-.celebrate-btn {
-    width: 100%;
-    padding: 16px;
-    border-radius: var(--r-pill);
-    background: linear-gradient(135deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    font-weight: 700;
-    font-size: 1.1rem;
-    margin-top: 8px;
-}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 22px;color:#fff;font-weight:bold;font-size:13px;background:#3b82f6;z-index:999;max-width:90%;text-align:center;display:none;border:1px solid #1e40af}
+.toast.show{display:block}
+.toast.success{background:#10b981;border-color:#065f46}
+.toast.error{background:#ef4444;border-color:#991b1b}
+.toast.info{background:#3b82f6}
 
-/* ============================================================
-   13. CONFETTI / TOAST / MISC
-   ============================================================ */
-.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; contain: strict; }
-.confetti-piece {
-    position: absolute;
-    width: 8px; height: 16px;
-    top: -20px;
-    opacity: .8;
-    will-change: transform;
-    animation: fall 4s linear forwards;
-}
-@keyframes fall { to { transform: translate3d(0,100vh,0) rotate(720deg); opacity: 0; } }
+.history-card{background:#0f1419;border:1px solid #2d3540;border-left:4px solid #fbbf24;padding:14px;margin-bottom:10px}
+.history-card strong{color:#fbbf24}
 
-.toast {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%) translateY(100px);
-    padding: 14px 28px;
-    border-radius: var(--r-pill);
-    color: #fff;
-    font-weight: 600;
-    font-size: .9rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,.3);
-    opacity: 0;
-    transition: transform .25s ease, opacity .25s ease;
-    z-index: 999;
-    max-width: 90%;
-    text-align: center;
-    pointer-events: none;
-}
-.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
-.toast.success { background: var(--success); }
-.toast.error   { background: var(--danger); }
-.toast.info    { background: var(--info); }
+.profile-stat{background:#0f1419;border:1px solid #2d3540;padding:16px;text-align:center;margin:12px 0}
+.profile-stat .label{color:#8b95a3;font-size:12px}
+.profile-stat .value{font-weight:bold;font-size:1.3rem;color:#fbbf24;margin-top:4px}
 
-.history-card {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-md);
-    padding: 16px;
-    margin-bottom: 12px;
-    border-left: 4px solid var(--accent);
-    border: 1px solid var(--border);
-}
-.history-card strong { color: var(--accent); }
+.invite-info{background:#0f1419;border:1px solid #2d3540;padding:12px 16px;margin:8px 0;font-size:12px;color:#cbd5e1}
+.invite-info strong{color:#fbbf24}
+.invite-code{background:#232a33;color:#fbbf24;padding:4px 12px;font-weight:bold;font-size:13px;display:inline-block;border:1px solid #2d3540}
 
-.profile-stat {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-lg);
-    padding: 18px;
-    text-align: center;
-    margin: 14px 0;
-    border: 1px solid var(--border);
-}
-.profile-stat .label { color: var(--text-dim); font-size: .8rem; }
-.profile-stat .value { font-weight: 800; font-size: 1.4rem; color: var(--accent); margin-top: 4px; }
+.telegram-links{text-align:center;margin-top:18px;font-size:11px;color:#8b95a3}
+.telegram-links a{color:#fbbf24;text-decoration:none;font-weight:bold}
 
-.invite-info {
-    background: rgba(15,23,42,.6);
-    border-radius: var(--r-lg);
-    padding: 14px 18px;
-    margin: 8px 0;
-    border: 1px solid var(--border);
-    font-size: .8rem;
-    color: var(--text-mid);
-}
-.invite-info strong { color: var(--accent); }
-.invite-code {
-    background: rgba(251,191,36,.1);
-    color: var(--accent);
-    padding: 4px 14px;
-    border-radius: 40px;
-    font-weight: 700;
-    font-size: .85rem;
-    display: inline-block;
-    border: 1px solid rgba(251,191,36,.2);
-}
+.mute-btn{background:#232a33 !important;color:#fff;font-size:13px !important;padding:4px 12px !important;border:1px solid #2d3540}
 
-.telegram-links { text-align: center; margin-top: 20px; font-size: .7rem; color: var(--text-faint); }
-.telegram-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
-.telegram-links a:hover { text-decoration: underline; }
-
-.mute-btn {
-    background: var(--bg-soft) !important;
-    border-radius: 40px;
-    color: #fff;
-    font-size: 1rem !important;
-    padding: 4px 12px !important;
-    min-width: 44px;
-}
-
-#inviteRequiredOverlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.9);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    padding: 24px;
-    text-align: center;
-    color: #fff;
-}
-#inviteRequiredOverlay .ico { font-size: 4.4rem; margin-bottom: 16px; }
-#inviteRequiredOverlay h2 { font-size: 2rem; margin-bottom: 12px; }
-#inviteRequiredOverlay p { font-size: 1rem; max-width: 400px; margin-bottom: 24px; color: var(--text-mid); }
-#inviteRequiredOverlay .btn-bot {
-    background: linear-gradient(135deg, var(--accent), var(--accent-hi));
-    color: var(--bg);
-    padding: 16px 40px;
-    border-radius: var(--r-pill);
-    font-weight: 700;
-    font-size: 1.1rem;
-    box-shadow: 0 4px 16px rgba(251,191,36,.3);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .confetti-piece { display: none; }
-    .winner-trophy { animation: none; }
-    .modal-content, .winner-card { transition: none; }
-}
+#inviteRequiredOverlay{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:24px;text-align:center;color:#fff}
+#inviteRequiredOverlay h2{font-size:1.6rem;margin-bottom:12px;color:#fbbf24}
+#inviteRequiredOverlay p{font-size:14px;max-width:400px;margin-bottom:20px;color:#cbd5e1}
+#inviteRequiredOverlay .btn-bot{background:#fbbf24;color:#111;padding:14px 32px;font-weight:bold;font-size:1rem;border:1px solid #fbbf24}
 </style>
 </head>
 <body>
 
 <!-- ============ INVITE REQUIRED ============ -->
 <div id="inviteRequiredOverlay" class="hidden">
-    <div class="ico">🔑</div>
     <h2>Invite Required</h2>
-    <p>Please use an invite link <a href="https://t.me/bingomkmk0120_bot?start=GIZ5GG8" target="_blank">🚀 open</a></p>
-    <button class="btn-bot" id="goToBotBtn">🚀 Go to Bot</button>
+    <p>Please use an invite link <a href="https://t.me/bingomkmk0120_bot?start=GIZ5GG8" target="_blank">open</a></p>
+    <button class="btn-bot" id="goToBotBtn">Go to Bot</button>
 </div>
 
-<button id="langToggleBtn" class="lang-toggle">🇬🇧 English</button>
+<button id="langToggleBtn" class="lang-toggle">English</button>
 
 <!-- ============ MODALS ============ -->
 
@@ -914,12 +238,12 @@ input  { font-family: inherit; }
 <div id="methodListModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
         <div class="step-header">
-            <button class="back" id="methodListBackBtn">←</button>
-            <span class="title" id="methodListTitle" data-key="selectMethod">💳 Select Deposit Method</span>
+            <button class="back" id="methodListBackBtn">Back</button>
+            <span class="title" id="methodListTitle" data-key="selectMethod">Select Deposit Method</span>
             <span class="badge" id="methodListStepLabel">Step 1/2</span>
         </div>
         <div id="methodListContainer" class="method-list">
-            <div class="empty-state"><div class="ico">💳</div><div>Loading payment methods...</div></div>
+            <div class="empty-state"><div>Loading payment methods...</div></div>
         </div>
         <button id="methodListCancelBtn" class="cancel-btn" data-key="cancel">Cancel</button>
     </div>
@@ -929,20 +253,19 @@ input  { font-family: inherit; }
 <div id="depositDetailsModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span class="icon">💸</span>
             <div>
                 <div class="title" data-key="deposit">Deposit</div>
                 <div class="sub" data-key="sendPayment">Send payment to the selected method</div>
             </div>
         </div>
-        <div class="field"><label data-key="yourPhone">📞 Your Phone Number (for verification)</label>
+        <div class="field"><label data-key="yourPhone">Your Phone Number (for verification)</label>
             <input type="tel" id="depositPhone" placeholder="09xxxxxxxx" autocomplete="off"></div>
-        <div class="field"><label data-key="amountLabel">💰 Amount (ETB)</label>
+        <div class="field"><label data-key="amountLabel">Amount (ETB)</label>
             <input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off"></div>
-        <div class="notice" data-key="depositHint">⚠️ After sending payment, admin will verify your deposit using your phone number.</div>
+        <div class="notice" data-key="depositHint">After sending payment, admin will verify your deposit using your phone number.</div>
         <div class="modal-buttons">
-            <button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">✔ Request Deposit</button>
-            <button id="depositDetailsBackBtn" class="btn-secondary" data-key="back">← Back</button>
+            <button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">Request Deposit</button>
+            <button id="depositDetailsBackBtn" class="btn-secondary" data-key="back">Back</button>
         </div>
     </div>
 </div>
@@ -951,7 +274,6 @@ input  { font-family: inherit; }
 <div id="paymentModal" class="modal">
     <div class="modal-content" style="max-width:420px;">
         <div class="modal-header">
-            <span class="icon" id="paymentMethodIcon">📱</span>
             <div>
                 <div class="title" id="paymentMethodTitle">Telebirr P2P</div>
                 <div class="sub">Ethiopia - ETB</div>
@@ -960,20 +282,20 @@ input  { font-family: inherit; }
         <div class="amount-big" id="paymentAmountDisplay">0.00 ETB</div>
 
         <div class="step">
-            <div class="num">1️⃣ Step 1:</div>
+            <div class="num">Step 1:</div>
             <div class="head" id="paymentStepLabel">Send <span id="paymentStepAmount">0.00</span> ETB to this number</div>
             <div class="body">
-                <div class="hint"><span id="howToPayTrigger" class="how-to-link" data-key="howToPay">📞 How to pay?</span></div>
+                <div class="hint"><span id="howToPayTrigger" class="how-to-link" data-key="howToPay">How to pay?</span></div>
                 <div class="recipient">
-                    <span class="number mono" id="paymentRecipient">📞 0953677690</span>
+                    <span class="number mono" id="paymentRecipient">0953677690</span>
                     <button class="copy-btn" id="paymentCopyBtn" data-key="copy">Copy</button>
                 </div>
-                <div class="micro">Open your payment app → Send Money → Paste the number → Make the transfer</div>
+                <div class="micro">Open your payment app, choose Send Money, paste the number, and make the transfer</div>
             </div>
         </div>
 
         <div class="step">
-            <div class="num">2️⃣ Step 2:</div>
+            <div class="num">Step 2:</div>
             <div class="head" data-key="enterInvoice">Enter your Invoice Number</div>
             <div class="body">
                 <div class="hint-lg" data-key="invoiceHint">After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.</div>
@@ -981,8 +303,8 @@ input  { font-family: inherit; }
             </div>
         </div>
 
-        <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment →</button>
-        <button id="paymentBackBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">← Back</button>
+        <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="confirmPayment">Confirm Payment</button>
+        <button id="paymentBackBtn" class="btn-secondary" style="width:100%; margin-top:12px;" data-key="back">Back</button>
     </div>
 </div>
 
@@ -990,13 +312,12 @@ input  { font-family: inherit; }
 <div id="howToPayModal" class="modal">
     <div class="modal-content" style="max-width:420px;">
         <div class="modal-header">
-            <span class="icon">📖</span>
             <div>
                 <div class="title" data-key="howToPayTitle">How to Pay</div>
                 <div class="sub" id="howToPayMethod">Telebirr</div>
             </div>
         </div>
-        <div id="howToPayContent" style="font-size:.9rem; line-height:1.6; color:var(--text-mid); max-height:400px; overflow-y:auto; padding-right:8px;"></div>
+        <div id="howToPayContent" style="font-size:14px; line-height:1.6; color:#cbd5e1; max-height:400px; overflow-y:auto; padding-right:8px;"></div>
         <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">Got it</button>
     </div>
 </div>
@@ -1005,22 +326,21 @@ input  { font-family: inherit; }
 <div id="withdrawModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span class="icon">🏧</span>
             <div>
                 <div class="title" id="withdrawTitle">Withdraw via Telebirr</div>
                 <div class="sub" data-key="yourDetails">Your account details</div>
             </div>
         </div>
-        <div class="field"><label data-key="fullName">👤 Full Name (as per bank/mobile money)</label>
+        <div class="field"><label data-key="fullName">Full Name (as per bank/mobile money)</label>
             <input type="text" id="withdrawName" placeholder="Full name" autocomplete="off"></div>
-        <div class="field"><label data-key="accountNumber">📞 Account / Phone Number</label>
+        <div class="field"><label data-key="accountNumber">Account / Phone Number</label>
             <input type="text" id="withdrawPhone" autocomplete="off"></div>
-        <div class="field"><label data-key="amountWithdraw">💰 Amount (ETB) - Min 20 ETB</label>
+        <div class="field"><label data-key="amountWithdraw">Amount (ETB) - Min 20 ETB</label>
             <input type="number" id="withdrawAmount" min="20" step="any" autocomplete="off"></div>
-        <div class="notice" data-key="withdrawHint">⏱️ Withdrawals processed within moment.</div>
+        <div class="notice" data-key="withdrawHint">Withdrawals processed within moment.</div>
         <div class="modal-buttons">
-            <button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">✔ Request Withdrawal</button>
-            <button id="withdrawBackBtn" class="btn-secondary" data-key="back">← Back</button>
+            <button id="submitWithdrawBtn" class="btn-primary" data-key="requestWithdrawal">Request Withdrawal</button>
+            <button id="withdrawBackBtn" class="btn-secondary" data-key="back">Back</button>
         </div>
     </div>
 </div>
@@ -1029,28 +349,27 @@ input  { font-family: inherit; }
 <div id="rulesModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span class="icon">📜</span>
             <div>
                 <div class="title" data-key="rulesTitle">የቢንጎ ሕጎች</div>
                 <div class="sub" data-key="rulesSub">75-ኳስ ክላሲክ</div>
             </div>
         </div>
         <div class="rules-text" style="max-height:400px; overflow-y:auto; padding-right:8px;">
-            <h3 data-key="rulesHowToPlayTitle">🎲 እንዴት እንደሚጫወቱ</h3>
-            <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>🏆 ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
-            <h3 data-key="rulesWinningPatternsTitle">🏆 የማሸነፊያ ሁኔታዎች</h3>
-            <p data-key="rulesWinningPatterns">✅ 1 አግድም መስመር (Row)<br>✅ 1 ቁመት መስመር (Column)<br>✅ 1 ሰያፍ መስመር (Diagonal)<br>✅ 4ቱ ማዕዘኖች (4 Corners)<br><br><strong>💡 ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
-            <h3 data-key="rulesPrizeTitle">🏆 የሽልማት ህግ</h3>
+            <h3 data-key="rulesHowToPlayTitle">እንዴት እንደሚጫወቱ</h3>
+            <p data-key="rulesHowToPlay">1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።<br>2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።<br>3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።<br>4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።<br>5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ <strong>ቢንጎ!</strong> የሚለውን ይጫኑ።</p>
+            <h3 data-key="rulesWinningPatternsTitle">የማሸነፊያ ሁኔታዎች</h3>
+            <p data-key="rulesWinningPatterns">1 አግድም መስመር (Row)<br>1 ቁመት መስመር (Column)<br>1 ሰያፍ መስመር (Diagonal)<br>4ቱ ማዕዘኖች (4 Corners)<br><br><strong>ማስታወሻ:</strong> መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።</p>
+            <h3 data-key="rulesPrizeTitle">የሽልማት ህግ</h3>
             <p data-key="rulesPrize">• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።<br>• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።<br>• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።</p>
-            <h3 data-key="rulesDepositTitle">💰 ገንዘብ ማስገባት</h3>
-            <p data-key="rulesDeposit">1. <strong>➕ Deposit</strong> ይጫኑ።<br>2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።<br>3. ገንዘብ ይላኩ።<br>4. <strong>Deposit ይጠይቁ</strong>።<br>5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
-            <h3 data-key="rulesWithdrawTitle">💸 ገንዘብ ማውጣት</h3>
-            <p data-key="rulesWithdraw">1. <strong>➖ Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
-            <h3 data-key="rulesGameRulesTitle">⚖️ የጨዋታ ህጎች</h3>
-            <p data-key="rulesGameRules">✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>🏆 ቢንጎ!</strong> መጫን አለብዎት።<br>✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
-            <h3 data-key="rulesHelpTitle">📞 እርዳታ</h3>
+            <h3 data-key="rulesDepositTitle">ገንዘብ ማስገባት</h3>
+            <p data-key="rulesDeposit">1. <strong>Deposit</strong> ይጫኑ።<br>2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።<br>3. ገንዘብ ይላኩ።<br>4. <strong>Deposit ይጠይቁ</strong>።<br>5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።<br><br><strong>ዝቅተኛ መጠን፦ 10 ብር</strong></p>
+            <h3 data-key="rulesWithdrawTitle">ገንዘብ ማውጣት</h3>
+            <p data-key="rulesWithdraw">1. <strong>Withdraw</strong> ይጫኑ።<br>2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።<br>3. ሙሉ ስምዎን ያስገቡ።<br>4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።<br>5. የሚያወጡትን መጠን ያስገቡ።<br>6. <strong>Withdrawal ይጠይቁ</strong>።<br>7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።<br><br><strong>ዝቅተኛ መጠን፦ 20 ብር</strong></p>
+            <h3 data-key="rulesGameRulesTitle">የጨዋታ ህጎች</h3>
+            <p data-key="rulesGameRules">ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።<br>ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።<br>ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት <strong>ቢንጎ!</strong> መጫን አለብዎት።<br>ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።<br>ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።<br>ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።</p>
+            <h3 data-key="rulesHelpTitle">እርዳታ</h3>
             <p data-key="rulesHelp">ጥያቄ ካለዎት የ <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> ወይም <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a> ይቀላቀሉ።</p>
-            <p style="margin-top:12px; font-weight:700; text-align:center; color:var(--accent);" data-key="rulesGoodLuck">🎉 መልካም ዕድል!<br><span style="font-weight:400; color:var(--text-mid);">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
+            <p style="margin-top:12px; font-weight:bold; text-align:center; color:#fbbf24;" data-key="rulesGoodLuck">መልካም ዕድል!<br><span style="font-weight:normal; color:#cbd5e1;">DOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!</span></p>
         </div>
         <button id="closeRulesBtn" class="btn-primary" style="width:100%; margin-top:16px;" data-key="gotIt">ገባኝ</button>
     </div>
@@ -1059,15 +378,14 @@ input  { font-family: inherit; }
 <!-- Winner overlay -->
 <div id="winnerOverlay" class="winner-modal">
     <div class="winner-card">
-        <div class="winner-trophy">🏆✨</div>
         <div class="winner-title" id="winTitle">BINGO!</div>
-        <div style="color:var(--text-dim); font-size:.9rem;" data-key="congrats">Congratulations</div>
+        <div style="color:#8b95a3; font-size:14px;" data-key="congrats">Congratulations</div>
         <div class="winners-avatars" id="winListContainer"></div>
         <div class="prize-amount">
-            <div class="label" data-key="winningPrize">🎁 WINNING PRIZE</div>
+            <div class="label" data-key="winningPrize">WINNING PRIZE</div>
             <div class="prize-number" id="winPrize">0 <small>ETB</small></div>
         </div>
-        <button class="celebrate-btn" data-key="amazing">🎉 Amazing! 🎉</button>
+        <button class="celebrate-btn" data-key="amazing">Amazing!</button>
     </div>
 </div>
 
@@ -1075,11 +393,11 @@ input  { font-family: inherit; }
 <div id="stakePage" class="page">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <h2>DOT BINGO</h2>
-        <div class="badge-pill">🎮 LOBBY</div>
+        <div class="badge-pill">LOBBY</div>
     </div>
 
     <div id="inviteInfoContainer" class="invite-info hidden">
-        <strong data-key="inviteCodeLabel">🔑 Invite Code:</strong>
+        <strong data-key="inviteCodeLabel">Invite Code:</strong>
         <span class="invite-code mono" id="userInviteCode">—</span>
     </div>
 
@@ -1095,84 +413,84 @@ input  { font-family: inherit; }
         </table>
     </div>
 
-    <h3 style="text-align:center; margin:10px 0 6px; font-size:1rem; color:var(--text-dim);" data-key="chooseStake">Choose Your Stake</h3>
+    <h3 style="text-align:center; margin:10px 0 6px; font-size:14px; color:#8b95a3;" data-key="chooseStake">Choose Your Stake</h3>
     <div class="stake-buttons">
-        <div style="text-align:center;"><button class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="c10">👥 0 players</div></div>
-        <div style="text-align:center;"><button class="stake-option" data-stake="20">20 ETB</button><div class="player-count-badge" id="c20">👥 0 players</div></div>
-        <div style="text-align:center;"><button class="stake-option" data-stake="30">30 ETB</button><div class="player-count-badge" id="c30">👥 0 players</div></div>
+        <div style="text-align:center;"><button class="stake-option" data-stake="10">10 ETB</button><div class="player-count-badge" id="c10">0 players</div></div>
+        <div style="text-align:center;"><button class="stake-option" data-stake="20">20 ETB</button><div class="player-count-badge" id="c20">0 players</div></div>
+        <div style="text-align:center;"><button class="stake-option" data-stake="30">30 ETB</button><div class="player-count-badge" id="c30">0 players</div></div>
     </div>
 
     <div class="rules-text">
-        <p><strong data-key="entryFeeLabelShort">💰 የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
-        <p><strong data-key="prizeLabelShort">🏆 የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
-        <p><strong data-key="winLabelShort">🎯 ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
-        <p><strong data-key="claimLabelShort">⏱️ የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው "CLAIM BINGO!"</span></p>
+        <p><strong data-key="entryFeeLabelShort">የመግቢያ ክፍያ፦</strong> <span data-key="entryFeeValues">10/20/30 ብር (እንደ ምርጫዎ)</span></p>
+        <p><strong data-key="prizeLabelShort">የሽልማት ገንዘብ፦</strong> <span data-key="prizeValueShort">80% (1 ተጫዋች ከሆነ 100%)</span></p>
+        <p><strong data-key="winLabelShort">ማሸነፍ፦</strong> <span data-key="winValueShort">ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች</span></p>
+        <p><strong data-key="claimLabelShort">የይገባኛል ጥያቄ፦</strong> <span data-key="claimValueShort">ወዲያው "CLAIM BINGO!"</span></p>
     </div>
 </div>
 
 <!-- ============ LOBBY PAGE ============ -->
 <div id="lobbyPage" class="page hidden">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <div style="font-weight:700; font-size:1.1rem;" id="lobbyUserName">Hi, Player</div>
-        <div class="badge-pill">👥 <span id="playersCount">0</span></div>
+        <div style="font-weight:bold; font-size:1rem;" id="lobbyUserName">Hi, Player</div>
+        <div class="badge-pill"><span id="playersCount">0</span></div>
     </div>
 
-    <div class="balance-top" style="flex-direction:column; align-items:stretch; gap:12px;">
+    <div class="balance-top" style="flex-direction:column; align-items:stretch; gap:10px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>💰 <span data-key="bal">BAL</span> <span id="lobbyBalance" style="color:var(--accent); font-weight:800;">0</span> ETB</div>
+            <div><span data-key="bal">BAL</span> <span id="lobbyBalance" style="color:#fbbf24; font-weight:bold;">0</span> ETB</div>
             <div class="timer-badge" id="lobbyTimer">30s</div>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn-primary" style="flex:1; padding:8px; border-radius:40px;" data-action="deposit"><span data-key="deposit">+Deposit</span></button>
-            <button class="btn-secondary" style="flex:1; padding:8px; border-radius:40px;" data-action="withdraw"><span data-key="withdraw">-Withdraw</span></button>
-            <button class="btn-ghost" style="flex:1;" data-action="goStake"><span data-key="stakeBtn">↺ Stake</span></button>
+            <button class="btn-primary" style="flex:1; padding:8px;" data-action="deposit"><span data-key="deposit">+Deposit</span></button>
+            <button class="btn-secondary" style="flex:1; padding:8px;" data-action="withdraw"><span data-key="withdraw">-Withdraw</span></button>
+            <button class="btn-ghost" style="flex:1;" data-action="goStake"><span data-key="stakeBtn">Stake</span></button>
         </div>
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin:16px 0 8px;">
-        <span style="font-weight:600; color:var(--text-dim); font-size:.85rem;" data-key="pickCard">🎴 Pick card ID:</span>
-        <span style="font-weight:700; color:var(--accent); font-size:.9rem;"><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
-        <button id="randomCardBtn" class="btn-ghost" style="padding:6px 16px; color:var(--accent); border-color:var(--accent-line); font-size:.75rem;" data-key="randomCard">✨ Random Card</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:14px 0 8px;">
+        <span style="font-weight:bold; color:#8b95a3; font-size:12px;" data-key="pickCard">Pick card ID:</span>
+        <span style="font-weight:bold; color:#fbbf24; font-size:13px;"><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
+        <button id="randomCardBtn" class="btn-ghost" style="padding:6px 12px; color:#fbbf24; font-size:12px;" data-key="randomCard">Random Card</button>
     </div>
     <div id="numberGrid" class="grid-100"></div>
 
-    <div style="font-weight:600; color:var(--text-dim); font-size:.85rem; margin:16px 0 8px;" data-key="yourCardPreview">🎴 Your Bingo Card Preview</div>
+    <div style="font-weight:bold; color:#8b95a3; font-size:12px; margin:14px 0 8px;" data-key="yourCardPreview">Your Bingo Card Preview</div>
     <div id="lobbyCardPreview" class="card-container"></div>
 
-    <button id="rulesBtn" class="btn-ghost" style="width:100%; margin-top:12px;" data-key="rulesBtn">📜 Game Rules</button>
+    <button id="rulesBtn" class="btn-ghost" style="width:100%; margin-top:12px;" data-key="rulesBtn">Game Rules</button>
 
     <div class="tab-bar">
-        <button class="tab-btn active" data-page="lobby" data-key="gameTab">🎮 Game</button>
-        <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
-        <button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button>
-        <button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button>
+        <button class="tab-btn active" data-page="lobby" data-key="gameTab">Game</button>
+        <button class="tab-btn" data-page="history" data-key="historyTab">History</button>
+        <button class="tab-btn" data-page="wallet" data-key="walletTab">Wallet</button>
+        <button class="tab-btn" data-page="profile" data-key="profileTab">Profile</button>
     </div>
 
-    <div class="telegram-links">📢 Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
+    <div class="telegram-links">Join our community:<br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
 </div>
 
 <!-- ============ HISTORY PAGE ============ -->
 <div id="historyPage" class="page hidden">
     <div class="page-header">
-        <h2 data-key="gameHistory">📜 Game History</h2>
-        <button class="btn-ghost" data-back data-key="back">← Back</button>
+        <h2 data-key="gameHistory">Game History</h2>
+        <button class="btn-ghost" data-back data-key="back">Back</button>
     </div>
-    <div style="font-weight:600;"><span data-key="totalGamesLabel">Total Games:</span> <span id="totalGamesCount" style="color:var(--accent);">0</span></div>
-    <div id="recentGamesList" style="margin-top:16px;"></div>
+    <div style="font-weight:bold;"><span data-key="totalGamesLabel">Total Games:</span> <span id="totalGamesCount" style="color:#fbbf24;">0</span></div>
+    <div id="recentGamesList" style="margin-top:14px;"></div>
 </div>
 
 <!-- ============ WALLET PAGE ============ -->
 <div id="walletPage" class="page hidden">
     <div class="page-header">
-        <h2 data-key="myWallet">💰 My Wallet</h2>
-        <button class="btn-ghost" data-back data-key="back">← Back</button>
+        <h2 data-key="myWallet">My Wallet</h2>
+        <button class="btn-ghost" data-back data-key="back">Back</button>
     </div>
     <div class="profile-stat">
         <div class="label" data-key="currentBalance">Current Balance</div>
         <div class="value" id="walletBalance">0</div>
         <div style="margin-top:8px;">
-            <button class="btn-primary" style="padding:10px 24px; border-radius:40px; margin:4px;" data-action="deposit" data-key="deposit">+ Deposit</button>
-            <button class="btn-secondary" style="padding:10px 24px; border-radius:40px; margin:4px;" data-action="withdraw" data-key="withdraw">- Withdraw</button>
+            <button class="btn-primary" style="padding:10px 20px; margin:4px;" data-action="deposit" data-key="deposit">+ Deposit</button>
+            <button class="btn-secondary" style="padding:10px 20px; margin:4px;" data-action="withdraw" data-key="withdraw">- Withdraw</button>
         </div>
     </div>
 </div>
@@ -1180,64 +498,64 @@ input  { font-family: inherit; }
 <!-- ============ PROFILE PAGE ============ -->
 <div id="profilePage" class="page hidden">
     <div class="page-header">
-        <h2 data-key="myProfile">👤 My Profile</h2>
-        <button class="btn-ghost" data-back data-key="back">← Back</button>
+        <h2 data-key="myProfile">My Profile</h2>
+        <button class="btn-ghost" data-back data-key="back">Back</button>
     </div>
     <div class="profile-stat">
         <div class="label" data-key="usernameLabel">Username</div>
-        <div style="font-weight:700; font-size:1.1rem; margin-top:4px;" id="profileUsername">Player</div>
+        <div style="font-weight:bold; font-size:1rem; margin-top:4px;" id="profileUsername">Player</div>
     </div>
     <div class="profile-stat">
-        <div class="label" data-key="balanceLabel">💰 Balance</div>
+        <div class="label" data-key="balanceLabel">Balance</div>
         <div class="value" id="profileBalance">0</div>
     </div>
     <div class="profile-stat">
-        <div class="label" data-key="inviteCodeLabel">🔑 Invite Code</div>
-        <div style="margin-top:6px; color:var(--accent); font-weight:700; font-size:1.1rem;" id="profileInviteCode">—</div>
+        <div class="label" data-key="inviteCodeLabel">Invite Code</div>
+        <div style="margin-top:6px; color:#fbbf24; font-weight:bold; font-size:1rem;" id="profileInviteCode">—</div>
     </div>
 </div>
 
 <!-- ============ GAME PAGE ============ -->
 <div id="gamePage" class="page hidden">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <div style="font-weight:700; font-size:.9rem; color:var(--text-dim);">Game #<span id="gameIdDisplay">...</span></div>
-        <div class="badge-pill">👥 <span id="gamePlayersCount">0</span></div>
+        <div style="font-weight:bold; font-size:12px; color:#8b95a3;">Game #<span id="gameIdDisplay">...</span></div>
+        <div class="badge-pill"><span id="gamePlayersCount">0</span></div>
     </div>
 
     <div class="balance-top" style="flex-wrap:wrap; gap:8px; padding:8px 12px;">
-        <div style="font-size:.85rem;">💰 <span id="gameBalance" style="color:var(--accent); font-weight:800;">0</span> ETB</div>
+        <div style="font-size:13px;"><span id="gameBalance" style="color:#fbbf24; font-weight:bold;">0</span> ETB</div>
         <div style="display:flex; gap:6px;">
-            <button class="btn-ghost" style="padding:4px 12px; color:var(--accent); border-color:var(--accent-line); font-size:.7rem;" data-action="deposit" data-key="deposit">+Deposit</button>
-            <button class="btn-ghost" style="padding:4px 12px; font-size:.7rem;" data-action="withdraw" data-key="withdraw">-Withdraw</button>
-            <button id="muteToggleBtn" class="mute-btn">🔊</button>
+            <button class="btn-ghost" style="padding:4px 10px; color:#fbbf24; font-size:11px;" data-action="deposit" data-key="deposit">+Deposit</button>
+            <button class="btn-ghost" style="padding:4px 10px; font-size:11px;" data-action="withdraw" data-key="withdraw">-Withdraw</button>
+            <button id="muteToggleBtn" class="mute-btn">Sound</button>
         </div>
-        <button id="rulesBtnGame" class="btn-ghost" style="padding:4px 12px; font-size:.7rem;" data-key="rulesBtn">📜 Rules</button>
+        <button id="rulesBtnGame" class="btn-ghost" style="padding:4px 10px; font-size:11px;" data-key="rulesBtn">Rules</button>
     </div>
 
     <div class="prize-pool">
-        <span class="label" data-key="prizePoolLabel">🏆 PRIZE POOL</span>
+        <span class="label" data-key="prizePoolLabel">PRIZE POOL</span>
         <div class="value" id="winningBalance">0 ETB</div>
     </div>
 
     <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
-        <button class="btn-secondary" style="padding:10px 24px; border-radius:40px; font-weight:600;" data-action="goStake" data-key="backToLobby">← Back to Lobby</button>
+        <button class="btn-secondary" style="padding:10px 20px; font-weight:bold;" data-action="goStake" data-key="backToLobby">Back to Lobby</button>
     </div>
 
     <div class="last-call">
-        <div class="last-call-label" data-key="lastCall">🎲 LAST CALL</div>
+        <div class="last-call-label" data-key="lastCall">LAST CALL</div>
         <div class="last-call-number" id="currentCall">--</div>
         <div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div>
     </div>
 
     <div id="gameCard" class="card-container"></div>
 
-    <button id="bingoBtn" data-key="claimBingo">🏆 BINGO! 🏆</button>
+    <button id="bingoBtn" data-key="claimBingo">BINGO!</button>
 
     <div class="tab-bar">
-        <button class="tab-btn" data-page="lobby" data-key="gameTab">🎮 Game</button>
-        <button class="tab-btn" data-page="history" data-key="historyTab">📜 History</button>
-        <button class="tab-btn" data-page="wallet" data-key="walletTab">💰 Wallet</button>
-        <button class="tab-btn" data-page="profile" data-key="profileTab">👤 Profile</button>
+        <button class="tab-btn" data-page="lobby" data-key="gameTab">Game</button>
+        <button class="tab-btn" data-page="history" data-key="historyTab">History</button>
+        <button class="tab-btn" data-page="wallet" data-key="walletTab">Wallet</button>
+        <button class="tab-btn" data-page="profile" data-key="profileTab">Profile</button>
     </div>
 </div>
 
@@ -1272,8 +590,8 @@ const toast = (msg, type = 'info') => {
 
 const copyText = t => t
     ? navigator.clipboard.writeText(t)
-        .then(() => toast('✅ Copied!', 'success'))
-        .catch(() => toast('❌ Failed', 'error'))
+        .then(() => toast('Copied!', 'success'))
+        .catch(() => toast('Failed', 'error'))
     : null;
 
 /* ============================================================
@@ -1281,96 +599,96 @@ const copyText = t => t
    ============================================================ */
 const I18N = {
     am: {
-        deposit:"+ተቀማጭ", withdraw:"-ማውጣት", requestDeposit:"✔ ተቀማጭ ጠይቅ", back:"← ተመለስ", cancel:"ይቅር",
-        yourPhone:"📞 የስልክ ቁጥርዎ (ለማረጋገጫ)", amountLabel:"💰 መጠን (ETB)",
-        depositHint:"⚠️ ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
-        sendPayment:"ክፍያ ወደ ታችኛው ቁጥር ይላኩ", selectMethod:"💳 የክፍያ ዘዴ ይምረጡ",
-        confirmPayment:"Confirm Payment →", copy:"Copy", howToPay:"📞 How to pay?", howToPayTitle:"How to Pay",
+        deposit:"+ተቀማጭ", withdraw:"-ማውጣት", requestDeposit:"ተቀማጭ ጠይቅ", back:"ተመለስ", cancel:"ይቅር",
+        yourPhone:"የስልክ ቁጥርዎ (ለማረጋገጫ)", amountLabel:"መጠን (ETB)",
+        depositHint:"ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+        sendPayment:"ክፍያ ወደ ታችኛው ቁጥር ይላኩ", selectMethod:"የክፍያ ዘዴ ይምረጡ",
+        confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
         enterInvoice:"Enter your Invoice Number",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"↺ ውርርድ",
-        pickCard:"🎴 የካርድ መለያ ይምረጡ:", selected:"የተመረጠው:", randomCard:"✨ በዘፈቀደ ካርድ",
-        yourCardPreview:"🎴 የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
-        gameTab:"🎮 ጨዋታ", historyTab:"📜 ታሪክ", walletTab:"💰 ቦርሳ", profileTab:"👤 መገለጫ",
-        rulesBtn:"📜 የጨዋታ ሕጎች", gameHistory:"📜 የጨዋታ ታሪክ", totalGamesLabel:"ጠቅላላ ጨዋታዎች:",
-        myWallet:"💰 ቦርሳዬ", currentBalance:"አሁን ያለው ቀሪ ሂሳብ", myProfile:"👤 መገለጫዬ",
-        usernameLabel:"የተጠቃሚ ስም", balanceLabel:"💰 ቀሪ ሂሳብ",
-        prizePoolLabel:"🏆 የሽልማት ገንዘብ", lastCall:"🎲 የመጨረሻ ጥሪ", calledPrefix:"የተጠሩ:",
-        claimBingo:"🏆 ቢንጎ ጠይቅ! 🏆",
-        entryFeeLabelShort:"💰 የመግቢያ ክፍያ፦", entryFeeValues:"10/20/30 ብር (እንደ ምርጫዎ)",
-        prizeLabelShort:"🏆 የሽልማት ገንዘብ፦", prizeValueShort:"80% (1 ተጫዋች ከሆነ 100%)",
-        winLabelShort:"🎯 ማሸነፍ፦", winValueShort:"ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
-        claimLabelShort:"⏱️ የይገባኛል ጥያቄ፦", claimValueShort:"ወዲያው “CLAIM BINGO!”",
+        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"ውርርድ",
+        pickCard:"የካርድ መለያ ይምረጡ:", selected:"የተመረጠው:", randomCard:"በዘፈቀደ ካርድ",
+        yourCardPreview:"የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
+        gameTab:"ጨዋታ", historyTab:"ታሪክ", walletTab:"ቦርሳ", profileTab:"መገለጫ",
+        rulesBtn:"የጨዋታ ሕጎች", gameHistory:"የጨዋታ ታሪክ", totalGamesLabel:"ጠቅላላ ጨዋታዎች:",
+        myWallet:"ቦርሳዬ", currentBalance:"አሁን ያለው ቀሪ ሂሳብ", myProfile:"መገለጫዬ",
+        usernameLabel:"የተጠቃሚ ስም", balanceLabel:"ቀሪ ሂሳብ",
+        prizePoolLabel:"የሽልማት ገንዘብ", lastCall:"የመጨረሻ ጥሪ", calledPrefix:"የተጠሩ:",
+        claimBingo:"ቢንጎ ጠይቅ!",
+        entryFeeLabelShort:"የመግቢያ ክፍያ፦", entryFeeValues:"10/20/30 ብር (እንደ ምርጫዎ)",
+        prizeLabelShort:"የሽልማት ገንዘብ፦", prizeValueShort:"80% (1 ተጫዋች ከሆነ 100%)",
+        winLabelShort:"ማሸነፍ፦", winValueShort:"ረድፍ፣ ዓምድ፣ ዲያግናል ወይም 4 ማዕዘኖች",
+        claimLabelShort:"የይገባኛል ጥያቄ፦", claimValueShort:"ወዲያው “CLAIM BINGO!”",
         rulesTitle:"የቢንጎ ሕጎች", rulesSub:"75-ኳስ ክላሲክ",
-        rulesHowToPlayTitle:"🎲 እንዴት እንደሚጫወቱ",
-        rulesHowToPlay:"1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **🏆 ቢንጎ!** የሚለውን ይጫኑ።",
-        rulesWinningPatternsTitle:"🏆 የማሸነፊያ ሁኔታዎች",
-        rulesWinningPatterns:"✅ 1 አግድም መስመር (Row)\n✅ 1 ቁመት መስመር (Column)\n✅ 1 ሰያፍ መስመር (Diagonal)\n✅ 4ቱ ማዕዘኖች (4 Corners)\n\n**💡 ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
-        rulesPrizeTitle:"🏆 የሽልማት ህግ",
+        rulesHowToPlayTitle:"እንዴት እንደሚጫወቱ",
+        rulesHowToPlay:"1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **ቢንጎ!** የሚለውን ይጫኑ።",
+        rulesWinningPatternsTitle:"የማሸነፊያ ሁኔታዎች",
+        rulesWinningPatterns:"1 አግድም መስመር (Row)\n1 ቁመት መስመር (Column)\n1 ሰያፍ መስመር (Diagonal)\n4ቱ ማዕዘኖች (4 Corners)\n\n**ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
+        rulesPrizeTitle:"የሽልማት ህግ",
         rulesPrize:"• 2 ወይም ከዚያ በላይ ተጫዋቾች ካሉ፣ 80% የገባው ገንዘብ ለአሸናፊ(ዎች) ይሰጣል።\n• 1 ተጫዋች ብቻ ከሆነ፣ ቢንጎ ካሳወቁ የገቡት 100% ገንዘብ ይመለስልዎታል።\n• ብዙ አሸናፊዎች ካሉ ሽልማቱ በእኩል ይከፈላል።",
-        rulesDepositTitle:"💰 ገንዘብ ማስገባት",
-        rulesDeposit:"1. **➕ Deposit** ይጫኑ።\n2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።\n3. ገንዘብ ይላኩ።\n4. **Deposit ይጠይቁ**።\n5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።\n\n**ዝቅተኛ መጠን፦ 10 ብር**",
-        rulesWithdrawTitle:"💸 ገንዘብ ማውጣት",
-        rulesWithdraw:"1. **➖ Withdraw** ይጫኑ።\n2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።\n3. ሙሉ ስምዎን ያስገቡ።\n4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።\n5. የሚያወጡትን መጠን ያስገቡ።\n6. **Withdrawal ይጠይቁ**።\n7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።\n\n**ዝቅተኛ መጠን፦ 20 ብር**",
-        rulesGameRulesTitle:"⚖️ የጨዋታ ህጎች",
-        rulesGameRules:"✅ ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።\n✅ ጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።\n✅ ቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት **🏆 ቢንጎ!** መጫን አለብዎት።\n✅ ሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።\n❌ ትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።\n❌ ማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።",
-        rulesHelpTitle:"📞 እርዳታ",
+        rulesDepositTitle:"ገንዘብ ማስገባት",
+        rulesDeposit:"1. **Deposit** ይጫኑ።\n2. የሚፈልጉትን የክፍያ ዘዴ ይምረጡ (Telebirr፣ CBE Birr ወይም M-Pesa)።\n3. ገንዘብ ይላኩ።\n4. **Deposit ይጠይቁ**።\n5. አድሚኑ ካፀደቀ በኋላ ቀሪ ሂሳብዎ ይጨምራል።\n\n**ዝቅተኛ መጠን፦ 10 ብር**",
+        rulesWithdrawTitle:"ገንዘብ ማውጣት",
+        rulesWithdraw:"1. **Withdraw** ይጫኑ።\n2. የመቀበያ ዘዴ ይምረጡ (አድሚኑ ከሚቀበላቸው ዘዴዎች መካከል)።\n3. ሙሉ ስምዎን ያስገቡ።\n4. ስልክ ወይም የመለያ ቁጥር ያስገቡ።\n5. የሚያወጡትን መጠን ያስገቡ።\n6. **Withdrawal ይጠይቁ**።\n7. አድሚኑ ካፀደቀ በኋላ ገንዘቡ ይላካል።\n\n**ዝቅተኛ መጠን፦ 20 ብር**",
+        rulesGameRulesTitle:"የጨዋታ ህጎች",
+        rulesGameRules:"ሁሉም ቁጥሮች በሰርቨሩ በፍትሃዊነት ይመረጣሉ።\nጨዋታው ከጀመረ በኋላ ካርድ መቀየር አይቻልም።\nቢንጎ ሲሞሉ ቀጣዩ ቁጥር ከመጠራቱ በፊት **ቢንጎ!** መጫን አለብዎት።\nሰርቨሩ የቢንጎ ጥያቄዎን ያረጋግጣል።\nትክክለኛ ቢንጎ ካልሆነ ጥያቄው ውድቅ ይሆናል።\nማጭበርበር፣ ብዙ አካውንት መጠቀም ወይም የሲስተሙን ክፍተት ለመጠቀም መሞከር ክልክል ነው።",
+        rulesHelpTitle:"እርዳታ",
         rulesHelp:"ጥያቄ ካለዎት የ @Dotbingogame ወይም @dotbingo ይቀላቀሉ።",
-        rulesGoodLuck:"🎉 መልካም ዕድል!\nDOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!",
-        selectWithdraw:"💸 የማውጫ ዘዴ ይምረጡ", yourDetails:"የአካውንትዎ ዝርዝሮች",
-        fullName:"👤 ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)", accountNumber:"📞 አካውንት / ስልክ ቁጥር",
-        amountWithdraw:"💰 መጠን (ETB) - ዝቅተኛ 20 ETB",
-        withdrawHint:"⏱️ ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።",
-        requestWithdrawal:"✔ ገንዘብ ማውጣት ጠይቅ", gotIt:"ገባኝ", congrats:"እንኳን ደስ ያለዎት!",
-        winningPrize:"🎁 የሽልማት ገንዘብ", amazing:"🎉 ደስ ያለኝ! 🎉",
+        rulesGoodLuck:"መልካም ዕድል!\nDOT BINGO ይጫወቱ፣ ያሸንፉ፣ ይደሰቱ!",
+        selectWithdraw:"የማውጫ ዘዴ ይምረጡ", yourDetails:"የአካውንትዎ ዝርዝሮች",
+        fullName:"ሙሉ ስም (እንደ ባንክ/ሞባይል ገንዘብ)", accountNumber:"አካውንት / ስልክ ቁጥር",
+        amountWithdraw:"መጠን (ETB) - ዝቅተኛ 20 ETB",
+        withdrawHint:"ገንዘብ ማውጣት በአጭር ጊዜ ውስጥ ይከናወናል።",
+        requestWithdrawal:"ገንዘብ ማውጣት ጠይቅ", gotIt:"ገባኝ", congrats:"እንኳን ደስ ያለዎት!",
+        winningPrize:"የሽልማት ገንዘብ", amazing:"ደስ ያለኝ!",
         sendTo:"Send {amount} ETB to this number",
-        inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back to Lobby",
+        inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
     },
     en: {
-        deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"✔ Request Deposit", back:"← Back", cancel:"Cancel",
-        yourPhone:"📞 Your Phone Number (for verification)", amountLabel:"💰 Amount (ETB)",
-        depositHint:"⚠️ After sending payment, admin will verify your deposit using your phone number.",
-        sendPayment:"Send payment to the selected method", selectMethod:"💳 Select Deposit Method",
-        confirmPayment:"Confirm Payment →", copy:"Copy", howToPay:"📞 How to pay?", howToPayTitle:"How to Pay",
+        deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"Request Deposit", back:"Back", cancel:"Cancel",
+        yourPhone:"Your Phone Number (for verification)", amountLabel:"Amount (ETB)",
+        depositHint:"After sending payment, admin will verify your deposit using your phone number.",
+        sendPayment:"Send payment to the selected method", selectMethod:"Select Deposit Method",
+        confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
         enterInvoice:"Enter your Invoice Number",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"↺ Stake",
-        pickCard:"🎴 Pick card ID:", selected:"Selected:", randomCard:"✨ Random Card",
-        yourCardPreview:"🎴 Your Bingo Card Preview",
-        gameTab:"🎮 Game", historyTab:"📜 History", walletTab:"💰 Wallet", profileTab:"👤 Profile",
-        rulesBtn:"📜 Game Rules", gameHistory:"📜 Game History", totalGamesLabel:"Total Games:",
-        myWallet:"💰 My Wallet", currentBalance:"Current Balance", myProfile:"👤 My Profile",
-        usernameLabel:"Username", balanceLabel:"💰 Balance",
-        prizePoolLabel:"🏆 PRIZE POOL", lastCall:"🎲 LAST CALL", calledPrefix:"Called:",
-        claimBingo:"🏆 CLAIM BINGO! 🏆",
-        entryFeeLabelShort:"💰 Entry Fee:", entryFeeValues:"10/20/30 Birr (as per your choice)",
-        prizeLabelShort:"🏆 Prize Money:", prizeValueShort:"80% (100% if 1 player)",
-        winLabelShort:"🎯 Winning:", winValueShort:"Row, Column, Diagonal or 4 Corners",
-        claimLabelShort:"⏱️ Claim:", claimValueShort:"Immediately 'CLAIM BINGO!'",
+        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"Stake",
+        pickCard:"Pick card ID:", selected:"Selected:", randomCard:"Random Card",
+        yourCardPreview:"Your Bingo Card Preview",
+        gameTab:"Game", historyTab:"History", walletTab:"Wallet", profileTab:"Profile",
+        rulesBtn:"Game Rules", gameHistory:"Game History", totalGamesLabel:"Total Games:",
+        myWallet:"My Wallet", currentBalance:"Current Balance", myProfile:"My Profile",
+        usernameLabel:"Username", balanceLabel:"Balance",
+        prizePoolLabel:"PRIZE POOL", lastCall:"LAST CALL", calledPrefix:"Called:",
+        claimBingo:"CLAIM BINGO!",
+        entryFeeLabelShort:"Entry Fee:", entryFeeValues:"10/20/30 Birr (as per your choice)",
+        prizeLabelShort:"Prize Money:", prizeValueShort:"80% (100% if 1 player)",
+        winLabelShort:"Winning:", winValueShort:"Row, Column, Diagonal or 4 Corners",
+        claimLabelShort:"Claim:", claimValueShort:"Immediately 'CLAIM BINGO!'",
         rulesTitle:"Bingo Rules", rulesSub:"75-ball Classic",
-        rulesHowToPlayTitle:"🎲 How to Play",
-        rulesHowToPlay:"1. Choose your stake (10, 20, or 30 Birr).\n2. Pick a BINGO card number from 1–100.\n3. When the game starts, numbers are called every few seconds.\n4. Mark the number on your card when it is called.\n5. If you complete one of the winning patterns, tap **🏆 BINGO!** immediately.",
-        rulesWinningPatternsTitle:"🏆 Winning Patterns",
-        rulesWinningPatterns:"✅ 1 Row\n✅ 1 Column\n✅ 1 Diagonal\n✅ 4 Corners\n\n**💡 Note:** The centre FREE space counts as automatically marked.",
-        rulesPrizeTitle:"🏆 Prize Rules",
+        rulesHowToPlayTitle:"How to Play",
+        rulesHowToPlay:"1. Choose your stake (10, 20, or 30 Birr).\n2. Pick a BINGO card number from 1–100.\n3. When the game starts, numbers are called every few seconds.\n4. Mark the number on your card when it is called.\n5. If you complete one of the winning patterns, tap **BINGO!** immediately.",
+        rulesWinningPatternsTitle:"Winning Patterns",
+        rulesWinningPatterns:"1 Row\n1 Column\n1 Diagonal\n4 Corners\n\n**Note:** The centre FREE space counts as automatically marked.",
+        rulesPrizeTitle:"Prize Rules",
         rulesPrize:"• If 2 or more players, 80% of the total entry fees goes to the winner(s).\n• If only 1 player, you get 100% of your entry fee back if you call BINGO.\n• If multiple winners, the prize is shared equally.",
-        rulesDepositTitle:"💰 Deposit",
-        rulesDeposit:"1. Tap **➕ Deposit**.\n2. Select a payment method (Telebirr, CBE Birr, or M-Pesa).\n3. Send payment.\n4. Tap **Request Deposit**.\n5. Your balance updates after admin approval.\n\n**Minimum amount:** 10 Birr",
-        rulesWithdrawTitle:"💸 Withdraw",
-        rulesWithdraw:"1. Tap **➖ Withdraw**.\n2. Select a withdrawal method (from the methods the admin accepts).\n3. Enter your full name.\n4. Enter your phone/account number.\n5. Enter the amount to withdraw.\n6. Tap **Request Withdrawal**.\n7. Funds are sent after admin approval.\n\n**Minimum amount:** 20 Birr",
-        rulesGameRulesTitle:"⚖️ Game Rules",
-        rulesGameRules:"✅ All numbers are drawn fairly by the server.\n✅ You cannot change your card after the game starts.\n✅ You must tap **🏆 BINGO!** before the next number is called.\n✅ The server validates your BINGO claim.\n❌ Invalid claims are rejected.\n❌ Cheating, multi‑accounting, or exploiting bugs is prohibited.",
-        rulesHelpTitle:"📞 Help",
+        rulesDepositTitle:"Deposit",
+        rulesDeposit:"1. Tap **Deposit**.\n2. Select a payment method (Telebirr, CBE Birr, or M-Pesa).\n3. Send payment.\n4. Tap **Request Deposit**.\n5. Your balance updates after admin approval.\n\n**Minimum amount:** 10 Birr",
+        rulesWithdrawTitle:"Withdraw",
+        rulesWithdraw:"1. Tap **Withdraw**.\n2. Select a withdrawal method (from the methods the admin accepts).\n3. Enter your full name.\n4. Enter your phone/account number.\n5. Enter the amount to withdraw.\n6. Tap **Request Withdrawal**.\n7. Funds are sent after admin approval.\n\n**Minimum amount:** 20 Birr",
+        rulesGameRulesTitle:"Game Rules",
+        rulesGameRules:"All numbers are drawn fairly by the server.\nYou cannot change your card after the game starts.\nYou must tap **BINGO!** before the next number is called.\nThe server validates your BINGO claim.\nInvalid claims are rejected.\nCheating, multi-accounting, or exploiting bugs is prohibited.",
+        rulesHelpTitle:"Help",
         rulesHelp:"Join @Dotbingogame or @dotbingo for support.",
-        rulesGoodLuck:"🎉 Good luck!\nPlay DOT BINGO, win, and have fun!",
-        selectWithdraw:"💸 Select Withdrawal Method", yourDetails:"Your account details",
-        fullName:"👤 Full Name (as per bank/mobile money)", accountNumber:"📞 Account / Phone Number",
-        amountWithdraw:"💰 Amount (ETB) - Min 20 ETB",
-        withdrawHint:"⏱️ Withdrawals processed within moment.",
-        requestWithdrawal:"✔ Request Withdrawal", gotIt:"Got it", congrats:"Congratulations!",
-        winningPrize:"🎁 WINNING PRIZE", amazing:"🎉 Amazing! 🎉",
+        rulesGoodLuck:"Good luck!\nPlay DOT BINGO, win, and have fun!",
+        selectWithdraw:"Select Withdrawal Method", yourDetails:"Your account details",
+        fullName:"Full Name (as per bank/mobile money)", accountNumber:"Account / Phone Number",
+        amountWithdraw:"Amount (ETB) - Min 20 ETB",
+        withdrawHint:"Withdrawals processed within moment.",
+        requestWithdrawal:"Request Withdrawal", gotIt:"Got it", congrats:"Congratulations!",
+        winningPrize:"WINNING PRIZE", amazing:"Amazing!",
         sendTo:"Send {amount} ETB to this number",
-        inviteCodeLabel:"🔑 Invite Code", backToLobby:"← Back to Lobby",
+        inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
     }
 };
 
@@ -1382,7 +700,7 @@ function applyLang() {
         const k = el.dataset.key;
         el.innerText = t(k);
     });
-    $('langToggleBtn').textContent = lang === 'am' ? '🇬🇧 English' : '🇪🇹 አማርኛ';
+    $('langToggleBtn').textContent = lang === 'am' ? 'English' : 'አማርኛ';
 }
 
 /* ============================================================
@@ -1437,25 +755,16 @@ function switchPage(id) {
     next.classList.remove('hidden');
 }
 
-/* ✅ Z-INDEX BASED MODAL TRANSITIONS
-   Every time a modal opens, it gets a fresh z-index higher than any
-   modal that came before it. No DOM reordering, no rAF, no race
-   conditions — CSS stacking order is deterministic and the class
-   change is applied synchronously so it can never be lost. */
 let modalZ = 2000;
 
 function transitionModal(closeId, openId) {
-    // 1. Close the outgoing modal
     if (closeId) {
         const closeEl = $(closeId);
         if (closeEl) closeEl.classList.remove('active');
     }
-
-    // 2. Open the incoming modal — always on top of whatever is below
     if (!openId) return;
     const openEl = $(openId);
     if (!openEl) return;
-
     modalZ++;
     openEl.style.zIndex = String(modalZ);
     openEl.classList.add('active');
@@ -1536,7 +845,7 @@ function updateStakeTable(stake, count) {
         if (bar) bar.style.transform = `scaleX(${stakeCounts[s] / max})`;
     }
     const badge = $(`c${stake}`);
-    if (badge) badge.innerText = `👥 ${count} players`;
+    if (badge) badge.innerText = `${count} players`;
 }
 
 function connectStakeSocket() {
@@ -1555,33 +864,12 @@ function disconnectStakeSocket() {
 /* ============================================================
    7. DEPOSIT / WITHDRAW — unified method picker
    ============================================================ */
-const METHOD_LOGOS = {
-    telebirr: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Telebirr_logo.svg',
-    cbebirr:  'https://upload.wikimedia.org/wikipedia/commons/8/8c/Commercial_Bank_of_Ethiopia_logo.svg',
-    mpesa:    'https://upload.wikimedia.org/wikipedia/commons/7/7e/M-Pesa_Logo.svg'
-};
 const METHOD_LABELS = { telebirr: 'Telebirr', cbebirr: 'CBE Birr', mpesa: 'M-Pesa' };
-const METHOD_FALLBACK = {
-    telebirr: { letter: 'T', color: '#FBBF24' },
-    cbebirr:  { letter: 'C', color: '#1e40af' },
-    mpesa:    { letter: 'M', color: '#10b981' }
-};
 
 function safeNumber(n) {
-    if (!n) return '📞 Contact admin';
+    if (!n) return 'Contact admin';
     const d = String(n).replace(/\D/g, '');
-    return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : '📞 Contact admin';
-}
-
-function methodIconHTML(type) {
-    const fb = METHOD_FALLBACK[type] || { letter: '💰', color: '#6b7280' };
-    const url = METHOD_LOGOS[type];
-    const fallbackSpan =
-        `<span class="fallback-icon" style="background:${fb.color};">${fb.letter}</span>`;
-    if (!url) return fallbackSpan;
-    return `<img src="${url}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
-                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-            <span class="fallback-icon" style="display:none; background:${fb.color};">${fb.letter}</span>`;
+    return (d.length === 10 && (d.startsWith('09') || d.startsWith('07'))) ? n : 'Contact admin';
 }
 
 function renderMethodList(methods, mode) {
@@ -1596,7 +884,7 @@ function renderMethodList(methods, mode) {
     backBtn.style.display = '';
 
     if (!methods.length) {
-        container.innerHTML = `<div class="empty-state"><div class="ico">💳</div><div>No methods available</div></div>`;
+        container.innerHTML = `<div class="empty-state"><div>No methods available</div></div>`;
         return;
     }
 
@@ -1604,7 +892,6 @@ function renderMethodList(methods, mode) {
         const label = METHOD_LABELS[m.type] || m.type;
         const disp = mode === 'deposit' ? `<div class="num">${safeNumber(m.number)}</div>` : '';
         return `<div class="method-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
-                    <div class="ico">${methodIconHTML(m.type)}</div>
                     <div class="info">
                         <div class="name">${label}</div>
                         ${disp}
@@ -1678,7 +965,6 @@ async function openDeposit() {
         if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
     });
     renderMethodList(methods, 'deposit');
-    // Method list also gets a fresh z-index so it renders above other modals
     modalZ++;
     $('methodListModal').style.zIndex = String(modalZ);
     $('methodListModal').classList.add('active');
@@ -1733,11 +1019,9 @@ function requestDeposit() {
     $('paymentAmountDisplay').textContent = amt + ' ETB';
     $('paymentStepAmount').textContent    = amt;
     $('paymentStepLabel').innerHTML       = t('sendTo').replace('{amount}', amt);
-    $('paymentRecipient').textContent     = `📞 ${safeNumber(state.selectedMethod.number)}`;
+    $('paymentRecipient').textContent     = safeNumber(state.selectedMethod.number);
     $('paymentMethodTitle').textContent   =
         (METHOD_LABELS[state.selectedMethod.type] || state.selectedMethod.type) + ' P2P';
-
-    $('paymentMethodIcon').innerHTML = methodIconHTML(state.selectedMethod.type);
 
     $('paymentInvoice').value = '';
     transitionModal('depositDetailsModal', 'paymentModal');
@@ -1758,13 +1042,13 @@ function openHowToPay() {
 function getPaymentInstructions(method) {
     const label = METHOD_LABELS[method] || method;
     const specifics = {
-        telebirr: `<h3>📱 Telebirr Specific</h3><ul style="padding-left:20px;"><li>Open Telebirr → <strong>Send Money</strong> → <strong>To Individual</strong>.</li><li>Paste the admin number (starting with <strong>09</strong>).</li><li>Your Invoice Number is the SMS <strong>Transaction ID</strong>.</li></ul>`,
-        cbebirr:  `<h3>🏦 CBE Birr Specific</h3><ul style="padding-left:20px;"><li>Open CBE Birr → <strong>Send Money</strong>.</li><li>Enter the admin number.</li><li>Your Invoice Number is the <strong>reference number</strong> shown after the transaction.</li></ul>`,
-        mpesa:    `<h3>📲 M-Pesa Specific</h3><ul style="padding-left:20px;"><li>Open M-Pesa → <strong>Send Money</strong>.</li><li>Enter the admin number (starting with <strong>07</strong>).</li><li>Your Invoice Number is the <strong>transaction code</strong> (e.g. <code>CKU3JPX6M3</code>).</li></ul>`
+        telebirr: `<h3>Telebirr Specific</h3><ul style="padding-left:20px;"><li>Open Telebirr, choose <strong>Send Money</strong>, then <strong>To Individual</strong>.</li><li>Paste the admin number (starting with <strong>09</strong>).</li><li>Your Invoice Number is the SMS <strong>Transaction ID</strong>.</li></ul>`,
+        cbebirr:  `<h3>CBE Birr Specific</h3><ul style="padding-left:20px;"><li>Open CBE Birr and choose <strong>Send Money</strong>.</li><li>Enter the admin number.</li><li>Your Invoice Number is the <strong>reference number</strong> shown after the transaction.</li></ul>`,
+        mpesa:    `<h3>M-Pesa Specific</h3><ul style="padding-left:20px;"><li>Open M-Pesa and choose <strong>Send Money</strong>.</li><li>Enter the admin number (starting with <strong>07</strong>).</li><li>Your Invoice Number is the <strong>transaction code</strong> (e.g. <code>CKU3JPX6M3</code>).</li></ul>`
     }[method] || '';
 
     return `
-        <p><strong>📌 Follow these steps carefully:</strong></p>
+        <p><strong>Follow these steps carefully:</strong></p>
         <ol style="padding-left:20px; margin-bottom:12px;">
             <li>Open your ${label} app.</li>
             <li>Select <strong>Send Money</strong>.</li>
@@ -1773,8 +1057,8 @@ function getPaymentInstructions(method) {
             <li>Copy the <strong>Invoice Number</strong> from the SMS.</li>
             <li>Paste it in the field and tap <strong>Confirm Payment</strong>.</li>
         </ol>
-        <p style="margin-top:12px; background:rgba(251,191,36,.1); padding:10px; border-radius:12px; border:1px solid rgba(251,191,36,.2);">
-            ⚠️ <strong>Important:</strong> Use the <strong>exact</strong> number and amount so your deposit is credited automatically.
+        <p style="margin-top:12px; background:#0f1419; border:1px solid #2d3540; padding:10px;">
+            <strong>Important:</strong> Use the <strong>exact</strong> number and amount so your deposit is credited automatically.
         </p>
         ${specifics}
     `;
@@ -1789,7 +1073,7 @@ async function submitDeposit() {
     const btn = $('confirmPaymentBtn');
     const orig = btn.innerText;
     btn.disabled = true;
-    btn.innerText = '⏳ Sending...';
+    btn.innerText = 'Sending...';
 
     try {
         const r = await fetch('/api/request-deposit', {
@@ -1805,13 +1089,13 @@ async function submitDeposit() {
         });
         const d = await r.json();
         if (d.success) {
-            toast(`✅ Deposit request sent: ${state.pendingAmount} ETB`, 'success');
+            toast(`Deposit request sent: ${state.pendingAmount} ETB`, 'success');
             resetDepositState();
         } else {
-            toast('❌ ' + (d.error || 'Submission failed'), 'error');
+            toast((d.error || 'Submission failed'), 'error');
         }
     } catch {
-        toast('⚠️ Network error', 'error');
+        toast('Network error', 'error');
     } finally {
         state.submitting = false;
         btn.disabled = false;
@@ -1831,7 +1115,7 @@ async function submitWithdraw() {
     const btn = $('submitWithdrawBtn');
     const orig = btn.innerText;
     btn.disabled = true;
-    btn.innerText = '⏳ Processing...';
+    btn.innerText = 'Processing...';
 
     try {
         const r = await fetch('/api/request-withdraw', {
@@ -1847,14 +1131,14 @@ async function submitWithdraw() {
         });
         const d = await r.json();
         if (d.success) {
-            toast('✅ Withdrawal request submitted!', 'success');
+            toast('Withdrawal request submitted!', 'success');
             $('withdrawModal').classList.remove('active');
             resetDepositState();
         } else {
-            toast('❌ ' + (d.error || 'Submission failed'), 'error');
+            toast((d.error || 'Submission failed'), 'error');
         }
     } catch {
-        toast('⚠️ Network error', 'error');
+        toast('Network error', 'error');
     } finally {
         btn.disabled = false;
         btn.innerText = orig;
@@ -1872,7 +1156,7 @@ function renderCard(card, containerId, clickable) {
 
     if (!card?.length) {
         if (cont.dataset.empty !== '1') {
-            cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-faint);">🎴 Select a card number to see your Bingo card</div>';
+            cont.innerHTML = '<div style="text-align:center;padding:20px;color:#8b95a3;">Select a card number to see your Bingo card</div>';
             cont.dataset.empty = '1';
             cardCache.delete(cont);
         }
@@ -1902,7 +1186,7 @@ function renderCard(card, containerId, clickable) {
             for (let c = 0; c < 5; c++) {
                 const v = card[r][c];
                 const td = document.createElement('td');
-                td.textContent = v === 'FREE' ? '★' : v;
+                td.textContent = v === 'FREE' ? '*' : v;
                 if (v === 'FREE') td.classList.add('free');
                 else cells.set(v, td);
                 tr.appendChild(td);
@@ -2064,27 +1348,10 @@ function showWinner(d) {
     const winners = d.winners || [d.winner].filter(Boolean);
     const each = d.prizeEach || 0;
 
-    $('winTitle').innerHTML = winners.length > 1 ? `${winners.length} WINNERS!` : '🎉 BINGO! 🎉';
+    $('winTitle').innerHTML = winners.length > 1 ? `${winners.length} WINNERS!` : 'BINGO!';
     $('winListContainer').innerHTML = winners.map(w => `<span class="winner-badge">${w}</span>`).join('');
     $('winPrize').innerHTML = each + ' <small>ETB</small>';
     $('winnerOverlay').classList.add('active');
-
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        const conf = document.createElement('div');
-        conf.className = 'confetti';
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < 60; i++) {
-            const p = document.createElement('div');
-            p.className = 'confetti-piece';
-            p.style.left = Math.random() * 100 + '%';
-            p.style.animationDuration = (Math.random() * 3 + 2) + 's';
-            p.style.backgroundColor = `hsl(${Math.random() * 30 + 20}, 90%, 60%)`;
-            frag.appendChild(p);
-        }
-        conf.appendChild(frag);
-        document.body.appendChild(conf);
-        setTimeout(() => conf.remove(), 4000);
-    }
 
     if (state.currentGameId) addRecord(true, each, d.totalPrize || 0);
     unlockSpeech();
@@ -2131,7 +1398,7 @@ function updateStats() {
     if (!div) return;
 
     if (!state.recentGames.length) {
-        div.innerHTML = '<div class="history-card" style="text-align:center; color:var(--text-faint);">✨ No games played yet. Join a round!</div>';
+        div.innerHTML = '<div class="history-card" style="text-align:center; color:#8b95a3;">No games played yet. Join a round!</div>';
         return;
     }
     div.innerHTML = state.recentGames.map(g => {
@@ -2139,10 +1406,10 @@ function updateStats() {
             ? `${g.totalPrize || g.playerPrize} ETB`
             : '—';
         return `<div class="history-card">
-            <div><strong>🎮 Game ID:</strong> <span style="color:var(--text);">${g.gameId || '—'}</span></div>
-            <div><strong>🏆 Result:</strong> <span style="color:var(--text);">${g.result}</span></div>
-            <div><strong>💰 Prize:</strong> <span style="color:var(--accent); font-weight:700;">${prize}</span></div>
-            <div style="font-size:.7rem;color:var(--text-dim); margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div>
+            <div><strong>Game ID:</strong> <span style="color:#e6e9ef;">${g.gameId || '—'}</span></div>
+            <div><strong>Result:</strong> <span style="color:#e6e9ef;">${g.result}</span></div>
+            <div><strong>Prize:</strong> <span style="color:#fbbf24; font-weight:bold;">${prize}</span></div>
+            <div style="font-size:11px;color:#8b95a3; margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div>
         </div>`;
     }).join('');
 }
@@ -2247,9 +1514,9 @@ async function connectToGame(stake) {
         $('backToLobbyContainer')?.classList.add('hidden');
     });
 
-    socket.on('invalidBingo', () => toast('❌ Not a valid bingo yet!', 'error'));
-    socket.on('depositStatus',  d => toast(d.status === 'approved' ? `✅ Deposit +${d.amount} ETB approved!` : '❌ Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
-    socket.on('withdrawStatus', d => toast(d.status === 'approved' ? `✅ Withdrawal -${d.amount} ETB processed.` : '❌ Withdrawal rejected.', d.status === 'approved' ? 'success' : 'error'));
+    socket.on('invalidBingo', () => toast('Not a valid bingo yet!', 'error'));
+    socket.on('depositStatus',  d => toast(d.status === 'approved' ? `Deposit +${d.amount} ETB approved!` : 'Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
+    socket.on('withdrawStatus', d => toast(d.status === 'approved' ? `Withdrawal -${d.amount} ETB processed.` : 'Withdrawal rejected.', d.status === 'approved' ? 'success' : 'error'));
 }
 
 function updateGrid(takenArr) {
@@ -2296,9 +1563,7 @@ function toggleMute() {
 function updateMute() {
     const btn = $('muteToggleBtn');
     if (!btn) return;
-    btn.textContent = state.soundMuted ? '🔇' : '🔊';
-    btn.style.background = state.soundMuted ? 'var(--bg-soft)' : 'var(--accent-soft)';
-    btn.style.color = state.soundMuted ? 'var(--text-dim)' : 'var(--accent)';
+    btn.textContent = state.soundMuted ? 'Muted' : 'Sound';
 }
 
 const AM_LETTERS = n => n <= 15 ? "ቢ" : n <= 30 ? "አይ" : n <= 45 ? "ኤን" : n <= 60 ? "ጂ" : "ኦ";
@@ -2337,14 +1602,12 @@ function goBack() {
    13. EVENT BINDINGS
    ============================================================ */
 
-// language
 $('langToggleBtn').addEventListener('click', () => {
     lang = lang === 'am' ? 'en' : 'am';
     localStorage.setItem('dot_bingo_lang', lang);
     applyLang();
 });
 
-// stake buttons
 document.querySelectorAll('.stake-option').forEach(btn => {
     btn.addEventListener('click', () => {
         loadStats();
@@ -2355,18 +1618,16 @@ document.querySelectorAll('.stake-option').forEach(btn => {
     });
 });
 
-// random card
 $('randomCardBtn').addEventListener('click', () => {
     if (state.isGameActive || !socket) return;
     socket.emit('newCardNumber');
     state.selectedCard = null;
-    $('selectedNumber').textContent = '⚡ ...';
+    $('selectedNumber').textContent = '...';
     scheduleGridPaint();
     updateBackToLobbyVisibility();
     unlockSpeech();
 });
 
-// number grid (delegated)
 $('numberGrid').addEventListener('click', e => {
     const cell = e.target.closest('.grid-cell');
     if (!cell || state.isGameActive || !socket) return;
@@ -2383,16 +1644,13 @@ $('numberGrid').addEventListener('click', e => {
     updateBackToLobbyVisibility();
 }, { passive: true });
 
-// bingo claim
 $('bingoBtn').addEventListener('click', () => {
     if (socket && state.isGameActive) socket.emit('claimBingo');
     unlockSpeech();
 });
 
-// mute
 $('muteToggleBtn').addEventListener('click', toggleMute);
 
-// tab bar
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         resetDepositState();
@@ -2410,7 +1668,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-// generic back buttons + action buttons
 document.addEventListener('click', e => {
     const backBtn = e.target.closest('[data-back]');
     if (backBtn) { resetDepositState(); goBack(); return; }
@@ -2424,7 +1681,6 @@ document.addEventListener('click', e => {
     }
 });
 
-// deposit / withdraw cancel & back
 $('methodListCancelBtn').addEventListener('click', closeMethodList);
 $('methodListBackBtn').addEventListener('click', closeMethodList);
 $('depositDetailsBackBtn').addEventListener('click', () => transitionModal('depositDetailsModal', 'methodListModal'));
@@ -2438,20 +1694,17 @@ $('withdrawBackBtn').addEventListener('click', () => {
     openWithdraw();
 });
 
-// deposit request / confirm
 $('requestDepositBtn').addEventListener('click', requestDeposit);
 $('confirmPaymentBtn').addEventListener('click', submitDeposit);
 $('howToPayTrigger').addEventListener('click', openHowToPay);
 $('closeHowToPayBtn').addEventListener('click', () => $('howToPayModal').classList.remove('active'));
 $('paymentCopyBtn').addEventListener('click', () => {
-    const raw = $('paymentRecipient').textContent.replace('📞 ', '').trim();
+    const raw = $('paymentRecipient').textContent.trim();
     copyText(raw);
 });
 
-// withdraw submit
 $('submitWithdrawBtn').addEventListener('click', submitWithdraw);
 
-// rules
 $('rulesBtn').addEventListener('click', () => {
     modalZ++;
     $('rulesModal').style.zIndex = String(modalZ);
@@ -2464,12 +1717,10 @@ $('rulesBtnGame').addEventListener('click', () => {
 });
 $('closeRulesBtn').addEventListener('click', () => $('rulesModal').classList.remove('active'));
 
-// winner celebrate
 document.querySelector('.celebrate-btn').addEventListener('click', () => {
     $('winnerOverlay').classList.remove('active');
 });
 
-// invite overlay
 $('goToBotBtn').addEventListener('click', () => {
     const url = 'https://t.me/bingomkmk0120_bot';
     tg?.openTelegramLink ? tg.openTelegramLink(url) : window.open(url, '_blank');
