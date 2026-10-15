@@ -120,6 +120,7 @@ class WriteQueue {
           } else if (type === 'audit_log') {
             ({ error } = await this.supabase.from('audit_logs').insert(rows));
           } else if (type === 'round_winner') {
+            // ★ NEW ★ optional durable storage (create table round_winners)
             ({ error } = await this.supabase.from('round_winners').insert(rows));
           } else {
             console.warn(`[WriteQueue] Unknown type: ${type}`);
@@ -1318,11 +1319,15 @@ let botGameHistory = [];
 const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
 const botNameAssignments = new Map();
 
-// ★ Round winners history for the admin dashboard (last N rounds)
+// ★ NEW ★ ─────────────────────────────────────────────────────
+//  Round winners history for the admin dashboard (last N rounds)
+//  One entry per winner. Newest first.
+// ──────────────────────────────────────────────────────────────
 const ROUND_WINNERS_LIMIT = 10;
 const roundWinnersHistory = [];
 
 function recordRoundWinners(entry) {
+  // entry: { round, stake, time, winningNumber, totalPrize, winners:[...] }
   const flattened = entry.winners.map(w => ({
     round: entry.round,
     stake: entry.stake,
@@ -1336,17 +1341,20 @@ function recordRoundWinners(entry) {
     prize: w.prize
   }));
 
+  // newest first
   roundWinnersHistory.unshift(...flattened);
   if (roundWinnersHistory.length > ROUND_WINNERS_LIMIT) {
     roundWinnersHistory.length = ROUND_WINNERS_LIMIT;
   }
 
+  // live-push to every connected admin dashboard
   try {
     adminNamespace.emit('admin:winnerHistory', roundWinnersHistory);
   } catch (e) {
     // adminNamespace not yet initialized (very unlikely at runtime)
   }
 
+  // optional durable copy
   for (const w of flattened) {
     writeQueue.push('round_winner', {
       round_number: w.round,
@@ -1361,6 +1369,7 @@ function recordRoundWinners(entry) {
     });
   }
 }
+// ★ END NEW ★
 
 function getBotName(botId) {
   const now = Date.now();
@@ -1897,7 +1906,7 @@ function isBingoValidOnLastCall(card, marked, lastCalled) {
 }
 
 // ================================================================
-//  END GAME  — fast critical path + queued writes
+//  END GAME  — REWRITTEN: fast critical path + queued writes
 // ================================================================
 async function endGameWithWinners(stake) {
   const game = getGame(stake);
@@ -2082,7 +2091,10 @@ async function endGameWithWinners(stake) {
     io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
   }
 
-  // Record this round's winners for the admin dashboard
+  // ★ NEW ★ ────────────────────────────────────────────────────
+  //  Record this round's winners for the admin dashboard BEFORE
+  //  game.winners gets cleared below.
+  // ────────────────────────────────────────────────────────────
   if (game.winners.length > 0) {
     recordRoundWinners({
       round: gameCounter,
@@ -2099,9 +2111,10 @@ async function endGameWithWinners(stake) {
       }))
     });
   }
+  // ★ END NEW ★
 
   // ============================================================
-  //  🚀 RESET GAME
+  //  🚀 RESET GAME  — players wait for this only
   // ============================================================
   game.winners = [];
   clearTimeout(game.bingoGraceTimeout);
@@ -4164,8 +4177,11 @@ adminNamespace.use((socket, next) => {
 
 adminNamespace.on('connection', (socket) => {
   socket.emit('admin:playersList', buildAdminSnapshot());
+
+  // ★ NEW ★ send current winners history immediately on connect
   socket.emit('admin:winnerHistory', roundWinnersHistory);
 
+  // ★ NEW ★ handle explicit request from client
   socket.on('admin:getWinners', () => {
     socket.emit('admin:winnerHistory', roundWinnersHistory);
   });
