@@ -233,7 +233,7 @@ nav button.on{color:#3b82f6}
         <h2>Deposits</h2>
         <button class="icon-btn" data-action="toggle-filter" data-target="depositFilter">Filter</button>
       </div>
-      <div class="filter" id="depositFilter">
+      <div class="filter" id="depositFilter" style="display:none">
         <div class="g"><label>Method</label>
           <select id="depositMethod"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
         </div>
@@ -253,7 +253,7 @@ nav button.on{color:#3b82f6}
         <h2>Withdrawals</h2>
         <button class="icon-btn" data-action="toggle-filter" data-target="withdrawFilter">Filter</button>
       </div>
-      <div class="filter" id="withdrawFilter">
+      <div class="filter" id="withdrawFilter" style="display:none">
         <div class="g"><label>Method</label>
           <select id="withdrawMethod"><option value="all">All</option><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
         </div>
@@ -277,7 +277,7 @@ nav button.on{color:#3b82f6}
         <button class="btn o" data-action="open-import-modal">Import</button>
         <button class="btn p" data-action="open-add-player-modal">Add Player</button>
       </div>
-      <div class="filter" id="playerFilter">
+      <div class="filter" id="playerFilter" style="display:none">
         <div class="g" style="width:100%;margin-right:0"><label>Search</label>
           <input type="text" id="playerSearchInput" placeholder="username or telegram id">
         </div>
@@ -555,7 +555,7 @@ function switchPage(page){
   state.currentPage=page;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===page));
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='page-'+page));
-  if(page==='game') Promise.all([loadStats(),loadCommissionSummary(),loadActiveTab({reset:true})]);
+  if(page==='game') Promise.all([loadStats(),loadCommissionSummary()]);
   else if(page==='profile') loadProfile();
 }
 function switchTab(tab){
@@ -564,12 +564,11 @@ function switchTab(tab){
   state.currentTab=tab;
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='tab-'+tab));
-  loadActiveTab({reset:false});
-}
-function loadActiveTab({reset}){
-  if(state.currentTab==='deposits') return loadDeposits({reset});
-  if(state.currentTab==='withdrawals') return loadWithdrawals({reset});
-  if(state.currentTab==='players') return loadPlayers({reset});
+  // Data is already pre-loaded in init(), so no need to re-fetch on switch.
+  // If data somehow wasn't loaded, trigger a load.
+  if(tab==='deposits' && !state.deposits.loaded) loadDeposits({reset:true});
+  else if(tab==='withdrawals' && !state.withdrawals.loaded) loadWithdrawals({reset:true});
+  else if(tab==='players' && !state.players.loaded) loadPlayers({reset:true});
 }
 function toggleFilter(id){const el=$(id);el.style.display=el.style.display==='none'?'block':'none'}
 
@@ -738,7 +737,8 @@ async function loadDeposits({reset=false}={}){
     $('depositShowingText').textContent='Showing '+s.byId.size+' deposits'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('deposits',()=>loadDeposits({reset:false}));
   }catch(e){
-    if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+    c.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+    showToast(e.message,'error');
   }finally{s.loading=false}
 }
 function upsertDepositRow(req){
@@ -827,7 +827,10 @@ async function loadWithdrawals({reset=false}={}){
     if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty">No withdrawals</div>';
     $('withdrawShowingText').textContent='Showing '+s.byId.size+' withdrawals'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('withdrawals',()=>loadWithdrawals({reset:false}));
-  }catch(e){if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  }catch(e){
+    c.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+    showToast(e.message,'error');
+  }
   finally{s.loading=false}
 }
 function upsertWithdrawalRow(req){
@@ -895,7 +898,10 @@ async function loadPlayers({reset=false}={}){
     $('playerShowingText').textContent='Showing '+s.byId.size+' players'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('players',()=>loadPlayers({reset:false}));
     applyPlayerSearch();
-  }catch(e){if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
+  }catch(e){
+    c.innerHTML='<div class="empty">'+esc(e.message)+'</div>';
+    showToast(e.message,'error');
+  }
   finally{s.loading=false}
 }
 function onPlayerAdded(e){
@@ -1129,9 +1135,9 @@ async function refreshAll({silent=false}={}){
   try{
     const tasks=[loadStats(),loadCommissionSummary()];
     if(state.currentPage==='game'){
-      if(state.currentTab==='deposits') tasks.push(loadDeposits({reset:true}));
-      if(state.currentTab==='withdrawals') tasks.push(loadWithdrawals({reset:true}));
-      if(state.currentTab==='players') tasks.push(loadPlayers({reset:true}));
+      tasks.push(loadDeposits({reset:true}));
+      tasks.push(loadWithdrawals({reset:true}));
+      tasks.push(loadPlayers({reset:true}));
     }else if(state.currentPage==='profile') tasks.push(loadProfile());
     await Promise.all(tasks);
     if(!silent) showToast('Refreshed','info');
@@ -1196,8 +1202,16 @@ document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='r'){e.preventDefa
 async function init(){
   const ok=await checkSession();
   if(!ok) return;
-  await Promise.all([loadStats(),loadCommissionSummary()]);
-  await loadDeposits({reset:true});
+  
+  // PRE-LOAD ALL DATA: Deposits, Withdrawals, Players, Stats, Commission
+  await Promise.all([
+    loadStats(),
+    loadCommissionSummary(),
+    loadDeposits({reset:true}),
+    loadWithdrawals({reset:true}),
+    loadPlayers({reset:true})
+  ]);
+  
   connectAdminWebSocket();
   startReconcile();
 }
