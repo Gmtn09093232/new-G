@@ -12,7 +12,6 @@
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: #0f1e3a; border-radius: 20px; padding: 20px 16px 24px; border: 1px solid #1e3358; }
         .page.hidden { display: none; }
 
-        /* ===== SVG Global Sizing ===== */
         svg { width: 16px; height: 16px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
         .winner-trophy svg { width: 56px; height: 56px; }
         #inviteRequiredOverlay .overlay-icon svg { width: 64px; height: 64px; }
@@ -102,48 +101,13 @@
         .grid-cell { background: #142647; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.75rem; color: #cbd5e1; border: 1px solid #1e3358; cursor: pointer; min-height: 28px; }
         .grid-cell.taken { background: #059669; color: #ffffff; border-color: #10b981; cursor: not-allowed; }
         .grid-cell.own-card { background: #dc2626; color: #ffffff; border-color: #ef4444; cursor: not-allowed; }
-
-        /* ===== BINGO BUTTON ===== */
-        #bingoBtn {
-            display: flex; align-items: center; justify-content: center; gap: 10px;
-            width: 90%; max-width: 340px; margin: 20px auto 18px;
-            background: #fbbf24; color: #0a1428;
-            font-size: 1.3rem; font-weight: 800;
-            padding: 14px 12px; border-radius: 80px; border: none;
-            letter-spacing: 1.5px; cursor: pointer;
-            transition: background 0.15s ease;
-            position: relative;
-        }
+        #bingoBtn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 90%; max-width: 340px; margin: 20px auto 18px; background: #fbbf24; color: #0a1428; font-size: 1.3rem; font-weight: 800; padding: 14px 12px; border-radius: 80px; border: none; letter-spacing: 1.5px; cursor: pointer; transition: background 0.15s ease; position: relative; }
         #bingoBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* ✅ NEW: Shake + red feedback for invalid bingo */
-        @keyframes bingoShake {
-            0%, 100% { transform: translateX(0); }
-            15% { transform: translateX(-8px); }
-            30% { transform: translateX(8px); }
-            45% { transform: translateX(-6px); }
-            60% { transform: translateX(6px); }
-            75% { transform: translateX(-3px); }
-            90% { transform: translateX(3px); }
-        }
-        #bingoBtn.shake {
-            animation: bingoShake 0.55s ease;
-            background: #dc2626 !important;
-            color: #ffffff !important;
-            box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25);
-        }
+        @keyframes bingoShake { 0%, 100% { transform: translateX(0); } 15% { transform: translateX(-8px); } 30% { transform: translateX(8px); } 45% { transform: translateX(-6px); } 60% { transform: translateX(6px); } 75% { transform: translateX(-3px); } 90% { transform: translateX(3px); } }
+        #bingoBtn.shake { animation: bingoShake 0.55s ease; background: #dc2626 !important; color: #ffffff !important; box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25); }
         #bingoBtn.shake svg { color: #ffffff !important; }
-
-        /* ✅ NEW: Green success flash */
-        @keyframes bingoSuccess {
-            0% { background: #fbbf24; }
-            50% { background: #10b981; color: #ffffff; }
-            100% { background: #fbbf24; }
-        }
-        #bingoBtn.success {
-            animation: bingoSuccess 0.8s ease;
-        }
-
+        @keyframes bingoSuccess { 0% { background: #fbbf24; } 50% { background: #10b981; color: #ffffff; } 100% { background: #fbbf24; } }
+        #bingoBtn.success { animation: bingoSuccess 0.8s ease; }
         .tab-bar { display: flex; background: #142647; border-radius: 100px; margin-top: 16px; padding: 5px 6px; gap: 4px; border: 1px solid #1e3358; }
         .tab-btn { flex: 1; background: transparent; border: none; padding: 9px 0; border-radius: 80px; font-weight: 600; font-size: 0.72rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
         .tab-btn.active { background: #fbbf24; color: #0a1428; }
@@ -208,33 +172,30 @@
         #inviteRequiredOverlay p a { color: #fbbf24; font-weight: 700; text-decoration: none; }
         #inviteRequiredOverlay .btn-bot { display: flex; align-items: center; justify-content: center; gap: 8px; background: #fbbf24; color: #0a1428; border: none; padding: 14px 36px; border-radius: 60px; font-weight: 800; font-size: 1rem; cursor: pointer; }
         .hidden { display: none; }
+
+        /* ⚡ NEW: Reconnecting indicator */
+        #reconnectBanner { position: fixed; top: 0; left: 0; right: 0; background: #dc2626; color: white; text-align: center; padding: 8px; font-size: 0.8rem; font-weight: 600; z-index: 5000; transform: translateY(-100%); transition: transform 0.3s ease; }
+        #reconnectBanner.show { transform: translateY(0); }
     </style>
 </head>
 <body>
+    <div id="reconnectBanner">Reconnecting...</div>
+
     <div id="inviteRequiredOverlay" class="hidden">
         <div class="overlay-icon" id="inviteOverlayIcon"></div>
         <h2>Invite Required</h2>
         <p>Please use an invite link <a href="https://t.me/bingomkmk0120_bot?start=GIZ5GG8" target="_blank">open</a></p>
-        <button class="btn-bot" id="goToBotBtn">
-            <span data-icon="send"></span>
-            <span>Go to Bot</span>
-        </button>
+        <button class="btn-bot" id="goToBotBtn"><span data-icon="send"></span><span>Go to Bot</span></button>
     </div>
 
-    <button id="langToggleBtn" class="lang-toggle">
-        <span data-icon="globe"></span>
-        <span id="langLabel">English</span>
-    </button>
+    <button id="langToggleBtn" class="lang-toggle"><span data-icon="globe"></span><span id="langLabel">English</span></button>
 
     <!-- ===== DEPOSIT METHOD LIST ===== -->
     <div id="depositMethodListModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <div class="deposit-step-header">
                 <button class="step-back" id="depositMethodListBackBtn"><span data-icon="arrow-left"></span></button>
-                <span class="step-title" id="depositMethodListTitle">
-                    <span data-icon="credit-card"></span>
-                    <span data-key="selectMethod">Select Deposit Method</span>
-                </span>
+                <span class="step-title" id="depositMethodListTitle"><span data-icon="credit-card"></span><span data-key="selectMethod">Select Deposit Method</span></span>
                 <span class="step-sub" id="depositMethodListStepLabel">Step 1/2</span>
             </div>
             <div id="methodListContainer" style="max-height:380px; overflow-y:auto; padding:4px 0;">
@@ -258,9 +219,7 @@
 
             <div class="deposit-step">
                 <div class="step-number"><span data-icon="arrow-right"></span><span data-key="step1">Step 1</span></div>
-                <div class="step-title" id="paymentStep1Label">
-                    <span data-key="sendTo">Send</span> <span id="paymentStepAmountLabel">0.00</span> <span data-key="etbToNumber">ETB to this number</span>
-                </div>
+                <div class="step-title" id="paymentStep1Label"><span data-key="sendTo">Send</span> <span id="paymentStepAmountLabel">0.00</span> <span data-key="etbToNumber">ETB to this number</span></div>
                 <div class="step-content">
                     <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:6px;">
                         <span id="howToPayTrigger" style="cursor:pointer; text-decoration:underline; color:#fbbf24; display:inline-flex; align-items:center; gap:4px;">
@@ -270,10 +229,7 @@
                     </div>
                     <div class="recipient-number">
                         <span class="number" id="paymentRecipientNumber">0953677690</span>
-                        <button class="copy-btn" id="paymentCopyBtn">
-                            <span data-icon="copy"></span>
-                            <span data-key="copy">Copy</span>
-                        </button>
+                        <button class="copy-btn" id="paymentCopyBtn"><span data-icon="copy"></span><span data-key="copy">Copy</span></button>
                     </div>
                     <div style="font-size:0.68rem; color:#94a3b8; margin-top:8px;" data-key="openAppHint">Open your payment app, Send Money, Paste the number, Make the transfer</div>
                 </div>
@@ -284,17 +240,11 @@
                 <div class="step-title" data-key="enterDetails">Enter your details & amount</div>
                 <div class="step-content">
                     <div class="input-group" style="margin-top:8px;">
-                        <label>
-                            <span data-icon="phone"></span>
-                            <span data-key="yourPhone">Your Phone Number (for verification)</span>
-                        </label>
+                        <label><span data-icon="phone"></span><span data-key="yourPhone">Your Phone Number (for verification)</span></label>
                         <input type="tel" id="depositPlayerPhone" placeholder="09xxxxxxxx" required autocomplete="off">
                     </div>
                     <div class="input-group" style="margin-bottom:0;">
-                        <label>
-                            <span data-icon="coin"></span>
-                            <span data-key="amountLabel">Amount (ETB)</span>
-                        </label>
+                        <label><span data-icon="coin"></span><span data-key="amountLabel">Amount (ETB)</span></label>
                         <input type="number" id="depositAmountSimple" placeholder="Min 10 ETB" min="10" step="any" required autocomplete="off">
                     </div>
                 </div>
@@ -302,26 +252,15 @@
 
             <div class="deposit-step">
                 <div class="step-number"><span data-icon="arrow-right"></span><span data-key="step3">Step 3</span></div>
-                <div class="step-title">
-                    <span data-icon="image"></span>
-                    <span data-key="uploadProof">Upload Screenshot Proof</span>
-                </div>
+                <div class="step-title"><span data-icon="image"></span><span data-key="uploadProof">Upload Screenshot Proof</span></div>
                 <div class="step-content">
-                    <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:8px;" data-key="uploadProofHint">
-                        Upload a screenshot of your payment confirmation.
-                    </div>
+                    <div style="font-size:0.72rem; color:#94a3b8; margin-bottom:8px;" data-key="uploadProofHint">Upload a screenshot of your payment confirmation.</div>
                     <input type="file" id="paymentScreenshot" accept="image/*" style="width:100%; padding:10px; border-radius:16px; border:1px dashed #2d4066; background:#0a1428; color:#cbd5e1; font-family:inherit; font-size:0.78rem;">
                 </div>
             </div>
 
-            <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;">
-                <span data-icon="check"></span>
-                <span data-key="confirmPayment">Confirm Payment</span>
-            </button>
-            <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:10px;">
-                <span data-icon="arrow-left"></span>
-                <span data-key="back">Back</span>
-            </button>
+            <button id="confirmPaymentBtn" class="btn-primary" style="width:100%; margin-top:16px;"><span data-icon="check"></span><span data-key="confirmPayment">Confirm Payment</span></button>
+            <button id="backPaymentBtn" class="btn-secondary" style="width:100%; margin-top:10px;"><span data-icon="arrow-left"></span><span data-key="back">Back</span></button>
         </div>
     </div>
 
@@ -336,10 +275,7 @@
                 </div>
             </div>
             <div id="howToPayContent" style="font-size:0.85rem; line-height:1.6; color:#cbd5e1; max-height:400px; overflow-y:auto; padding-right:8px;"></div>
-            <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;">
-                <span data-icon="check"></span>
-                <span data-key="gotIt">Got it</span>
-            </button>
+            <button id="closeHowToPayBtn" class="btn-primary" style="width:100%; margin-top:16px;"><span data-icon="check"></span><span data-key="gotIt">Got it</span></button>
         </div>
     </div>
 
@@ -353,37 +289,13 @@
                     <div class="bank-sub" data-key="yourDetails">Your account details</div>
                 </div>
             </div>
-            <div class="input-group">
-                <label>
-                    <span data-icon="user"></span>
-                    <span data-key="fullName">Full Name (as per bank/mobile money)</span>
-                </label>
-                <input type="text" id="withdrawName" placeholder="Full name" required autocomplete="off">
-            </div>
-            <div class="input-group">
-                <label>
-                    <span data-icon="phone"></span>
-                    <span data-key="accountNumber">Account / Phone Number</span>
-                </label>
-                <input type="text" id="withdrawReceiver" placeholder="" required autocomplete="off">
-            </div>
-            <div class="input-group">
-                <label>
-                    <span data-icon="coin"></span>
-                    <span data-key="amountWithdraw">Amount (ETB) - Min 20 ETB</span>
-                </label>
-                <input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any" autocomplete="off">
-            </div>
+            <div class="input-group"><label><span data-icon="user"></span><span data-key="fullName">Full Name (as per bank/mobile money)</span></label><input type="text" id="withdrawName" placeholder="Full name" required autocomplete="off"></div>
+            <div class="input-group"><label><span data-icon="phone"></span><span data-key="accountNumber">Account / Phone Number</span></label><input type="text" id="withdrawReceiver" placeholder="" required autocomplete="off"></div>
+            <div class="input-group"><label><span data-icon="coin"></span><span data-key="amountWithdraw">Amount (ETB) - Min 20 ETB</span></label><input type="number" id="withdrawAmount" placeholder="Amount" min="20" step="any" autocomplete="off"></div>
             <div class="transaction-summary" data-key="withdrawHint">Withdrawals processed within moment.</div>
             <div class="modal-buttons">
-                <button id="submitWithdrawBtn" class="btn-primary">
-                    <span data-icon="check"></span>
-                    <span data-key="requestWithdrawal">Request Withdrawal</span>
-                </button>
-                <button id="backWithdrawBtn" class="btn-secondary">
-                    <span data-icon="arrow-left"></span>
-                    <span data-key="back">Back</span>
-                </button>
+                <button id="submitWithdrawBtn" class="btn-primary"><span data-icon="check"></span><span data-key="requestWithdrawal">Request Withdrawal</span></button>
+                <button id="backWithdrawBtn" class="btn-secondary"><span data-icon="arrow-left"></span><span data-key="back">Back</span></button>
             </div>
         </div>
     </div>
@@ -415,10 +327,7 @@
                 <p data-key="rulesHelp">Join <a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> or <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a>.</p>
                 <p style="margin-top:12px; font-weight:700; text-align:center; color:#fbbf24;" data-key="rulesGoodLuck">Good luck!</p>
             </div>
-            <button id="closeRulesBtn" class="btn-primary" style="width:100%; margin-top:16px;">
-                <span data-icon="check"></span>
-                <span data-key="gotIt">Got it</span>
-            </button>
+            <button id="closeRulesBtn" class="btn-primary" style="width:100%; margin-top:16px;"><span data-icon="check"></span><span data-key="gotIt">Got it</span></button>
         </div>
     </div>
 
@@ -433,40 +342,25 @@
                 <div class="prize-label"><span data-icon="gift"></span><span data-key="winningPrize">WINNING PRIZE</span></div>
                 <div class="prize-number" id="winPrize">0 <small>ETB</small></div>
             </div>
-            <button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')">
-                <span data-icon="sparkles"></span>
-                <span data-key="amazing">Amazing!</span>
-            </button>
+            <button class="celebrate-btn" onclick="document.getElementById('winnerOverlay').classList.remove('active')"><span data-icon="sparkles"></span><span data-key="amazing">Amazing!</span></button>
         </div>
     </div>
 
     <!-- ===== STAKE PAGE ===== -->
     <div id="stakePage" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h2 style="font-weight:800; color:#fbbf24; font-size:1.3rem; display:flex; align-items:center; gap:8px;">
-                <span data-icon="dice"></span>
-                <span>ዶት ቢንጎ</span>
-            </h2>
+            <h2 style="font-weight:800; color:#fbbf24; font-size:1.3rem; display:flex; align-items:center; gap:8px;"><span data-icon="dice"></span><span>ዶት ቢንጎ</span></h2>
             <div class="players-badge">DOT BINGO</div>
         </div>
         <div id="inviteInfoContainer" class="invite-info hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                <div>
-                    <strong><span data-icon="key"></span><span data-key="inviteCodeLabel">Invite Code:</span></strong>
-                    <span class="invite-code-display" id="userInviteCode">—</span>
-                </div>
+                <div><strong><span data-icon="key"></span><span data-key="inviteCodeLabel">Invite Code:</span></strong> <span class="invite-code-display" id="userInviteCode">—</span></div>
             </div>
         </div>
         <div class="stake-table-wrap">
             <div class="table-title"><span data-icon="bar-chart"></span><span data-key="tableTitle">Players by Stake</span></div>
             <table class="stake-table" id="stakeTable">
-                <thead>
-                    <tr>
-                        <th data-key="tableStake">Stake (ETB)</th>
-                        <th data-key="tablePlayers">Players</th>
-                        <th data-key="tablePopularity">Popularity</th>
-                    </tr>
-                </thead>
+                <thead><tr><th data-key="tableStake">Stake (ETB)</th><th data-key="tablePlayers">Players</th><th data-key="tablePopularity">Popularity</th></tr></thead>
                 <tbody>
                     <tr><td class="stake-amount">10</td><td class="stake-players"><span class="count-num" id="stakeTable10Count">0</span></td><td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar10" style="width:0%;"></div></div></td></tr>
                     <tr><td class="stake-amount">20</td><td class="stake-players"><span class="count-num" id="stakeTable20Count">0</span></td><td><div class="stake-bar-wrap"><div class="stake-bar" id="stakeBar20" style="width:0%;"></div></div></td></tr>
@@ -490,41 +384,23 @@
 
     <!-- ===== LOBBY PAGE ===== -->
     <div id="lobbyPage" class="page hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <div></div>
-            <div class="players-badge"><span data-icon="users"></span><span data-key="playersLabel">Players:</span> <span id="playersCount">0</span></div>
-        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div></div><div class="players-badge"><span data-icon="users"></span><span data-key="playersLabel">Players:</span> <span id="playersCount">0</span></div></div>
         <div class="balance-top">
             <div><span data-icon="coin"></span> <span data-key="bal">BAL</span> <span id="lobbyBalance">0</span> ETB</div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button id="depositBtn" style="background:#fbbf24; border:none; border-radius:40px; padding:6px 14px; color:#0a1428; cursor:pointer; font-size:0.78rem; font-weight:700; display:flex; align-items:center; gap:4px;">
-                    <span data-icon="plus"></span>
-                    <span data-key="deposit">Deposit</span>
-                </button>
-                <button id="withdrawBtn" style="background:#1e3358; border:none; border-radius:40px; padding:6px 14px; color:#e2e8f0; cursor:pointer; font-size:0.78rem; font-weight:600; display:flex; align-items:center; gap:4px;">
-                    <span data-icon="minus"></span>
-                    <span data-key="withdraw">Withdraw</span>
-                </button>
-                <button id="backToStakeBtn" style="background:#2d4066; border:none; border-radius:40px; padding:6px 14px; color:#e2e8f0; cursor:pointer; font-size:0.78rem; font-weight:600; display:flex; align-items:center; gap:4px;">
-                    <span data-icon="rotate"></span>
-                    <span data-key="stakeBtn">Stake</span>
-                </button>
+                <button id="depositBtn" style="background:#fbbf24; border:none; border-radius:40px; padding:6px 14px; color:#0a1428; cursor:pointer; font-size:0.78rem; font-weight:700; display:flex; align-items:center; gap:4px;"><span data-icon="plus"></span><span data-key="deposit">Deposit</span></button>
+                <button id="withdrawBtn" style="background:#1e3358; border:none; border-radius:40px; padding:6px 14px; color:#e2e8f0; cursor:pointer; font-size:0.78rem; font-weight:600; display:flex; align-items:center; gap:4px;"><span data-icon="minus"></span><span data-key="withdraw">Withdraw</span></button>
+                <button id="backToStakeBtn" style="background:#2d4066; border:none; border-radius:40px; padding:6px 14px; color:#e2e8f0; cursor:pointer; font-size:0.78rem; font-weight:600; display:flex; align-items:center; gap:4px;"><span data-icon="rotate"></span><span data-key="stakeBtn">Stake</span></button>
             </div>
             <div class="timer-badge" id="lobbyTimer"><span data-icon="clock"></span><span id="lobbyTimerText">30s</span></div>
         </div>
         <div style="display:flex; justify-content:space-between; margin:12px 0; flex-wrap:wrap; gap:8px; font-size:0.82rem; color:#cbd5e1; align-items:center;">
             <span style="display:flex; align-items:center; gap:5px;"><span data-icon="card"></span><span data-key="pickCard">Pick card ID:</span></span>
             <span><span data-key="selected">Selected:</span> <span id="selectedNumber">-</span></span>
-            <button id="randomCardBtn" style="background:#fbbf24; border:none; border-radius:40px; padding:6px 16px; color:#0a1428; cursor:pointer; font-size:0.75rem; font-weight:700; display:flex; align-items:center; gap:4px;">
-                <span data-icon="shuffle"></span>
-                <span data-key="randomCard">Random Card</span>
-            </button>
+            <button id="randomCardBtn" style="background:#fbbf24; border:none; border-radius:40px; padding:6px 16px; color:#0a1428; cursor:pointer; font-size:0.75rem; font-weight:700; display:flex; align-items:center; gap:4px;"><span data-icon="shuffle"></span><span data-key="randomCard">Random Card</span></button>
         </div>
         <div id="numberGrid" class="grid-100"></div>
-        <div style="color:#cbd5e1; font-size:0.82rem; margin-top:8px; display:flex; align-items:center; gap:5px;" data-key="yourCardPreview">
-            <span data-icon="card"></span>
-            <span>Your Bingo Card Preview</span>
-        </div>
+        <div style="color:#cbd5e1; font-size:0.82rem; margin-top:8px; display:flex; align-items:center; gap:5px;" data-key="yourCardPreview"><span data-icon="card"></span><span>Your Bingo Card Preview</span></div>
         <div id="lobbyCardPreview" class="card-container"></div>
         <div class="tab-bar">
             <button class="tab-btn active" data-page="lobby"><span data-icon="gamepad"></span><span data-key="gameTab">Game</span></button>
@@ -532,24 +408,15 @@
             <button class="tab-btn" data-page="wallet"><span data-icon="wallet"></span><span data-key="walletTab">Wallet</span></button>
             <button class="tab-btn" data-page="profile"><span data-icon="user"></span><span data-key="profileTab">Profile</span></button>
         </div>
-        <button id="rulesBtn" style="width:100%; background:#1e3358; color:#e2e8f0; border:1px solid #2d4066; border-radius:40px; padding:10px; cursor:pointer; margin-top:12px; font-weight:600; font-size:0.82rem; display:flex; align-items:center; justify-content:center; gap:6px;">
-            <span data-icon="book"></span>
-            <span data-key="rulesBtn">Game Rules</span>
-        </button>
+        <button id="rulesBtn" style="width:100%; background:#1e3358; color:#e2e8f0; border:1px solid #2d4066; border-radius:40px; padding:10px; cursor:pointer; margin-top:12px; font-weight:600; font-size:0.82rem; display:flex; align-items:center; justify-content:center; gap:6px;"><span data-icon="book"></span><span data-key="rulesBtn">Game Rules</span></button>
         <div class="telegram-links"><span data-key="joinCommunity">Join our community:</span><br><a href="https://t.me/Dotbingogame" target="_blank">Dot Bingo help</a> | <a href="https://t.me/dotbingo" target="_blank">Dot Bingo channel</a></div>
     </div>
 
     <!-- ===== HISTORY ===== -->
     <div id="historyPage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                <span data-icon="history"></span>
-                <span data-key="gameHistory">Game History</span>
-            </h2>
-            <button class="back-btn" id="backFromHistoryBtn">
-                <span data-icon="arrow-left"></span>
-                <span data-key="back">Back</span>
-            </button>
+            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;"><span data-icon="history"></span><span data-key="gameHistory">Game History</span></h2>
+            <button class="back-btn" id="backFromHistoryBtn"><span data-icon="arrow-left"></span><span data-key="back">Back</span></button>
         </div>
         <div style="color:#cbd5e1; font-size:0.85rem;"><strong data-key="totalGamesLabel">Total Games:</strong> <span id="totalGamesCount">0</span></div>
         <div id="recentGamesList" style="margin-top:16px;"></div>
@@ -558,38 +425,22 @@
     <!-- ===== WALLET ===== -->
     <div id="walletPage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                <span data-icon="wallet"></span>
-                <span data-key="myWallet">My Wallet</span>
-            </h2>
-            <button class="back-btn" id="backFromWalletBtn">
-                <span data-icon="arrow-left"></span>
-                <span data-key="back">Back</span>
-            </button>
+            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;"><span data-icon="wallet"></span><span data-key="myWallet">My Wallet</span></h2>
+            <button class="back-btn" id="backFromWalletBtn"><span data-icon="arrow-left"></span><span data-key="back">Back</span></button>
         </div>
         <div class="profile-stat">
             <div data-key="currentBalance" style="color:#94a3b8; font-size:0.82rem;">Current Balance</div>
             <div style="font-size:1.8rem; color:#fbbf24; font-weight:800; margin:8px 0;" id="walletBalancePage">0</div>
-            <button id="depositFromWalletBtn" class="btn-primary" style="border:none; padding:10px 20px; border-radius:40px; cursor:pointer; margin:4px; font-weight:700; display:inline-flex; align-items:center; gap:5px;">
-                <span data-icon="plus"></span><span>Deposit</span>
-            </button>
-            <button id="withdrawFromWalletBtn" class="btn-secondary" style="border:none; padding:10px 20px; border-radius:40px; cursor:pointer; margin:4px; font-weight:600; display:inline-flex; align-items:center; gap:5px;">
-                <span data-icon="minus"></span><span>Withdraw</span>
-            </button>
+            <button id="depositFromWalletBtn" class="btn-primary" style="border:none; padding:10px 20px; border-radius:40px; cursor:pointer; margin:4px; font-weight:700; display:inline-flex; align-items:center; gap:5px;"><span data-icon="plus"></span><span>Deposit</span></button>
+            <button id="withdrawFromWalletBtn" class="btn-secondary" style="border:none; padding:10px 20px; border-radius:40px; cursor:pointer; margin:4px; font-weight:600; display:inline-flex; align-items:center; gap:5px;"><span data-icon="minus"></span><span>Withdraw</span></button>
         </div>
     </div>
 
     <!-- ===== PROFILE ===== -->
     <div id="profilePage" class="page hidden">
         <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
-                <span data-icon="user"></span>
-                <span data-key="myProfile">My Profile</span>
-            </h2>
-            <button class="back-btn" id="backFromProfileBtn">
-                <span data-icon="arrow-left"></span>
-                <span data-key="back">Back</span>
-            </button>
+            <h2 style="color:#f1f5f9; font-size:1.1rem; display:flex; align-items:center; gap:8px;"><span data-icon="user"></span><span data-key="myProfile">My Profile</span></h2>
+            <button class="back-btn" id="backFromProfileBtn"><span data-icon="arrow-left"></span><span data-key="back">Back</span></button>
         </div>
         <div class="profile-stat"><div data-key="usernameLabel" style="color:#94a3b8; font-size:0.8rem;">Username</div><div style="margin-top:6px; color:#f1f5f9;"><strong id="profileUsername">Player</strong></div></div>
         <div class="profile-stat"><div data-key="balanceLabel" style="color:#94a3b8; font-size:0.8rem;">Balance</div><div style="margin-top:6px; color:#fbbf24; font-weight:800; font-size:1.3rem;" id="profileBalancePage">0</div></div>
@@ -598,38 +449,19 @@
 
     <!-- ===== GAME PAGE ===== -->
     <div id="gamePage" class="page hidden">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <div></div>
-            <div class="players-badge"><span data-icon="users"></span><span data-key="playersLabel">Players:</span> <span id="gamePlayersCount">0</span></div>
-        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><div></div><div class="players-badge"><span data-icon="users"></span><span data-key="playersLabel">Players:</span> <span id="gamePlayersCount">0</span></div></div>
         <div class="game-top-bar" style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px; background:#142647; padding:6px 12px; border-radius:60px; margin-bottom:16px; border:1px solid #1e3358;">
-            <div style="color:#e2e8f0; font-size:0.82rem; display:flex; align-items:center; gap:4px;">
-                <span data-icon="coin"></span><span id="gameBalanceDisplay">0</span> ETB
-            </div>
+            <div style="color:#e2e8f0; font-size:0.82rem; display:flex; align-items:center; gap:4px;"><span data-icon="coin"></span><span id="gameBalanceDisplay">0</span> ETB</div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button id="depositBtnGame" style="background:#fbbf24; border:none; border-radius:40px; padding:4px 12px; color:#0a1428; cursor:pointer; font-size:0.72rem; font-weight:700; display:flex; align-items:center; gap:3px;">
-                    <span data-icon="plus"></span><span data-key="deposit">Deposit</span>
-                </button>
-                <button id="withdrawBtnGame" style="background:#1e3358; border:none; border-radius:40px; padding:4px 12px; color:#e2e8f0; cursor:pointer; font-size:0.72rem; font-weight:600; display:flex; align-items:center; gap:3px;">
-                    <span data-icon="minus"></span><span data-key="withdraw">Withdraw</span>
-                </button>
-                <button id="muteToggleBtn" class="mute-btn" aria-label="Mute">
-                    <span data-icon="volume"></span>
-                </button>
+                <button id="depositBtnGame" style="background:#fbbf24; border:none; border-radius:40px; padding:4px 12px; color:#0a1428; cursor:pointer; font-size:0.72rem; font-weight:700; display:flex; align-items:center; gap:3px;"><span data-icon="plus"></span><span data-key="deposit">Deposit</span></button>
+                <button id="withdrawBtnGame" style="background:#1e3358; border:none; border-radius:40px; padding:4px 12px; color:#e2e8f0; cursor:pointer; font-size:0.72rem; font-weight:600; display:flex; align-items:center; gap:3px;"><span data-icon="minus"></span><span data-key="withdraw">Withdraw</span></button>
+                <button id="muteToggleBtn" class="mute-btn" aria-label="Mute"><span data-icon="volume"></span></button>
             </div>
-            <button id="rulesBtnGame" style="background:#1e3358; color:#e2e8f0; border:1px solid #2d4066; border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.72rem; font-weight:600; display:flex; align-items:center; gap:3px;">
-                <span data-icon="book"></span><span data-key="rulesBtn">Rules</span>
-            </button>
+            <button id="rulesBtnGame" style="background:#1e3358; color:#e2e8f0; border:1px solid #2d4066; border-radius:40px; padding:4px 12px; cursor:pointer; font-size:0.72rem; font-weight:600; display:flex; align-items:center; gap:3px;"><span data-icon="book"></span><span data-key="rulesBtn">Rules</span></button>
         </div>
-        <div class="prize-pool">
-            <span><span data-icon="trophy"></span><span data-key="prizePoolLabel">PRIZE POOL</span></span>
-            <div id="winningBalance">0 ETB</div>
-        </div>
+        <div class="prize-pool"><span><span data-icon="trophy"></span><span data-key="prizePoolLabel">PRIZE POOL</span></span><div id="winningBalance">0 ETB</div></div>
         <div id="backToLobbyContainer" class="hidden" style="text-align:center; margin:10px 0;">
-            <button id="backToLobbyBtn" class="btn-secondary" style="padding:10px 24px; border-radius:40px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                <span data-icon="home"></span>
-                <span data-key="backToLobby">Back to Lobby</span>
-            </button>
+            <button id="backToLobbyBtn" class="btn-secondary" style="padding:10px 24px; border-radius:40px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;"><span data-icon="home"></span><span data-key="backToLobby">Back to Lobby</span></button>
         </div>
         <div class="last-call-area">
             <div class="last-call-label"><span data-icon="volume"></span><span data-key="lastCall">LAST CALL</span></div>
@@ -637,10 +469,7 @@
             <div class="called-history" id="calledList" data-key="calledPrefix">Called: —</div>
         </div>
         <div id="gameCard" class="card-container"></div>
-        <button id="bingoBtn">
-            <span data-icon="award"></span>
-            <span data-key="claimBingo">CLAIM BINGO!</span>
-        </button>
+        <button id="bingoBtn"><span data-icon="award"></span><span data-key="claimBingo">CLAIM BINGO!</span></button>
         <div class="tab-bar">
             <button class="tab-btn" data-page="lobby"><span data-icon="gamepad"></span><span data-key="gameTab">Game</span></button>
             <button class="tab-btn" data-page="history"><span data-icon="history"></span><span data-key="historyTab">History</span></button>
@@ -696,9 +525,7 @@
         function injectSvgIcons(root = document) {
             root.querySelectorAll('[data-icon]').forEach(el => {
                 const name = el.getAttribute('data-icon');
-                if (SVG_ICONS[name] && !el.querySelector('svg')) {
-                    el.innerHTML = SVG_ICONS[name];
-                }
+                if (SVG_ICONS[name] && !el.querySelector('svg')) el.innerHTML = SVG_ICONS[name];
             });
         }
         injectSvgIcons();
@@ -858,9 +685,10 @@
                 noMethods: "ምንም የክፍያ ዘዴ የለም",
                 networkError: "የኔትወርክ ስህተት።",
                 submitting: "በማስገባት ላይ...",
-                // ✅ NEW: invalid bingo messages
                 invalidBingo: "ቢንጎ አልተሟላም!",
-                bingoNotReady: "የቢንጎ መስመር ገና አልተሟላም!"
+                bingoNotReady: "የቢንጎ መስመር ገና አልተሟላም!",
+                reconnecting: "እንደገና በመገናኘት ላይ...",
+                connected: "ተገናኝቷል"
             },
             en: {
                 back: "Back", cancel: "Cancel", gotIt: "Got it",
@@ -929,9 +757,10 @@
                 noMethods: "No payment methods available",
                 networkError: "Network error.",
                 submitting: "Processing...",
-                // ✅ NEW: invalid bingo messages
                 invalidBingo: "Not completed Bingo!",
-                bingoNotReady: "Your bingo line is not complete yet!"
+                bingoNotReady: "Your bingo line is not complete yet!",
+                reconnecting: "Reconnecting...",
+                connected: "Connected"
             }
         };
 
@@ -939,16 +768,9 @@
             document.querySelectorAll('[data-key]').forEach(el => {
                 const k = el.getAttribute('data-key');
                 const val = (lang === 'am' ? data.am[k] : data.en[k]);
-                if (val !== undefined && !el.querySelector('svg')) {
-                    el.innerHTML = val;
-                }
+                if (val !== undefined && !el.querySelector('svg')) el.innerHTML = val;
             });
             langLabel.textContent = lang === 'am' ? 'English' : 'አማርኛ';
-            const mTitle = $('depositMethodListTitle');
-            if (mTitle) {
-                const key = mTitle.querySelector('[data-key]');
-                if (key) key.innerHTML = lang === 'am' ? '💳 የክፍያ ዘዴ ይምረጡ' : 'Select Deposit Method';
-            }
             const dt = $('depositMethodListTitle');
             if (dt) {
                 const span = dt.querySelector('[data-key="selectMethod"]');
@@ -1121,10 +943,7 @@
                     `<span style="background:${fb.color}; color:#0a1428; font-weight:800;">${fb.letter}</span>`;
                 return `<div class="method-list-item" data-method="${m.type}" data-admin="${m.adminId}" data-number="${m.number}">
                             <div class="method-icon">${imgHtml}</div>
-                            <div class="method-info">
-                                <div class="method-name">${m.label}</div>
-                                <div class="method-number">${disp}</div>
-                            </div>
+                            <div class="method-info"><div class="method-name">${m.label}</div><div class="method-number">${disp}</div></div>
                             <div class="method-select-badge">Select</div>
                         </div>`;
             }).join('');
@@ -1177,8 +996,7 @@
         function getPaymentInstructions(method) {
             const ml = method.charAt(0).toUpperCase() + method.slice(1);
             if (lang === 'am') {
-                return `
-                    <p><strong>እነዚህን ደረጃዎች በጥንቃቄ ይከተሉ:</strong></p>
+                return `<p><strong>እነዚህን ደረጃዎች በጥንቃቄ ይከተሉ:</strong></p>
                     <ol style="padding-left:20px;">
                         <li>የ${ml} መተግበሪያዎን ይክፈቱ።</li>
                         <li><strong>Send Money</strong> ይምረጡ።</li>
@@ -1186,11 +1004,9 @@
                         <li>ትክክለኛውን መጠን ያስገቡ።</li>
                         <li>ግብይቱን ያጠናቅቁ እና <strong>ፎቶ</strong> ያንሱ።</li>
                         <li>ፎቶውን በመተግበሪያው ውስጥ ይጫኑ እና <strong>ክፍያውን አረጋግጥ</strong> ይጫኑ።</li>
-                    </ol>
-                `;
+                    </ol>`;
             }
-            return `
-                <p><strong>Follow these steps carefully:</strong></p>
+            return `<p><strong>Follow these steps carefully:</strong></p>
                 <ol style="padding-left:20px;">
                     <li>Open your ${ml} app or mobile money service.</li>
                     <li>Select <strong>Send Money</strong> (or <strong>Transfer</strong>).</li>
@@ -1198,8 +1014,7 @@
                     <li>Enter the exact amount.</li>
                     <li>Complete the transaction and take a <strong>screenshot</strong> of the confirmation.</li>
                     <li>Upload that screenshot in the app and tap <strong>Confirm Payment</strong>.</li>
-                </ol>
-            `;
+                </ol>`;
         }
 
         async function openWithdrawFlow() {
@@ -1374,13 +1189,27 @@
                     if (markedNumbers.includes(val)) td.classList.add('marked');
                     if (clickable && val !== 'FREE') {
                         td.style.cursor = 'pointer';
-                        td.onclick = () => { if (isGameActive && socket) socket.emit('markNumber', val); };
+                        td.onclick = () => markCardCell(val, td);
                     }
                     tr.appendChild(td);
                 }
                 tb.appendChild(tr);
             }
             tbl.appendChild(tb); cont.appendChild(tbl);
+        }
+
+        // ⚡ OPTIMIZED: optimistic local mark + debounced socket emit
+        let _lastMarkSent = 0;
+        function markCardCell(val, td) {
+            if (!isGameActive || !socket) return;
+            const now = Date.now();
+            if (now - _lastMarkSent < 80) return;
+            _lastMarkSent = now;
+            if (!markedNumbers.includes(val)) {
+                markedNumbers.push(val);
+                if (td) td.classList.add('marked');
+            }
+            socket.emit('markNumber', val);
         }
 
         function buildGrid() {
@@ -1390,26 +1219,50 @@
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell'; cell.dataset.number = i; cell.textContent = i;
                 const taken = displayTaken.has(i); const own = (selectedCardNumber === i);
-                if (taken && !own) { cell.classList.add('taken'); cell.onclick = null; }
-                else if (own) { cell.classList.add('own-card'); cell.onclick = null; }
-                else {
-                    cell.onclick = () => {
-                        if (!isGameActive && socket && !displayTaken.has(i) && !serverTaken.has(i)) {
-                            if (selectedCardNumber !== null && selectedCardNumber !== i) { serverTaken.delete(selectedCardNumber); displayTaken.delete(selectedCardNumber); }
-                            pendingSelection = i; selectedCardNumber = i; selectedNumber.textContent = i;
-                            buildGrid(); socket.emit('selectCardNumber', i); updateBackToLobbyVisibility();
-                        }
-                    };
-                }
+                if (taken && !own) cell.classList.add('taken');
+                else if (own) cell.classList.add('own-card');
                 numberGrid.appendChild(cell);
             }
         }
 
+        // ⚡ OPTIMIZED: incremental grid update
+        function updateGridCell(num, isTaken) {
+            if (!numberGrid) return;
+            const cell = numberGrid.querySelector(`[data-number="${num}"]`);
+            if (!cell) return;
+            if (isTaken) cell.classList.add('taken');
+            else cell.classList.remove('taken');
+        }
+
+        // ⚡ OPTIMIZED: event delegation for the grid
+        numberGrid.addEventListener('click', (e) => {
+            const cell = e.target.closest('.grid-cell');
+            if (!cell) return;
+            if (cell.classList.contains('taken') || cell.classList.contains('own-card')) return;
+            if (isGameActive || !socket) return;
+            const i = parseInt(cell.dataset.number);
+            if (displayTaken.has(i) || serverTaken.has(i)) return;
+            if (selectedCardNumber !== null && selectedCardNumber !== i) {
+                serverTaken.delete(selectedCardNumber);
+                displayTaken.delete(selectedCardNumber);
+                updateGridCell(selectedCardNumber, false);
+            }
+            pendingSelection = i;
+            selectedCardNumber = i;
+            selectedNumber.textContent = i;
+            cell.classList.remove('taken');
+            cell.classList.add('own-card');
+            socket.emit('selectCardNumber', i);
+            updateBackToLobbyVisibility();
+        });
+
         function updateGrid(takenArr) {
-            const ns = new Set(takenArr); serverTaken = ns;
+            serverTaken = new Set(takenArr);
             const d = new Set(takenArr);
             if (selectedCardNumber !== null) d.delete(selectedCardNumber);
-            displayTaken = d; buildGrid(); updateCount(serverTaken.size);
+            displayTaken = d;
+            buildGrid();
+            updateCount(serverTaken.size);
         }
 
         function updateCount(c) { const v = c !== undefined ? c : serverTaken.size; if (playersCount) playersCount.innerText = v; if (gamePlayersCount) gamePlayersCount.innerText = v; }
@@ -1472,14 +1325,13 @@
             else if (data.winningCard !== undefined && data.winningCard !== null) wc = [data.winningCard];
             else if (data.cardNumber !== undefined && data.cardNumber !== null) wc = [data.cardNumber];
             else if (selectedCardNumber !== null) wc = [selectedCardNumber];
-            const total = data.totalPrize || 0;
             const each = data.prizeEach || 0;
             const title = wc.length > 1 ? `${wc.length} WINNERS!` : 'BINGO!';
             $('winTitle').innerHTML = title;
             $('winListContainer').innerHTML = wc.map(c => `<span class="winner-badge">${SVG_ICONS['card']}Card #${c}</span>`).join('');
             $('winPrize').innerHTML = each + ' <small>ETB</small>';
             $('winnerOverlay').classList.add('active');
-            if (currentGameId) addRecord(true, each, currentGameId, currentStake, [], data.winningNumber, total, wc);
+            if (currentGameId) addRecord(true, each, currentGameId, currentStake, [], data.winningNumber, data.totalPrize || 0, wc);
             unlockSpeech();
         }
 
@@ -1531,39 +1383,29 @@
 
         function syncBalance(v) { balance = v; lobbyBalance.innerText = v; if ($('walletBalancePage')) $('walletBalancePage').innerText = v; if ($('profileBalancePage')) $('profileBalancePage').innerText = v; if ($('gameBalanceDisplay')) $('gameBalanceDisplay').innerText = v; }
 
-        // ✅ NEW: Client-side bingo validation
         function checkLocalBingo() {
             if (!userCard || !userCard.length) return false;
             const marked = [...markedNumbers, 'FREE'];
             const lines = [];
-            // Rows
             for (let r = 0; r < 5; r++) lines.push([userCard[r][0], userCard[r][1], userCard[r][2], userCard[r][3], userCard[r][4]]);
-            // Columns
             for (let c = 0; c < 5; c++) lines.push([userCard[0][c], userCard[1][c], userCard[2][c], userCard[3][c], userCard[4][c]]);
-            // Diagonals
             lines.push([userCard[0][0], userCard[1][1], userCard[2][2], userCard[3][3], userCard[4][4]]);
             lines.push([userCard[0][4], userCard[1][3], userCard[2][2], userCard[3][1], userCard[4][0]]);
-            // Corners
             lines.push([userCard[0][0], userCard[0][4], userCard[4][0], userCard[4][4]]);
-
-            for (const line of lines) {
-                if (line.every(v => v === 'FREE' || marked.includes(v))) return true;
-            }
+            for (const line of lines) if (line.every(v => v === 'FREE' || marked.includes(v))) return true;
             return false;
         }
 
-        // ✅ NEW: Shake animation + error toast
         function triggerInvalidBingo() {
             const btn = $('bingoBtn');
             if (!btn) return;
             btn.classList.remove('shake');
-            void btn.offsetWidth;              // force reflow to restart animation
+            void btn.offsetWidth;
             btn.classList.add('shake');
             setTimeout(() => btn.classList.remove('shake'), 650);
             showToast(lang === 'am' ? data.am.invalidBingo : data.en.invalidBingo, 'error');
         }
 
-        // ✅ NEW: Success flash
         function triggerValidBingo() {
             const btn = $('bingoBtn');
             if (!btn) return;
@@ -1581,7 +1423,17 @@
 
             socket = io({ transports: ['websocket'] });
 
-            socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
+            socket.on('connect', () => {
+                socket.emit('joinLobby', { stake: currentStake });
+                const b = $('reconnectBanner');
+                if (b) b.classList.remove('show');
+            });
+
+            socket.on('disconnect', () => {
+                const b = $('reconnectBanner');
+                if (b) b.classList.add('show');
+            });
+
             socket.on('balanceUpdate', syncBalance);
             socket.on('lobbyState', state => {
                 if (state.stake === currentStake) {
@@ -1595,24 +1447,33 @@
                 }
             });
             socket.on('yourCard', card => { userCard = card; if (isGameActive) renderCard(card, 'gameCard', true); else renderCard(card, 'lobbyCardPreview', false); });
+
+            // ⚡ OPTIMIZED: incremental grid update
             socket.on('cardTaken', data => {
                 if (data.stake !== currentStake) return;
                 serverTaken = new Set(data.takenNumbers);
                 const disp = new Set(data.takenNumbers);
                 if (selectedCardNumber !== null) disp.delete(selectedCardNumber);
-                displayTaken = disp; buildGrid(); updateCount(serverTaken.size);
+                displayTaken = disp;
+                // Incremental: only toggle the changed cell
+                updateGridCell(data.number, true);
+                if (selectedCardNumber === data.number) {
+                    const cell = numberGrid.querySelector(`[data-number="${data.number}"]`);
+                    if (cell) { cell.classList.remove('taken'); cell.classList.add('own-card'); }
+                }
+                updateCount(serverTaken.size);
                 if (pendingSelection && data.number === pendingSelection) {
                     selectedCardNumber = data.number; selectedNumber.textContent = data.number; pendingSelection = null;
-                    buildGrid(); updateBackToLobbyVisibility();
+                    updateBackToLobbyVisibility();
                 }
                 if (pendingRandom && data.number) {
                     selectedCardNumber = data.number; selectedNumber.textContent = data.number; pendingRandom = false;
-                    buildGrid(); updateBackToLobbyVisibility();
+                    updateBackToLobbyVisibility();
                 }
             });
             socket.on('cardSelectionFailed', msg => {
                 alert(msg);
-                if (pendingSelection) { pendingSelection = null; if (selectedCardNumber) { selectedCardNumber = null; selectedNumber.textContent = '-'; buildGrid(); updateBackToLobbyVisibility(); } }
+                if (pendingSelection) { pendingSelection = null; if (selectedCardNumber) { updateGridCell(selectedCardNumber, false); selectedCardNumber = null; selectedNumber.textContent = '-'; updateBackToLobbyVisibility(); } }
                 if (pendingRandom) pendingRandom = false;
             });
             socket.on('playersCount', (data) => {
@@ -1642,7 +1503,23 @@
                 speakAmharic(num);
             });
 
-            socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true); else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
+            // ⚡ OPTIMIZED: incremental card update
+            socket.on('markedNumbers', nums => {
+                const added = nums.filter(n => !markedNumbers.includes(n));
+                markedNumbers = nums;
+                if (isGameActive && userCard.length) {
+                    const cont = $('gameCard');
+                    if (!cont || !cont.querySelector('table')) { renderCard(userCard, 'gameCard', true); return; }
+                    added.forEach(val => {
+                        cont.querySelectorAll('td').forEach(td => {
+                            if (td.textContent == val) td.classList.add('marked');
+                        });
+                    });
+                } else if (!isGameActive && userCard.length) {
+                    renderCard(userCard, 'lobbyCardPreview', false);
+                }
+            });
+
             socket.on('gameEnded', data => {
                 if (data.stake !== currentStake) return;
                 if (data.winningNumber) currentCall.innerText = formatCall(data.winningNumber);
@@ -1658,21 +1535,28 @@
                 const c = $('backToLobbyContainer'); if (c) c.classList.add('hidden');
             });
 
-            // ✅ NEW: Server invalidBingo triggers shake instead of alert
-            socket.on('invalidBingo', () => {
-                triggerInvalidBingo();
-            });
+            socket.on('invalidBingo', () => triggerInvalidBingo());
 
             socket.on('depositStatus', d => alert(d.status === 'approved' ? `Deposit +${d.amount} ETB approved!` : 'Deposit rejected.'));
             socket.on('withdrawStatus', d => alert(d.status === 'approved' ? `Withdrawal -${d.amount} ETB processed.` : 'Withdrawal rejected.'));
         }
 
+        // ⚡ OPTIMIZED: pause socket when app is backgrounded
+        document.addEventListener('visibilitychange', () => {
+            if (!socket) return;
+            if (document.hidden) {
+                socket.io.opts.reconnection = false;
+                socket.disconnect();
+            } else {
+                socket.io.opts.reconnection = true;
+                socket.connect();
+                if (currentStake) socket.emit('joinLobby', { stake: currentStake });
+            }
+        });
+
         function unlockSpeech() { if (speechUnlocked) return; speechUnlocked = true; const d = new SpeechSynthesisUtterance(' '); d.volume = 0; window.speechSynthesis.speak(d); setTimeout(() => window.speechSynthesis.cancel(), 100); }
         function toggleMute() { soundMuted = !soundMuted; localStorage.setItem('dot_bingo_sound_muted', soundMuted); updateMute(); if (soundMuted && utterance) { window.speechSynthesis.cancel(); utterance = null; } unlockSpeech(); }
-        function updateMute() {
-            const b = $('muteToggleBtn');
-            if (b) b.innerHTML = soundMuted ? SVG_ICONS['volume-off'] : SVG_ICONS['volume'];
-        }
+        function updateMute() { const b = $('muteToggleBtn'); if (b) b.innerHTML = soundMuted ? SVG_ICONS['volume-off'] : SVG_ICONS['volume']; }
         function getLetter(n) { if (n <= 15) return "ቢ"; if (n <= 30) return "አይ"; if (n <= 45) return "ኤን"; if (n <= 60) return "ጂ"; return "ኦ"; }
         function getAmharicWord(n) {
             const ones = ["", "አንድ", "ሁለት", "ሶስት", "አራት", "አምስት", "ስድስት", "ሰባት", "ስምንት", "ዘጠኝ"];
@@ -1722,18 +1606,11 @@
         $('stake10Btn')?.addEventListener('click', () => { loadStats(); connectToGame(10); showLobby(30); unlockSpeech(); });
         $('stake20Btn')?.addEventListener('click', () => { loadStats(); connectToGame(20); showLobby(30); unlockSpeech(); });
         $('stake30Btn')?.addEventListener('click', () => { loadStats(); connectToGame(30); showLobby(30); unlockSpeech(); });
-        $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumber.textContent = '...'; buildGrid(); updateBackToLobbyVisibility(); } unlockSpeech(); });
+        $('randomCardBtn')?.addEventListener('click', () => { if (!isGameActive && socket) { pendingRandom = true; socket.emit('newCardNumber'); selectedCardNumber = null; selectedNumber.textContent = '...'; updateBackToLobbyVisibility(); } unlockSpeech(); });
 
-        // ✅ UPDATED: Client-side validation + shake feedback
         $('bingoBtn')?.addEventListener('click', () => {
             if (!socket || !isGameActive) return;
-            // Client-side check first — avoids unnecessary network round-trip
-            if (!checkLocalBingo()) {
-                triggerInvalidBingo();
-                unlockSpeech();
-                return;
-            }
-            // Valid bingo — flash green and send to server
+            if (!checkLocalBingo()) { triggerInvalidBingo(); unlockSpeech(); return; }
             triggerValidBingo();
             socket.emit('claimBingo');
             unlockSpeech();
