@@ -620,7 +620,7 @@
         const data = {
             am: {
                 back: "ተመለስ", cancel: "ሰርዝ", gotIt: "ገባኝ",
-                deposit: "ዲፖዚት", withdraw: "ማውጣት", requestDeposit: "ዲፖዚት ጠይቅ",
+                deposit: "ተቀማጭ", withdraw: "ማውጣት", requestDeposit: "ተቀማጭ ጠይቅ",
                 selectMethod: "የክፍያ ዘዴ ይምረጡ",
                 loadingMethods: "የክፍያ ዘዴዎች በመጫን ላይ...",
                 step1: "ደረጃ 1", step2: "ደረጃ 2", step3: "ደረጃ 3",
@@ -760,7 +760,13 @@
                 noMethods: "No payment methods available",
                 networkError: "Network error.",
                 submitting: "Processing...",
-                invalidBingo: "Not completed Bingo!"
+                invalidBingo: "Not completed Bingo!",
+                bingoNotReady: "Your bingo line is not complete yet!",
+                notCalledYet: "This number has not been called yet!",
+                oneCardOnly: "One player can only hold one card!",
+                cardReleased: "Previous card released.",
+                reconnecting: "Reconnecting...",
+                connected: "Connected"
             }
         };
 
@@ -1206,14 +1212,18 @@
         }
 
         // ⚡ OPTIMIZED: optimistic local mark + debounced socket emit
+        let _lastMarkSent = 0;
         function markCardCell(val, td) {
-    if (!isGameActive || !socket) return;
-    if (val === 'FREE') return;
+            if (!isGameActive || !socket) return;
+            if (val === 'FREE') return;
 
-    // 🚫 uncalled number → silently ignored (no UI)
-    if (!isNumberCalled(val)) return;
+            // 🚫 number not called yet -> refuse the mark
+            if (!isNumberCalled(val)) {
+                showToast(data[lang].notCalledYet, 'error');
+                return;
+            }
 
-    const now = Date.now();
+            const now = Date.now();
             if (now - _lastMarkSent < 80) return;
             _lastMarkSent = now;
             if (!markedNumbers.includes(val)) {
@@ -1278,9 +1288,10 @@
             if (serverTaken.has(i)) return;         // taken by somebody else
 
             const prev = selectedCardNumber;
-if (prev !== null && prev !== i) {
-    releaseCard(prev);   // 🔇 silent
-}
+            if (prev !== null && prev !== i) {
+                releaseCard(prev);
+                showToast(data[lang].cardReleased, 'info');
+            }
 
             pendingSelection = i;
             selectedCardNumber = i;
