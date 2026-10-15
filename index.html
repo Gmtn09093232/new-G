@@ -11,8 +11,8 @@
         body { min-height: 100vh; background: #0a1428; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 12px; display: flex; align-items: center; justify-content: center; }
         .page { max-width: 600px; width: 100%; margin: 0 auto; background: #0f1e3a; border-radius: 20px; padding: 20px 16px 24px; border: 1px solid #1e3358; }
         .page.hidden { display: none; }
-        
-        /* ===== FIX: SVG Global Sizing ===== */
+
+        /* ===== SVG Global Sizing ===== */
         svg {
             width: 16px;
             height: 16px;
@@ -20,7 +20,6 @@
             display: inline-block;
             vertical-align: middle;
         }
-        /* Larger icons where needed */
         .winner-trophy svg { width: 56px; height: 56px; }
         #inviteRequiredOverlay .overlay-icon svg { width: 64px; height: 64px; }
         .bank-header .bank-icon svg { width: 24px; height: 24px; }
@@ -50,7 +49,6 @@
         #inviteRequiredOverlay .btn-bot svg { width: 18px; height: 18px; }
         .tab-btn svg { width: 14px; height: 14px; }
         #bingoBtn svg { width: 24px; height: 24px; }
-        /* ==================================== */
 
         .lang-toggle { position: fixed; top: 16px; left: 16px; background: #fbbf24; color: #0a1428; border: none; border-radius: 40px; padding: 8px 16px; font-weight: 700; cursor: pointer; z-index: 1000; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
         @media (max-width:550px) { .lang-toggle { top: 8px; left: 8px; padding: 6px 12px; font-size: 0.7rem; } }
@@ -688,7 +686,9 @@
         const stake20Count = $('stake20Count');
         const stake30Count = $('stake30Count');
 
-        const stakeSocket = io('/public');
+        // ✅ FIX #1: WebSocket-only transport for public namespace
+        const stakeSocket = io('/public', { transports: ['websocket'] });
+
         stakeSocket.on('playersCount', d => {
             if (d.stake === 10 && stake10Count) stake10Count.innerHTML = `<span data-icon="users"></span><span>${d.count} players</span>`;
             if (d.stake === 20 && stake20Count) stake20Count.innerHTML = `<span data-icon="users"></span><span>${d.count} players</span>`;
@@ -748,6 +748,10 @@
         let withdrawMethodMap = {};
         let userInviteData = { invite_code: null, admin_id: null, admin_name: null };
         let isAuthenticated = false;
+
+        // ✅ FIX #2: Local called-numbers history (server no longer sends the full array)
+        let localCalledNumbers = [];
+
         try { soundMuted = localStorage.getItem('dot_bingo_sound_muted') === 'true'; } catch (e) {}
 
         let lang = 'am';
@@ -1258,13 +1262,27 @@
             btn.disabled = true;
             btn.innerHTML = SVG_ICONS['check'] + '<span>' + data[lang].submitting + '</span>';
             try {
+                // ✅ FIX #3: Add client_request_id for idempotency
+                const clientRequestId = (crypto.randomUUID ? crypto.randomUUID() :
+                    'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+
                 const r = await fetch('/api/request-withdraw', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: Number(amt), phone: rec, withdrawal_type: selectedWithdrawType, name, admin_id: selectedAdminId })
+                    body: JSON.stringify({
+                        amount: Number(amt),
+                        phone: rec,
+                        withdrawal_type: selectedWithdrawType,
+                        name,
+                        admin_id: selectedAdminId,
+                        client_request_id: clientRequestId
+                    })
                 });
                 const d = await r.json();
-                if (d.success) { alert(data[lang].withdrawSubmitted); $('withdrawDetailsModal').classList.remove('active'); resetDepositState(); }
-                else { alert('Error: ' + (d.error || 'Submission failed')); }
+                if (d.success) {
+                    alert(data[lang].withdrawSubmitted);
+                    $('withdrawDetailsModal').classList.remove('active');
+                    resetDepositState();
+                } else { alert('Error: ' + (d.error || 'Submission failed')); }
             } catch (err) { alert(data[lang].networkError); }
             finally { submittingW = false; btn.disabled = false; btn.innerHTML = orig; unlockSpeech(); }
         }
@@ -1288,9 +1306,21 @@
                 btn.disabled = true;
                 btn.innerHTML = SVG_ICONS['check'] + '<span>' + data[lang].sending + '</span>';
                 try {
+                    // ✅ FIX #3: Add client_request_id for idempotency
+                    const clientRequestId = (crypto.randomUUID ? crypto.randomUUID() :
+                        'req-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10));
+
                     const r = await fetch('/api/request-deposit', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ phone, amount: Number(amount), payment_type: selectedDepositType, admin_id: selectedAdminId, transaction_reference: b64, proof_type: 'image' })
+                        body: JSON.stringify({
+                            phone,
+                            amount: Number(amount),
+                            payment_type: selectedDepositType,
+                            admin_id: selectedAdminId,
+                            transaction_reference: b64,
+                            proof_type: 'image',
+                            client_request_id: clientRequestId
+                        })
                     });
                     const d = await r.json();
                     if (d.success) {
@@ -1410,6 +1440,7 @@
             if (socket) { socket.disconnect(); socket = null; }
             isGameActive = false; userCard = []; markedNumbers = []; selectedCardNumber = null;
             serverTaken.clear(); displayTaken.clear(); currentStake = null;
+            localCalledNumbers = [];
             localStorage.removeItem('dot_bingo_stake');
             clearInterval(lobbyTimerInterval);
             switchPage('stakePage'); selectedNumber.textContent = '-';
@@ -1492,13 +1523,17 @@
             const initData = tg.initData;
             if (!initData) { alert('Open inside Telegram'); return; }
             if (socket) socket.disconnect();
-            socket = io();
+
+            // ✅ FIX #1: WebSocket-only transport
+            socket = io({ transports: ['websocket'] });
+
             socket.on('connect', () => { socket.emit('joinLobby', { stake: currentStake }); });
             socket.on('balanceUpdate', syncBalance);
             socket.on('lobbyState', state => {
                 if (state.stake === currentStake) {
                     selectedCardNumber = null; selectedNumber.textContent = '-';
                     userCard = []; markedNumbers = [];
+                    localCalledNumbers = [];   // ✅ FIX #4: Reset called history
                     showLobby(state.startsIn);
                     if (state.takenNumbers) updateGrid(state.takenNumbers);
                     updateCount(state.playersCount);
@@ -1536,19 +1571,24 @@
                 if (data.stake !== currentStake) return;
                 if (data?.prizePool) winningBalance.innerText = data.prizePool;
                 if (data?.playersCount) updateCount(data.playersCount);
+                localCalledNumbers = [];   // ✅ FIX #4: Reset called history on new game
                 showGame();
                 currentGameId = 'GAME_' + Date.now().toString(36).toUpperCase();
                 updateBackToLobbyVisibility();
             });
+
+            // ✅ FIX #5: Use local history instead of server-sent array
             socket.on('numberCalled', data => {
                 if (data.stake !== currentStake) return;
                 const num = data.number;
+                localCalledNumbers.push(num);
                 currentCall.innerText = formatCall(num);
-                const full = data.calledNumbers || [];
-                const hist = full.slice(0, -1);
+                const hist = localCalledNumbers.slice(0, -1);
                 calledList.innerText = (lang === 'am' ? 'የተጠሩ: ' : 'Called: ') + (hist.length ? hist.map(n => formatCall(n)).join(', ') : '—');
-                scrollEnd(); speakAmharic(num);
+                scrollEnd();
+                speakAmharic(num);
             });
+
             socket.on('markedNumbers', nums => { markedNumbers = nums; if (isGameActive && userCard.length) renderCard(userCard, 'gameCard', true); else if (!isGameActive && userCard.length) renderCard(userCard, 'lobbyCardPreview', false); });
             socket.on('gameEnded', data => {
                 if (data.stake !== currentStake) return;
@@ -1558,6 +1598,7 @@
                 markedNumbers = []; userCard = []; selectedCardNumber = null;
                 selectedNumber.textContent = '-';
                 serverTaken.clear(); displayTaken.clear();
+                localCalledNumbers = [];
                 const gc = $('gameCard'); if (gc) gc.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Select a card number to see your Bingo card</div>';
                 const lp = $('lobbyCardPreview'); if (lp) lp.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;">Select a card number to see your Bingo card</div>';
                 buildGrid();
