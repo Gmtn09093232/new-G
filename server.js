@@ -3202,6 +3202,33 @@ io.on('connection', async (socket) => {
     notifyAdminClients();
   });
 
+  // ⚡ SILENT release: frees a card the player no longer wants.
+  // Used by the client when swapping cards (one player = one card).
+  // No UI message is shown; the change is reflected via cardTaken.
+  socket.on('releaseCardNumber', (cardNumber) => {
+    if (!currentStake) return;
+    const game = getGame(currentStake);
+    if (!game || game.status !== 'lobby') return;
+
+    const num = Number(cardNumber);
+    if (!Number.isInteger(num) || num < 1 || num > 100) return;
+
+    const existing = game.players.find(p => p.telegramId === socket.userId);
+    // Only release the card if this player actually holds it
+    if (!existing || existing.cardNumber !== num) return;
+
+    game.takenCardNumbers.delete(num);
+    game.players = game.players.filter(p => p.telegramId !== socket.userId);
+
+    io.to(`stake_${currentStake}`).emit('cardTaken', {
+      stake: currentStake,
+      number: num,
+      takenNumbers: Array.from(game.takenCardNumbers)
+    });
+    broadcastPlayerCount(currentStake);
+    notifyAdminClients();
+  });
+
   socket.on('newCardNumber', () => {
     if (!currentStake) return;
     const now = Date.now();
