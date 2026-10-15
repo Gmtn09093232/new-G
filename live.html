@@ -67,7 +67,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   </div>
 
   <main>
-    <!-- LIVE -->
     <section id="live" class="view on">
       <div class="head">
         <div>
@@ -79,7 +78,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="liveList"></ul>
     </section>
 
-    <!-- REGISTERED -->
     <section id="users" class="view">
       <div class="head">
         <h2>Registered Users</h2>
@@ -88,7 +86,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="uList"></ul>
     </section>
 
-    <!-- BALANCES -->
     <section id="bal" class="view">
       <div class="card">
         <span class="mut">Total balance</span>
@@ -98,7 +95,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="bList"></ul>
     </section>
 
-    <!-- WINNERS -->
     <section id="winners" class="view">
       <div class="head">
         <div>
@@ -110,7 +106,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="wList"></ul>
     </section>
 
-    <!-- DETAILS -->
     <section id="details" class="view">
       <button class="back" id="back">&lt; Back</button>
       <div class="prof">
@@ -154,9 +149,7 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     return;
   }
 
-  /* ---------- state ---------- */
   var ROUND_LIMIT = 10;
-
   var stake = 10;
   var live = [];
   var users = [];
@@ -170,7 +163,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     ['#4c1d95', '#ddd6fe'], ['#713f12', '#fef08a'], ['#831843', '#fbcfe8']
   ];
 
-  /* ---------- helpers ---------- */
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -215,47 +207,31 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       '<span class="badge ' + (cls || '') + '">' + esc(badge) + '</span></li>';
   }
 
-  /* ---------- winner normalisation ---------- */
   function normWinner(raw) {
     var w = raw || {};
     var p = w.player || w.user || w.winner || w;
-
     var name = p.telegram_handle ? '@' + p.telegram_handle
              : (p.username || w.username || w.name || w.playerName || 'Anonymous');
-
     var round = w.round != null ? w.round
               : (w.roundNumber != null ? w.roundNumber
               : (w.roundId != null ? w.roundId : '?'));
-
     var stakeV = w.stake != null ? w.stake : p.stake;
-
     var card = w.cardNumber != null ? w.cardNumber
              : (w.card != null ? w.card
              : (p.cardNumber != null ? p.cardNumber : p.card));
     if (card == null) card = 'N/A';
-
     var prize = w.prize != null ? w.prize
               : (w.amount != null ? w.amount
               : (w.payout != null ? w.payout : w.winnings));
-
     var time = w.time || w.timestamp || w.finishedAt || w.endedAt ||
                w.createdAt || w.date || null;
-
     return {
-      round: round,
-      name: name,
-      stake: stakeV,
-      card: card,
-      prize: prize,
-      time: time,
+      round: round, name: name, stake: stakeV, card: card, prize: prize, time: time,
       _p: {
         username: p.username || w.username || name,
-        telegram_handle: p.telegram_handle ||
-          (name.charAt(0) === '@' ? name.slice(1) : null),
+        telegram_handle: p.telegram_handle || (name.charAt(0) === '@' ? name.slice(1) : null),
         telegramId: p.telegramId || w.telegramId || null,
-        stake: stakeV,
-        cardNumber: card,
-        balance: p.balance
+        stake: stakeV, cardNumber: card, balance: p.balance
       }
     };
   }
@@ -264,11 +240,7 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     var allNum = winners.length > 0 && winners.every(function (w) {
       return !isNaN(parseInt(w.round, 10));
     });
-    if (allNum) {
-      winners.sort(function (a, b) {
-        return parseInt(b.round, 10) - parseInt(a.round, 10);
-      });
-    }
+    if (allNum) winners.sort(function (a, b) { return parseInt(b.round, 10) - parseInt(a.round, 10); });
   }
 
   function setWinners(list) {
@@ -283,9 +255,7 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     var i;
     for (i = 0; i < winners.length; i++) {
       if (String(winners[i].round) === String(w.round) &&
-          String(winners[i]._p.telegramId) === String(w._p.telegramId)) {
-        return;
-      }
+          String(winners[i]._p.telegramId) === String(w._p.telegramId)) return;
     }
     winners.unshift(w);
     sortWinners();
@@ -293,70 +263,47 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     renderWinners();
   }
 
-  /* ---------- views ---------- */
   function show(v) {
     var views = document.querySelectorAll('.view'), i;
     for (i = 0; i < views.length; i++) views[i].classList.toggle('on', views[i].id === v);
-
     var isDetails = (v === 'details');
     $('hdr').classList.toggle('hide', isDetails);
     $('tabs').classList.toggle('hide', isDetails);
-
     var btns = $('nav').children;
     for (i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.view === v);
-
     if (!isDetails) lastMain = v;
     window.scrollTo(0, 0);
   }
 
-  /* ---------- render ---------- */
   function renderLive() {
     var list = live.filter(function (p) { return String(p.stake) === String(stake); });
     SRC.live = list;
     $('count').textContent = list.length + ' players';
-
     var st = status[stake] || status[String(stake)];
     $('st').textContent = st ? String(st).toUpperCase() : 'RUNNING';
-
-    if (!list.length) {
-      $('liveList').innerHTML = '<li class="empty">No players in ' + stake + ' ETB stake</li>';
-      return;
-    }
+    if (!list.length) { $('liveList').innerHTML = '<li class="empty">No players in ' + stake + ' ETB stake</li>'; return; }
     var html = '', i;
-    for (i = 0; i < list.length; i++) {
-      html += rowHtml(list[i], '#' + cardOf(list[i]), '', i, 'live');
-    }
+    for (i = 0; i < list.length; i++) html += rowHtml(list[i], '#' + cardOf(list[i]), '', i, 'live');
     $('liveList').innerHTML = html;
   }
 
   function renderUsers() {
     SRC.reg = users;
     $('uCount').textContent = users.length + ' users';
-    if (!users.length) {
-      $('uList').innerHTML = '<li class="empty">No registered users found.</li>';
-      return;
-    }
+    if (!users.length) { $('uList').innerHTML = '<li class="empty">No registered users found.</li>'; return; }
     var html = '', i;
-    for (i = 0; i < users.length; i++) {
-      html += rowHtml(users[i], num(users[i].balance).toLocaleString() + ' ETB', '', i, 'reg');
-    }
+    for (i = 0; i < users.length; i++) html += rowHtml(users[i], num(users[i].balance).toLocaleString() + ' ETB', '', i, 'reg');
     $('uList').innerHTML = html;
   }
 
   function renderBal() {
     var sorted = users.slice().sort(function (a, b) { return num(b.balance) - num(a.balance); });
     SRC.bal = sorted;
-
     var total = 0, i;
     for (i = 0; i < users.length; i++) total += num(users[i].balance);
-
     $('tBal').textContent = total.toLocaleString() + ' ETB';
     $('tCount').textContent = users.length + ' registered';
-
-    if (!sorted.length) {
-      $('bList').innerHTML = '<li class="empty">No data available.</li>';
-      return;
-    }
+    if (!sorted.length) { $('bList').innerHTML = '<li class="empty">No data available.</li>'; return; }
     var html = '';
     for (i = 0; i < sorted.length; i++) {
       var b = num(sorted[i].balance);
@@ -367,32 +314,20 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
 
   function renderWinners() {
     SRC.win = winners.map(function (w) { return w._p; });
-
     $('wCount').textContent = winners.length + ' winner' + (winners.length === 1 ? '' : 's');
-
-    if (!winners.length) {
-      $('wList').innerHTML = '<li class="empty">No winners recorded yet.</li>';
-      return;
-    }
-
+    if (!winners.length) { $('wList').innerHTML = '<li class="empty">No winners recorded yet.</li>'; return; }
     var html = '', i;
     for (i = 0; i < winners.length; i++) {
       var w = winners[i];
       var c = colorFor(w.name);
-
       var bits = [];
       if (w.stake != null) bits.push(w.stake + ' ETB');
       if (w.card !== 'N/A') bits.push('Card #' + w.card);
       if (w.time) bits.push(timeAgo(w.time));
-
-      var prize = (w.prize != null)
-        ? num(w.prize).toLocaleString() + ' ETB'
-        : 'WINNER';
-
+      var prize = (w.prize != null) ? num(w.prize).toLocaleString() + ' ETB' : 'WINNER';
       html += '<li class="row" data-src="win" data-i="' + i + '">' +
         '<span class="rnd"><small>ROUND</small><b>' + esc(String(w.round)) + '</b></span>' +
-        '<span class="av" style="background:' + c[0] + ';color:' + c[1] + '">' +
-          esc(initialOf(w.name)) + '</span>' +
+        '<span class="av" style="background:' + c[0] + ';color:' + c[1] + '">' + esc(initialOf(w.name)) + '</span>' +
         '<span class="info"><b>' + esc(w.name) + '</b>' +
           '<small>' + esc(bits.join(' · ') || '—') + '</small></span>' +
         '<span class="badge y">' + esc(prize) + '</span></li>';
@@ -400,38 +335,30 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     $('wList').innerHTML = html;
   }
 
-  /* ---------- details ---------- */
   function showDetails(p) {
     var h = handle(p);
     var c = colorFor(h);
     var av = $('d-av');
-
     av.textContent = initialOf(h);
     av.style.background = c[0];
     av.style.color = c[1];
-
     $('d-name').textContent = p.username || 'Anonymous User';
     $('d-handle').textContent = h;
     $('d-id').textContent = p.telegramId || 'N/A';
     $('d-user').textContent = p.telegram_handle || p.username || 'N/A';
     $('d-stake').textContent = (p.stake || 0) + ' ETB';
-
     var card = cardOf(p);
     $('d-card').textContent = (card === 'N/A') ? 'N/A' : '#' + card;
     $('d-bal').textContent = num(p.balance).toLocaleString() + ' ETB';
-
     show('details');
   }
 
-  /* ---------- events ---------- */
   $('tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
     stake = parseInt(b.dataset.stake, 10);
-
     var kids = this.children, i;
     for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', kids[i] === b);
-
     $('room').textContent = stake + ' ETB Room';
     renderLive();
     socket.emit('admin:requestPlayers');
@@ -456,7 +383,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
 
   $('back').addEventListener('click', function () { show(lastMain); });
 
-  /* ---------- socket ---------- */
   var socket = io('/admin', {
     query: { secret: secret },
     transports: ['websocket', 'polling']
@@ -469,15 +395,12 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   });
 
   socket.on('connect_error', function (err) {
-    $('liveList').innerHTML =
-      '<li class="empty" style="color:#f87171">Connection failed: ' + esc(err.message) + '</li>';
+    $('liveList').innerHTML = '<li class="empty" style="color:#f87171">Connection failed: ' + esc(err.message) + '</li>';
   });
 
   socket.on('admin:playersList', function (data) {
-    if (Array.isArray(data)) {
-      live = data;
-      status = {};
-    } else {
+    if (Array.isArray(data)) { live = data; status = {}; }
+    else {
       live = data.players || [];
       status = data.gameStatus || {};
       var w = data.winners || data.roundWinners || data.winnerHistory;
@@ -493,21 +416,20 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   });
 
   function onWinnerList(data) {
-    var arr = Array.isArray(data)
-      ? data
-      : (data.winners || data.history || data.rounds || data.list || []);
+    var arr = Array.isArray(data) ? data
+            : (data.winners || data.history || data.rounds || data.list || []);
     if (!Array.isArray(arr)) return;
-    setWinners(arr.slice(-ROUND_LIMIT));
+    // Server returns newest-first; we accept either order
+    setWinners(arr.slice(0, ROUND_LIMIT));
   }
   socket.on('admin:winnersList', onWinnerList);
   socket.on('admin:winnerHistory', onWinnerList);
   socket.on('admin:roundWinners', onWinnerList);
 
-  ['admin:winner', 'winner', 'game:winner', 'round:winner',
-   'roundWinner', 'bingo:winner'].forEach(function (ev) {
+  ['admin:winner', 'winner', 'game:winner', 'round:winner', 'roundWinner', 'bingo:winner'].forEach(function (ev) {
     socket.on(ev, function (data) {
-      if (Array.isArray(data)) { data.forEach(addWinner); }
-      else if (data) { addWinner(data); }
+      if (Array.isArray(data)) data.forEach(addWinner);
+      else if (data) addWinner(data);
     });
   });
 
