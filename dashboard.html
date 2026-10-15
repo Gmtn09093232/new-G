@@ -2,263 +2,201 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0f1419">
 <title>Admin</title>
 <style>
-/* ---------- THEME ---------- */
-:root{
-  --bg:#0f1419; --panel:#1a1f26; --panel2:#232a33;
-  --line:#2d3540; --line2:#3d4856;
-  --fg:#e6e9ef; --dim:#8b95a3;
-  --blue:#3b82f6; --green:#10b981; --red:#ef4444; --amber:#f59e0b; --purple:#8b5cf6;
-  --r:6px;
-}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{background:var(--bg);color:var(--fg);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-body{padding-bottom:76px;min-height:100vh}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-input,select,textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;width:100%;outline:none}
-input:focus,select:focus,textarea:focus{border-color:var(--blue)}
-a{color:var(--blue);text-decoration:none}
-svg.i{width:1em;height:1em;display:inline-block;vertical-align:-0.125em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
-@keyframes sp{to{transform:rotate(360deg)}}
+/* ---------- BASE ---------- */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#0f1419;color:#e6e9ef;font:14px/1.4 Arial,Helvetica,sans-serif}
+body{padding-bottom:84px}
+button{font-family:inherit;font-size:12px;font-weight:bold;color:#e6e9ef;background:#232a33;border:1px solid #2d3540;border-radius:3px;padding:8px 10px;cursor:pointer}
+button:active{background:#2d3540}
+input,select,textarea{font-family:inherit;font-size:13px;color:#e6e9ef;background:#0f1419;border:1px solid #2d3540;border-radius:3px;padding:8px 10px;width:100%}
+input:focus,select:focus,textarea:focus{border-color:#3b82f6;outline:none}
+a{color:#3b82f6;text-decoration:none}
+table{width:100%;border-collapse:collapse}
 
 /* ---------- CONNECTION ---------- */
-#conn{position:fixed;top:0;left:0;right:0;z-index:99;background:var(--amber);color:#111;font-size:12px;font-weight:600;text-align:center;padding:4px;transform:translateY(-100%)}
-#conn.on{transform:none}
-#conn.ok{background:var(--green);color:#fff}
+#conn{position:fixed;top:0;left:0;right:0;z-index:99;background:#f59e0b;color:#111;font-size:12px;font-weight:bold;text-align:center;padding:4px;display:none}
+#conn.on{display:block}
+#conn.ok{background:#10b981;color:#fff}
 
 /* ---------- HEADER ---------- */
-header{position:sticky;top:0;z-index:50;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
-header h1{font-size:15px;font-weight:600;letter-spacing:-.2px}
-.btn-out{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:var(--r);color:var(--dim)}
-.btn-out:active{background:var(--panel2)}
+header{background:#1a1f26;border-bottom:1px solid #2d3540;padding:10px 14px;overflow:hidden}
+header h1{font-size:15px;font-weight:bold;float:left;line-height:32px}
+.btn-out{float:right}
 
 /* ---------- LAYOUT ---------- */
 .wrap{max-width:820px;margin:0 auto;padding:12px}
 
 /* ---------- COMMISSION ---------- */
-.comm{background:var(--blue);border-radius:var(--r);padding:12px 14px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;position:relative}
-.comm .cell{display:flex;flex-direction:column;gap:2px;min-width:0}
-.comm .cell .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.comm .cell .v{font:600 15px/1.2 ui-monospace,Menlo,Consolas,monospace;color:#fff}
-.comm .stamp{position:absolute;top:6px;right:8px;font-size:10px;color:rgba(255,255,255,.6)}
+.comm{background:#3b82f6;border-radius:3px;padding:10px 12px;margin-bottom:12px;font-size:0;overflow:hidden}
+.comm .stamp{font-size:10px;color:#dbeafe;text-align:right}
+.comm .cell{display:inline-block;width:33.33%;vertical-align:top;font-size:14px}
+.comm .k{display:block;font-size:10px;text-transform:uppercase;color:#dbeafe}
+.comm .v{display:block;font-size:15px;font-weight:bold;font-family:"Courier New",monospace;color:#fff}
 
 /* ---------- STATS ---------- */
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
-@media(min-width:560px){.stats{grid-template-columns:repeat(3,1fr)}}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
-.stat .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);display:flex;align-items:center;gap:5px}
-.stat .v{font:600 16px/1.2 ui-monospace,Menlo,Consolas,monospace;color:var(--fg)}
-.stat .v.g{color:var(--green)}.stat .v.b{color:var(--blue)}.stat .v.a{color:var(--amber)}
-.stat .v.r{color:var(--red)}.stat .v.p{color:var(--purple)}
+.stats{font-size:0;margin-bottom:12px}
+.stat{display:inline-block;width:32%;margin:0 2% 8px 0;vertical-align:top;font-size:14px;background:#1a1f26;border:1px solid #2d3540;border-radius:3px;padding:10px 12px}
+.stat .k{font-size:10px;text-transform:uppercase;color:#8b95a3}
+.stat .v{font-size:16px;font-weight:bold;font-family:"Courier New",monospace}
+.v.g{color:#10b981}
+.v.b{color:#3b82f6}
+.v.a{color:#f59e0b}
+.v.r{color:#ef4444}
+.v.p{color:#8b5cf6}
 
 /* ---------- TABS ---------- */
-.tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:3px;gap:3px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tab{flex:1;min-width:max-content;padding:8px 12px;border-radius:4px;font-size:12px;font-weight:600;color:var(--dim);display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
-.tab.on{background:var(--blue);color:#fff}
-.tab .n{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:8px;font-size:10px}
-.tab.on .n{background:rgba(255,255,255,.25)}
+.tabs{background:#1a1f26;border:1px solid #2d3540;border-radius:3px;padding:3px;margin-bottom:12px;font-size:0}
+.tab{display:inline-block;width:33.33%;padding:8px 4px;border:0;background:none;border-radius:3px;font-size:12px;font-weight:bold;color:#8b95a3;text-align:center}
+.tab.on{background:#3b82f6;color:#fff}
+.tab .n{font-size:10px}
 
 /* ---------- SECTIONS ---------- */
 .page,.pane{display:none}
 .page.on,.pane.on{display:block}
-.sec{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.sec h2{font-size:14px;font-weight:600}
-.icon-btn{width:34px;height:34px;border:1px solid var(--line);border-radius:var(--r);display:inline-flex;align-items:center;justify-content:center;color:var(--dim)}
-.icon-btn:active{background:var(--panel2)}
-.filter{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px;margin-bottom:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
-.filter .g{flex:1;min-width:120px}
-.filter label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);margin-bottom:4px}
-.filter select,.filter input{padding:8px 10px;font-size:12px}
-.muted{font-size:12px;color:var(--dim);margin-bottom:8px}
-.row-actions{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-.row-actions .btn{flex:1;min-width:120px}
+.sec{overflow:hidden;margin-bottom:10px}
+.sec h2{font-size:14px;font-weight:bold;float:left;line-height:32px}
+.sec .icon-btn{float:right}
+.icon-btn{border:1px solid #2d3540;background:#232a33;color:#8b95a3}
+.filter{background:#1a1f26;border:1px solid #2d3540;border-radius:3px;padding:10px;margin-bottom:10px;font-size:0}
+.filter .g{display:inline-block;width:47%;margin:0 3% 8px 0;vertical-align:bottom;font-size:13px}
+.filter .g:nth-child(2n){margin-right:0}
+.filter label{display:block;font-size:10px;text-transform:uppercase;color:#8b95a3;margin-bottom:3px}
+.muted{font-size:12px;color:#8b95a3;margin-bottom:8px}
+.row-actions{margin-bottom:10px}
+.row-actions .btn{margin:0 6px 6px 0}
 
 /* ---------- BUTTONS ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;border-radius:var(--r);font-size:12px;font-weight:600;min-height:36px;border:1px solid transparent}
-.btn:active{filter:brightness(.9)}
-.btn.p{background:var(--blue);color:#fff}
-.btn.s{background:var(--green);color:#fff}
-.btn.d{background:var(--red);color:#fff}
-.btn.w{background:var(--amber);color:#111}
-.btn.g{background:var(--panel2);color:var(--fg);border-color:var(--line)}
-.btn.o{background:transparent;color:var(--blue);border-color:var(--blue)}
-.btn.sm{padding:6px 10px;min-height:30px;font-size:11px}
-.adj{background:var(--panel2);color:var(--amber);border:1px solid var(--line);padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
-.link{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:4px;background:var(--panel2);color:var(--blue);font-size:11px;font-weight:600;border:1px solid var(--line)}
-.copy{background:none;border:1px solid var(--line);border-radius:4px;padding:3px 6px;color:var(--dim);font-size:11px}
+.btn{display:inline-block;padding:8px 12px;border-radius:3px;font-size:12px;font-weight:bold;border:1px solid transparent;text-align:center}
+.btn.p{background:#3b82f6;color:#fff}
+.btn.s{background:#10b981;color:#fff}
+.btn.d{background:#ef4444;color:#fff}
+.btn.w{background:#f59e0b;color:#111}
+.btn.g{background:#232a33;color:#e6e9ef;border-color:#2d3540}
+.btn.o{background:transparent;color:#3b82f6;border-color:#3b82f6}
+.btn.sm{padding:5px 8px;font-size:11px}
+.adj{background:#232a33;color:#f59e0b;border:1px solid #2d3540;padding:5px 10px;border-radius:3px;font-size:11px;font-weight:bold}
+.link{display:inline-block;padding:3px 8px;border:1px solid #2d3540;border-radius:3px;background:#232a33;color:#3b82f6;font-size:11px;font-weight:bold}
+.copy{background:none;border:1px solid #2d3540;border-radius:3px;padding:3px 6px;color:#8b95a3;font-size:11px}
 
 /* ---------- TABLES ---------- */
-.list{display:flex;flex-direction:column;gap:8px}
-table{width:100%;border-collapse:collapse}
-thead{display:none}
-tr{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px;gap:6px;margin-bottom:8px}
-tr.busy{opacity:.55;pointer-events:none}
-td{display:flex;justify-content:space-between;align-items:center;font-size:12px;gap:8px}
-td::before{content:attr(data-label);font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim);font-weight:600}
-.cell-user{display:flex;align-items:center;gap:8px}
-.av{width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;background:var(--blue);flex:none}
-.av.g{background:var(--green)}.av.p{background:var(--purple)}.av.o{background:var(--amber)}
-.uinfo{display:flex;flex-direction:column;min-width:0}
-.uinfo .n{font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.uinfo .i{font-size:10px;color:var(--dim);font-family:ui-monospace,monospace}
-.acts{display:flex;gap:6px;width:100%}
-.acts .btn{flex:1}
-@media(min-width:720px){
-  thead{display:table-header-group}tbody{display:table-row-group}table{display:table}
-  tr{display:table-row;padding:0;margin:0;border:0;border-radius:0;background:transparent}
-  th{display:table-cell;background:var(--panel);text-align:left;padding:8px 10px;font-weight:600;color:var(--dim);border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-  td{display:table-cell;padding:10px;border-bottom:1px solid var(--line);background:var(--panel)}
-  td::before{display:none}
-  .list{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;gap:0}
-  .list table tbody tr:last-child td{border-bottom:0}
-  .acts{width:auto}.acts .btn{flex:none}
-}
+.list{margin-bottom:10px}
+.list table{background:#1a1f26;border:1px solid #2d3540}
+.list th{background:#1a1f26;text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;color:#8b95a3;border-bottom:1px solid #2d3540}
+.list td{padding:8px 10px;border-bottom:1px solid #2d3540;font-size:12px;vertical-align:middle}
+.list tr.busy{opacity:.55}
+.cell-user{overflow:hidden}
+.av{float:left;width:28px;height:28px;line-height:28px;text-align:center;font-weight:bold;font-size:11px;color:#fff;background:#3b82f6;border-radius:3px;margin-right:8px}
+.av.g{background:#10b981}
+.av.p{background:#8b5cf6}
+.av.o{background:#f59e0b}
+.uinfo{overflow:hidden}
+.uinfo .n{display:block;font-weight:bold}
+.uinfo .i{display:block;font-size:10px;color:#8b95a3;font-family:"Courier New",monospace}
+.acts .btn{margin-right:6px}
 
 /* ---------- BADGES ---------- */
-.bdg{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:capitalize}
-.bdg.pending{background:rgba(245,158,11,.15);color:#fcd34d}
-.bdg.approved{background:rgba(16,185,129,.15);color:#6ee7b7}
-.bdg.rejected{background:rgba(239,68,68,.15);color:#fca5a5}
-.bdg.telebirr{background:rgba(239,68,68,.15);color:#fca5a5}
-.bdg.cbebirr{background:rgba(59,130,246,.15);color:#93c5fd}
-.bdg.mpesa{background:rgba(245,158,11,.15);color:#fcd34d}
-.ref{font-family:ui-monospace,monospace;font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:#93c5fd}
-.ref-wrap{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.bdg{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:bold;text-transform:capitalize}
+.bdg.pending{background:#3a2f16;color:#fcd34d}
+.bdg.approved{background:#16302a;color:#6ee7b7}
+.bdg.rejected{background:#3a1f22;color:#fca5a5}
+.bdg.telebirr{background:#3a1f22;color:#fca5a5}
+.bdg.cbebirr{background:#1b2b40;color:#93c5fd}
+.bdg.mpesa{background:#3a2f16;color:#fcd34d}
+.ref{display:inline-block;font-family:"Courier New",monospace;font-size:11px;background:#0f1419;padding:2px 6px;border-radius:3px;border:1px solid #2d3540;color:#93c5fd}
+.ref-wrap{overflow:hidden}
+.ref-wrap>*{margin-right:5px;vertical-align:middle}
+.receipt{overflow:hidden}
+.receipt img{float:left;width:34px;height:34px;margin-right:6px;border:1px solid #2d3540}
+.receipt .link{vertical-align:top}
 
 /* ---------- PROFILE ---------- */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
-.p-hd{display:flex;flex-direction:column;align-items:center;gap:6px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
-.p-av{width:56px;height:56px;border-radius:var(--r);background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff}
-.p-hd .n{font-size:16px;font-weight:700}
-.p-hd .ph{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:5px}
-.p-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
-.p-row:last-child{border-bottom:0}
-.p-row .k{color:var(--dim);display:flex;align-items:center;gap:6px}
-.p-row .v{font-weight:600;font-family:ui-monospace,monospace}
+.card{background:#1a1f26;border:1px solid #2d3540;border-radius:3px;padding:16px}
+.p-hd{text-align:center;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #2d3540}
+.p-av{width:60px;height:60px;line-height:60px;margin:0 auto 8px;text-align:center;background:#3b82f6;color:#fff;font-size:13px;font-weight:bold;border-radius:3px}
+.p-hd .n{font-size:16px;font-weight:bold}
+.p-hd .ph{font-size:12px;color:#8b95a3}
+.p-row{overflow:hidden;padding:10px 0;border-bottom:1px solid #2d3540;font-size:13px}
+.p-row .k{float:left;color:#8b95a3}
+.p-row .v{float:right;font-weight:bold;font-family:"Courier New",monospace}
 .p-row .v.hl{color:#93c5fd}
-.box{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:12px}
-.box h3{font-size:13px;font-weight:600;margin-bottom:6px}
-.box p{font-size:11px;color:var(--dim);margin-bottom:8px}
-.box .line{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;align-items:center}
-.box .line:last-child{border-bottom:0}
-.box .line strong{color:var(--fg);display:flex;align-items:center;gap:5px}
-.box .line span{font-family:ui-monospace,monospace;color:#93c5fd}
-.invite-url{word-break:break-all;font-size:12px;color:#93c5fd;font-family:ui-monospace,monospace;margin-bottom:8px}
-.withdraw{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;margin-top:10px}
-.withdraw label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600}
+.box{background:#0f1419;border:1px solid #2d3540;border-radius:3px;padding:12px;margin-top:12px}
+.box h3{font-size:13px;font-weight:bold;margin-bottom:6px}
+.box p{font-size:11px;color:#8b95a3;margin-bottom:8px}
+.box .line{overflow:hidden;padding:6px 0;border-bottom:1px solid #2d3540;font-size:12px}
+.box .line strong{float:left}
+.box .line span{float:right;font-family:"Courier New",monospace;color:#93c5fd}
+.invite-url{word-break:break-all;font-size:12px;color:#93c5fd;font-family:"Courier New",monospace;margin-bottom:8px}
+.invite-actions{margin-top:4px}
+.invite-actions .btn{margin-right:6px}
+.sub{font-size:14px;font-weight:bold;margin:16px 0 8px}
+.withdraw{background:#0f1419;border:1px solid #2d3540;border-radius:3px;padding:12px;margin-top:10px}
+.withdraw .fld{margin-bottom:10px}
+.withdraw label{display:block;font-size:11px;color:#8b95a3;margin-bottom:3px;font-weight:bold}
 
 /* ---------- RULES ---------- */
-.rules h3{font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
-.banner{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:var(--r);padding:10px;margin-bottom:12px;display:flex;gap:8px;font-size:12px;color:#93c5fd}
-.warn-card{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r);padding:10px;margin-bottom:12px}
-.warn-card .h{display:flex;gap:6px;color:#fcd34d;font-weight:700;font-size:12px;margin-bottom:4px}
-.warn-card .b{font-size:12px;color:var(--dim);line-height:1.5}
-.warn-card .b strong{color:var(--fg);font-size:14px;display:block;margin-top:3px}
-details{border-bottom:1px solid var(--line);padding:8px 0}
-details:last-of-type{border-bottom:0}
-summary{font-size:13px;font-weight:600;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
-summary::-webkit-details-marker{display:none}
-summary::after{content:"+";color:var(--dim);font-weight:400}
-details[open] summary::after{content:"−"}
-details .body{padding-top:8px;font-size:12px;color:var(--dim);line-height:1.6}
-details .body ul{list-style:none;padding:0}
-details .body li{padding:3px 0 3px 14px;position:relative}
-details .body li::before{content:"·";position:absolute;left:2px;color:var(--blue);font-weight:700}
-.ftr{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--dim);text-align:center}
+.rules h3{font-size:14px;font-weight:bold;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #2d3540}
+.banner{background:#16233a;border:1px solid #24406b;border-radius:3px;padding:10px;margin-bottom:12px;font-size:12px;color:#93c5fd}
+.warn-card{background:#2e2513;border:1px solid #5a4a1e;border-radius:3px;padding:10px;margin-bottom:12px}
+.warn-card .h{color:#fcd34d;font-weight:bold;font-size:12px;margin-bottom:4px}
+.warn-card .b{font-size:12px;color:#8b95a3;line-height:1.5}
+.warn-card .b strong{color:#e6e9ef;font-size:14px;display:block;margin-top:3px}
+details{border-bottom:1px solid #2d3540;padding:8px 0}
+summary{font-size:13px;font-weight:bold;cursor:pointer}
+details .body{padding-top:8px;font-size:12px;color:#8b95a3;line-height:1.6}
+details .body ul{list-style:none}
+details .body li{padding:3px 0 3px 12px}
+.ftr{margin-top:12px;padding-top:10px;border-top:1px solid #2d3540;font-size:11px;color:#8b95a3;text-align:center}
 
 /* ---------- NAV ---------- */
-nav{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--line);display:flex;padding:4px 0 calc(4px + env(safe-area-inset-bottom,0));z-index:40}
-nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;font-size:10px;color:var(--dim);font-weight:600}
-nav button.on{color:var(--blue)}
-nav button svg{width:18px;height:18px}
+nav{position:fixed;bottom:0;left:0;right:0;background:#1a1f26;border-top:1px solid #2d3540;padding:4px 0;text-align:center;font-size:0;z-index:40}
+nav button{display:inline-block;width:33.33%;padding:8px 4px;border:0;background:none;font-size:12px;font-weight:bold;color:#8b95a3}
+nav button.on{color:#3b82f6}
 
 /* ---------- FLOATING REFRESH ---------- */
-.fab{position:fixed;right:14px;bottom:88px;width:40px;height:40px;border-radius:var(--r);background:var(--panel);border:1px solid var(--line);color:var(--fg);display:flex;align-items:center;justify-content:center;z-index:30;font-size:16px}
-.fab:active{background:var(--panel2)}
-.fab.spin svg{animation:sp .8s linear infinite}
+.fab{position:fixed;right:14px;bottom:80px;background:#1a1f26;border:1px solid #2d3540;color:#e6e9ef;z-index:30}
 
 /* ---------- MODAL ---------- */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-end;justify-content:center;z-index:100}
-.modal.on{display:flex}
-.modal .sheet{background:var(--panel);border-top-left-radius:var(--r);border-top-right-radius:var(--r);border:1px solid var(--line);border-bottom:0;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;padding:16px}
-@media(min-width:720px){.modal{align-items:center}.modal .sheet{border-radius:var(--r);border-bottom:1px solid var(--line)}}
-.sheet .hd{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
-.sheet .hd svg{width:20px;height:20px;color:var(--blue);flex:none}
-.sheet .hd h3{font-size:15px;font-weight:700}
-.sheet .hd p{font-size:11px;color:var(--dim)}
-.sheet .hd .close{margin-left:auto;width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--dim);background:var(--panel2)}
-.sheet textarea{min-height:130px;font-family:ui-monospace,monospace;resize:vertical}
-.sheet .foot{display:flex;gap:8px;margin-top:16px}
-.sheet .foot button{flex:1;padding:12px;border-radius:var(--r);font-weight:700;font-size:13px}
-.sheet .info{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:10px;font-size:12px;color:var(--dim);margin-bottom:12px}
-.sheet .info strong{color:var(--fg)}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:100;overflow-y:auto}
+.modal.on{display:block}
+.sheet{background:#1a1f26;border:1px solid #2d3540;border-radius:3px;width:90%;max-width:600px;margin:40px auto;padding:16px}
+.sheet .hd{position:relative;border-bottom:1px solid #2d3540;padding:0 70px 10px 0;margin-bottom:12px}
+.sheet .hd h3{font-size:15px;font-weight:bold}
+.sheet .hd p{font-size:11px;color:#8b95a3}
+.sheet .hd .close{position:absolute;top:0;right:0}
+.sheet textarea{min-height:130px;font-family:"Courier New",monospace}
+.sheet .hint{font-size:11px;color:#8b95a3;margin-bottom:8px}
+.sheet .foot{margin-top:16px}
+.sheet .foot button{min-width:120px;margin-right:8px}
+.sheet .info{background:#0f1419;border:1px solid #2d3540;border-radius:3px;padding:10px;font-size:12px;color:#8b95a3;margin-bottom:12px}
+.sheet .info strong{color:#e6e9ef}
+.sheet .fld{margin-bottom:10px}
+.sheet label{display:block;font-size:11px;color:#8b95a3;margin-bottom:3px;font-weight:bold}
+#proofClose{position:fixed;top:14px;right:14px;z-index:10}
+#proofImage{display:block;max-width:90%;margin:60px auto;border:0}
 
 /* ---------- TOAST ---------- */
-#toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(30px);padding:10px 16px;border-radius:var(--r);color:#fff;font-size:13px;font-weight:600;background:var(--blue);opacity:0;pointer-events:none;max-width:90%;text-align:center;z-index:200;transition:transform .15s,opacity .15s}
-#toast.on{opacity:1;transform:translateX(-50%)}
-#toast.success{background:var(--green)}
-#toast.error{background:var(--red)}
+#toast{position:fixed;bottom:88px;left:10%;right:10%;padding:10px;border-radius:3px;color:#fff;font-size:13px;font-weight:bold;background:#3b82f6;text-align:center;opacity:0;visibility:hidden;z-index:200}
+#toast.on{opacity:1;visibility:visible}
+#toast.success{background:#10b981}
+#toast.error{background:#ef4444}
 
 /* ---------- LOADING / EMPTY ---------- */
-.loading{padding:30px 0;text-align:center;color:var(--dim);font-size:12px}
-.spinner{display:inline-block;width:22px;height:22px;border:2px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
-.empty{padding:30px 12px;text-align:center;color:var(--dim);font-size:12px}
-.empty svg{width:32px;height:32px;color:var(--line2);display:block;margin:0 auto 8px}
+.loading{padding:30px 0;text-align:center;color:#8b95a3;font-size:12px}
+.empty{padding:30px 12px;text-align:center;color:#8b95a3;font-size:12px}
 .sentinel{height:1px}
 </style>
 </head>
 <body>
 
-<!-- SVG SPRITE (2KB, no network request) -->
-<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
-<defs>
-<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></symbol>
-<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
-<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h7v17H4z M13 4h7v17h-7z"/></symbol>
-<symbol id="i-out" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4 M10 17l-5-5 5-5 M5 12h11"/></symbol>
-<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></symbol>
-<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
-<symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
-<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18"/></symbol>
-<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4 M21 4v6h-6"/></symbol>
-<symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
-<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="1"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></symbol>
-<symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6 M20 4l-9 9 M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></symbol>
-<symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="8.5" cy="10" r="1.2"/><path d="M4 17l4-4 3 3 5-6 4 5"/></symbol>
-<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z M12 10v5 M12 18v.5"/></symbol>
-<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6 M12 8v.5"/></symbol>
-<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18 M5 8h14 M5 8l-3 6h6z M19 8l-3 6h6z"/></symbol>
-<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5 M5 12l7-7 7 7"/></symbol>
-<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14 M5 12l7 7 7-7"/></symbol>
-<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
-<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0 M16 5a3.5 3.5 0 0 1 0 7 M22 20a5 5 0 0 0-4-4.9"/></symbol>
-<symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 1.5a13 13 0 0 0 5.5 5.5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
-<symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 21h18 M5 21V10l7-4 7 4v11 M9 21v-5h6v5"/></symbol>
-<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5 M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5"/></symbol>
-<symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13 M22 2l-7 20-4-9-9-4z"/></symbol>
-<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
-<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20h18 M6 16v-5 M11 16v-9 M16 16v-3 M21 16v-7"/></symbol>
-<symbol id="i-percent" viewBox="0 0 24 24"><path d="M19 5L5 19 M7 6a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0 M14 18a1.5 1.5 0 1 0 3 0 1.5 1.5 0 0 0-3 0"/></symbol>
-<symbol id="i-wallet" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="1"/><path d="M3 7l3-3h12l3 3 M16 13h2"/></symbol>
-<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="15" rx="1"/><path d="M3 10h18 M8 3v4 M16 3v4"/></symbol>
-<symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 3v12 M5 10l7 7 7-7 M3 21h18"/></symbol>
-<symbol id="i-import" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M15 3v5h5 M12 12v6 M9 15l3 3 3-3"/></symbol>
-<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z"/></symbol>
-<symbol id="i-pie" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z M12 3v9h9A9 9 0 0 0 12 3z"/></symbol>
-<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18"/></symbol>
-</defs>
-</svg>
-
 <div id="conn">Connecting…</div>
 
 <header>
   <h1 id="headerTitle">Admin</h1>
-  <button class="btn-out" data-action="logout"><svg class="i"><use href="#i-out"/></svg> Logout</button>
+  <button class="btn-out" data-action="logout">Logout</button>
 </header>
 
 <div class="wrap">
@@ -275,25 +213,25 @@ nav button svg{width:18px;height:18px}
   <div class="page on" id="page-game">
 
     <div class="stats">
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-wallet"/></svg> Deposits</div><div class="v g" id="statDeposits">-</div></div>
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-cal"/></svg> Today</div><div class="v a" id="statTodayDeposits">-</div></div>
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-clock"/></svg> Pending Dep.</div><div class="v r" id="statPendingDeposits">-</div></div>
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-dl"/></svg> Withdrawals</div><div class="v a" id="statWithdrawals">-</div></div>
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-clock"/></svg> Pending With.</div><div class="v p" id="statPendingWithdrawals">-</div></div>
-      <div class="stat"><div class="k"><svg class="i"><use href="#i-users"/></svg> Players</div><div class="v b" id="statPlayers">-</div></div>
+      <div class="stat"><div class="k">Deposits</div><div class="v g" id="statDeposits">-</div></div>
+      <div class="stat"><div class="k">Today</div><div class="v a" id="statTodayDeposits">-</div></div>
+      <div class="stat"><div class="k">Pending Dep.</div><div class="v r" id="statPendingDeposits">-</div></div>
+      <div class="stat"><div class="k">Withdrawals</div><div class="v a" id="statWithdrawals">-</div></div>
+      <div class="stat"><div class="k">Pending With.</div><div class="v p" id="statPendingWithdrawals">-</div></div>
+      <div class="stat"><div class="k">Players</div><div class="v b" id="statPlayers">-</div></div>
     </div>
 
     <div class="tabs">
-      <button class="tab on" data-tab="deposits" data-action="switch-tab"><svg class="i"><use href="#i-wallet"/></svg> Deposits <span class="n" id="depositBadge">0</span></button>
-      <button class="tab" data-tab="withdrawals" data-action="switch-tab"><svg class="i"><use href="#i-bank"/></svg> Withdrawals <span class="n" id="withdrawalBadge">0</span></button>
-      <button class="tab" data-tab="players" data-action="switch-tab"><svg class="i"><use href="#i-users"/></svg> Players <span class="n" id="playerBadge">0</span></button>
+      <button class="tab on" data-tab="deposits" data-action="switch-tab">Deposits <span class="n" id="depositBadge">0</span></button>
+      <button class="tab" data-tab="withdrawals" data-action="switch-tab">Withdrawals <span class="n" id="withdrawalBadge">0</span></button>
+      <button class="tab" data-tab="players" data-action="switch-tab">Players <span class="n" id="playerBadge">0</span></button>
     </div>
 
     <!-- DEPOSITS -->
     <div class="pane on" id="tab-deposits">
       <div class="sec">
         <h2>Deposits</h2>
-        <button class="icon-btn" data-action="toggle-filter" data-target="depositFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+        <button class="icon-btn" data-action="toggle-filter" data-target="depositFilter">Filter</button>
       </div>
       <div class="filter" id="depositFilter">
         <div class="g"><label>Method</label>
@@ -302,10 +240,10 @@ nav button svg{width:18px;height:18px}
         <div class="g"><label>Status</label>
           <select id="depositStatus"><option value="pending">Pending</option><option value="all">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
         </div>
-        <button class="btn p" data-action="apply-deposit-filters" style="width:100%"><svg class="i"><use href="#i-search"/></svg> Apply</button>
+        <button class="btn p" data-action="apply-deposit-filters" style="width:100%">Apply</button>
       </div>
       <div class="muted" id="depositShowingText">Showing 0 deposits</div>
-      <div id="depositsList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div id="depositsList"><div class="loading">Loading…</div></div>
       <div class="sentinel" id="depositsSentinel"></div>
     </div>
 
@@ -313,7 +251,7 @@ nav button svg{width:18px;height:18px}
     <div class="pane" id="tab-withdrawals">
       <div class="sec">
         <h2>Withdrawals</h2>
-        <button class="icon-btn" data-action="toggle-filter" data-target="withdrawFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+        <button class="icon-btn" data-action="toggle-filter" data-target="withdrawFilter">Filter</button>
       </div>
       <div class="filter" id="withdrawFilter">
         <div class="g"><label>Method</label>
@@ -322,10 +260,10 @@ nav button svg{width:18px;height:18px}
         <div class="g"><label>Status</label>
           <select id="withdrawStatus"><option value="pending">Pending</option><option value="all">All</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select>
         </div>
-        <button class="btn p" data-action="apply-withdraw-filters" style="width:100%"><svg class="i"><use href="#i-search"/></svg> Apply</button>
+        <button class="btn p" data-action="apply-withdraw-filters" style="width:100%">Apply</button>
       </div>
       <div class="muted" id="withdrawShowingText">Showing 0 withdrawals</div>
-      <div id="withdrawalsList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div id="withdrawalsList"><div class="loading">Loading…</div></div>
       <div class="sentinel" id="withdrawalsSentinel"></div>
     </div>
 
@@ -333,19 +271,19 @@ nav button svg{width:18px;height:18px}
     <div class="pane" id="tab-players">
       <div class="sec">
         <h2>Players</h2>
-        <button class="icon-btn" data-action="toggle-filter" data-target="playerFilter"><svg class="i"><use href="#i-filter"/></svg></button>
+        <button class="icon-btn" data-action="toggle-filter" data-target="playerFilter">Filter</button>
       </div>
       <div class="row-actions">
-        <button class="btn o" data-action="open-import-modal"><svg class="i"><use href="#i-import"/></svg> Import</button>
-        <button class="btn p" data-action="open-add-player-modal"><svg class="i"><use href="#i-plus"/></svg> Add Player</button>
+        <button class="btn o" data-action="open-import-modal">Import</button>
+        <button class="btn p" data-action="open-add-player-modal">Add Player</button>
       </div>
       <div class="filter" id="playerFilter">
-        <div class="g" style="flex:1 1 100%"><label>Search</label>
+        <div class="g" style="width:100%;margin-right:0"><label>Search</label>
           <input type="text" id="playerSearchInput" placeholder="username or telegram id">
         </div>
       </div>
       <div class="muted" id="playerShowingText">Showing 0 players</div>
-      <div id="playersList"><div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div></div>
+      <div id="playersList"><div class="loading">Loading…</div></div>
       <div class="sentinel" id="playersSentinel"></div>
     </div>
   </div>
@@ -354,16 +292,16 @@ nav button svg{width:18px;height:18px}
   <div class="page" id="page-profile">
     <div class="card">
       <div class="p-hd">
-        <div class="p-av"><svg class="i" style="width:28px;height:28px"><use href="#i-shield"/></svg></div>
+        <div class="p-av">ADMIN</div>
         <div class="n" id="profileName">—</div>
-        <div class="ph" id="profilePhone"><svg class="i"><use href="#i-phone"/></svg> —</div>
+        <div class="ph" id="profilePhone">—</div>
       </div>
-      <div class="p-row"><span class="k"><svg class="i"><use href="#i-wallet"/></svg> Available</span><span class="v hl" id="profileAvailableBalance">—</span></div>
-      <div class="p-row"><span class="k"><svg class="i"><use href="#i-chart"/></svg> Total Earned</span><span class="v hl" id="profileTotalEarned">—</span></div>
-      <div class="p-row"><span class="k"><svg class="i"><use href="#i-percent"/></svg> Rate</span><span class="v" id="profileCommissionRate">—</span></div>
+      <div class="p-row"><span class="k">Available</span><span class="v hl" id="profileAvailableBalance">—</span></div>
+      <div class="p-row"><span class="k">Total Earned</span><span class="v hl" id="profileTotalEarned">—</span></div>
+      <div class="p-row"><span class="k">Rate</span><span class="v" id="profileCommissionRate">—</span></div>
 
       <div class="box">
-        <h3><svg class="i"><use href="#i-phone"/></svg> Payment Numbers</h3>
+        <h3>Payment Numbers</h3>
         <p>Registered accounts for receiving payments.</p>
         <div class="line"><strong>Telebirr</strong><span id="profileTelebirr">Not set</span></div>
         <div class="line"><strong>CBE</strong><span id="profileCbe">Not set</span></div>
@@ -371,42 +309,42 @@ nav button svg{width:18px;height:18px}
       </div>
 
       <div class="box">
-        <h3><svg class="i"><use href="#i-link"/></svg> Invite Link</h3>
+        <h3>Invite Link</h3>
         <p>Share to earn commission on player activity.</p>
         <div class="invite-url" id="profileInviteLink">—</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <button class="btn o sm" data-action="copy-invite-link"><svg class="i"><use href="#i-copy"/></svg> Copy Link</button>
-          <button class="btn o sm" data-action="copy-invite-code"><svg class="i"><use href="#i-copy"/></svg> Copy Code</button>
+        <div class="invite-actions">
+          <button class="btn o sm" data-action="copy-invite-link">Copy Link</button>
+          <button class="btn o sm" data-action="copy-invite-code">Copy Code</button>
           <span class="ref" id="profileInviteCode">-</span>
         </div>
       </div>
 
-      <h3 style="font-size:14px;font-weight:700;margin:16px 0 8px"><svg class="i"><use href="#i-send"/></svg> Request Withdrawal</h3>
+      <h3 class="sub">Request Withdrawal</h3>
       <div class="withdraw">
-        <div><label>Amount (ETB)</label><input type="number" id="withdrawEarningsAmount" placeholder="0" min="10"></div>
-        <div><label>Phone</label><input type="text" id="withdrawEarningsPhone" placeholder="+251..."></div>
-        <div><label>Account Name</label><input type="text" id="withdrawEarningsName" placeholder="Full name"></div>
-        <div><label>Method</label>
+        <div class="fld"><label>Amount (ETB)</label><input type="number" id="withdrawEarningsAmount" placeholder="0" min="10"></div>
+        <div class="fld"><label>Phone</label><input type="text" id="withdrawEarningsPhone" placeholder="+251..."></div>
+        <div class="fld"><label>Account Name</label><input type="text" id="withdrawEarningsName" placeholder="Full name"></div>
+        <div class="fld"><label>Method</label>
           <select id="withdrawEarningsMethod"><option value="telebirr">Telebirr</option><option value="cbebirr">CBE</option><option value="mpesa">M-Pesa</option></select>
         </div>
-        <button class="btn p" data-action="request-admin-withdrawal" style="width:100%"><svg class="i"><use href="#i-send"/></svg> Submit Request</button>
-        <div style="text-align:center;font-size:11px;color:var(--dim)"><svg class="i"><use href="#i-shield"/></svg> Processed within 24–48 hours.</div>
+        <button class="btn p" data-action="request-admin-withdrawal" style="width:100%">Submit Request</button>
+        <div style="text-align:center;font-size:11px;color:#8b95a3;margin-top:8px">Processed within 24–48 hours.</div>
       </div>
-      <div id="withdrawStatus" style="margin-top:8px;font-size:12px;text-align:center;color:var(--dim)"></div>
+      <div id="withdrawStatus" style="margin-top:8px;font-size:12px;text-align:center;color:#8b95a3"></div>
     </div>
   </div>
 
   <!-- PAGE: RULES -->
   <div class="page" id="page-rules">
     <div class="card rules">
-      <h3><svg class="i"><use href="#i-book"/></svg> Rules & Guidelines</h3>
-      <div class="banner"><svg class="i"><use href="#i-info"/></svg><div>Please read and follow the rules.<br><span style="font-size:11px;opacity:.8">አባክዎን ህጎቹን ያንብቡ።</span></div></div>
+      <h3>Rules &amp; Guidelines</h3>
+      <div class="banner">Please read and follow the rules.<br><span style="font-size:11px">አባክዎን ህጎቹን ያንብቡ።</span></div>
       <div class="warn-card">
-        <div class="h"><svg class="i"><use href="#i-warn"/></svg> MAX DEPOSIT PER TXN</div>
+        <div class="h">MAX DEPOSIT PER TXN</div>
         <div class="b">1500 ETB / 1500 ብር<strong>1500 ETB</strong></div>
       </div>
 
-      <details open><summary>1. Account & Access</summary><div class="body"><ul>
+      <details open><summary>1. Account &amp; Access</summary><div class="body"><ul>
         <li>Register with valid phone and 4+ digit PIN.</li>
         <li>Login with phone + PIN.</li>
         <li>Only active admins can log in.</li>
@@ -436,7 +374,7 @@ nav button svg{width:18px;height:18px}
         <li>Playing balance is separate from commission.</li>
       </ul></div></details>
 
-      <details><summary>6. Profile & Payments</summary><div class="body"><ul>
+      <details><summary>6. Profile &amp; Payments</summary><div class="body"><ul>
         <li>Each admin has a unique invite code.</li>
         <li>Payment numbers shown to players for deposits.</li>
       </ul></div></details>
@@ -458,21 +396,22 @@ nav button svg{width:18px;height:18px}
 </div>
 
 <nav id="bottomNav">
-  <button class="on" data-page="game" data-action="switch-page"><svg class="i"><use href="#i-home"/></svg> Dashboard</button>
-  <button data-page="profile" data-action="switch-page"><svg class="i"><use href="#i-user"/></svg> Profile</button>
-  <button data-page="rules" data-action="switch-page"><svg class="i"><use href="#i-book"/></svg> Rules</button>
+  <button class="on" data-page="game" data-action="switch-page">Dashboard</button>
+  <button data-page="profile" data-action="switch-page">Profile</button>
+  <button data-page="rules" data-action="switch-page">Rules</button>
 </nav>
 
-<button class="fab" id="refreshBtn" data-action="refresh-all" title="Refresh"><svg class="i" style="width:18px;height:18px"><use href="#i-refresh"/></svg></button>
+<button class="fab" id="refreshBtn" data-action="refresh-all" title="Refresh">Refresh</button>
 
 <div id="toast"></div>
 
 <!-- Add Player -->
 <div class="modal" id="addPlayerModal" data-close-on-backdrop="1">
   <div class="sheet">
-    <div class="hd"><svg class="i"><use href="#i-plus"/></svg>
-      <div><h3>Add Player</h3><p>Telegram ID or @username</p></div>
-      <button class="close" data-action="close-modal" data-target="addPlayerModal"><svg class="i"><use href="#i-close"/></svg></button>
+    <div class="hd">
+      <button class="close" data-action="close-modal" data-target="addPlayerModal">Close</button>
+      <h3>Add Player</h3>
+      <p>Telegram ID or @username</p>
     </div>
     <input type="text" id="addPlayerInput" placeholder="123456789 or @username">
     <div id="addPlayerStatus" style="margin-top:8px;font-size:12px;text-align:center"></div>
@@ -486,19 +425,20 @@ nav button svg{width:18px;height:18px}
 <!-- Import -->
 <div class="modal" id="importModal" data-close-on-backdrop="1">
   <div class="sheet">
-    <div class="hd"><svg class="i"><use href="#i-import"/></svg>
-      <div><h3>Import Players</h3><p>One per line</p></div>
-      <button class="close" data-action="close-modal" data-target="importModal"><svg class="i"><use href="#i-close"/></svg></button>
+    <div class="hd">
+      <button class="close" data-action="close-modal" data-target="importModal">Close</button>
+      <h3>Import Players</h3>
+      <p>One per line</p>
     </div>
     <textarea id="importTextarea" placeholder="123456789&#10;@john_doe"></textarea>
-    <div style="display:flex;gap:10px;margin-top:10px;font-size:12px;flex-wrap:wrap">
-      <label style="cursor:pointer;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:8px 12px;display:flex;align-items:center;gap:6px">
-        <svg class="i"><use href="#i-import"/></svg> Upload CSV
+    <div style="margin-top:10px;font-size:12px">
+      <label style="cursor:pointer;background:#0f1419;border:1px solid #2d3540;border-radius:3px;padding:8px 12px;display:inline-block;margin-right:10px">
+        Upload CSV
         <input type="file" id="csvFileInput" accept=".csv,.txt" style="display:none">
       </label>
-      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="importOverwrite" style="width:auto"> Overwrite</label>
+      <label style="display:inline-block"><input type="checkbox" id="importOverwrite" style="width:auto"> Overwrite</label>
     </div>
-    <div id="importStatus" style="margin-top:12px;font-size:12px;max-height:200px;overflow-y:auto;background:var(--bg);padding:10px;border-radius:4px;display:none;border:1px solid var(--line)"></div>
+    <div id="importStatus" style="margin-top:12px;font-size:12px;max-height:200px;overflow-y:auto;background:#0f1419;padding:10px;border-radius:3px;display:none;border:1px solid #2d3540"></div>
     <div class="foot">
       <button class="btn p" data-action="submit-import">Import</button>
       <button class="btn g" data-action="close-modal" data-target="importModal">Cancel</button>
@@ -509,18 +449,19 @@ nav button svg{width:18px;height:18px}
 <!-- Balance -->
 <div class="modal" id="balanceModal" data-close-on-backdrop="1">
   <div class="sheet">
-    <div class="hd"><svg class="i"><use href="#i-scale"/></svg>
-      <div><h3>Adjust Balance</h3><p>Add or deduct funds</p></div>
-      <button class="close" data-action="close-modal" data-target="balanceModal"><svg class="i"><use href="#i-close"/></svg></button>
+    <div class="hd">
+      <button class="close" data-action="close-modal" data-target="balanceModal">Close</button>
+      <h3>Adjust Balance</h3>
+      <p>Add or deduct funds</p>
     </div>
     <div class="info">
       <strong>Player:</strong> <span id="balancePlayerName">—</span> (ID: <span id="balancePlayerId">—</span>)<br>
       <strong>Current:</strong> <span id="balanceCurrentBalance" style="color:#93c5fd">—</span> ETB
     </div>
-    <div style="margin-bottom:10px"><label style="display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600">Operation</label>
+    <div class="fld"><label>Operation</label>
       <select id="balanceOperation"><option value="add">Add</option><option value="subtract">Subtract</option></select>
     </div>
-    <div style="margin-bottom:12px"><label style="display:block;font-size:11px;color:var(--dim);margin-bottom:4px;font-weight:600">Amount (ETB)</label>
+    <div class="fld"><label>Amount (ETB)</label>
       <input type="number" id="balanceAmount" placeholder="0" min="1" step="0.01">
     </div>
     <div class="foot">
@@ -532,23 +473,17 @@ nav button svg{width:18px;height:18px}
 </div>
 
 <!-- Proof -->
-<div class="modal" id="proofModal" style="align-items:center;background:rgba(0,0,0,.9)">
-  <button class="close" data-action="close-modal" data-target="proofModal"
-    style="position:fixed;top:14px;right:14px;width:40px;height:40px;border-radius:4px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;z-index:10">
-    <svg class="i" style="width:20px;height:20px"><use href="#i-close"/></svg>
-  </button>
-  <img id="proofImage" src="" alt="Proof" style="max-width:100%;max-height:90vh;object-fit:contain;display:block">
+<div class="modal" id="proofModal" style="background:#000">
+  <button class="close" id="proofClose" data-action="close-modal" data-target="proofModal">Close</button>
+  <img id="proofImage" src="" alt="Proof">
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 /* ================================================================
-   Admin dashboard — lite + classical
-   Functionality is identical to the event-driven version.
-   Only the presentation layer changed: fewer DOM nodes, no
-   external icon font, no backdrop-filter, no gradients, no
-   animations besides the spinner. All data-action hooks and
-   element IDs are unchanged so the JS behaviour is the same.
+   Admin dashboard — icons removed, modern CSS removed.
+   All element IDs and data-action hooks are unchanged, so the
+   behaviour is identical to before.
    ================================================================ */
 
 const BOT_USERNAME='bingomkmk0120_bot';
@@ -630,15 +565,13 @@ function switchTab(tab){
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='tab-'+tab));
   loadActiveTab({reset:false});
-  const active=document.querySelector('.tab.on');
-  if(active)active.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
 }
 function loadActiveTab({reset}){
   if(state.currentTab==='deposits') return loadDeposits({reset});
   if(state.currentTab==='withdrawals') return loadWithdrawals({reset});
   if(state.currentTab==='players') return loadPlayers({reset});
 }
-function toggleFilter(id){const el=$(id);el.style.display=el.style.display==='none'?'flex':'none'}
+function toggleFilter(id){const el=$(id);el.style.display=el.style.display==='none'?'block':'none'}
 
 function setConn(ok,msg){
   const b=$('conn');
@@ -737,10 +670,10 @@ function renderDepositRow(req){
   if(req.proof_url){
     const thumb=req.proof_url+'?size=thumb';
     const full=req.proof_url+'?size=full';
-    receipt=`<div style="display:flex;gap:6px;align-items:center"><img src="${esc(thumb)}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:4px" data-action="view-proof" data-src="${esc(full)}" alt=""><button class="link" data-action="view-proof" data-src="${esc(full)}"><svg class="i"><use href="#i-img"/></svg> View</button></div>`;
+    receipt=`<div class="receipt"><img src="${esc(thumb)}" loading="lazy" alt="" data-action="view-proof" data-src="${esc(full)}"><button class="link" data-action="view-proof" data-src="${esc(full)}">View</button></div>`;
   }else if(req.proof_photo_url&&String(req.proof_photo_url).startsWith('data:image/')){
     const s=esc(req.proof_photo_url);
-    receipt=`<div style="display:flex;gap:6px;align-items:center"><img src="${s}" loading="lazy" style="width:34px;height:34px;object-fit:cover;border-radius:4px" data-action="view-proof" data-src="${s}" alt=""><button class="link" data-action="view-proof" data-src="${s}"><svg class="i"><use href="#i-img"/></svg> View</button></div>`;
+    receipt=`<div class="receipt"><img src="${s}" loading="lazy" alt="" data-action="view-proof" data-src="${s}"><button class="link" data-action="view-proof" data-src="${s}">View</button></div>`;
   }else{
     const t=req.transaction_reference||req.proof_photo_url||'';
     let ref=null,ph=null;
@@ -750,14 +683,14 @@ function renderDepositRow(req){
       let url;
       if(pt==='cbebirr'){let p=ph||'';if(p.startsWith('09'))p='251'+p.substring(1);url='https://cbepay1.cbe.com.et/aureceipt?TID='+encodeURIComponent(ref)+'&PH='+encodeURIComponent(p)}
       else url='https://transactioninfo.ethiotelecom.et/receipt/'+encodeURIComponent(ref);
-      receipt=`<div class="ref-wrap"><span class="ref">${esc(ref)}</span><button class="copy" data-action="copy" data-copy="${esc(ref)}"><svg class="i"><use href="#i-copy"/></svg></button><a class="link" href="${url}" target="_blank" rel="noopener"><svg class="i"><use href="#i-ext"/></svg></a></div>`;
-    }else receipt='<span style="color:var(--dim)">—</span>';
+      receipt=`<div class="ref-wrap"><span class="ref">${esc(ref)}</span><button class="copy" data-action="copy" data-copy="${esc(ref)}">Copy</button><a class="link" href="${url}" target="_blank" rel="noopener">Open</a></div>`;
+    }else receipt='<span style="color:#8b95a3">—</span>';
   }
 
   let acts='—';
   if(req.status==='pending'){
-    if(busy) acts='<span style="font-size:11px;color:var(--dim)"><span class="spin"></span> '+opt+'…</span>';
-    else acts=`<div class="acts"><button class="btn s sm" data-action="deposit-approve" data-id="${req.id}"><svg class="i"><use href="#i-check"/></svg> Approve</button><button class="btn d sm" data-action="deposit-reject" data-id="${req.id}"><svg class="i"><use href="#i-x"/></svg> Reject</button></div>`;
+    if(busy) acts='<span style="font-size:11px;color:#8b95a3">'+opt+'…</span>';
+    else acts=`<div class="acts"><button class="btn s sm" data-action="deposit-approve" data-id="${req.id}">Approve</button><button class="btn d sm" data-action="deposit-reject" data-id="${req.id}">Reject</button></div>`;
   }
 
   return `<tr data-row-id="${req.id}"${busy?' class="busy"':''}>
@@ -777,7 +710,7 @@ async function loadDeposits({reset=false}={}){
   if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
   s.loading=true;
   const c=$('depositsList');
-  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading">Loading…</div>';
   const f=getDepositFilters();
   const p=new URLSearchParams({limit:String(PAGE_SIZE)});
   if(f.method!=='all') p.append('method',f.method);
@@ -800,7 +733,7 @@ async function loadDeposits({reset=false}={}){
     if(reset) tbody.innerHTML='';
     tbody.insertAdjacentHTML('beforeend',rows.map(renderDepositRow).join(''));
     if(!rows.length&&!s.byId.size){
-      c.innerHTML='<div class="empty"><svg><use href="#i-check"/></svg><div>No deposits</div></div>';
+      c.innerHTML='<div class="empty">No deposits</div>';
     }
     $('depositShowingText').textContent='Showing '+s.byId.size+' deposits'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('deposits',()=>loadDeposits({reset:false}));
@@ -848,8 +781,8 @@ function renderWithdrawalRow(req){
   const busy=!!opt;
   let acts='—';
   if(req.status==='pending'){
-    if(busy) acts='<span style="font-size:11px;color:var(--dim)"><span class="spin"></span> '+opt+'…</span>';
-    else acts=`<div class="acts"><button class="btn s sm" data-action="withdrawal-approve" data-id="${req.id}"><svg class="i"><use href="#i-check"/></svg> Approve</button><button class="btn d sm" data-action="withdrawal-reject" data-id="${req.id}"><svg class="i"><use href="#i-x"/></svg> Reject</button></div>`;
+    if(busy) acts='<span style="font-size:11px;color:#8b95a3">'+opt+'…</span>';
+    else acts=`<div class="acts"><button class="btn s sm" data-action="withdrawal-approve" data-id="${req.id}">Approve</button><button class="btn d sm" data-action="withdrawal-reject" data-id="${req.id}">Reject</button></div>`;
   }
   return `<tr data-row-id="${req.id}"${busy?' class="busy"':''}>
     <td data-label="User"><div class="cell-user"><div class="av ${avc}">${esc(ini)}</div><div class="uinfo"><span class="n">${esc(req.username)}</span><span class="i">${esc(req.telegram_id)}</span></div></div></td>
@@ -869,7 +802,7 @@ async function loadWithdrawals({reset=false}={}){
   if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
   s.loading=true;
   const c=$('withdrawalsList');
-  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading">Loading…</div>';
   const f=getWithdrawFilters();
   const p=new URLSearchParams({limit:String(PAGE_SIZE)});
   if(f.method!=='all') p.append('method',f.method);
@@ -891,7 +824,7 @@ async function loadWithdrawals({reset=false}={}){
     const tb=document.getElementById('withdrawalsTbody');
     if(reset) tb.innerHTML='';
     tb.insertAdjacentHTML('beforeend',rows.map(renderWithdrawalRow).join(''));
-    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty"><svg><use href="#i-check"/></svg><div>No withdrawals</div></div>';
+    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty">No withdrawals</div>';
     $('withdrawShowingText').textContent='Showing '+s.byId.size+' withdrawals'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('withdrawals',()=>loadWithdrawals({reset:false}));
   }catch(e){if(reset) c.innerHTML='<div class="empty">'+esc(e.message)+'</div>'}
@@ -922,12 +855,12 @@ function onWithdrawalEvent(e,isNew){
 function renderPlayerRow(p,i){
   const av=['','g','p','o'][i%4];
   const ini=(p.username||'??').substring(0,2).toUpperCase();
-  const fd=p.first_deposit_amount>0?'<span style="color:var(--green);font-weight:600">Yes</span>':'<span style="color:var(--dim)">No</span>';
+  const fd=p.first_deposit_amount>0?'<span style="color:#10b981;font-weight:bold">Yes</span>':'<span style="color:#8b95a3">No</span>';
   return `<tr data-row-id="${esc(p.telegram_id)}">
     <td data-label="Player"><div class="cell-user"><div class="av ${av}">${esc(ini)}</div><div class="uinfo"><span class="n">${esc(p.username)}</span><span class="i">${esc(p.telegram_id)}</span></div></div></td>
     <td data-label="Balance"><strong data-balance-for="${esc(p.telegram_id)}">${p.balance.toFixed(0)} ETB</strong></td>
     <td data-label="First Deposit">${fd}</td>
-    <td data-label="Actions"><button class="adj" data-action="open-balance-modal" data-id="${esc(p.telegram_id)}" data-username="${esc(p.username)}" data-balance="${p.balance}"><svg class="i"><use href="#i-scale"/></svg> Adjust</button></td>
+    <td data-label="Actions"><button class="adj" data-action="open-balance-modal" data-id="${esc(p.telegram_id)}" data-username="${esc(p.username)}" data-balance="${p.balance}">Adjust</button></td>
   </tr>`;
 }
 async function loadPlayers({reset=false}={}){
@@ -937,7 +870,7 @@ async function loadPlayers({reset=false}={}){
   if(reset){s.cursor=null;s.hasMore=true;s.byId.clear()}
   s.loading=true;
   const c=$('playersList');
-  if(reset||!s.byId.size) c.innerHTML='<div class="loading"><div class="spinner"></div><div style="margin-top:8px">Loading…</div></div>';
+  if(reset||!s.byId.size) c.innerHTML='<div class="loading">Loading…</div>';
   const p=new URLSearchParams({limit:String(PAGE_SIZE)});
   if(s.cursor) p.append('cursor',s.cursor);
   try{
@@ -958,7 +891,7 @@ async function loadPlayers({reset=false}={}){
     if(reset) tb.innerHTML='';
     const start=tb.querySelectorAll('tr').length;
     tb.insertAdjacentHTML('beforeend',rows.map((pl,i)=>renderPlayerRow(pl,start+i)).join(''));
-    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty"><svg><use href="#i-users"/></svg><div>No players</div></div>';
+    if(!rows.length&&!s.byId.size) c.innerHTML='<div class="empty">No players</div>';
     $('playerShowingText').textContent='Showing '+s.byId.size+' players'+(s.hasMore?' (scroll for more)':'');
     observeSentinel('players',()=>loadPlayers({reset:false}));
     applyPlayerSearch();
@@ -1127,11 +1060,11 @@ async function submitImport(){
     const added=results.filter(x=>x.success&&x.created).length;
     const updated=results.filter(x=>x.success&&x.updated).length;
     const failed=results.filter(x=>!x.success).length;
-    let h='<div style="font-weight:600">'+added+' added, '+updated+' updated'+(failed?', '+failed+' failed':'')+'</div>';
-    h+='<ul style="list-style:none;padding:0;margin-top:6px;font-size:11px">';
+    let h='<div style="font-weight:bold">'+added+' added, '+updated+' updated'+(failed?', '+failed+' failed':'')+'</div>';
+    h+='<ul style="list-style:none;margin-top:6px;font-size:11px">';
     results.forEach(x=>{
       const c=x.success?(x.created?'#10b981':'#f59e0b'):'#ef4444';
-      h+='<li style="padding:4px 0;border-bottom:1px solid var(--line);color:'+c+'">'+esc(x.telegramId)+' — '+esc(x.error||(x.created?'Created':'Updated'))+'</li>';
+      h+='<li style="padding:4px 0;border-bottom:1px solid #2d3540;color:'+c+'">'+esc(x.telegramId)+' — '+esc(x.error||(x.created?'Created':'Updated'))+'</li>';
     });
     h+='</ul>';
     st.innerHTML=h;
@@ -1144,7 +1077,7 @@ async function loadProfile(){
   if(!state.admin) return;
   const a=state.admin;
   $('profileName').textContent=a.name;
-  $('profilePhone').innerHTML='<svg class="i"><use href="#i-phone"/></svg> '+esc(a.phone);
+  $('profilePhone').textContent=a.phone;
   $('profileTelebirr').textContent=a.telebirr_number||'Not set';
   $('profileCbe').textContent=a.cbebirr_number||'Not set';
   $('profileMpesa').textContent=a.mpesa_number||'Not set';
@@ -1193,7 +1126,6 @@ let isRefreshing=false;
 async function refreshAll({silent=false}={}){
   if(isRefreshing) return;
   isRefreshing=true;
-  if(!silent) $('refreshBtn').classList.add('spin');
   try{
     const tasks=[loadStats(),loadCommissionSummary()];
     if(state.currentPage==='game'){
@@ -1205,7 +1137,6 @@ async function refreshAll({silent=false}={}){
     if(!silent) showToast('Refreshed','info');
   }finally{
     isRefreshing=false;
-    setTimeout(()=>$('refreshBtn').classList.remove('spin'),400);
   }
 }
 function startReconcile(){
