@@ -22,16 +22,21 @@ main{flex:1;padding:0 16px 92px}
 .head h2{font-size:1.2rem;font-weight:800;letter-spacing:-.3px}
 .mut{font-size:.72rem;color:#94a3b8;font-weight:600}
 .tag{display:inline-block;margin-top:5px;background:rgba(34,197,94,.15);color:#4ade80;font-size:.62rem;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+.tag.gold{background:rgba(250,204,21,.15);color:#facc15}
 ul{list-style:none}
 .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1e293b;cursor:pointer}
 .row:last-child{border-bottom:0}
 .av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.05rem;flex:none}
+.rnd{flex:none;width:42px;height:42px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(250,204,21,.12);color:#facc15;font-weight:800;line-height:1}
+.rnd small{font-size:.5rem;font-weight:700;letter-spacing:.6px;opacity:.75;margin-bottom:1px}
+.rnd b{font-size:.85rem}
 .info{flex:1;min-width:0;display:flex;flex-direction:column}
 .info b{font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.info small{font-size:.72rem;color:#94a3b8}
+.info small{font-size:.72rem;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge{flex:none;background:rgba(59,130,246,.15);color:#60a5fa;font-size:.74rem;font-weight:700;padding:5px 10px;border-radius:10px}
 .badge.g{background:rgba(34,197,94,.15);color:#4ade80}
 .badge.z{background:rgba(148,163,184,.12);color:#94a3b8}
+.badge.y{background:rgba(250,204,21,.15);color:#facc15}
 .empty{padding:34px 0;text-align:center;color:#64748b;font-size:.82rem}
 .card{background:#1f2937;border:1px solid #1e293b;border-radius:16px;padding:18px;margin-bottom:18px}
 .card .v{display:block;font-size:1.6rem;font-weight:800;letter-spacing:-.5px;margin:2px 0}
@@ -94,6 +99,18 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
       <ul id="bList"></ul>
     </section>
 
+    <!-- WINNERS -->
+    <section id="winners" class="view">
+      <div class="head">
+        <div>
+          <h2>Round Winners</h2>
+          <span class="tag gold" id="wTag">Last 10 rounds</span>
+        </div>
+        <span class="mut" id="wCount">0 winners</span>
+      </div>
+      <ul id="wList"></ul>
+    </section>
+
     <!-- DETAILS -->
     <section id="details" class="view">
       <button class="back" id="back">&larr; Back</button>
@@ -118,6 +135,7 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
     <button class="on" data-view="live"><i>&#127968;</i>Live</button>
     <button data-view="users"><i>&#128101;</i>Players</button>
     <button data-view="bal"><i>&#128176;</i>Balances</button>
+    <button data-view="winners"><i>&#127942;</i>Winners</button>
   </nav>
 </div>
 
@@ -138,12 +156,15 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
   }
 
   /* ---------- state ---------- */
+  var ROUND_LIMIT = 10;          // show last 10 rounds only
+
   var stake = 10;
-  var live = [];      // players in rooms
-  var users = [];     // all registered users
-  var status = {};    // gameStatus map
+  var live = [];                 // players in rooms
+  var users = [];                // all registered users
+  var status = {};               // gameStatus map
+  var winners = [];              // last N round winners
   var lastMain = 'live';
-  var SRC = { live: [], reg: [], bal: [] };  // index lookup for clicks
+  var SRC = { live: [], reg: [], bal: [], win: [] };  // index lookup for clicks
 
   var COLORS = [
     ['#1e3a8a', '#bfdbfe'], ['#134e4a', '#99f6e4'], ['#7c2d12', '#fdba74'],
@@ -174,6 +195,18 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
   }
   function num(n) { return Number(n || 0); }
 
+  function timeAgo(t) {
+    if (t == null) return '';
+    var d = (t instanceof Date) ? t
+          : new Date(typeof t === 'number' && t < 1e12 ? t * 1000 : t);
+    if (isNaN(d.getTime())) return String(t);
+    var s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
+
   function rowHtml(p, badge, cls, i, src) {
     var h = handle(p);
     var c = colorFor(h);
@@ -181,6 +214,88 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
       '<span class="av" style="background:' + c[0] + ';color:' + c[1] + '">' + esc(initialOf(h)) + '</span>' +
       '<span class="info"><b>' + esc(h) + '</b><small>' + esc(p.telegramId || '') + '</small></span>' +
       '<span class="badge ' + (cls || '') + '">' + esc(badge) + '</span></li>';
+  }
+
+  /* ---------- winner normalisation ---------- */
+  /* Accepts many possible server shapes:
+     { round, player:{...}, stake, cardNumber, prize, time }
+     { roundNumber, username, telegramId, amount, timestamp }
+     or a plain player object with .round                */
+  function normWinner(raw) {
+    var w = raw || {};
+    var p = w.player || w.user || w.winner || w;
+
+    var name = p.telegram_handle ? '@' + p.telegram_handle
+             : (p.username || w.username || w.name || w.playerName || 'Anonymous');
+
+    var round = w.round != null ? w.round
+              : (w.roundNumber != null ? w.roundNumber
+              : (w.roundId != null ? w.roundId : '?'));
+
+    var stakeV = w.stake != null ? w.stake : p.stake;
+
+    var card = w.cardNumber != null ? w.cardNumber
+             : (w.card != null ? w.card
+             : (p.cardNumber != null ? p.cardNumber : p.card));
+    if (card == null) card = 'N/A';
+
+    var prize = w.prize != null ? w.prize
+              : (w.amount != null ? w.amount
+              : (w.payout != null ? w.payout : w.winnings));
+
+    var time = w.time || w.timestamp || w.finishedAt || w.endedAt ||
+               w.createdAt || w.date || null;
+
+    return {
+      round: round,
+      name: name,
+      stake: stakeV,
+      card: card,
+      prize: prize,
+      time: time,
+      _p: {                                   // synthetic player for the details view
+        username: p.username || w.username || name,
+        telegram_handle: p.telegram_handle ||
+          (name.charAt(0) === '@' ? name.slice(1) : null),
+        telegramId: p.telegramId || w.telegramId || null,
+        stake: stakeV,
+        cardNumber: card,
+        balance: p.balance
+      }
+    };
+  }
+
+  function sortWinners() {
+    var allNum = winners.length > 0 && winners.every(function (w) {
+      return !isNaN(parseInt(w.round, 10));
+    });
+    if (allNum) {
+      winners.sort(function (a, b) {
+        return parseInt(b.round, 10) - parseInt(a.round, 10);
+      });
+    }
+  }
+
+  function setWinners(list) {
+    winners = (list || []).map(normWinner);
+    sortWinners();
+    winners = winners.slice(0, ROUND_LIMIT);
+    renderWinners();
+  }
+
+  function addWinner(raw) {
+    var w = normWinner(raw);
+    var i;
+    for (i = 0; i < winners.length; i++) {
+      if (String(winners[i].round) === String(w.round) &&
+          String(winners[i]._p.telegramId) === String(w._p.telegramId)) {
+        return;                       // already recorded this round winner
+      }
+    }
+    winners.unshift(w);
+    sortWinners();
+    winners = winners.slice(0, ROUND_LIMIT);
+    renderWinners();
   }
 
   /* ---------- views ---------- */
@@ -255,6 +370,41 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
     $('bList').innerHTML = html;
   }
 
+  function renderWinners() {
+    SRC.win = winners.map(function (w) { return w._p; });
+
+    $('wCount').textContent = winners.length + ' winner' + (winners.length === 1 ? '' : 's');
+
+    if (!winners.length) {
+      $('wList').innerHTML = '<li class="empty">No winners recorded yet.</li>';
+      return;
+    }
+
+    var html = '', i;
+    for (i = 0; i < winners.length; i++) {
+      var w = winners[i];
+      var c = colorFor(w.name);
+
+      var bits = [];
+      if (w.stake != null) bits.push(w.stake + ' ETB');
+      if (w.card !== 'N/A') bits.push('Card #' + w.card);
+      if (w.time) bits.push(timeAgo(w.time));
+
+      var prize = (w.prize != null)
+        ? num(w.prize).toLocaleString() + ' ETB'
+        : 'WINNER';
+
+      html += '<li class="row" data-src="win" data-i="' + i + '">' +
+        '<span class="rnd"><small>ROUND</small><b>' + esc(String(w.round)) + '</b></span>' +
+        '<span class="av" style="background:' + c[0] + ';color:' + c[1] + '">' +
+          esc(initialOf(w.name)) + '</span>' +
+        '<span class="info"><b>' + esc(w.name) + '</b>' +
+          '<small>' + esc(bits.join(' · ') || '—') + '</small></span>' +
+        '<span class="badge y">' + esc(prize) + '</span></li>';
+    }
+    $('wList').innerHTML = html;
+  }
+
   /* ---------- details ---------- */
   function showDetails(p) {
     var h = handle(p);
@@ -298,6 +448,7 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
     var v = b.dataset.view;
     show(v);
     if (v === 'users' || v === 'bal') socket.emit('admin:getAllRegisteredPlayers');
+    if (v === 'winners') socket.emit('admin:getWinners', { limit: ROUND_LIMIT });
   });
 
   document.addEventListener('click', function (e) {
@@ -319,6 +470,7 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
   socket.on('connect', function () {
     socket.emit('admin:getAllRegisteredPlayers');
     socket.emit('admin:requestPlayers');
+    socket.emit('admin:getWinners', { limit: ROUND_LIMIT });
   });
 
   socket.on('connect_error', function (err) {
@@ -333,6 +485,9 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
     } else {
       live = data.players || [];
       status = data.gameStatus || {};
+      // some servers ship the winner history in the same payload
+      var w = data.winners || data.roundWinners || data.winnerHistory;
+      if (Array.isArray(w) && w.length) setWinners(w);
     }
     renderLive();
   });
@@ -342,6 +497,29 @@ nav i{font-style:normal;font-size:1.15rem;line-height:1}
     renderUsers();
     renderBal();
   });
+
+  /* --- winner history (full list, replaces what we have) --- */
+  function onWinnerList(data) {
+    var arr = Array.isArray(data)
+      ? data
+      : (data.winners || data.history || data.rounds || data.list || []);
+    if (!Array.isArray(arr)) return;
+    setWinners(arr.slice(-ROUND_LIMIT));   // keep the newest ones
+  }
+  socket.on('admin:winnersList', onWinnerList);
+  socket.on('admin:winnerHistory', onWinnerList);
+  socket.on('admin:roundWinners', onWinnerList);
+
+  /* --- live winner events (one round finished) --- */
+  ['admin:winner', 'winner', 'game:winner', 'round:winner',
+   'roundWinner', 'bingo:winner'].forEach(function (ev) {
+    socket.on(ev, function (data) {
+      if (Array.isArray(data)) { data.forEach(addWinner); }
+      else if (data) { addWinner(data); }
+    });
+  });
+
+  renderWinners();
 })();
 </script>
 </body>
