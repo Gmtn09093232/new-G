@@ -119,6 +119,9 @@ class WriteQueue {
             ({ error } = await this.supabase.from('game_admin_contributions').insert(rows));
           } else if (type === 'audit_log') {
             ({ error } = await this.supabase.from('audit_logs').insert(rows));
+          } else if (type === 'round_winner') {
+            // ★ NEW ★ optional durable storage (create table round_winners)
+            ({ error } = await this.supabase.from('round_winners').insert(rows));
           } else {
             console.warn(`[WriteQueue] Unknown type: ${type}`);
             return;
@@ -1316,6 +1319,58 @@ let botGameHistory = [];
 const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
 const botNameAssignments = new Map();
 
+// ★ NEW ★ ─────────────────────────────────────────────────────
+//  Round winners history for the admin dashboard (last N rounds)
+//  One entry per winner. Newest first.
+// ──────────────────────────────────────────────────────────────
+const ROUND_WINNERS_LIMIT = 10;
+const roundWinnersHistory = [];
+
+function recordRoundWinners(entry) {
+  // entry: { round, stake, time, winningNumber, totalPrize, winners:[...] }
+  const flattened = entry.winners.map(w => ({
+    round: entry.round,
+    stake: entry.stake,
+    time: entry.time,
+    winningNumber: entry.winningNumber,
+    totalPrize: entry.totalPrize,
+    telegramId: w.telegramId,
+    username: w.username,
+    cardNumber: w.cardNumber,
+    isBot: !!w.isBot,
+    prize: w.prize
+  }));
+
+  // newest first
+  roundWinnersHistory.unshift(...flattened);
+  if (roundWinnersHistory.length > ROUND_WINNERS_LIMIT) {
+    roundWinnersHistory.length = ROUND_WINNERS_LIMIT;
+  }
+
+  // live-push to every connected admin dashboard
+  try {
+    adminNamespace.emit('admin:winnerHistory', roundWinnersHistory);
+  } catch (e) {
+    // adminNamespace not yet initialized (very unlikely at runtime)
+  }
+
+  // optional durable copy
+  for (const w of flattened) {
+    writeQueue.push('round_winner', {
+      round_number: w.round,
+      stake: w.stake,
+      telegram_id: w.telegramId,
+      username: w.username,
+      card_number: w.cardNumber,
+      is_bot: w.isBot,
+      prize: w.prize,
+      winning_number: w.winningNumber,
+      total_prize: w.totalPrize
+    });
+  }
+}
+// ★ END NEW ★
+
 function getBotName(botId) {
   const now = Date.now();
   const entry = botNameAssignments.get(botId);
@@ -1794,7 +1849,6 @@ function startCalling(stake) {
     game.calledNumbers.push(number);
     callCount++;
 
-    // ✅ Only send the new number
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number });
 
     Audit.numberDrawn(`stake_${stake}`, {
@@ -2037,6 +2091,28 @@ async function endGameWithWinners(stake) {
     io.to(`stake_${stake}`).emit('gameEnded', { stake, noWinner: true });
   }
 
+  // ★ NEW ★ ────────────────────────────────────────────────────
+  //  Record this round's winners for the admin dashboard BEFORE
+  //  game.winners gets cleared below.
+  // ────────────────────────────────────────────────────────────
+  if (game.winners.length > 0) {
+    recordRoundWinners({
+      round: gameCounter,
+      stake,
+      time: new Date().toISOString(),
+      winningNumber: game.winningNumber,
+      totalPrize: game.prizePool,
+      winners: game.winners.map(w => ({
+        telegramId: w.telegramId,
+        username: w.username,
+        cardNumber: w.cardNumber,
+        isBot: !!w.isBot,
+        prize: !w.isBot ? prizeEachReal : prizeEachBot
+      }))
+    });
+  }
+  // ★ END NEW ★
+
   // ============================================================
   //  🚀 RESET GAME  — players wait for this only
   // ============================================================
@@ -2143,7 +2219,6 @@ const handleDepositRequest = async (req, res) => {
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
 
-  // ✅ Idempotency check
   if (client_request_id) {
     const { data: existing } = await supabase
       .from('deposit_requests')
@@ -2334,7 +2409,6 @@ app.post('/api/request-withdraw', async (req, res) => {
   const receiverName = (name || '').trim();
   if (!receiverName) return res.status(400).json({ error: 'Account holder name is required' });
 
-  // ✅ Idempotency check
   if (client_request_id) {
     const { data: existing } = await supabase
       .from('withdrawal_requests')
@@ -3944,7 +4018,6 @@ io.use((socket, next) => {
 });
 
 io.on('connection', async (socket) => {
-  // ✅ Register in socket map for O(1) lookups
   socketByUser.set(String(socket.userId), socket);
   socket.on('disconnect', () => {
     if (socketByUser.get(String(socket.userId)) === socket) {
@@ -4105,6 +4178,14 @@ adminNamespace.use((socket, next) => {
 adminNamespace.on('connection', (socket) => {
   socket.emit('admin:playersList', buildAdminSnapshot());
 
+  // ★ NEW ★ send current winners history immediately on connect
+  socket.emit('admin:winnerHistory', roundWinnersHistory);
+
+  // ★ NEW ★ handle explicit request from client
+  socket.on('admin:getWinners', () => {
+    socket.emit('admin:winnerHistory', roundWinnersHistory);
+  });
+
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', buildAdminSnapshot());
   });
@@ -4171,10 +4252,8 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Bingo server on port ${PORT}`);
 
-  // 🔁 Recover any crashed games BEFORE starting new ones
   await snapshotManager.recoverOnBoot();
 
-  // Start game loops
   resetGame(10);
   resetGame(20);
   resetGame(30);
