@@ -429,6 +429,10 @@ async function apiFetch(key,url,opts={}){
   inflight.set(key,{controller,seq});
   try{
     const res=await fetch(url,{credentials:'same-origin',headers:{'Accept':'application/json',...(opts.headers||{})},...opts,signal:controller.signal});
+    if(res.status === 401) {
+      window.location.href='/admin-auth';
+      return null;
+    }
     if(inflight.get(key)?.seq!==seq) return null;
     return res;
   }catch(err){
@@ -538,7 +542,7 @@ function applyCommission(p,e,r){
   $('pendingCommission').textContent=p.toFixed(0)+' ETB';
   $('totalCommissionEarned').textContent=e.toFixed(0)+' ETB';
   $('commissionRateDisplay').textContent=(r*100).toFixed(0)+'%';
-  $('commissionUpdated').textContent=new Date().toLocaleTimeString();
+  $('commissionUpdated').textContent='Updated: '+new Date().toLocaleTimeString();
   if(state.currentPage==='profile'){
     $('profileAvailableBalance').textContent=p.toFixed(0)+' ETB';
     $('profileTotalEarned').textContent=e.toFixed(0)+' ETB';
@@ -1040,9 +1044,11 @@ async function requestAdminWithdrawal(){
 
 /* =================== REFRESH =================== */
 let isRefreshing=false;
+let refreshTimeout=null;
 async function refreshAll({silent=false}={}){
   if(isRefreshing) return;
   isRefreshing=true;
+  refreshTimeout = setTimeout(() => { isRefreshing = false; }, 15000); // Failsafe to prevent stuck state
   try{
     const tasks=[loadStats(),loadCommissionSummary()];
     if(state.currentPage==='game'){
@@ -1053,12 +1059,19 @@ async function refreshAll({silent=false}={}){
     await Promise.all(tasks);
     if(!silent) showToast('Refreshed','info');
   }finally{
+    clearTimeout(refreshTimeout);
     isRefreshing=false;
   }
 }
 function startReconcile(){
   if(reconcileTimer) clearInterval(reconcileTimer);
-  reconcileTimer=setInterval(()=>{if(!document.hidden) refreshAll({silent:true})},RECONCILE_MS);
+  reconcileTimer=setInterval(()=>{
+    if(!document.hidden) {
+      refreshAll({silent:true});
+      const stamp = $('commissionUpdated');
+      if(stamp) stamp.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    }
+  },RECONCILE_MS);
 }
 
 /* =================== EVENT DELEGATION =================== */
