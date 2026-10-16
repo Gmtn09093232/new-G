@@ -1207,11 +1207,12 @@ async function endGameWithWinners(stake) {
       adminNamespace.emit('admin:winner', entry);
     }
 
-    const winnerNames = game.winners.map(w => w.username);
+    // ✅ FRONTEND UPDATE: Send winning card numbers instead of names
+    const winningCards = game.winners.map(w => w.cardNumber || 'Unknown');
+    
     io.to(`stake_${stake}`).emit('gameEnded', {
       stake,
-      winner: winnerNames.length === 1 ? winnerNames[0] : `${winnerNames.length} winners`,
-      winners: winnerNames,
+      winningCards: winningCards,
       prizeEach: finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
