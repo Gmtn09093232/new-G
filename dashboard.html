@@ -170,10 +170,7 @@ nav button.on{color:#3b82f6}
     <div class="stats">
       <div class="stat"><div class="k">Deposits</div><div class="v g" id="statDeposits">-</div></div>
       <div class="stat"><div class="k">Today</div><div class="v a" id="statTodayDeposits">-</div></div>
-      <div class="stat"><div class="k">Pending Dep.</div><div class="v r" id="statPendingDeposits">-</div></div>
       <div class="stat"><div class="k">Withdrawals</div><div class="v a" id="statWithdrawals">-</div></div>
-      <div class="stat"><div class="k">Pending With.</div><div class="v p" id="statPendingWithdrawals">-</div></div>
-      <div class="stat"><div class="k">Players</div><div class="v b" id="statPlayers">-</div></div>
     </div>
 
     <div class="tabs">
@@ -394,7 +391,7 @@ nav button.on{color:#3b82f6}
    Admin dashboard — corrected
    ============================================================ */
 const BOT_USERNAME='bingomkmk0120_bot';
-const RECONCILE_MS=5*60*1000;
+const RECONCILE_MS=30*1000;
 const PAGE_SIZE=20;
 
 const state={
@@ -494,7 +491,6 @@ function connectAdminWebSocket(){
   adminSocket.on('disconnect',()=>setConn(false,'Reconnecting…'));
   adminSocket.io.on('reconnect_attempt',n=>setConn(false,'Reconnecting… ('+n+')'));
 
-  // ✅ These are now real events, emitted by the server
   adminSocket.on('deposit:new', e=>onDepositEvent(e,true));
   adminSocket.on('deposit:updated', e=>onDepositEvent(e,false));
   adminSocket.on('withdrawal:new', e=>onWithdrawalEvent(e,true));
@@ -519,12 +515,9 @@ async function loadStats(){
     const d=await res.json();
     if(!d.success) return null;
     state.stats=d.stats;
-    $('statPlayers').textContent=d.stats.playerCount;
     $('statDeposits').textContent=d.stats.depositBalance.toFixed(0)+' ETB';
     $('statTodayDeposits').textContent=d.stats.todayDeposits.toFixed(0)+' ETB';
-    $('statPendingDeposits').textContent=d.stats.pendingDeposits;
     $('statWithdrawals').textContent=d.stats.totalWithdrawals.toFixed(0)+' ETB';
-    $('statPendingWithdrawals').textContent=d.stats.pendingWithdrawals;
     $('depositBadge').textContent=d.stats.pendingDeposits;
     $('withdrawalBadge').textContent=d.stats.pendingWithdrawals;
     $('playerBadge').textContent=d.stats.playerCount;
@@ -613,7 +606,7 @@ function renderDepositRow(req){
     <td data-label="Amount"><strong>${esc(req.amount)} ETB</strong></td>
     <td data-label="Payment"><span class="bdg ${esc(pt)}">${esc(pt)}</span></td>
     <td data-label="Status"><span class="bdg ${esc(st)}">${esc(st)}</span></td>
-    <td data-label="Receipt">${receipt}</td>
+    <td data-label="Screenshot Photo">${receipt}</td>
     <td data-label="Date">${esc(dt)}</td>
     <td data-label="Actions">${acts}</td>
   </tr>`;
@@ -642,7 +635,7 @@ async function loadDeposits({reset=false}={}){
     s.loaded=true;
     for(const r of rows){s.byId.set(r.id,r);acceptVersion('deposit',r.id,r.version||r.updated_at)}
     if(reset||!document.getElementById('depositsTbody')){
-      c.innerHTML='<div class="list"><table><thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Receipt</th><th>Date</th><th>Actions</th></tr></thead><tbody id="depositsTbody"></tbody></table></div>';
+      c.innerHTML='<div class="list"><table><thead><tr><th>User</th><th>Amount</th><th>Payment</th><th>Status</th><th>Screenshot Photo</th><th>Date</th><th>Actions</th></tr></thead><tbody id="depositsTbody"></tbody></table></div>';
     }
     const tbody=document.getElementById('depositsTbody');
     if(reset) tbody.innerHTML='';
@@ -866,7 +859,6 @@ async function processDeposit(id,action){
     if(!d.success) throw new Error(d.error||'Failed');
     showToast('Deposit '+action+'d','success');
     if(!adminSocket?.connected){
-      // Server didn't broadcast — fetch the single record directly (endpoint now exists)
       optimistic.delete(k);
       const r=await apiFetch('deposit:'+id,'/admin/deposits/'+id);
       if(r&&r.ok){
