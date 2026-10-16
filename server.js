@@ -616,11 +616,7 @@ app.get('/api/user/invite-code', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
 
-// ============================================================
-//  ✅ FIXED /admin/add-balance
-//  Fills all columns needed for the deposit history page so
-//  manual entries appear correctly (method = "manual").
-// ============================================================
+// ---------- Legacy admin balance management ----------
 app.post('/admin/add-balance', async (req, res) => {
   const { secret, telegramId, amount } = req.body;
   if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
@@ -631,38 +627,24 @@ app.post('/admin/add-balance', async (req, res) => {
     const user = await loadUser(strId, 'unknown', null, null, true);
     user.balance += amt;
     await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', strId);
-
-    // ✅ Full insert so the deposit history page shows this row correctly
-    const { error: insertErr } = await supabase.from('deposit_requests').insert({
-      telegram_id: strId,
-      username: user.username,
-      amount: amt,
-      status: 'approved',
-      phone: 'manual',                  // so the "Phone" column isn't blank
-      payment_type: 'manual',           // used by the deposit history page
-      transaction_reference: null,
-      proof_photo_url: null,
-      assigned_deposit_number: null,
-      admin_id: user.admin_id || null,  // attribute to the player's admin if any
-      processed_at: new Date().toISOString()
+    await supabase.from('deposit_requests').insert({
+      telegram_id: strId, username: user.username, amount: amt,
+      status: 'approved', phone: 'manual', payment_type: 'manual',
+      proof_photo_url: null, processed_at: new Date().toISOString()
     });
-    if (insertErr) {
-      console.error('❌ Failed to insert manual deposit_requests row:', insertErr.message);
-    }
-
-    Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, {
-      targetUserId: strId, amount: amt, newBalance: user.balance
-    });
-
+    Audit.adminAction('ADMIN_ADD_BALANCE', 'admin', req.ip, { targetUserId: strId, amount: amt, newBalance: user.balance });
     const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', user.balance);
-
     res.json({ success: true, newBalance: user.balance });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ============================================================
-//  ✅ /admin/set-balance — accepts ADMIN_SECRET OR admin session
+//  ✅ /admin/set-balance
+//     - Accepts ADMIN_SECRET OR admin session
+//     - Records the delta as a manual deposit (when +) or
+//       manual withdrawal (when −) so live.html's +/− buttons
+//       appear in the finance / deposit-history pages.
 // ============================================================
 app.post('/admin/set-balance', async (req, res) => {
   const { secret, userId, telegramId, newBalance } = req.body;
@@ -690,17 +672,65 @@ app.post('/admin/set-balance', async (req, res) => {
       return res.status(403).json({ error: 'This player is not assigned to you' });
     }
 
+    const oldBalance = Number(existing.balance) || 0;
+    const delta = newBal - oldBalance;
+
+    // 1. Apply the new balance
     await supabase.from('users').update({ balance: newBal }).eq('telegram_id', strId);
     if (users[strId]) users[strId].balance = newBal;
     else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
 
+    // 2. ✅ Record the delta so it shows up in Finance / history
+    if (delta > 0) {
+      // ADD → record as manual deposit
+      try {
+        const { error: depErr } = await supabase.from('deposit_requests').insert({
+          telegram_id: strId,
+          username: existing.username || 'Player',
+          amount: delta,
+          status: 'approved',
+          phone: 'manual',
+          payment_type: 'manual',
+          transaction_reference: null,
+          proof_photo_url: null,
+          assigned_deposit_number: null,
+          admin_id: existing.admin_id || (authorizedAdmin ? authorizedAdmin.id : null),
+          processed_at: new Date().toISOString()
+        });
+        if (depErr) console.error('❌ Failed to record manual deposit_requests row:', depErr.message);
+      } catch (e) {
+        console.error('❌ Manual deposit insert threw:', e.message);
+      }
+    } else if (delta < 0) {
+      // SUBTRACT → record as manual withdrawal
+      try {
+        const { error: wdErr } = await supabase.from('withdrawal_requests').insert({
+          telegram_id: strId,
+          username: existing.username || 'Player',
+          amount: Math.abs(delta),
+          status: 'approved',
+          phone_number: 'manual',
+          withdrawal_type: 'manual',
+          receiver_name: 'manual adjustment',
+          admin_id: existing.admin_id || (authorizedAdmin ? authorizedAdmin.id : null),
+          admin_name: existing.admin_name || (authorizedAdmin ? authorizedAdmin.name : 'super'),
+          processed_at: new Date().toISOString()
+        });
+        if (wdErr) console.error('❌ Failed to record manual withdrawal_requests row:', wdErr.message);
+      } catch (e) {
+        console.error('❌ Manual withdrawal insert threw:', e.message);
+      }
+    }
+
+    // 3. Audit
     Audit.adminAction(
       'ADMIN_SET_BALANCE',
       authorizedAdmin ? authorizedAdmin.id : 'super',
       req.ip,
-      { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal }
+      { targetUserId: strId, oldBalance, newBalance: newBal, delta }
     );
 
+    // 4. Notify player + other admin tabs
     const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
 
@@ -708,7 +738,7 @@ app.post('/admin/set-balance', async (req, res) => {
       emitToAdminId(authorizedAdmin.id, 'player:balance', { telegram_id: strId, balance: newBal });
     }
 
-    res.json({ success: true, newBalance: newBal });
+    res.json({ success: true, newBalance: newBal, delta });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1760,24 +1790,6 @@ app.post('/admin/update-player-balance', async (req, res) => {
       created_by: admin.id, created_at: new Date().toISOString()
     });
     if (adjErr) console.error('Failed to record adjustment:', adjErr.message);
-
-    // ✅ Also record a deposit_requests row so it shows in the deposit history page
-    if (operation === 'add') {
-      const { error: depErr } = await supabase.from('deposit_requests').insert({
-        telegram_id: telegramId,
-        username: user.username,
-        amount: amt,
-        status: 'approved',
-        phone: 'manual',
-        payment_type: 'manual',
-        transaction_reference: null,
-        proof_photo_url: null,
-        assigned_deposit_number: null,
-        admin_id: admin.id,
-        processed_at: new Date().toISOString()
-      });
-      if (depErr) console.error('Failed to record manual deposit_requests row:', depErr.message);
-    }
 
     if (users[telegramId]) users[telegramId].balance = newBalance;
     else await loadUser(telegramId, user.username, user.telegram_handle, null, true);
