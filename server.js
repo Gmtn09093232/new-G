@@ -641,23 +641,62 @@ app.post('/admin/add-balance', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============================================================
+//  ✅ CORRECTED /admin/set-balance
+//  Accepts EITHER the super-admin ADMIN_SECRET (used by /live viewer)
+//  OR a valid admin session (cookie from /admin login).
+//  Regular admins can only modify players assigned to them.
+// ============================================================
 app.post('/admin/set-balance', async (req, res) => {
-  const { secret, userId, newBalance } = req.body;
-  if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  const strId = String(userId);
+  const { secret, userId, telegramId, newBalance } = req.body;
+
+  // Auth: super-admin via secret, otherwise admin session
+  let authorizedAdmin = null;   // null == super admin
+  if (secret === ADMIN_SECRET) {
+    authorizedAdmin = null;
+  } else {
+    const admin = await getAdminFromSession(req);
+    if (!admin) return res.status(403).json({ error: 'Forbidden — invalid secret or no session' });
+    authorizedAdmin = admin;
+  }
+
+  const strId = String(userId || telegramId || '');
   const newBal = Number(newBalance);
+  if (!strId || strId === 'undefined') return res.status(400).json({ error: 'userId required' });
   if (isNaN(newBal) || newBal < 0) return res.status(400).json({ error: 'Balance must be non-negative' });
+
   try {
-    const { data: existing, error: fetchErr } = await supabase.from('users').select('*').eq('telegram_id', strId).maybeSingle();
+    const { data: existing, error: fetchErr } = await supabase
+      .from('users').select('*').eq('telegram_id', strId).maybeSingle();
     if (fetchErr || !existing) return res.status(404).json({ error: 'User not found' });
+
+    // Non-super admins can only touch their own players
+    if (authorizedAdmin && existing.admin_id !== authorizedAdmin.id) {
+      return res.status(403).json({ error: 'This player is not assigned to you' });
+    }
+
     await supabase.from('users').update({ balance: newBal }).eq('telegram_id', strId);
     if (users[strId]) users[strId].balance = newBal;
     else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
-    Audit.adminAction('ADMIN_SET_BALANCE', 'admin', req.ip, { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal });
+
+    Audit.adminAction(
+      'ADMIN_SET_BALANCE',
+      authorizedAdmin ? authorizedAdmin.id : 'super',
+      req.ip,
+      { targetUserId: strId, oldBalance: existing.balance, newBalance: newBal }
+    );
+
     const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
+
+    if (authorizedAdmin) {
+      emitToAdminId(authorizedAdmin.id, 'player:balance', { telegram_id: strId, balance: newBal });
+    }
+
     res.json({ success: true, newBalance: newBal });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/admin/delete-user', async (req, res) => {
@@ -1209,7 +1248,7 @@ async function endGameWithWinners(stake) {
 
     // ✅ FRONTEND UPDATE: Send winning card numbers instead of names
     const winningCards = game.winners.map(w => w.cardNumber || 'Unknown');
-    
+
     io.to(`stake_${stake}`).emit('gameEnded', {
       stake,
       winningCards: winningCards,
@@ -1648,9 +1687,9 @@ app.get('/admin/players', async (req, res) => {
       players: players,
       count: players.length
     });
-  } catch (err) { 
-    console.error('Error fetching admin players:', err.message); 
-    res.status(500).json({ error: err.message }); 
+  } catch (err) {
+    console.error('Error fetching admin players:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -2781,6 +2820,63 @@ adminNamespace.on('connection', (socket) => {
 
   socket.on('admin:getWinners', ({ limit = 10 } = {}) => {
     socket.emit('admin:winnersList', winnerHistory.slice(0, Math.min(limit, 100)));
+  });
+
+  // ============================================================
+  //  ✅ NEW: Deposits & Withdrawals for the Finance tab
+  // ============================================================
+  socket.on('admin:getDeposits', async () => {
+    try {
+      let query = supabase.from('deposit_requests').select('*')
+        .order('created_at', { ascending: false }).limit(100);
+      if (socket.adminId) query = query.eq('admin_id', socket.adminId);
+      else query = query.eq('status', 'pending'); // viewer only sees pending
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const list = (data || []).map(d => ({
+        id: d.id,
+        username: d.username || 'Unknown',
+        amount: Number(d.amount),
+        phone: d.phone || 'N/A',
+        name: d.receiver_name || d.username || 'N/A',
+        type: d.payment_type || 'telebirr',
+        status: d.status === 'approved' ? 'Approved'
+               : d.status === 'rejected' ? 'Rejected' : 'Pending',
+        date: d.created_at ? new Date(d.created_at).toLocaleString() : 'N/A'
+      }));
+      socket.emit('admin:depositsList', list);
+    } catch (err) {
+      console.error('admin:getDeposits error:', err.message);
+      socket.emit('admin:depositsList', []);
+    }
+  });
+
+  socket.on('admin:getWithdrawals', async () => {
+    try {
+      let query = supabase.from('withdrawal_requests').select('*')
+        .order('created_at', { ascending: false }).limit(100);
+      if (socket.adminId) query = query.eq('admin_id', socket.adminId);
+      else query = query.eq('status', 'pending');
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const list = (data || []).map(w => ({
+        id: w.id,
+        username: w.username || 'Unknown',
+        amount: Number(w.amount),
+        phone: w.phone_number || 'N/A',
+        name: w.receiver_name || 'N/A',
+        type: w.withdrawal_type || 'telebirr',
+        status: w.status === 'approved' ? 'Approved'
+               : w.status === 'rejected' ? 'Rejected' : 'Pending',
+        date: w.created_at ? new Date(w.created_at).toLocaleString() : 'N/A'
+      }));
+      socket.emit('admin:withdrawalsList', list);
+    } catch (err) {
+      console.error('admin:getWithdrawals error:', err.message);
+      socket.emit('admin:withdrawalsList', []);
+    }
   });
 });
 
