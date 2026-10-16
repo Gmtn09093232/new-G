@@ -34,6 +34,26 @@ a{color:#3b82f6;text-decoration:none}
 .hidden{display:none!important}
 .mono{font-family:"Courier New",monospace}
 
+input[type="file"] {
+  padding: 8px;
+  background: #040B16;
+  border: 1px solid #1B2A41;
+  color: #e6e9ef;
+  font-size: 13px;
+  width: 100%;
+  margin-top: 4px;
+}
+input[type="file"]::file-selector-button {
+  background: #112240;
+  color: #fbbf24;
+  border: 1px solid #1B2A41;
+  padding: 6px 12px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: 10px;
+  font-family: inherit;
+}
+
 /* ============================================================
    PAGE SHELL
    ============================================================ */
@@ -247,7 +267,7 @@ a{color:#3b82f6;text-decoration:none}
     </div>
 </div>
 
-<!-- Deposit details (Single Page with visible method list) -->
+<!-- Deposit details (Single Page with visible method list and Photo upload) -->
 <div id="depositDetailsModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -275,10 +295,10 @@ a{color:#3b82f6;text-decoration:none}
         <div class="field"><label data-key="amountLabel">Amount (ETB)</label>
             <input type="number" id="depositAmount" placeholder="Min 10 ETB" min="10" step="any" autocomplete="off"></div>
         
-        <div class="field"><label data-key="enterInvoice">Enter your Invoice Number</label>
-            <input type="text" id="paymentInvoice" placeholder="e.g. CKU3JPX6M3" autocomplete="off"></div>
+        <div class="field"><label data-key="uploadReceipt">Upload Payment Screenshot / Photo</label>
+            <input type="file" id="depositPhoto" name="photo" accept="image/*" autocomplete="off"></div>
 
-        <div class="notice" data-key="depositHint">After sending payment, admin will verify your deposit using your phone number.</div>
+        <div class="notice" data-key="depositHint">After sending payment, admin will verify your deposit using your screenshot.</div>
         
         <div class="modal-buttons">
             <button id="requestDepositBtn" class="btn-primary" data-key="requestDeposit">Request Deposit</button>
@@ -565,10 +585,10 @@ const I18N = {
     am: {
         deposit:"+ተቀማጭ", withdraw:"-ማውጣት", requestDeposit:"ተቀማጭ ጠይቅ", back:"ተመለስ", cancel:"ይቅር",
         yourPhone:"የስልክ ቁጥርዎ (ለማረጋገጫ)", amountLabel:"መጠን (ETB)",
-        depositHint:"ክፍያ ከላኩ በኋላ አስተዳዳሪ በስልክ ቁጥርዎ ተቀማጭዎን ያረጋግጣል።",
+        depositHint:"ክፍያ ከላኩ በኋላ አስተዳዳሪ በስክሪንሾትዎ ተቀማጭዎን ያረጋግጣል።",
         sendPayment:"ክፍያ ወደ ታችኛው ቁጥር ይላኩ", selectMethod:"የክፍያ ዘዴ ይምረጡ",
         confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
-        enterInvoice:"Enter your Invoice Number",
+        uploadReceipt:"Upload Payment Screenshot / Photo",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
         invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"ውርርድ",
         pickCard:"የካርድ መለያ ይምረጡ:", selected:"የተመረጠው:", randomCard:"በዘፈቀደ ካርድ",
@@ -612,10 +632,10 @@ const I18N = {
     en: {
         deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"Request Deposit", back:"Back", cancel:"Cancel",
         yourPhone:"Your Phone Number (for verification)", amountLabel:"Amount (ETB)",
-        depositHint:"After sending payment, admin will verify your deposit using your phone number.",
+        depositHint:"After sending payment, admin will verify your deposit using your screenshot.",
         sendPayment:"Send payment to the selected method", selectMethod:"Select Deposit Method",
         confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
-        enterInvoice:"Enter your Invoice Number",
+        uploadReceipt:"Upload Payment Screenshot / Photo",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
         invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"Stake",
         pickCard:"Pick card ID:", selected:"Selected:", randomCard:"Random Card",
@@ -883,8 +903,11 @@ function resetDepositState() {
     state.submitting = false;
     state.methodMode = null;
 
-    ['depositPhone', 'depositAmount', 'paymentInvoice', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
+    ['depositPhone', 'depositAmount', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
         .forEach(id => { const el = $(id); if (el) el.value = ''; });
+    
+    const fileInput = $('depositPhoto');
+    if (fileInput) fileInput.value = '';
 
     const rec = $('depositRecipientDisplay');
     if (rec) rec.textContent = '—';
@@ -986,38 +1009,38 @@ function openWithdrawDetails(method, number) {
 function requestDeposit() {
     const phone  = $('depositPhone')?.value.trim()  || '';
     const amount = $('depositAmount')?.value.trim() || '';
-    const invoice = $('paymentInvoice')?.value.trim() || '';
+    const photoFile = $('depositPhoto')?.files[0];
 
     if (!phone.match(/^(09|07)\d{8}$/)) return toast('Invalid phone number', 'error');
     if (!amount || Number(amount) < 10)  return toast('Minimum deposit is 10 ETB', 'error');
     if (!state.selectedMethod) return toast('Please select a payment method', 'error');
-    if (!invoice) return toast('Please enter your Invoice Number', 'error');
+    if (!photoFile) return toast('Please upload a screenshot/photo of your payment', 'error');
 
     state.savedPhone = phone;
     state.savedAmount = amount;
     state.pendingAmount = Number(amount);
-    submitDeposit();
+    submitDeposit(photoFile);
 }
 
-async function submitDeposit() {
+async function submitDeposit(photoFile) {
     if (state.submitting) return;
     state.submitting = true;
     const btn = $('requestDepositBtn');
     const orig = btn.innerText;
     btn.disabled = true;
-    btn.innerText = 'Sending...';
+    btn.innerText = 'Uploading...';
 
     try {
+        const formData = new FormData();
+        formData.append('photo', photoFile);
+        formData.append('phone', state.savedPhone);
+        formData.append('amount', state.pendingAmount);
+        formData.append('payment_type', state.selectedMethod.type);
+        formData.append('admin_id', state.selectedMethod.adminId);
+
         const r = await fetch('/api/request-deposit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                phone: state.savedPhone,
-                amount: state.pendingAmount,
-                payment_type: state.selectedMethod.type,
-                admin_id: state.selectedMethod.adminId,
-                transaction_reference: $('paymentInvoice').value.trim()
-            })
+            body: formData // Note: Do NOT set Content-Type header; browser sets it with boundary
         });
         const d = await r.json();
         if (d.success) {
