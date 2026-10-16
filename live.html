@@ -52,19 +52,59 @@ nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
 nav button.on{background:#1e3a8a;color:#3b82f6}
 .hide{display:none!important}
 
-/* ===== NEW: search box ===== */
+/* ===== Search box ===== */
 .search-wrap{margin-bottom:10px}
 .search-input{width:100%;padding:10px 12px;background:#0f1419;border:1px solid #1e293b;color:#f8fafc;font:14px Arial,sans-serif;outline:none}
 .search-input:focus{border-color:#3b82f6}
 .search-input::placeholder{color:#64748b}
 
-/* ===== NEW: balance adjust buttons ===== */
+/* ===== Balance adjust buttons ===== */
 .adj-actions{display:flex;gap:4px;flex:none}
 .adj-btn{width:30px;height:30px;border:1px solid #1e293b;background:#1e293b;font:bold 16px Arial,sans-serif;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
 .adj-btn.adj-add{color:#4ade80}
 .adj-btn.adj-add:hover{background:#064e3b;border-color:#4ade80}
 .adj-btn.adj-red{color:#f87171}
 .adj-btn.adj-red:hover{background:#7f1d1d;border-color:#f87171}
+
+/* ===== NEW: Deposit/Withdraw specific styles ===== */
+.sub-tabs{display:flex;gap:4px;background:#1e293b;margin:0 0 16px;padding:4px;border:1px solid #1e293b}
+.sub-tabs button{flex:1;padding:9px 0;border:0;background:none;color:#94a3b8;font:bold .78rem Arial,sans-serif;cursor:pointer}
+.sub-tabs button.on{background:#1e3a8a;color:#60a5fa}
+.tx-list { display: flex; flex-direction: column; gap: 8px; }
+.tx-row { background: #1f2937; border: 1px solid #1e293b; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tx-header { display: flex; justify-content: space-between; align-items: center; }
+.tx-user { display: flex; align-items: center; gap: 8px; font-weight: bold; }
+.tx-amount { font-weight: bold; }
+.tx-amount.deposit { color: #4ade80; }
+.tx-amount.withdraw { color: #f87171; }
+.tx-details { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.75rem; color: #94a3b8; }
+.tx-actions { display: flex; gap: 8px; margin-top: 4px; }
+.btn-approve, .btn-reject { flex: 1; padding: 8px 0; border: 0; font: bold 0.75rem Arial, sans-serif; cursor: pointer; }
+.btn-approve { background: #10b981; color: #fff; }
+.btn-approve:hover { background: #059669; }
+.btn-reject { background: #ef4444; color: #fff; }
+.btn-reject:hover { background: #dc2626; }
+
+/* ===== NEW: Modal styles ===== */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 20px;
+}
+.modal-box {
+  background: #1f2937; border: 1px solid #1e293b; padding: 20px; width: 100%; max-width: 350px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.modal-box h3 { font-size: 1rem; font-weight: bold; }
+.modal-box p { font-size: 0.8rem; color: #94a3b8; }
+.modal-actions { display: flex; gap: 8px; }
+.modal-actions button {
+  flex: 1; padding: 10px; border: 0; font: bold 0.8rem Arial, sans-serif; cursor: pointer;
+}
+.btn-cancel { background: #1e293b; color: #94a3b8; }
+.btn-cancel:hover { background: #334155; color: #fff; }
+.btn-confirm { background: #3b82f6; color: #fff; }
+.btn-confirm:hover { background: #2563eb; }
 </style>
 </head>
 <body>
@@ -93,8 +133,15 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="liveList"></ul>
     </section>
 
-    <!-- REGISTERED -->
+    <!-- REGISTERED / PLAYERS -->
     <section id="users" class="view">
+      <!-- NEW: Total balance card -->
+      <div class="card">
+        <span class="mut">Total balance (All Players)</span>
+        <span class="v" id="uTotalBal">0 ETB</span>
+        <small class="mut" id="uTotalCount">0 registered</small>
+      </div>
+      
       <div class="head">
         <h2>Registered Users</h2>
         <span class="mut" id="uCount">0 users</span>
@@ -105,14 +152,17 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <ul id="uList"></ul>
     </section>
 
-    <!-- BALANCES -->
+    <!-- BALANCES -> CHANGED TO DEPOSITS & WITHDRAWALS -->
     <section id="bal" class="view">
-      <div class="card">
-        <span class="mut">Total balance</span>
-        <span class="v" id="tBal">0 ETB</span>
-        <small class="mut" id="tCount">0 registered</small>
+      <div class="sub-tabs" id="balTabs">
+        <button class="on" data-tab="deposits">Deposits</button>
+        <button data-tab="withdrawals">Withdrawals</button>
       </div>
-      <ul id="bList"></ul>
+      <div class="head">
+        <h2 id="balTitle">Deposits</h2>
+        <span class="mut" id="balCount">0 pending</span>
+      </div>
+      <div id="balList" class="tx-list"></div>
     </section>
 
     <!-- WINNERS -->
@@ -150,9 +200,22 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   <nav id="nav">
     <button class="on" data-view="live"><span>Live</span></button>
     <button data-view="users"><span>Players</span></button>
-    <button data-view="bal"><span>Balances</span></button>
+    <button data-view="bal"><span>Finance</span></button> <!-- Renamed to Finance -->
     <button data-view="winners"><span>Winners</span></button>
   </nav>
+</div>
+
+<!-- NEW: Custom Modal for Balance Adjustment -->
+<div id="modal" class="modal-overlay hide">
+  <div class="modal-box">
+    <h3 id="modalTitle">Adjust Balance</h3>
+    <p id="modalMsg" class="mut"></p>
+    <input type="number" id="modalInput" class="search-input" placeholder="Enter amount" min="1">
+    <div class="modal-actions">
+      <button id="modalCancel" class="btn-cancel">Cancel</button>
+      <button id="modalConfirm" class="btn-confirm">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -173,7 +236,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
 
   /* ---------- state ---------- */
   var ROUND_LIMIT = 10;
-
   var stake = 10;
   var live = [];
   var users = [];
@@ -181,6 +243,11 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   var winners = [];
   var lastMain = 'live';
   var SRC = { live: [], reg: [], bal: [], win: [] };
+
+  // NEW: Finance state
+  var balTab = 'deposits';
+  var deposits = [];
+  var withdrawals = [];
 
   var COLORS = [
     ['#1e3a8a', '#bfdbfe'], ['#134e4a', '#99f6e4'], ['#7c2d12', '#fdba74'],
@@ -232,7 +299,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       '<span class="badge ' + (cls || '') + '">' + esc(badge) + '</span></li>';
   }
 
-  /* ---------- NEW: user row with balance adjustment buttons ---------- */
   function userRowHtml(p, i) {
     var h = handle(p);
     var c = colorFor(h);
@@ -255,43 +321,28 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   function normWinner(raw) {
     var w = raw || {};
     var p = w.player || w.user || w.winner || w;
-
     var name = p.telegram_handle ? '@' + p.telegram_handle
              : (p.username || w.username || w.name || w.playerName || 'Anonymous');
-
     var round = w.round != null ? w.round
               : (w.roundNumber != null ? w.roundNumber
               : (w.roundId != null ? w.roundId : '?'));
-
     var stakeV = w.stake != null ? w.stake : p.stake;
-
     var card = w.cardNumber != null ? w.cardNumber
              : (w.card != null ? w.card
              : (p.cardNumber != null ? p.cardNumber : p.card));
     if (card == null) card = 'N/A';
-
     var prize = w.prize != null ? w.prize
               : (w.amount != null ? w.amount
               : (w.payout != null ? w.payout : w.winnings));
-
     var time = w.time || w.timestamp || w.finishedAt || w.endedAt ||
                w.createdAt || w.date || null;
-
     return {
-      round: round,
-      name: name,
-      stake: stakeV,
-      card: card,
-      prize: prize,
-      time: time,
+      round: round, name: name, stake: stakeV, card: card, prize: prize, time: time,
       _p: {
         username: p.username || w.username || name,
-        telegram_handle: p.telegram_handle ||
-          (name.charAt(0) === '@' ? name.slice(1) : null),
+        telegram_handle: p.telegram_handle || (name.charAt(0) === '@' ? name.slice(1) : null),
         telegramId: p.telegramId || w.telegramId || null,
-        stake: stakeV,
-        cardNumber: card,
-        balance: p.balance
+        stake: stakeV, cardNumber: card, balance: p.balance
       }
     };
   }
@@ -336,8 +387,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
 
     var isDetails = (v === 'details');
     $('hdr').classList.toggle('hide', isDetails);
-
-    /* ===== CHANGED: tabs only visible on the live section ===== */
     $('tabs').classList.toggle('hide', v !== 'live');
 
     var btns = $('nav').children;
@@ -367,7 +416,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     $('liveList').innerHTML = html;
   }
 
-  /* ===== CHANGED: renderUsers now filters by search and shows adjustment buttons ===== */
   function renderUsers() {
     var q = ($('uSearch') && $('uSearch').value || '').toLowerCase().trim();
     var filtered = users;
@@ -385,43 +433,74 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       ? (filtered.length + ' / ' + users.length + ' users')
       : (users.length + ' users');
 
+    // NEW: Calculate and display total balance
+    var totalBal = 0;
+    for (var i = 0; i < users.length; i++) totalBal += num(users[i].balance);
+    $('uTotalBal').textContent = totalBal.toLocaleString() + ' ETB';
+    $('uTotalCount').textContent = users.length + ' registered';
+
     if (!filtered.length) {
       $('uList').innerHTML = '<li class="empty">' +
         (users.length ? 'No matching users.' : 'No registered users found.') + '</li>';
       return;
     }
-    var html = '', i;
+    var html = '';
     for (i = 0; i < filtered.length; i++) {
       html += userRowHtml(filtered[i], i);
     }
     $('uList').innerHTML = html;
   }
 
+  // NEW: Render Deposits/Withdrawals
   function renderBal() {
-    var sorted = users.slice().sort(function (a, b) { return num(b.balance) - num(a.balance); });
-    SRC.bal = sorted;
-
-    var total = 0, i;
-    for (i = 0; i < users.length; i++) total += num(users[i].balance);
-
-    $('tBal').textContent = total.toLocaleString() + ' ETB';
-    $('tCount').textContent = users.length + ' registered';
-
-    if (!sorted.length) {
-      $('bList').innerHTML = '<li class="empty">No data available.</li>';
+    var list = balTab === 'deposits' ? deposits : withdrawals;
+    var title = balTab === 'deposits' ? 'Deposits' : 'Withdrawals';
+    
+    $('balTitle').textContent = title;
+    $('balCount').textContent = list.length + ' pending';
+    
+    if (!list.length) {
+      $('balList').innerHTML = '<div class="empty">No pending ' + title.toLowerCase() + '.</div>';
       return;
     }
+
     var html = '';
-    for (i = 0; i < sorted.length; i++) {
-      var b = num(sorted[i].balance);
-      html += rowHtml(sorted[i], b.toLocaleString() + ' ETB', b === 0 ? 'z' : 'g', i, 'bal');
+    for (var i = 0; i < list.length; i++) {
+      var tx = list[i];
+      var isDeposit = balTab === 'deposits';
+      var amountClass = isDeposit ? 'deposit' : 'withdraw';
+      var amountSign = isDeposit ? '+' : '-';
+      var statusColor = tx.status === 'Pending' ? 'y' : (tx.status === 'Approved' ? 'g' : 'z');
+      
+      html += '<div class="tx-row">' +
+        '<div class="tx-header">' +
+          '<span class="tx-user">' +
+            '<span class="av" style="width:24px;height:24px;font-size:0.7rem;background:#1e293b;color:#fff">' + esc(initialOf(tx.username || 'U')) + '</span>' +
+            esc(tx.username || 'Unknown') +
+          '</span>' +
+          '<span class="tx-amount ' + amountClass + '">' + amountSign + ' ' + num(tx.amount).toLocaleString() + ' ETB</span>' +
+        '</div>' +
+        '<div class="tx-details">' +
+          '<span>Phone: ' + esc(tx.phone || 'N/A') + '</span>' +
+          '<span>Name: ' + esc(tx.name || 'N/A') + '</span>' +
+          '<span>Type: ' + esc(tx.type || 'Telebirr') + '</span>' +
+          '<span class="badge ' + statusColor + '">' + esc(tx.status || 'Pending') + '</span>' +
+        '</div>' +
+        '<div class="tx-details" style="grid-column: 1 / -1;">' +
+          '<span>Date: ' + esc(tx.date || 'N/A') + '</span>' +
+        '</div>' +
+        (tx.status === 'Pending' ?
+        '<div class="tx-actions">' +
+          '<button class="btn-approve" data-action="approve" data-id="' + esc(tx.id) + '" data-type="' + balTab + '">Approve</button>' +
+          '<button class="btn-reject" data-action="reject" data-id="' + esc(tx.id) + '" data-type="' + balTab + '">Reject</button>' +
+        '</div>' : '') +
+      '</div>';
     }
-    $('bList').innerHTML = html;
+    $('balList').innerHTML = html;
   }
 
   function renderWinners() {
     SRC.win = winners.map(function (w) { return w._p; });
-
     $('wCount').textContent = winners.length + ' winner' + (winners.length === 1 ? '' : 's');
 
     if (!winners.length) {
@@ -433,15 +512,11 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     for (i = 0; i < winners.length; i++) {
       var w = winners[i];
       var c = colorFor(w.name);
-
       var bits = [];
       if (w.stake != null) bits.push(w.stake + ' ETB');
       if (w.card !== 'N/A') bits.push('Card #' + w.card);
       if (w.time) bits.push(timeAgo(w.time));
-
-      var prize = (w.prize != null)
-        ? num(w.prize).toLocaleString() + ' ETB'
-        : 'WINNER';
+      var prize = (w.prize != null) ? num(w.prize).toLocaleString() + ' ETB' : 'WINNER';
 
       html += '<li class="row" data-src="win" data-i="' + i + '">' +
         '<span class="rnd"><small>ROUND</small><b>' + esc(String(w.round)) + '</b></span>' +
@@ -477,40 +552,69 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     show('details');
   }
 
-  /* ===== NEW: balance adjustment handler ===== */
-  function adjustBalance(id, name, currentBal, mode) {
-    if (!id) { alert('Missing Telegram ID for this player.'); return; }
+  /* ---------- NEW: Balance adjustment with custom modal ---------- */
+  var pendingAdjust = null;
 
-    var label = mode === 'add'
-      ? 'Amount to ADD for ' + name + '\nCurrent: ' + currentBal + ' ETB'
-      : 'Amount to REDUCE from ' + name + '\nCurrent: ' + currentBal + ' ETB';
+  function openModal(id, name, currentBal, mode) {
+    pendingAdjust = { id: id, name: name, currentBal: currentBal, mode: mode };
+    var isAdd = mode === 'add';
+    $('modalTitle').textContent = isAdd ? 'Add Funds' : 'Reduce Funds';
+    $('modalMsg').textContent = (isAdd ? 'Add to ' : 'Reduce from ') + name + '\nCurrent: ' + currentBal + ' ETB';
+    $('modalInput').value = '';
+    $('modalInput').placeholder = 'Enter amount in ETB';
+    $('modal').classList.remove('hide');
+    $('modalInput').focus();
+  }
 
-    var input = prompt(label, '');
-    if (input === null) return;
-    var amt = parseFloat(input);
-    if (isNaN(amt) || amt <= 0) { alert('Enter a valid positive amount.'); return; }
+  function closeModal() {
+    $('modal').classList.add('hide');
+    pendingAdjust = null;
+  }
 
-    var newBal = mode === 'add' ? currentBal + amt : currentBal - amt;
+  $('modalCancel').addEventListener('click', closeModal);
+
+  $('modalConfirm').addEventListener('click', function () {
+    if (!pendingAdjust) return;
+    var amt = parseFloat($('modalInput').value);
+    if (isNaN(amt) || amt <= 0) { alert('Please enter a valid positive amount.'); return; }
+
+    var newBal = pendingAdjust.mode === 'add' ? pendingAdjust.currentBal + amt : pendingAdjust.currentBal - amt;
     if (newBal < 0) { alert('Balance cannot go negative.'); return; }
 
-    var confirmMsg = mode === 'add'
-      ? 'Add ' + amt + ' ETB to ' + name + '?\nNew balance: ' + newBal + ' ETB'
-      : 'Reduce ' + amt + ' ETB from ' + name + '?\nNew balance: ' + newBal + ' ETB';
-    if (!confirm(confirmMsg)) return;
+    var id = pendingAdjust.id;
+    var mode = pendingAdjust.mode;
+    
+    closeModal();
 
+    // FIX: Added credentials and proper payload for the backend
     fetch('/admin/set-balance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret: secret, userId: id, newBalance: newBal })
+      credentials: 'include', // Important for cookies/session auth
+      body: JSON.stringify({ 
+        secret: secret, 
+        userId: id, 
+        telegramId: id, // Send both just in case
+        newBalance: newBal,
+        action: mode
+      })
     })
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (!r.ok) {
+        if (r.status === 403) throw new Error('Forbidden. Check your secret or admin permissions.');
+        return r.json().then(function(d) { throw new Error(d.error || 'Server error'); });
+      }
+      return r.json();
+    })
     .then(function (d) {
-      if (!d.success) throw new Error(d.error || 'Failed');
+      if (d && d.success === false) throw new Error(d.error || 'Failed');
+      
+      var finalBal = d.newBalance != null ? d.newBalance : newBal;
 
       // Update in-memory list
       for (var i = 0; i < users.length; i++) {
         if (String(users[i].telegramId) === String(id)) {
-          users[i].balance = d.newBalance;
+          users[i].balance = finalBal;
           break;
         }
       }
@@ -518,34 +622,44 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       // Update the balance badge in-place
       var badge = document.querySelector('[data-balance-for="' + id + '"]');
       if (badge) {
-        badge.textContent = Number(d.newBalance).toLocaleString() + ' ETB';
-        badge.className = 'badge ' + (Number(d.newBalance) === 0 ? 'z' : 'g');
+        badge.textContent = Number(finalBal).toLocaleString() + ' ETB';
+        badge.className = 'badge ' + (Number(finalBal) === 0 ? 'z' : 'g');
       }
 
       // Update the adj buttons' cached balance
       var btns = document.querySelectorAll('.adj-btn[data-id="' + id + '"]');
-      for (var j = 0; j < btns.length; j++) btns[j].dataset.bal = d.newBalance;
+      for (var j = 0; j < btns.length; j++) btns[j].dataset.bal = finalBal;
 
-      // Refresh the balances tab if visible
-      renderBal();
-
-      alert('Balance updated: ' + Number(d.newBalance).toLocaleString() + ' ETB');
+      renderUsers(); // Recalculate total balance
+      alert('Balance updated successfully to ' + Number(finalBal).toLocaleString() + ' ETB');
     })
-    .catch(function (err) { alert('Error: ' + err.message); });
-  }
+    .catch(function (err) { 
+      alert('Error: ' + err.message); 
+    });
+  });
 
   /* ---------- events ---------- */
   $('tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button');
     if (!b) return;
     stake = parseInt(b.dataset.stake, 10);
-
     var kids = this.children, i;
     for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', kids[i] === b);
-
     $('room').textContent = stake + ' ETB Room';
     renderLive();
     socket.emit('admin:requestPlayers');
+  });
+
+  // NEW: Handle Finance Tab switching
+  $('balTabs').addEventListener('click', function(e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    balTab = b.dataset.tab;
+    var kids = this.children, i;
+    for (i = 0; i < kids.length; i++) kids[i].classList.toggle('on', kids[i] === b);
+    renderBal();
+    if (balTab === 'deposits') socket.emit('admin:getDeposits');
+    else socket.emit('admin:getWithdrawals');
   });
 
   $('nav').addEventListener('click', function (e) {
@@ -553,17 +667,21 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     if (!b) return;
     var v = b.dataset.view;
     show(v);
-    if (v === 'users' || v === 'bal') socket.emit('admin:getAllRegisteredPlayers');
+    if (v === 'users') socket.emit('admin:getAllRegisteredPlayers');
+    if (v === 'bal') {
+      socket.emit('admin:getDeposits');
+      socket.emit('admin:getWithdrawals');
+    }
     if (v === 'winners') socket.emit('admin:getWinners', { limit: ROUND_LIMIT });
   });
 
-  /* ===== CHANGED: handle adj buttons before generic row click ===== */
   document.addEventListener('click', function (e) {
+    // 1. Handle Balance Adjust Buttons
     var adj = e.target.closest('[data-act]');
     if (adj) {
       e.preventDefault();
       e.stopPropagation();
-      adjustBalance(
+      openModal(
         adj.dataset.id,
         adj.dataset.name || 'player',
         parseFloat(adj.dataset.bal) || 0,
@@ -572,6 +690,39 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       return;
     }
 
+    // 2. Handle Approve/Reject Transaction Buttons
+    var txBtn = e.target.closest('[data-action]');
+    if (txBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var action = txBtn.dataset.action;
+      var txId = txBtn.dataset.id;
+      var txType = txBtn.dataset.type; // 'deposits' or 'withdrawals'
+      
+      if (!confirm('Are you sure you want to ' + action + ' this ' + txType.slice(0, -1) + '?')) return;
+
+      fetch('/admin/' + action + '-' + txType.slice(0, -1), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ secret: secret, id: txId })
+      })
+      .then(function(r) {
+        if (!r.ok) throw new Error('Request failed');
+        return r.json();
+      })
+      .then(function(d) {
+        if (d && d.success === false) throw new Error(d.error || 'Failed');
+        alert('Transaction ' + action + 'd successfully.');
+        // Refresh the list
+        if (txType === 'deposits') socket.emit('admin:getDeposits');
+        else socket.emit('admin:getWithdrawals');
+      })
+      .catch(function(err) { alert('Error: ' + err.message); });
+      return;
+    }
+
+    // 3. Handle Row Click (Show Details)
     var li = e.target.closest('.row');
     if (!li) return;
     var arr = SRC[li.dataset.src] || [];
@@ -579,7 +730,6 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     if (p) showDetails(p);
   });
 
-  /* ===== NEW: live search input ===== */
   document.addEventListener('input', function (e) {
     if (e.target && e.target.id === 'uSearch') {
       renderUsers();
@@ -598,6 +748,8 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
     socket.emit('admin:getAllRegisteredPlayers');
     socket.emit('admin:requestPlayers');
     socket.emit('admin:getWinners', { limit: ROUND_LIMIT });
+    socket.emit('admin:getDeposits');
+    socket.emit('admin:getWithdrawals');
   });
 
   socket.on('connect_error', function (err) {
@@ -621,7 +773,22 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   socket.on('admin:allRegisteredPlayers', function (data) {
     users = Array.isArray(data) ? data : (data.users || []);
     renderUsers();
-    renderBal();
+  });
+
+  // NEW: Socket events for Finance
+  socket.on('admin:depositsList', function(data) {
+    deposits = Array.isArray(data) ? data : (data.deposits || []);
+    if (balTab === 'deposits') renderBal();
+  });
+
+  socket.on('admin:withdrawalsList', function(data) {
+    withdrawals = Array.isArray(data) ? data : (data.withdrawals || []);
+    if (balTab === 'withdrawals') renderBal();
+  });
+
+  socket.on('admin:transactionUpdate', function() {
+    socket.emit('admin:getDeposits');
+    socket.emit('admin:getWithdrawals');
   });
 
   function onWinnerList(data) {
