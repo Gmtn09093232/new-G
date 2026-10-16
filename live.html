@@ -82,6 +82,20 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
 .btn-reject{background:#ef4444;color:#fff}
 .btn-reject:hover{background:#dc2626}
 
+/* ---- Deposit proof photo ---- */
+.tx-proof{margin-top:6px;display:flex;flex-direction:column;gap:5px}
+.tx-proof img{width:100%;max-height:200px;object-fit:contain;background:#0f1419;
+  border:1px solid #1e293b;display:block;cursor:zoom-in}
+.proof-label{font-size:.68rem;color:#64748b;font-weight:bold}
+.proof-missing{font-size:.72rem;color:#f59e0b;font-weight:bold}
+.proof-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  z-index:2000;padding:16px}
+.proof-overlay img{max-width:100%;max-height:80vh;border:1px solid #1e293b;background:#0f1419}
+.proof-overlay button{padding:10px 22px;border:0;background:#1e293b;color:#f8fafc;
+  font:bold .8rem Arial,sans-serif;cursor:pointer}
+.proof-overlay button:hover{background:#334155}
+
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
 .modal-box{background:#1f2937;border:1px solid #1e293b;padding:20px;width:100%;max-width:350px;display:flex;flex-direction:column;gap:16px}
 .modal-box h3{font-size:1rem;font-weight:bold}
@@ -178,9 +192,9 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   </main>
 
   <nav id="nav">
-    <button class="on" data-view="live"><span>Live</span></button>
-    <button data-view="users"><span>Players</span></button>
     <button data-view="bal"><span>Finance</span></button>
+    <button data-view="users"><span>Players</span></button>
+    <button class="on" data-view="live"><span>Live</span></button>
     <button data-view="winners"><span>Winners</span></button>
   </nav>
 </div>
@@ -195,6 +209,11 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       <button id="modalConfirm" class="btn-confirm">Confirm</button>
     </div>
   </div>
+</div>
+
+<div id="proofModal" class="proof-overlay hide">
+  <img id="proofModalImg" src="" alt="Payment proof">
+  <button id="proofModalClose">Close</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -442,6 +461,24 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       var amountSign = isDeposit ? '+' : '-';
       var statusCls = tx.status === 'Pending' ? 'y' : (tx.status === 'Approved' ? 'g' : 'z');
 
+      /* ---- proof photo (deposits only) ---- */
+      var proofHtml = '';
+      if (isDeposit) {
+        if (tx.proof_photo_url) {
+          proofHtml =
+            '<div class="tx-proof">' +
+              '<img src="' + esc(tx.proof_photo_url) + '" alt="Payment proof" loading="lazy" ' +
+                   'data-proof="' + esc(tx.proof_photo_url) + '">' +
+              '<span class="proof-label">Payment proof — tap image to enlarge</span>' +
+            '</div>';
+        } else {
+          proofHtml =
+            '<div class="tx-proof">' +
+              '<span class="proof-missing">No payment proof photo attached</span>' +
+            '</div>';
+        }
+      }
+
       html += '<div class="tx-row">' +
         '<div class="tx-header">' +
           '<span class="tx-user">' +
@@ -459,6 +496,7 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
         '<div class="tx-details" style="grid-column: 1 / -1;">' +
           '<span>Date: ' + esc(tx.date || 'N/A') + '</span>' +
         '</div>' +
+        proofHtml +
         (tx.status === 'Pending' ?
         '<div class="tx-actions">' +
           '<button class="btn-approve" data-action="approve" data-id="' + esc(tx.id) + '" data-type="' + balTab + '">Approve</button>' +
@@ -639,6 +677,21 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
   });
 
   document.addEventListener('click', function (e) {
+    /* Proof photo → enlarge */
+    var proof = e.target.closest('[data-proof]');
+    if (proof) {
+      e.preventDefault();
+      e.stopPropagation();
+      $('proofModalImg').src = proof.getAttribute('data-proof');
+      $('proofModal').classList.remove('hide');
+      return;
+    }
+    if (e.target.id === 'proofModal' || e.target.id === 'proofModalClose') {
+      $('proofModal').classList.add('hide');
+      $('proofModalImg').src = '';
+      return;
+    }
+
     /* Balance + / − */
     var adj = e.target.closest('[data-act]');
     if (adj) {
@@ -666,11 +719,11 @@ nav button.on{background:#1e3a8a;color:#3b82f6}
       if (!confirm('Are you sure you want to ' + action + ' this ' + singular + '?')) return;
 
       fetch('/admin/process-' + singular, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  credentials: 'include',
-  body: JSON.stringify({ requestId: txId, action: action, secret: secret })
-})
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ requestId: txId, action: action, secret: secret })
+      })
       .then(function (r) {
         return r.json().then(function (d) {
           if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
