@@ -6,7 +6,6 @@
     <title>Completed Deposits · All Sources</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
-        /* ---------- RESET & BASE ---------- */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
@@ -21,7 +20,6 @@
         }
         h1 small { font-weight: 400; font-size: 0.95rem; color: #64748b; }
 
-        /* Filter bar */
         .filter-bar {
             display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
             background: white; padding: 12px 16px; border-radius: 16px;
@@ -51,7 +49,6 @@
             margin-left: 4px; color: #64748b; font-size: 0.8rem; white-space: nowrap;
         }
 
-        /* Stats */
         .stats-row {
             display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;
             background: white; padding: 16px 20px; border-radius: 16px;
@@ -62,7 +59,6 @@
         .stats-row .stat-item .amount { color: #059669; font-weight: 700; }
         .stats-row .stat-item .count { color: #2563eb; font-weight: 700; }
 
-        /* Table */
         .table-wrapper {
             background: white; border-radius: 16px; border: 1px solid #e9edf4;
             overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 0 0 4px 0;
@@ -79,9 +75,7 @@
             padding: 10px 10px; border-bottom: 1px solid #eef2f6; color: #1e293b;
         }
         tr:hover td { background: #fafcff; }
-        .empty-row td {
-            text-align: center; color: #94a3b8; padding: 40px 10px;
-        }
+        .empty-row td { text-align: center; color: #94a3b8; padding: 40px 10px; }
         .badge-method {
             display: inline-block; background: #eef2f6; color: #334155;
             padding: 0 10px; border-radius: 20px; font-size: 0.7rem;
@@ -91,15 +85,12 @@
             background: #fef3c7; color: #92400e; font-weight: 600;
         }
 
-        .loading {
-            text-align: center; padding: 40px 20px; color: #64748b;
-        }
+        .loading { text-align: center; padding: 40px 20px; color: #64748b; }
         .error {
             background: #fee2e2; color: #991b1b; padding: 14px 18px;
             border-radius: 12px; margin-bottom: 20px; display: none;
             font-size: 0.9rem;
         }
-
         footer {
             text-align: center; margin-top: 30px; color: #94a3b8; font-size: 0.75rem;
         }
@@ -108,21 +99,11 @@
             body { padding: 10px; }
             h1 { font-size: 1.2rem; flex-direction: column; align-items: flex-start; gap: 4px; }
             h1 small { font-size: 0.85rem; }
-            .filter-bar {
-                flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px;
-            }
-            .filter-bar input[type="date"] {
-                flex: 1 1 auto; min-width: 100%; font-size: 0.8rem;
-                padding: 6px 8px; min-height: 40px;
-            }
-            .filter-bar button {
-                font-size: 0.8rem; padding: 6px 12px;
-                min-height: 40px; min-width: 60px;
-            }
+            .filter-bar { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+            .filter-bar input[type="date"] { flex: 1 1 auto; min-width: 100%; font-size: 0.8rem; padding: 6px 8px; min-height: 40px; }
+            .filter-bar button { font-size: 0.8rem; padding: 6px 12px; min-height: 40px; min-width: 60px; }
             .filter-bar .date-range-label { text-align: center; width: 100%; }
-            .stats-row {
-                flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px;
-            }
+            .stats-row { flex-direction: column; align-items: stretch; gap: 6px; padding: 12px 14px; }
             .stats-row .stat-item { font-size: 0.85rem; }
             table { font-size: 0.75rem; min-width: 550px; }
             th, td { padding: 8px 6px; }
@@ -137,7 +118,6 @@
             <small>all sources (including manual admin deposits)</small>
         </h1>
 
-        <!-- Filter Bar -->
         <div class="filter-bar">
             <label for="startDate">From</label>
             <input type="date" id="startDate" />
@@ -152,13 +132,11 @@
         <div id="errorContainer" class="error"></div>
         <div id="loadingMessage" class="loading">⏳ Loading completed deposits…</div>
 
-        <!-- Stats -->
         <div class="stats-row" id="statsRow" style="display:none;">
             <div class="stat-item">Total deposits: <span class="count" id="totalCount">0</span></div>
             <div class="stat-item">Total amount: <span class="amount" id="totalAmount">0.0</span> ETB</div>
         </div>
 
-        <!-- Table -->
         <div class="table-wrapper">
             <table>
                 <thead>
@@ -189,7 +167,6 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // DOM refs
         const tableBody = document.getElementById('depositTableBody');
         const loadingEl = document.getElementById('loadingMessage');
         const errorEl = document.getElementById('errorContainer');
@@ -204,7 +181,6 @@
         const resetBtn = document.getElementById('resetFilterBtn');
         const dateRangeLabel = document.getElementById('dateRangeLabel');
 
-        // State
         let filterStart = null;
         let filterEnd = null;
 
@@ -214,9 +190,7 @@
             loadingEl.style.display = 'none';
         }
 
-        function fmt(num) {
-            return Number(num).toFixed(1);
-        }
+        function fmt(num) { return Number(num).toFixed(1); }
 
         function formatDate(iso) {
             if (!iso) return '-';
@@ -227,7 +201,6 @@
             });
         }
 
-        /** Returns YYYY-MM-DD for today (local time). */
         function getTodayStr() {
             const d = new Date();
             const y = d.getFullYear();
@@ -243,7 +216,6 @@
                 statsRow.style.display = 'none';
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading…</td></tr>';
 
-                // 1. Fetch approved deposit_requests (includes manual entries)
                 let query = supabase
                     .from('deposit_requests')
                     .select('telegram_id, username, amount, created_at, payment_type, phone')
@@ -270,7 +242,6 @@
                     return;
                 }
 
-                // 2. Enrich usernames from users table
                 const userIds = [...new Set(deposits.map(d => d.telegram_id).filter(id => id))];
                 let usernameMap = {};
                 if (userIds.length > 0) {
@@ -283,7 +254,6 @@
                     }
                 }
 
-                // 3. Build final list
                 const enriched = deposits.map(d => {
                     const userId = d.telegram_id;
                     const finalUsername = usernameMap[userId] || d.username || 'N/A';
@@ -297,26 +267,26 @@
                     };
                 });
 
-                // 4. Render stats
                 const totalCount = enriched.length;
                 const totalAmount = enriched.reduce((sum, d) => sum + d.amount, 0);
                 totalCountEl.textContent = totalCount;
                 totalAmountEl.textContent = fmt(totalAmount);
                 statsRow.style.display = 'flex';
 
-                // 5. Render table rows
                 let rows = '';
                 enriched.forEach(d => {
-                    const methodClass = (d.method || '').toLowerCase() === 'manual'
-                        ? 'badge-method manual'
-                        : 'badge-method';
+                    const isManual = (d.method || '').toLowerCase() === 'manual';
+                    const methodClass = isManual ? 'badge-method manual' : 'badge-method';
+                    const phoneDisplay = isManual
+                        ? 'Manual'
+                        : (d.phone && d.phone !== '-' ? d.phone : '-');
                     rows += `<tr>
                         <td>${d.userId}</td>
                         <td>${d.username}</td>
                         <td><strong>${fmt(d.amount)}</strong></td>
                         <td>${formatDate(d.timestamp)}</td>
                         <td><span class="${methodClass}">${d.method}</span></td>
-                        <td>${d.phone}</td>
+                        <td>${phoneDisplay}</td>
                     </tr>`;
                 });
                 tableBody.innerHTML = rows;
@@ -329,7 +299,6 @@
             }
         }
 
-        // ---------- Filter logic ----------
         function applyFilter() {
             const startVal = startDateInput.value;
             const endVal = endDateInput.value;
@@ -376,7 +345,6 @@
             loadDeposits(null, null);
         }
 
-        // ---------- Init: default to TODAY ----------
         applyToday();
 
         applyBtn.addEventListener('click', applyFilter);
