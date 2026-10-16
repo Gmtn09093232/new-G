@@ -1309,25 +1309,14 @@ const handleDepositRequest = async (req, res) => {
   const userId = req.session?.userId;
   if (!userId) return res.status(401).json({ error: 'Not logged in' });
 
-  const { phone, amount, payment_type, transaction_reference, admin_id } = req.body;
+  const { phone, amount, payment_type, admin_id } = req.body;
   const amt = Number(amount);
   const photoFile = req.file;
 
   if (isNaN(amt) || amt <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!['telebirr', 'cbebirr', 'mpesa'].includes(payment_type)) return res.status(400).json({ error: 'Invalid payment type' });
   if (!admin_id) return res.status(400).json({ error: 'Please select a deposit account' });
-  if (!photoFile && !transaction_reference) return res.status(400).json({ error: 'Please provide either a photo proof or an invoice number' });
-
-  let extractedTxn = null;
-  if (transaction_reference) {
-    extractedTxn = extractTransactionNumber(transaction_reference);
-    if (!extractedTxn) return res.status(400).json({ error: 'Could not extract a valid transaction number. Please paste the full SMS or the transaction number.' });
-  }
-  if (extractedTxn) {
-    const { data: existing, error: dupErr } = await supabase.from('deposit_requests').select('id').eq('transaction_reference', extractedTxn).maybeSingle();
-    if (dupErr) return res.status(500).json({ error: 'Error validating transaction number' });
-    if (existing) return res.status(400).json({ error: 'This transaction number has already been used.' });
-  }
+  if (!photoFile) return res.status(400).json({ error: 'Please provide a screenshot/photo of your payment.' });
 
   try {
     const { data: admin, error: adminErr } = await supabase.from('admins')
@@ -1364,7 +1353,7 @@ const handleDepositRequest = async (req, res) => {
     const { data, error } = await supabase.from('deposit_requests').insert({
       telegram_id: userId, username: user.username, amount: amt,
       status: 'pending', phone: phone || null, payment_type,
-      transaction_reference: extractedTxn, proof_photo_url: photoUrl,
+      transaction_reference: null, proof_photo_url: photoUrl,
       admin_id: admin.id, assigned_deposit_number: admin[methodField]
     }).select().single();
     if (error) throw error;
@@ -1372,7 +1361,7 @@ const handleDepositRequest = async (req, res) => {
     Audit.depositInitiated(userId, req.ip, {
       transactionId: data.id.toString(), amount: amt, currency: 'ETB',
       method: payment_type, adminId: admin.id, adminName: admin.name,
-      adminNumber: admin[methodField], transactionReference: extractedTxn, hasPhoto: !!photoUrl
+      adminNumber: admin[methodField], hasPhoto: true
     });
 
     // ✅ Notify admins of new deposit
