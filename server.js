@@ -2673,6 +2673,8 @@ if (botToken) {
     bot.onText(/\/start(.+)?/, async (msg, match) => {
       const chatId = msg.chat.id;
       const startParam = match[1] ? match[1].trim() : '';
+      console.log(`📩 Received /start from ${chatId} with param: "${startParam}"`);
+
       const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
       const webAppUrlWithParam = startParam ? `${webAppUrl}?start_param=${startParam}` : webAppUrl;
 
@@ -2722,7 +2724,12 @@ if (botToken) {
       }).catch(err => console.error(`Failed to send message to ${chatId}:`, err.message));
     });
 
-    bot.on('polling_error', (err) => console.error('Polling error:', err.message));
+    bot.on('polling_error', (err) => {
+      console.error('❌ Telegram Polling Error:', err.message);
+      if (err.message.includes('409')) {
+        console.error('🚨 CONFLICT: Another instance is polling this bot! Please ensure only one server instance is running, or restart the server.');
+      }
+    });
   } catch (err) {
     console.error('❌ Failed to initialize Telegram bot:', err.message);
   }
