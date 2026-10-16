@@ -247,7 +247,7 @@ a{color:#3b82f6;text-decoration:none}
     </div>
 </div>
 
-<!-- Deposit details (Single Page) -->
+<!-- Deposit details (Single Page with visible method list) -->
 <div id="depositDetailsModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -259,9 +259,7 @@ a{color:#3b82f6;text-decoration:none}
         
         <div class="field">
             <label data-key="selectMethod">Select Deposit Method</label>
-            <select id="depositMethodSelect" style="width:100%; padding:10px; background:#040B16; border:1px solid #1B2A41; color:#e6e9ef; font-size:14px; margin-top:4px;">
-                <option value="">Loading...</option>
-            </select>
+            <div id="depositMethodListContainer" class="method-list" style="max-height:180px; margin-top:4px;"></div>
         </div>
         
         <div class="field">
@@ -609,6 +607,7 @@ const I18N = {
         winningPrize:"የሽልማት ገንዘብ", amazing:"ደስ ያለኝ!",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
+        lastCalledLabel:"የመጨረሻ ጥሪ", 
     },
     en: {
         deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"Request Deposit", back:"Back", cancel:"Cancel",
@@ -655,6 +654,7 @@ const I18N = {
         winningPrize:"WINNING PRIZE", amazing:"Amazing!",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
+        lastCalledLabel:"Last Called",
     }
 };
 
@@ -886,10 +886,10 @@ function resetDepositState() {
     ['depositPhone', 'depositAmount', 'paymentInvoice', 'withdrawName', 'withdrawPhone', 'withdrawAmount']
         .forEach(id => { const el = $(id); if (el) el.value = ''; });
 
-    const sel = $('depositMethodSelect');
-    if (sel) sel.innerHTML = '<option value="">Loading...</option>';
     const rec = $('depositRecipientDisplay');
     if (rec) rec.textContent = '—';
+    const container = $('depositMethodListContainer');
+    if (container) container.innerHTML = '<div class="empty-state">Loading...</div>';
 
     ['depositDetailsModal', 'methodListModal', 'withdrawModal']
         .forEach(id => $(id)?.classList.remove('active'));
@@ -920,23 +920,37 @@ async function openDeposit() {
         if (a.mpesa)    methods.push({ type: 'mpesa',    number: a.mpesa,    adminId: a.id });
     });
 
-    const sel = $('depositMethodSelect');
-    if (sel) {
-        sel.innerHTML = '<option value="">Select a method...</option>' + methods.map((m, i) => 
-            `<option value="${i}">${METHOD_LABELS[m.type] || m.type}</option>`
-        ).join('');
-        
-        sel.onchange = () => {
-            const idx = sel.value;
-            if (idx === '') {
-                state.selectedMethod = null;
-                $('depositRecipientDisplay').textContent = '—';
-                return;
-            }
-            const m = methods[idx];
-            state.selectedMethod = m;
-            $('depositRecipientDisplay').textContent = safeNumber(m.number);
-        };
+    const container = $('depositMethodListContainer');
+    if (container) {
+        if (!methods.length) {
+            container.innerHTML = '<div class="empty-state">No methods available</div>';
+        } else {
+            container.innerHTML = methods.map((m, i) => {
+                const label = METHOD_LABELS[m.type] || m.type;
+                return `<div class="method-item" data-index="${i}">
+                    <div class="info"><div class="name">${label}</div></div>
+                    <div class="badge">Select</div>
+                </div>`;
+            }).join('');
+            
+            container.onclick = e => {
+                const el = e.target.closest('.method-item');
+                if (!el) return;
+                const idx = el.dataset.index;
+                const m = methods[idx];
+                state.selectedMethod = m;
+                $('depositRecipientDisplay').textContent = safeNumber(m.number);
+                
+                // Highlight selected item
+                container.querySelectorAll('.method-item').forEach(item => {
+                    item.style.borderColor = '#1B2A41';
+                    item.querySelector('.badge').style.background = '#3b82f6';
+                });
+                el.style.borderColor = '#fbbf24';
+                el.querySelector('.badge').style.background = '#fbbf24';
+                el.querySelector('.badge').style.color = '#111';
+            };
+        }
     }
 
     modalZ++;
@@ -1258,13 +1272,14 @@ function goStake() {
 
 function showWinner(d) {
     if (d.noWinner) {
-        if (state.currentGameId) addRecord(false, 0, 0, null);
+        if (state.currentGameId) addRecord(false, 0, 0, null, null);
         toast('No winner this round.', 'info');
         return;
     }
     
-    // Changed: Display Bingo card number(s) instead of names
+    // Extract winning cards array and last called number
     const winningCards = d.winningCards || (state.selectedCard ? [state.selectedCard] : ['Unknown']);
+    const winningNumber = d.winningNumber || null;
     const each = d.prizeEach || 0;
 
     $('winTitle').innerHTML = winningCards.length > 1 ? `${winningCards.length} WINNERS!` : 'BINGO!';
@@ -1272,15 +1287,16 @@ function showWinner(d) {
     $('winPrize').innerHTML = each + ' <small>ETB</small>';
     $('winnerOverlay').classList.add('active');
 
-    if (state.currentGameId) addRecord(true, each, d.totalPrize || 0, state.selectedCard);
+    if (state.currentGameId) addRecord(true, each, d.totalPrize || 0, winningCards.join(', '), winningNumber);
 }
 
-function addRecord(win, prize, totalPrize, winningCard) {
+function addRecord(win, prize, totalPrize, winningCard, winningNumber) {
     state.totalGames++;
     state.recentGames.unshift({
         gameId: state.currentGameId,
         date: new Date().toLocaleString(),
         winningCard: winningCard || '—',
+        winningNumber: winningNumber || '—',
         stake: state.stake,
         playerPrize: prize,
         totalPrize
@@ -1320,12 +1336,12 @@ function updateStats() {
         return;
     }
     
-    // Changed: Removed Result, added Winning Card
     div.innerHTML = state.recentGames.map(g => {
-        const prize = g.result === 'Win' ? `${g.totalPrize || g.playerPrize} ETB` : '—';
+        const prize = g.playerPrize > 0 || g.totalPrize > 0 ? `${g.totalPrize || g.playerPrize} ETB` : '—';
         return `<div class="history-card">
             <div><strong>Game ID:</strong> <span style="color:#e6e9ef;">${g.gameId || '—'}</span></div>
             <div><strong>Winning Card:</strong> <span style="color:#fbbf24; font-weight:bold;">${g.winningCard || '—'}</span></div>
+            <div><strong>Last Called:</strong> <span style="color:#fbbf24; font-weight:bold;">${g.winningNumber || '—'}</span></div>
             <div><strong>Prize:</strong> <span style="color:#fbbf24; font-weight:bold;">${prize}</span></div>
             <div style="font-size:11px;color:#8b95a3; margin-top:4px;">${g.date} | Stake: ${g.stake} ETB</div>
         </div>`;
@@ -1545,7 +1561,7 @@ $('withdrawBackBtn').addEventListener('click', () => {
 $('requestDepositBtn').addEventListener('click', requestDeposit);
 $('depositCopyBtn').addEventListener('click', () => {
     const raw = $('depositRecipientDisplay').textContent.trim();
-    copyText(raw);
+    if (raw && raw !== '—') copyText(raw);
 });
 
 $('submitWithdrawBtn').addEventListener('click', submitWithdraw);
