@@ -1641,6 +1641,23 @@ app.get('/admin/players', async (req, res) => {
   const admin = await getAdminFromSession(req);
   if (!admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired or deactivated' }); }
   try {
+    // Just fetch the players directly (this is now instant)
+    const players = await getAdminPlayers(admin.id);
+    
+    res.json({
+      success: true,
+      admin: { id: admin.id, name: admin.name, phone: admin.phone },
+      players: players,
+      count: players.length
+    });
+  } catch (err) { 
+    console.error('Error fetching admin players:', err.message); 
+    res.status(500).json({ error: err.message }); 
+  }
+});
+  const admin = await getAdminFromSession(req);
+  if (!admin) { req.session.destroy(); return res.status(401).json({ error: 'Session expired or deactivated' }); }
+  try {
     const players = await getAdminPlayers(admin.id);
     const playersWithStats = await Promise.all(players.map(async (player) => {
       const { data: deposits } = await supabase.from('deposit_requests')
@@ -1655,7 +1672,6 @@ app.get('/admin/players', async (req, res) => {
       players: playersWithStats, count: playersWithStats.length
     });
   } catch (err) { console.error('Error fetching admin players:', err.message); res.status(500).json({ error: err.message }); }
-});
 
 app.post('/admin/update-player-balance', async (req, res) => {
   const admin = await getAdminFromSession(req);
