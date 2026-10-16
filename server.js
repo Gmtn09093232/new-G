@@ -5,6 +5,7 @@
 //             - Session-auth admin sockets
 //             - Winner history broadcasting
 //             - Cascade player delete
+//             - Deposit proof photos in admin finance view
 // ================================================================
 
 require('dotenv').config();
@@ -2910,7 +2911,9 @@ adminNamespace.on('connection', (socket) => {
         type: d.payment_type || 'telebirr',
         status: d.status === 'approved' ? 'Approved'
                : d.status === 'rejected' ? 'Rejected' : 'Pending',
-        date: d.created_at ? new Date(d.created_at).toLocaleString() : 'N/A'
+        date: d.created_at ? new Date(d.created_at).toLocaleString() : 'N/A',
+        proof_photo_url: d.proof_photo_url || null,
+        transaction_reference: d.transaction_reference || null
       }));
       socket.emit('admin:depositsList', list);
     } catch (err) {
