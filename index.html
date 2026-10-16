@@ -607,7 +607,7 @@ const I18N = {
         claimLabelShort:"የይገባኛል ጥያቄ፦", claimValueShort:"ወዲያው “CLAIM BINGO!”",
         rulesTitle:"የቢንጎ ሕጎች", rulesSub:"75-ኳስ ክላሲክ",
         rulesHowToPlayTitle:"እንዴት እንደሚጫወቱ",
-        rulesHowToPlay:"1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀምር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **ቢንጎ!** የሚለውን ይጫኑ።",
+        rulesHowToPlay:"1. የመጫወቻ ክፍያ (10፣ 20 ወይም 30 ብር) ይምረጡ።\n2. ከ1–100 ውስጥ አንድ የBINGO ካርድ ይምረጡ።\n3. ጨዋታው ሲጀመር ቁጥሮች በየጥቂት ሰከንዶች ይጠራሉ።\n4. በካርድዎ ላይ ያለ ቁጥር ሲጠራ mark ያድርጉ።\n5. ከሚከተሉት የማሸነፊያ ሁኔታዎች አንዱን ካሟሉ **ቢንጎ!** የሚለውን ይጫኑ።",
         rulesWinningPatternsTitle:"የማሸነፊያ ሁኔታዎች",
         rulesWinningPatterns:"1 አግድም መስመር (Row)\n1 ቁመት መስመር (Column)\n1 ሰያፍ መስመር (Diagonal)\n4ቱ ማዕዘኖች (4 Corners)\n\n**ማስታወሻ:** መካከለኛው FREE ቦታ በራስ-ሰር እንደተሞላ ይቆጠራል።",
         rulesPrizeTitle:"የሽልማት ህግ",
@@ -720,6 +720,28 @@ const state = {
 let socket = null;
 let stakeSocket = null;
 let lobbyTimer = null;
+
+/* ============================================================
+   2b. CARD LOCAL CACHE (per stake)
+   Makes the bingo card appear instantly on re-entry.
+   ============================================================ */
+function saveCardLocal(stake, card) {
+    if (!stake || !Array.isArray(card) || card.length !== 5) return;
+    try { localStorage.setItem('dot_bingo_card_' + stake, JSON.stringify(card)); } catch {}
+}
+function loadCardLocal(stake) {
+    if (!stake) return null;
+    try {
+        const raw = localStorage.getItem('dot_bingo_card_' + stake);
+        if (!raw) return null;
+        const c = JSON.parse(raw);
+        return Array.isArray(c) && c.length === 5 ? c : null;
+    } catch { return null; }
+}
+function clearCardLocal(stake) {
+    if (!stake) return;
+    try { localStorage.removeItem('dot_bingo_card_' + stake); } catch {}
+}
 
 /* ============================================================
    3. TELEGRAM
@@ -1121,7 +1143,9 @@ function renderCard(card, containerId, clickable) {
     }
     cont.dataset.empty = '0';
 
-    const key = card.flat().join(',') + (clickable ? '|c' : '|n');
+    // Key by card contents only — NOT by clickable — so switching
+    // between lobby preview and game view does NOT rebuild the table.
+    const key = card.flat().join(',');
     let entry = cardCache.get(cont);
 
     if (!entry || entry.key !== key) {
@@ -1279,6 +1303,7 @@ function goStake() {
     resetDepositState();
     socket?.disconnect(); socket = null;
     state.stake = null;
+    // NOTE: keep the cached card so it appears instantly next time
     state.userCard = [];
     state.markedNumbers = new Set();
     state.selectedCard = null;
@@ -1389,9 +1414,16 @@ async function connectToGame(stake) {
     if (!tg?.initData) return toast('Open inside Telegram', 'error');
 
     state.stake = stake;
-    state.userCard = []; // Reset previous card
-    state.selectedCard = null; // Reset selection
-    state.markedNumbers = new Set(); // Reset marks
+    state.selectedCard = null;
+    state.markedNumbers = new Set();
+
+    // Restore the player's last card for this stake INSTANTLY from local cache.
+    // This makes the bingo card show immediately on re-entry (no server round-trip).
+    state.userCard = loadCardLocal(stake) || [];
+    if (state.userCard.length) {
+        renderCard(state.userCard, 'lobbyCardPreview', false);
+    }
+
     localStorage.setItem('dot_bingo_stake', stake);
     disconnectStakeSocket();
 
@@ -1404,8 +1436,9 @@ async function connectToGame(stake) {
     socket.on('lobbyState', s => {
         if (s.stake !== stake) return;
         state.selectedCard = null;
-        state.userCard = []; // Reset previous card
-        state.markedNumbers = new Set(); // Reset marks
+        // IMPORTANT: do NOT clear state.userCard here — the cached card stays
+        // visible while we wait for the server's authoritative 'yourCard'.
+        state.markedNumbers = new Set();
         $('selectedNumber').textContent = '-';
         showLobby(s.startsIn);
         if (s.takenNumbers) updateGrid(s.takenNumbers);
@@ -1414,6 +1447,7 @@ async function connectToGame(stake) {
 
     socket.on('yourCard', card => {
         state.userCard = card;
+        saveCardLocal(stake, card); // cache for next entry
         renderCard(card, state.isGameActive ? 'gameCard' : 'lobbyCardPreview', state.isGameActive);
     });
 
