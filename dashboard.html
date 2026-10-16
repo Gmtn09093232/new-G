@@ -583,10 +583,13 @@ function renderDepositRow(req){
     const thumb=req.proof_url+'?size=thumb';
     const full=req.proof_url+'?size=full';
     receipt=`<div class="receipt"><img src="${esc(thumb)}" loading="lazy" alt="" data-action="view-proof" data-src="${esc(full)}"><button class="link" data-action="view-proof" data-src="${esc(full)}">View</button></div>`;
-  }else if(req.proof_photo_url&&String(req.proof_photo_url).startsWith('data:image/')){
+  }
+  // FIXED: Removed the base64 check so it accepts standard HTTP URLs from Supabase
+  else if(req.proof_photo_url){
     const s=esc(req.proof_photo_url);
     receipt=`<div class="receipt"><img src="${s}" loading="lazy" alt="" data-action="view-proof" data-src="${s}"><button class="link" data-action="view-proof" data-src="${s}">View</button></div>`;
-  }else{
+  }
+  else{
     const t=req.transaction_reference||req.proof_photo_url||'';
     let ref=null,ph=null;
     if(pt==='cbebirr'){const c=extractCbeData(t);ref=c.tid;ph=c.ph;if(!ref){const m=t.match(/\b([A-Z0-9]{8,15})\b/);if(m)ref=m[1]}}
