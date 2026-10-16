@@ -1242,7 +1242,7 @@ function showLobby(sec) {
     switchPage('lobbyPage');
     socket?.emit('getBalance');
     startTimer(sec);
-    if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
+    renderCard(state.userCard, 'lobbyCardPreview', false); // Unconditional call
     updateStats();
     $('backToLobbyContainer')?.classList.add('hidden');
 }
@@ -1253,7 +1253,7 @@ function showGame() {
     switchPage('gamePage');
     clearInterval(lobbyTimer);
     socket?.emit('getBalance');
-    if (state.userCard.length) renderCard(state.userCard, 'gameCard', true);
+    renderCard(state.userCard, 'gameCard', true); // Unconditional call
     updateBackToLobbyVisibility();
 }
 
@@ -1387,6 +1387,9 @@ async function connectToGame(stake) {
     if (!tg?.initData) return toast('Open inside Telegram', 'error');
 
     state.stake = stake;
+    state.userCard = []; // Reset previous card
+    state.selectedCard = null; // Reset selection
+    state.markedNumbers = new Set(); // Reset marks
     localStorage.setItem('dot_bingo_stake', stake);
     disconnectStakeSocket();
 
@@ -1399,6 +1402,8 @@ async function connectToGame(stake) {
     socket.on('lobbyState', s => {
         if (s.stake !== stake) return;
         state.selectedCard = null;
+        state.userCard = []; // Reset previous card
+        state.markedNumbers = new Set(); // Reset marks
         $('selectedNumber').textContent = '-';
         showLobby(s.startsIn);
         if (s.takenNumbers) updateGrid(s.takenNumbers);
@@ -1466,7 +1471,7 @@ async function connectToGame(stake) {
         showWinner(d);
         state.currentGameId = null;
         state.markedNumbers = new Set();
-        if (state.userCard.length) renderCard(state.userCard, 'lobbyCardPreview', false);
+        renderCard(state.userCard, 'lobbyCardPreview', false); // Unconditional call
         $('backToLobbyContainer')?.classList.add('hidden');
     });
 
