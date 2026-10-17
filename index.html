@@ -640,7 +640,7 @@ const I18N = {
         winningPrize:"የሽልማት ገንዘብ", amazing:"ደስ ያለኝ!",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
-        lastCalledLabel:"የመጨረሻ ጥሪ", 
+        lastCalledLabel:"የመጨረሻ ጥሪ", notCompleted: "አልተሟላም"
     },
     en: {
         deposit:"+Deposit", withdraw:"-Withdraw", requestDeposit:"Request Deposit", back:"Back", cancel:"Cancel",
@@ -687,7 +687,7 @@ const I18N = {
         winningPrize:"WINNING PRIZE", amazing:"Amazing!",
         sendTo:"Send {amount} ETB to this number",
         inviteCodeLabel:"Invite Code", backToLobby:"Back to Lobby",
-        lastCalledLabel:"Last Called",
+        lastCalledLabel:"Last Called", notCompleted: "NOT COMPLETED"
     }
 };
 
@@ -1526,11 +1526,23 @@ async function connectToGame(stake) {
         toast('Not a valid bingo yet!', 'error');
         const btn = $('bingoBtn');
         if (btn) {
+            // Store original text
+            const originalText = btn.getAttribute('data-original-text') || btn.innerText || t('claimBingo');
+            btn.setAttribute('data-original-text', originalText);
+
+            // Change text and apply alarm
+            btn.innerText = t('notCompleted');
             btn.classList.add('bingo-alarm');
+
             if (tg?.HapticFeedback) {
                 tg.HapticFeedback.notificationOccurred('error');
             }
-            setTimeout(() => btn.classList.remove('bingo-alarm'), 1200);
+
+            // Revert after 1.2 seconds
+            setTimeout(() => {
+                btn.classList.remove('bingo-alarm');
+                btn.innerText = originalText;
+            }, 1200);
         }
     });
 
