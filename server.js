@@ -2756,6 +2756,13 @@ io.on('connection', async (socket) => {
     if (game.status === 'lobby') {
       const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
       socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
+      
+      // NEW: Restore card if player is already in the lobby
+      const player = game.players.find(p => p.telegramId === socket.userId);
+      if (player) {
+        socket.emit('yourCard', player.card);
+        socket.emit('markedNumbers', player.markedNumbers);
+      }
     } else if (game.status === 'running') {
       socket.emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
       const player = game.players.find(p => p.telegramId === socket.userId);
