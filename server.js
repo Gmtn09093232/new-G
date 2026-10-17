@@ -642,15 +642,11 @@ app.post('/admin/add-balance', async (req, res) => {
 
 // ============================================================
 //  ✅ /admin/set-balance
-//     - Accepts ADMIN_SECRET OR admin session
-//     - Records the delta as a manual deposit (when +) or
-//       manual withdrawal (when −) so live.html's +/− buttons
-//       appear in the finance / deposit-history pages.
 // ============================================================
 app.post('/admin/set-balance', async (req, res) => {
   const { secret, userId, telegramId, newBalance } = req.body;
 
-  let authorizedAdmin = null;   // null == super admin
+  let authorizedAdmin = null;
   if (secret === ADMIN_SECRET) {
     authorizedAdmin = null;
   } else {
@@ -676,14 +672,11 @@ app.post('/admin/set-balance', async (req, res) => {
     const oldBalance = Number(existing.balance) || 0;
     const delta = newBal - oldBalance;
 
-    // 1. Apply the new balance
     await supabase.from('users').update({ balance: newBal }).eq('telegram_id', strId);
     if (users[strId]) users[strId].balance = newBal;
     else await loadUser(strId, existing.username, existing.telegram_handle, null, true);
 
-    // 2. ✅ Record the delta so it shows up in Finance / history
     if (delta > 0) {
-      // ADD → record as manual deposit
       try {
         const { error: depErr } = await supabase.from('deposit_requests').insert({
           telegram_id: strId,
@@ -703,7 +696,6 @@ app.post('/admin/set-balance', async (req, res) => {
         console.error('❌ Manual deposit insert threw:', e.message);
       }
     } else if (delta < 0) {
-      // SUBTRACT → record as manual withdrawal
       try {
         const { error: wdErr } = await supabase.from('withdrawal_requests').insert({
           telegram_id: strId,
@@ -723,7 +715,6 @@ app.post('/admin/set-balance', async (req, res) => {
       }
     }
 
-    // 3. Audit
     Audit.adminAction(
       'ADMIN_SET_BALANCE',
       authorizedAdmin ? authorizedAdmin.id : 'super',
@@ -731,7 +722,6 @@ app.post('/admin/set-balance', async (req, res) => {
       { targetUserId: strId, oldBalance, newBalance: newBal, delta }
     );
 
-    // 4. Notify player + other admin tabs
     const playerSocket = await getSocketByUserId(strId);
     if (playerSocket) playerSocket.emit('balanceUpdate', newBal);
 
@@ -753,7 +743,7 @@ app.post('/admin/delete-user', async (req, res) => {
     const { data: user, error: findErr } = await supabase.from('users').select('telegram_id').eq('telegram_id', strId).maybeSingle();
     if (findErr || !user) return res.status(404).json({ error: 'User not found' });
     await supabase.from('users').delete().eq('telegram_id', strId);
-    for (const stake of [10, 20, 30]) {
+    for (const stake of [10, 20, 30, 50]) {
       const game = games[stake];
       if (!game) continue;
       const idx = game.players.findIndex(p => p.telegramId === strId);
@@ -807,7 +797,7 @@ function createGameState(entryFee) {
   };
 }
 
-const games = { 10: createGameState(10), 20: createGameState(20), 30: createGameState(30) };
+const games = { 10: createGameState(10), 20: createGameState(20), 30: createGameState(30), 50: createGameState(50) };
 
 const BOT_IDS = ['1945854','8696548','78963521','45896872','1236584','4567890','9876543','3216549','7539512'];
 const botBalances = new Map();
@@ -946,7 +936,7 @@ function getGame(stake) { return games[stake]; }
 
 function getAllPlayersList() {
   const allPlayers = [];
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [10, 20, 30, 50]) {
     const game = games[stake];
     game.players.forEach(p => {
       const user = users[p.telegramId];
@@ -964,13 +954,13 @@ function getAllPlayersList() {
 function notifyAdminClients() {
   adminNamespace.emit('admin:playersList', {
     players: getAllPlayersList(),
-    gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status }
+    gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status, 50: games[50].status }
   });
 }
 
 const publicNamespace = io.of('/public');
 publicNamespace.on('connection', (socket) => {
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [10, 20, 30, 50]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
@@ -1666,7 +1656,7 @@ app.post('/admin/process-deposit', async (req, res) => {
 
       const updated = { ...reqData, status: 'approved', processed_at: processedAt, version: Date.now() };
       if (ownerAdminId) emitToAdminId(ownerAdminId, 'deposit:updated', updated);
-      io.to(`stake_10`).to(`stake_20`).to(`stake_30`).emit('admin:playerBalance', { telegram_id: reqData.telegram_id, balance: user.balance });
+      io.to(`stake_10`).to(`stake_20`).to(`stake_30`).to(`stake_50`).emit('admin:playerBalance', { telegram_id: reqData.telegram_id, balance: user.balance });
 
       res.json({ success: true, newBalance: user.balance });
     } else {
@@ -2391,7 +2381,7 @@ app.delete('/super-admin/delete-player', async (req, res) => {
 
     if (users[String(telegramId)]) delete users[String(telegramId)];
 
-    for (const stake of [10, 20, 30]) {
+    for (const stake of [10, 20, 30, 50]) {
       const game = getGame(stake);
       if (!game) continue;
       const idx = game.players.findIndex(p => p.telegramId === String(telegramId));
@@ -2746,12 +2736,12 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   let currentStake = null;
   socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-  for (const stake of [10, 20, 30]) {
+  for (const stake of [10, 20, 30, 50]) {
     const game = getGame(stake);
     socket.emit('playersCount', { stake, count: game.players.length });
   }
   socket.on('joinLobby', ({ stake }) => {
-    if (![10, 20, 30].includes(stake)) return;
+    if (![10, 20, 30, 50].includes(stake)) return;
     currentStake = stake;
     socket.join(`stake_${stake}`);
     const game = getGame(stake);
@@ -2866,14 +2856,14 @@ adminNamespace.on('connection', (socket) => {
 
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
-    gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status }
+    gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status, 50: games[50].status }
   });
   socket.emit('admin:winnersList', winnerHistory.slice(0, 50));
 
   socket.on('admin:requestPlayers', () => {
     socket.emit('admin:playersList', {
       players: getAllPlayersList(),
-      gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status }
+      gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status, 50: games[50].status }
     });
   });
 
@@ -2969,6 +2959,7 @@ app.use((err, req, res, next) => {
 resetGame(10);
 resetGame(20);
 resetGame(30);
+resetGame(50);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
