@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
-    <title>Completed Deposits · All Sources</title>
+    <title>Completed Deposits & Withdrawals · All Sources</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,15 +54,18 @@
         }
 
         .stats-row {
-            display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;
+            display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 20px;
             background: white; padding: 16px 20px; border-radius: 16px;
             border: 1px solid #e9edf4; align-items: center;
         }
-        .stats-row .stat-item { font-size: 0.95rem; }
-        .stats-row .stat-item strong { font-weight: 600; color: #0f172a; }
-        .stats-row .stat-item .amount { color: #059669; font-weight: 700; }
-        .stats-row .stat-item .count { color: #2563eb; font-weight: 700; }
-        .stats-row .stat-item .sep { color: #cbd5e1; margin: 0 4px; }
+        .stats-row .stat-item { font-size: 0.95rem; color: #475569; }
+        .stats-row .stat-item strong,
+        .stats-row .stat-item span { font-weight: 700; }
+        .stats-row .stat-item .count { color: #2563eb; }
+        .stats-row .stat-item .in  { color: #059669; }
+        .stats-row .stat-item .out { color: #dc2626; }
+        .stats-row .stat-item .net { color: #0f172a; }
+        .stats-row .stat-item .net.neg { color: #dc2626; }
 
         .table-wrapper {
             background: white; border-radius: 16px; border: 1px solid #e9edf4;
@@ -81,28 +84,33 @@
         }
         tr:hover td { background: #fafcff; }
         .empty-row td { text-align: center; color: #94a3b8; padding: 40px 10px; }
+
+        .amt-in  strong { color: #0f172a; }
+        .amt-out strong { color: #dc2626; }
+
         .badge-method {
             display: inline-block; background: #eef2f6; color: #334155;
             padding: 2px 10px; border-radius: 20px; font-size: 0.7rem;
             text-transform: capitalize;
         }
-        .badge-method.manual {
-            background: #fef3c7; color: #92400e; font-weight: 600;
-        }
-        .badge-method.balance {
-            background: #dbeafe; color: #1e40af; font-weight: 600;
-        }
-        .badge-method.telebirr { background: #fee2e2; color: #991b1b; }
-        .badge-method.cbebirr { background: #e0e7ff; color: #3730a3; }
-        .badge-method.mpesa   { background: #fef3c7; color: #92400e; }
+        .badge-method.manual      { background: #fef3c7; color: #92400e; font-weight: 600; }
+        .badge-method.balance     { background: #dbeafe; color: #1e40af; font-weight: 600; }
+        .badge-method.adjustment  { background: #ede9fe; color: #5b21b6; font-weight: 600; }
+        .badge-method.withdrawal  { background: #fee2e2; color: #991b1b; font-weight: 600; }
+        .badge-method.telebirr    { background: #fee2e2; color: #991b1b; }
+        .badge-method.cbebirr     { background: #e0e7ff; color: #3730a3; }
+        .badge-method.mpesa       { background: #fef3c7; color: #92400e; }
 
         .src-badge {
             display: inline-block; font-size: 0.7rem; font-weight: 600;
-            padding: 2px 8px; border-radius: 6px;
+            padding: 2px 8px; border-radius: 6px; white-space: nowrap;
         }
-        .src-player  { background: #dcfce7; color: #166534; }
-        .src-manual  { background: #fef3c7; color: #92400e; }
-        .src-balance { background: #dbeafe; color: #1e40af; }
+        .src-player      { background: #dcfce7; color: #166534; }
+        .src-manual      { background: #fef3c7; color: #92400e; }
+        .src-balance     { background: #dbeafe; color: #1e40af; }
+        .src-wd-player   { background: #fee2e2; color: #991b1b; }
+        .src-wd-manual   { background: #ffe4e6; color: #9f1239; }
+        .src-wd-balance  { background: #ede9fe; color: #5b21b6; }
 
         .loading { text-align: center; padding: 40px 20px; color: #64748b; }
         .error {
@@ -134,8 +142,8 @@
 <body>
     <div class="container">
         <h1>
-            💳 Completed Deposits
-            <small>player deposits · manual · balance adjustments</small>
+            💳 Deposits &amp; Withdrawals
+            <small>player · manual · balance adjustments — newest first</small>
         </h1>
 
         <div class="filter-bar">
@@ -147,8 +155,11 @@
             <select id="sourceFilter">
                 <option value="all">All sources</option>
                 <option value="player">Player deposits</option>
-                <option value="manual">Manual</option>
-                <option value="balance">Balance adjustments</option>
+                <option value="manual">Manual deposits</option>
+                <option value="balance">Balance additions</option>
+                <option value="wd_player">Player withdrawals</option>
+                <option value="wd_manual">Manual withdrawals</option>
+                <option value="wd_balance">Balance deductions</option>
             </select>
             <button id="applyFilterBtn">Apply</button>
             <button id="todayFilterBtn" class="today-btn">Today</button>
@@ -157,18 +168,13 @@
         </div>
 
         <div id="errorContainer" class="error"></div>
-        <div id="loadingMessage" class="loading">⏳ Loading completed deposits…</div>
+        <div id="loadingMessage" class="loading">⏳ Loading records…</div>
 
         <div class="stats-row" id="statsRow" style="display:none;">
-            <div class="stat-item">Total entries: <span class="count" id="totalCount">0</span></div>
-            <div class="stat-item">Total amount: <span class="amount" id="totalAmount">0.0</span> ETB</div>
-            <div class="stat-item">
-                <span style="color:#166534">Player:</span> <span id="playerAmt">0</span>
-                <span class="sep">|</span>
-                <span style="color:#92400e">Manual:</span> <span id="manualAmt">0</span>
-                <span class="sep">|</span>
-                <span style="color:#1e40af">Balance:</span> <span id="balanceAmt">0</span>
-            </div>
+            <div class="stat-item">Entries: <span class="count" id="totalCount">0</span></div>
+            <div class="stat-item">Deposits in: <span class="in" id="totalIn">0.0</span> ETB</div>
+            <div class="stat-item">Withdrawals out: <span class="out" id="totalOut">0.0</span> ETB</div>
+            <div class="stat-item">Net: <span class="net" id="netAmount">0.0</span> ETB</div>
         </div>
 
         <div class="table-wrapper">
@@ -181,15 +187,18 @@
                         <th>Time</th>
                         <th>Method</th>
                         <th>Phone</th>
-                        <th>Source</th>
+                        <th>Type</th>
                     </tr>
                 </thead>
                 <tbody id="depositTableBody">
-                    <tr class="empty-row"><td colspan="7">No completed deposits found.</td></tr>
+                    <tr class="empty-row"><td colspan="7">No records found.</td></tr>
                 </tbody>
             </table>
         </div>
-        <footer>Sources: deposit_requests (approved) · admin_deposit_adjustments (additions) · default view = today</footer>
+        <footer>
+            Sources: deposit_requests (approved) · withdrawal_requests (approved/completed) ·
+            admin_deposit_adjustments (+ / −) — sorted by time, newest first
+        </footer>
     </div>
 
     <script>
@@ -202,27 +211,27 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const tableBody = document.getElementById('depositTableBody');
-        const loadingEl = document.getElementById('loadingMessage');
-        const errorEl = document.getElementById('errorContainer');
-        const statsRow = document.getElementById('statsRow');
-        const totalCountEl = document.getElementById('totalCount');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const playerAmtEl = document.getElementById('playerAmt');
-        const manualAmtEl = document.getElementById('manualAmt');
-        const balanceAmtEl = document.getElementById('balanceAmt');
+        const tableBody      = document.getElementById('depositTableBody');
+        const loadingEl      = document.getElementById('loadingMessage');
+        const errorEl        = document.getElementById('errorContainer');
+        const statsRow       = document.getElementById('statsRow');
+        const totalCountEl   = document.getElementById('totalCount');
+        const totalInEl      = document.getElementById('totalIn');
+        const totalOutEl     = document.getElementById('totalOut');
+        const netAmountEl    = document.getElementById('netAmount');
 
         const startDateInput = document.getElementById('startDate');
-        const endDateInput = document.getElementById('endDate');
-        const sourceFilter = document.getElementById('sourceFilter');
-        const applyBtn = document.getElementById('applyFilterBtn');
-        const todayBtn = document.getElementById('todayFilterBtn');
-        const resetBtn = document.getElementById('resetFilterBtn');
+        const endDateInput   = document.getElementById('endDate');
+        const sourceFilter   = document.getElementById('sourceFilter');
+        const applyBtn       = document.getElementById('applyFilterBtn');
+        const todayBtn       = document.getElementById('todayFilterBtn');
+        const resetBtn       = document.getElementById('resetFilterBtn');
         const dateRangeLabel = document.getElementById('dateRangeLabel');
 
         let filterStart = null;
-        let filterEnd = null;
+        let filterEnd   = null;
 
+        // ---------- helpers ----------
         function showError(msg) {
             errorEl.textContent = msg;
             errorEl.style.display = 'block';
@@ -234,6 +243,7 @@
         function formatDate(iso) {
             if (!iso) return '-';
             const d = new Date(iso);
+            if (isNaN(d)) return '-';
             return d.toLocaleString('en-US', {
                 month: 'short', day: 'numeric',
                 hour: '2-digit', minute: '2-digit'
@@ -248,96 +258,155 @@
             return `${y}-${m}-${day}`;
         }
 
-        /**
-         * Load from BOTH sources:
-         *   1. deposit_requests (approved) — player + manual
-         *   2. admin_deposit_adjustments (positive) — balance additions
-         * Merge, sort, render.
-         */
-        async function loadDeposits(startDate, endDate) {
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function applyRange(query, startIso, endIso) {
+            if (startIso) query = query.gte('created_at', startIso);
+            if (endIso)   query = query.lte('created_at', endIso);
+            return query;
+        }
+
+        // ---------- withdrawals: tolerant fetcher ----------
+        // Tries a couple of likely table names / status values so the page
+        // keeps working even if the schema differs slightly.
+        async function fetchWithdrawals(startIso, endIso) {
+            const tables   = ['withdrawal_requests', 'withdrawals'];
+            const statusSets = [['approved', 'completed'], ['approved'], ['completed']];
+
+            for (const table of tables) {
+                for (const statuses of statusSets) {
+                    try {
+                        let q = supabase
+                            .from(table)
+                            .select('*')
+                            .in('status', statuses)
+                            .order('created_at', { ascending: false });
+                        q = applyRange(q, startIso, endIso);
+
+                        const { data, error } = await q;
+                        if (!error) return data || [];
+                    } catch (e) {
+                        /* try next combination */
+                    }
+                }
+            }
+            console.warn('Withdrawals could not be fetched from any known table/status combination.');
+            return [];
+        }
+
+        // ---------- main loader ----------
+        async function loadRecords(startDate, endDate) {
             try {
                 loadingEl.style.display = 'block';
-                errorEl.style.display = 'none';
-                statsRow.style.display = 'none';
+                errorEl.style.display   = 'none';
+                statsRow.style.display  = 'none';
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
 
-                // -------- 1. Build queries --------
+                // -------- 1. date bounds --------
+                let startIso = null, endIso = null;
+                if (startDate) {
+                    const s = new Date(startDate); s.setHours(0, 0, 0, 0);
+                    startIso = s.toISOString();
+                }
+                if (endDate) {
+                    const e = new Date(endDate); e.setHours(23, 59, 59, 999);
+                    endIso = e.toISOString();
+                }
+
+                // -------- 2. build queries --------
                 let depQuery = supabase
                     .from('deposit_requests')
                     .select('telegram_id, username, amount, created_at, payment_type, phone, admin_id')
                     .eq('status', 'approved')
                     .order('created_at', { ascending: false });
+                depQuery = applyRange(depQuery, startIso, endIso);
 
+                // all adjustments: sign decides direction (+ add / − deduct)
                 let adjQuery = supabase
                     .from('admin_deposit_adjustments')
                     .select('admin_id, amount, description, type, created_at')
-                    .eq('type', 'manual_balance_adjustment')
-                    .gt('amount', 0)
                     .order('created_at', { ascending: false });
+                adjQuery = applyRange(adjQuery, startIso, endIso);
 
-                if (startDate) {
-                    const start = new Date(startDate);
-                    start.setHours(0, 0, 0, 0);
-                    const sIso = start.toISOString();
-                    depQuery = depQuery.gte('created_at', sIso);
-                    adjQuery = adjQuery.gte('created_at', sIso);
-                }
-                if (endDate) {
-                    const end = new Date(endDate);
-                    end.setHours(23, 59, 59, 999);
-                    const eIso = end.toISOString();
-                    depQuery = depQuery.lte('created_at', eIso);
-                    adjQuery = adjQuery.lte('created_at', eIso);
-                }
+                // -------- 3. fetch in parallel --------
+                const [depRes, adjRes, withdrawalRows] = await Promise.all([
+                    depQuery,
+                    adjQuery,
+                    fetchWithdrawals(startIso, endIso)
+                ]);
 
-                // -------- 2. Fetch both in parallel --------
-                const [depRes, adjRes] = await Promise.all([depQuery, adjQuery]);
                 if (depRes.error) throw new Error('Deposits: ' + depRes.error.message);
 
                 const deposits = depRes.data || [];
-                const adjustments = adjRes.error ? [] : (adjRes.data || []);
+                let adjustments = adjRes.error ? [] : (adjRes.data || []);
                 if (adjRes.error) console.warn('Adjustments fetch failed:', adjRes.error.message);
 
-                // -------- 3. Merge into one array --------
+                // -------- 4. merge everything into one array --------
                 const combined = [];
 
+                // 4a. player + manual deposits
                 for (const d of deposits) {
                     const m = String(d.payment_type || '').toLowerCase();
-                    let source = 'player';
-                    if (m === 'manual') source = 'manual';
                     combined.push({
-                        userId: String(d.telegram_id || 'N/A'),
-                        username: d.username || '',
-                        amount: Number(d.amount) || 0,
+                        userId:    String(d.telegram_id || 'N/A'),
+                        username:  d.username || '',
+                        amount:    Math.abs(Number(d.amount) || 0),
                         timestamp: d.created_at,
-                        method: d.payment_type || 'N/A',
-                        phone: d.phone || '-',
-                        source: source
+                        method:    d.payment_type || 'N/A',
+                        phone:     d.phone || '-',
+                        source:    m === 'manual' ? 'manual' : 'player',
+                        direction: 'in'
                     });
                 }
 
+                // 4b. completed withdrawals (player + manual)
+                for (const w of withdrawalRows) {
+                    const m = String(w.payment_type || w.method || '').toLowerCase();
+                    const isManual = m === 'manual';
+                    combined.push({
+                        userId:    String(w.telegram_id || w.user_id || 'N/A'),
+                        username:  w.username || '',
+                        amount:    Math.abs(Number(w.amount) || 0),
+                        timestamp: w.created_at || w.updated_at || w.processed_at,
+                        method:    w.payment_type || w.method || 'withdrawal',
+                        phone:     w.phone || '-',
+                        source:    isManual ? 'manual' : 'player',
+                        direction: 'out'
+                    });
+                }
+
+                // 4c. balance adjustments (positive = add, negative = deduct)
                 for (const a of adjustments) {
+                    const amt = Number(a.amount) || 0;
+                    if (!amt) continue;
                     const desc = String(a.description || '');
                     const m = desc.match(/for player (\d+)/i);
-                    const playerId = m ? m[1] : 'N/A';
+                    const playerId = m
+                        ? m[1]
+                        : (a.telegram_id ? String(a.telegram_id) : 'N/A');
                     combined.push({
-                        userId: playerId,
-                        username: '',
-                        amount: Number(a.amount) || 0,
+                        userId:    playerId,
+                        username:  '',
+                        amount:    Math.abs(amt),
                         timestamp: a.created_at,
-                        method: 'balance',
-                        phone: '-',
-                        source: 'balance'
+                        method:    'adjustment',
+                        phone:     '-',
+                        source:    'balance',
+                        direction: amt > 0 ? 'in' : 'out'
                     });
                 }
 
-                // -------- 4. Enrich usernames from users table --------
+                // -------- 5. enrich usernames --------
                 const userIds = [...new Set(
                     combined
                         .map(x => x.userId)
                         .filter(id => id && id !== 'N/A' && /^\d+$/.test(id))
                 )];
-                let usernameMap = {};
+                const usernameMap = {};
                 if (userIds.length > 0) {
                     const { data: users, error: usersErr } = await supabase
                         .from('users')
@@ -350,64 +419,75 @@
                     }
                 }
                 combined.forEach(x => {
-                    if (!x.username && usernameMap[x.userId]) {
-                        x.username = usernameMap[x.userId];
-                    }
+                    if (!x.username && usernameMap[x.userId]) x.username = usernameMap[x.userId];
                     if (!x.username) x.username = 'N/A';
                 });
 
-                // -------- 5. Sort by timestamp desc --------
-                combined.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                // -------- 6. SORT BY TIME — newest first (not by method) --------
+                combined.sort((a, b) => {
+                    const ta = new Date(a.timestamp).getTime() || 0;
+                    const tb = new Date(b.timestamp).getTime() || 0;
+                    return tb - ta;
+                });
 
-                // -------- 6. Apply source filter --------
-                const srcFilter = (sourceFilter.value || 'all');
-                const filtered = srcFilter === 'all'
-                    ? combined
-                    : combined.filter(x => x.source === srcFilter);
+                // -------- 7. apply source filter --------
+                const srcFilter = sourceFilter.value || 'all';
+                const filtered = combined.filter(x => matchesFilter(x, srcFilter));
 
                 if (filtered.length === 0) {
-                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">No deposits found for this period.</td></tr>';
+                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">No records found for this period.</td></tr>';
                     loadingEl.style.display = 'none';
                     statsRow.style.display = 'none';
                     return;
                 }
 
-                // -------- 7. Stats --------
-                const totalCount = filtered.length;
-                const totalAmount = filtered.reduce((s, x) => s + x.amount, 0);
-                const playerAmt = filtered.filter(x => x.source === 'player').reduce((s, x) => s + x.amount, 0);
-                const manualAmt = filtered.filter(x => x.source === 'manual').reduce((s, x) => s + x.amount, 0);
-                const balanceAmt = filtered.filter(x => x.source === 'balance').reduce((s, x) => s + x.amount, 0);
+                // -------- 8. stats --------
+                const totalIn  = filtered.filter(x => x.direction === 'in')
+                                        .reduce((s, x) => s + x.amount, 0);
+                const totalOut = filtered.filter(x => x.direction === 'out')
+                                        .reduce((s, x) => s + x.amount, 0);
+                const net = totalIn - totalOut;
 
-                totalCountEl.textContent = totalCount;
-                totalAmountEl.textContent = fmt(totalAmount);
-                playerAmtEl.textContent = fmt(playerAmt);
-                manualAmtEl.textContent = fmt(manualAmt);
-                balanceAmtEl.textContent = fmt(balanceAmt);
+                totalCountEl.textContent = filtered.length;
+                totalInEl.textContent    = fmt(totalIn);
+                totalOutEl.textContent   = fmt(totalOut);
+                netAmountEl.textContent  = fmt(net);
+                netAmountEl.classList.toggle('neg', net < 0);
                 statsRow.style.display = 'flex';
 
-                // -------- 8. Render rows --------
+                // -------- 9. render rows (already time-sorted) --------
                 let rows = '';
                 filtered.forEach(d => {
                     const m = String(d.method || '').toLowerCase();
                     let methodClass = 'badge-method ' + m;
-                    if (m === 'manual') methodClass = 'badge-method manual';
-                    if (m === 'balance') methodClass = 'badge-method balance';
+                    if (m === 'manual')     methodClass = 'badge-method manual';
+                    if (m === 'balance' || m === 'adjustment') methodClass = 'badge-method adjustment';
+                    if (m === 'withdrawal') methodClass = 'badge-method withdrawal';
 
                     let phoneDisplay;
                     if (m === 'manual') phoneDisplay = 'Manual';
-                    else if (m === 'balance') phoneDisplay = 'Adjustment';
+                    else if (m === 'balance' || m === 'adjustment') phoneDisplay = 'Adjustment';
+                    else if (m === 'withdrawal') phoneDisplay = 'Withdrawal';
                     else phoneDisplay = (d.phone && d.phone !== '-' ? d.phone : '-');
 
                     let srcClass, srcLabel;
-                    if (d.source === 'player') { srcClass = 'src-player'; srcLabel = 'Player deposit'; }
-                    else if (d.source === 'manual') { srcClass = 'src-manual'; srcLabel = 'Manual'; }
-                    else { srcClass = 'src-balance'; srcLabel = 'Balance adjust'; }
+                    if (d.direction === 'in') {
+                        if (d.source === 'player')      { srcClass = 'src-player';     srcLabel = 'Player deposit'; }
+                        else if (d.source === 'manual') { srcClass = 'src-manual';     srcLabel = 'Manual deposit'; }
+                        else                            { srcClass = 'src-balance';    srcLabel = 'Balance add'; }
+                    } else {
+                        if (d.source === 'player')      { srcClass = 'src-wd-player';  srcLabel = 'Player withdraw'; }
+                        else if (d.source === 'manual') { srcClass = 'src-wd-manual';  srcLabel = 'Manual withdraw'; }
+                        else                            { srcClass = 'src-wd-balance'; srcLabel = 'Balance deduct'; }
+                    }
+
+                    const amtClass = d.direction === 'out' ? 'amt-out' : 'amt-in';
+                    const sign     = d.direction === 'out' ? '-' : '';
 
                     rows += `<tr>
                         <td>${escapeHtml(d.userId)}</td>
                         <td>${escapeHtml(d.username)}</td>
-                        <td><strong>${fmt(d.amount)}</strong></td>
+                        <td class="${amtClass}"><strong>${sign}${fmt(d.amount)}</strong></td>
                         <td>${formatDate(d.timestamp)}</td>
                         <td><span class="${methodClass}">${escapeHtml(d.method)}</span></td>
                         <td>${escapeHtml(phoneDisplay)}</td>
@@ -419,28 +499,48 @@
 
             } catch (err) {
                 console.error(err);
-                showError('Error loading deposits: ' + err.message);
+                showError('Error loading records: ' + err.message);
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading data</td></tr>';
             }
         }
 
-        function escapeHtml(s) {
-            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[c]));
+        // ---------- source filter mapping ----------
+        const FILTER_MAP = {
+            player:    ['player',  'in'],
+            manual:    ['manual',  'in'],
+            balance:   ['balance', 'in'],
+            wd_player: ['player',  'out'],
+            wd_manual: ['manual',  'out'],
+            wd_balance:['balance', 'out']
+        };
+
+        function matchesFilter(row, key) {
+            if (key === 'all' || !key) return true;
+            const m = FILTER_MAP[key];
+            return !!m && row.source === m[0] && row.direction === m[1];
         }
 
+        const FILTER_NAMES = {
+            player: 'Player deposits',
+            manual: 'Manual deposits',
+            balance: 'Balance additions',
+            wd_player: 'Player withdrawals',
+            wd_manual: 'Manual withdrawals',
+            wd_balance: 'Balance deductions'
+        };
+
+        // ---------- UI actions ----------
         function applyFilter() {
             const startVal = startDateInput.value;
-            const endVal = endDateInput.value;
+            const endVal   = endDateInput.value;
             if (startVal && endVal && new Date(startVal) > new Date(endVal)) {
                 showError('Start date must be before end date.');
                 return;
             }
             filterStart = startVal || null;
-            filterEnd = endVal || null;
+            filterEnd   = endVal || null;
 
-            let labelText = '';
+            let labelText;
             if (filterStart && filterEnd && filterStart === filterEnd) {
                 labelText = `📅 ${filterStart}`;
             } else if (filterStart && filterEnd) {
@@ -453,32 +553,29 @@
                 labelText = '🌍 All time';
             }
             const s = sourceFilter.value;
-            if (s !== 'all') {
-                const names = { player: 'Player', manual: 'Manual', balance: 'Balance' };
-                labelText += ` · ${names[s]}`;
-            }
+            if (s !== 'all') labelText += ` · ${FILTER_NAMES[s] || s}`;
             dateRangeLabel.textContent = labelText;
 
-            loadDeposits(filterStart, filterEnd);
+            loadRecords(filterStart, filterEnd);
         }
 
         function applyToday() {
             const today = getTodayStr();
             startDateInput.value = today;
-            endDateInput.value = today;
+            endDateInput.value   = today;
             filterStart = today;
-            filterEnd = today;
+            filterEnd   = today;
             dateRangeLabel.textContent = `📅 Today (${today})`;
-            loadDeposits(today, today);
+            loadRecords(today, today);
         }
 
         function resetFilter() {
             startDateInput.value = '';
-            endDateInput.value = '';
+            endDateInput.value   = '';
             filterStart = null;
-            filterEnd = null;
+            filterEnd   = null;
             dateRangeLabel.textContent = '🌍 All time';
-            loadDeposits(null, null);
+            loadRecords(null, null);
         }
 
         applyToday();
@@ -487,8 +584,8 @@
         todayBtn.addEventListener('click', applyToday);
         resetBtn.addEventListener('click', resetFilter);
         sourceFilter.addEventListener('change', applyFilter);
-        startDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
-        endDateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyFilter(); });
+        startDateInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilter(); });
+        endDateInput.addEventListener('keydown',   e => { if (e.key === 'Enter') applyFilter(); });
     </script>
 </body>
 </html>
