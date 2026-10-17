@@ -1422,10 +1422,9 @@ async function connectToGame(stake) {
     state.selectedCard = null;
     state.markedNumbers = new Set();
 
-    state.userCard = loadCardLocal(stake) || [];
-    if (state.userCard.length) {
-        renderCard(state.userCard, 'lobbyCardPreview', false);
-    }
+    // FIX #3: Do not load a stale card from localStorage on reconnect.
+    // The server will send the correct card via the `yourCard` event.
+    state.userCard = [];
 
     localStorage.setItem('dot_bingo_stake', stake);
     disconnectStakeSocket();
@@ -1508,8 +1507,10 @@ async function connectToGame(stake) {
         showWinner(d);
         state.currentGameId = null;
         state.markedNumbers = new Set();
+        // FIX #1: Clear selectedCard & show Back to Lobby after game ends.
+        state.selectedCard = null;
         renderCard(state.userCard, 'lobbyCardPreview', false); 
-        $('backToLobbyContainer')?.classList.add('hidden');
+        updateBackToLobbyVisibility();
     });
 
     socket.on('invalidBingo', () => {
@@ -1600,7 +1601,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         const page = btn.dataset.page;
         clearInterval(lobbyTimer);
         if (page === 'lobby') {
-            state.currentPage === 'lobby' ? showLobby(state.timerSeconds) : showGame();
+            // FIX #2: From game page, return to Lobby instead of trapping user in game.
+            state.currentPage === 'lobby' ? showLobby(state.timerSeconds) : showLobby(30);
         } else {
             $(state.currentPage === 'lobby' ? 'lobbyPage' : 'gamePage')?.classList.add('hidden');
             if (page === 'history') { switchPage('historyPage'); if (statsDirty) updateStats(); }
@@ -1676,10 +1678,8 @@ async function init() {
     await authenticate();
     await fetchInvite();
 
-    const saved = parseInt(localStorage.getItem('dot_bingo_stake'), 10);
-    if ([10, 20, 30, 50].includes(saved)) {
-        setTimeout(() => connectToGame(saved), 500);
-    }
+    // FIX #4: Removed auto-reconnect from localStorage so a fresh session
+    // never auto-joins a stale game or shows an old card.
 }
 
 init();
