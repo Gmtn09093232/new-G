@@ -262,6 +262,8 @@ input[type="file"]::file-selector-button {
 <button id="langToggleBtn" class="lang-toggle">English</button>
 
 <!-- ============ MODALS ============ -->
+
+<!-- Method picker (Withdraw only) -->
 <div id="methodListModal" class="modal">
     <div class="modal-content" style="max-width:400px;">
         <div class="step-header">
@@ -276,6 +278,7 @@ input[type="file"]::file-selector-button {
     </div>
 </div>
 
+<!-- Deposit details (Single Page with visible method list and Photo upload) -->
 <div id="depositDetailsModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -315,6 +318,7 @@ input[type="file"]::file-selector-button {
     </div>
 </div>
 
+<!-- Withdraw details -->
 <div id="withdrawModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -337,6 +341,7 @@ input[type="file"]::file-selector-button {
     </div>
 </div>
 
+<!-- Rules -->
 <div id="rulesModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -366,6 +371,7 @@ input[type="file"]::file-selector-button {
     </div>
 </div>
 
+<!-- Winner overlay -->
 <div id="winnerOverlay" class="winner-modal">
     <div class="winner-card">
         <div class="winner-title" id="winTitle">BINGO!</div>
@@ -435,7 +441,7 @@ input[type="file"]::file-selector-button {
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn-primary" style="flex:1; padding:8px;" data-action="deposit"><span data-key="deposit">+Deposit</span></button>
             <button class="btn-secondary" style="flex:1; padding:8px;" data-action="withdraw"><span data-key="withdraw">-Withdraw</span></button>
-            <button class="btn-ghost" style="flex:1;" data-action="goStake"><span data-key="stakeBtn">Stake</span></button>
+            <button class="btn-ghost" style="flex:1;" data-action="goStake"><span data-key="stakeBtn">BACK</span></button>
         </div>
     </div>
 
@@ -597,7 +603,7 @@ const I18N = {
         confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
         uploadReceipt:"Upload Payment Screenshot / Photo",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"ውርርድ",
+        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"የመግቢያ ክፍያ ይምረጡ", bal:"ቀሪ ሂሳብ", stakeBtn:"ተመለስ",
         pickCard:"የካርድ መለያ ይምረጡ:", selected:"የተመረጠው:", randomCard:"በዘፈቀደ ካርድ",
         yourCardPreview:"የእርስዎ ቢንጎ ካርድ ቅድመ ዕይታ",
         gameTab:"ጨዋታ", historyTab:"ታሪክ", walletTab:"ቦርሳ", profileTab:"መገለጫ",
@@ -644,7 +650,7 @@ const I18N = {
         confirmPayment:"Confirm Payment", copy:"Copy", howToPay:"How to pay?", howToPayTitle:"How to Pay",
         uploadReceipt:"Upload Payment Screenshot / Photo",
         invoiceHint:"After completing the transfer, paste your Invoice Number or the full SMS confirmation below — we'll extract the code automatically.",
-        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"Stake",
+        invoicePlaceholder:"e.g. CKU3JPX6M3", chooseStake:"Choose Your Stake", bal:"BAL", stakeBtn:"BACK ↩️",
         pickCard:"Pick card ID:", selected:"Selected:", randomCard:"Random Card",
         yourCardPreview:"Your Bingo Card Preview",
         gameTab:"Game", historyTab:"History", walletTab:"Wallet", profileTab:"Profile",
@@ -1404,15 +1410,6 @@ function syncBalance(v) {
     set('walletBalance', v);
     set('profileBalance', v);
     set('gameBalance', v);
-
-    if (state.selectedCard !== null && state.balance < state.stake) {
-        state.selectedCard = null;
-        if (socket) socket.emit('selectCardNumber', 0); 
-        $('selectedNumber').textContent = '-';
-        scheduleGridPaint();
-        updateBackToLobbyVisibility();
-        toast('Insufficient balance. Card deselected.', 'error');
-    }
 }
 
 /* ============================================================
@@ -1443,8 +1440,8 @@ async function connectToGame(stake) {
         if (s.stake !== stake) return;
         state.selectedCard = null;
         state.markedNumbers = new Set();
-        state.userCard = [];              
-        clearCardLocal(stake);            
+        state.userCard = [];              // CLEAR OLD CARD
+        clearCardLocal(stake);            // CLEAR CACHE
         $('selectedNumber').textContent = '-';
         showLobby(s.startsIn);
         if (s.takenNumbers) updateGrid(s.takenNumbers);
@@ -1489,20 +1486,6 @@ async function connectToGame(stake) {
         $('gameIdDisplay').textContent = state.currentGameId.replace('GAME_', '');
     });
 
-    socket.on('calledNumbers', nums => {
-        if (!state.isGameActive) return;
-        if (nums && nums.length > 0) {
-            const last = nums[nums.length - 1];
-            $('currentCall').innerText = formatCall(last);
-            const hist = nums.slice(0, -1);
-            $('calledList').innerText = 'Called: ' + (hist.length ? hist.map(formatCall).join(', ') : '—');
-            requestAnimationFrame(() => {
-                const el = $('calledList');
-                if (el) el.scrollLeft = el.scrollWidth;
-            });
-        }
-    });
-
     socket.on('numberCalled', d => {
         if (d.stake !== state.stake) return;
         $('currentCall').innerText = formatCall(d.number);
@@ -1527,8 +1510,8 @@ async function connectToGame(stake) {
         showWinner(d);
         state.currentGameId = null;
         state.markedNumbers = new Set();
-        state.userCard = [];              
-        clearCardLocal(state.stake);      
+        state.userCard = [];              // CLEAR OLD CARD
+        clearCardLocal(state.stake);      // CLEAR CACHE
         renderCard(state.userCard, 'lobbyCardPreview', false); 
         $('backToLobbyContainer')?.classList.add('hidden');
     });
@@ -1543,14 +1526,6 @@ async function connectToGame(stake) {
             }
             setTimeout(() => btn.classList.remove('bingo-alarm'), 1200);
         }
-    });
-
-    socket.on('kickedForInsufficientFunds', () => {
-        toast('You were removed from the game due to insufficient balance.', 'error');
-        state.selectedCard = null;
-        $('selectedNumber').textContent = '-';
-        scheduleGridPaint();
-        updateBackToLobbyVisibility();
     });
 
     socket.on('depositStatus',  d => toast(d.status === 'approved' ? `Deposit +${d.amount} ETB approved!` : 'Deposit rejected.', d.status === 'approved' ? 'success' : 'error'));
@@ -1597,6 +1572,7 @@ document.querySelectorAll('.stake-option').forEach(btn => {
 $('randomCardBtn').addEventListener('click', () => {
     if (state.isGameActive || !socket) return;
     
+    // NEW: Check if the player has enough balance
     if (state.balance < state.stake) {
         toast(`Insufficient balance. You need ${state.stake} ETB to play.`, 'error');
         return;
@@ -1609,10 +1585,11 @@ $('randomCardBtn').addEventListener('click', () => {
     updateBackToLobbyVisibility();
 });
 
-$('numberGrid').addEventListener('click', e => {
+    $('numberGrid').addEventListener('click', e => {
     const cell = e.target.closest('.grid-cell');
     if (!cell || state.isGameActive || !socket) return;
     
+    // NEW: Check if the player has enough balance
     if (state.balance < state.stake) {
         toast(`Insufficient balance. You need ${state.stake} ETB to play.`, 'error');
         return;
@@ -1620,6 +1597,8 @@ $('numberGrid').addEventListener('click', e => {
 
     const i = Number(cell.dataset.number);
     if (state.displayTaken.has(i) || state.serverTaken.has(i)) return;
+    
+    // ... rest of the code
     if (state.selectedCard !== null && state.selectedCard !== i) {
         state.serverTaken.delete(state.selectedCard);
         state.displayTaken.delete(state.selectedCard);
