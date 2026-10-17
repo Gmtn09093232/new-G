@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
-    <title>Completed Deposits & Withdrawals · All Sources</title>
+    <title>Deposits & Withdrawals · All Sources</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
-            background: #f5f7fc; padding: 16px; color: #1e293b;
+            background: #f5f7fc; padding: 16px; padding-bottom: 100px; color: #1e293b;
         }
         .container { max-width: 1200px; margin: 0 auto; }
 
@@ -62,10 +62,9 @@
         .stats-row .stat-item strong,
         .stats-row .stat-item span { font-weight: 700; }
         .stats-row .stat-item .count { color: #2563eb; }
-        .stats-row .stat-item .in  { color: #059669; }
-        .stats-row .stat-item .out { color: #dc2626; }
-        .stats-row .stat-item .net { color: #0f172a; }
-        .stats-row .stat-item .net.neg { color: #dc2626; }
+        .stats-row .stat-item .amount-in  { color: #059669; }
+        .stats-row .stat-item .amount-out { color: #dc2626; }
+        .stats-row .stat-item .sep { color: #cbd5e1; margin: 0 4px; }
 
         .table-wrapper {
             background: white; border-radius: 16px; border: 1px solid #e9edf4;
@@ -94,7 +93,7 @@
             text-transform: capitalize;
         }
         .badge-method.manual      { background: #fef3c7; color: #92400e; font-weight: 600; }
-        .badge-method.balance     { background: #dbeafe; color: #1e40af; font-weight: 600; }
+        .badge-method.balance,
         .badge-method.adjustment  { background: #ede9fe; color: #5b21b6; font-weight: 600; }
         .badge-method.withdrawal  { background: #fee2e2; color: #991b1b; font-weight: 600; }
         .badge-method.telebirr    { background: #fee2e2; color: #991b1b; }
@@ -105,12 +104,12 @@
             display: inline-block; font-size: 0.7rem; font-weight: 600;
             padding: 2px 8px; border-radius: 6px; white-space: nowrap;
         }
-        .src-player      { background: #dcfce7; color: #166534; }
-        .src-manual      { background: #fef3c7; color: #92400e; }
-        .src-balance     { background: #dbeafe; color: #1e40af; }
-        .src-wd-player   { background: #fee2e2; color: #991b1b; }
-        .src-wd-manual   { background: #ffe4e6; color: #9f1239; }
-        .src-wd-balance  { background: #ede9fe; color: #5b21b6; }
+        .src-player  { background: #dcfce7; color: #166534; }
+        .src-manual  { background: #fef3c7; color: #92400e; }
+        .src-balance { background: #dbeafe; color: #1e40af; }
+        .src-wd-player  { background: #fee2e2; color: #991b1b; }
+        .src-wd-manual  { background: #ffe4e6; color: #9f1239; }
+        .src-wd-balance { background: #ede9fe; color: #5b21b6; }
 
         .loading { text-align: center; padding: 40px 20px; color: #64748b; }
         .error {
@@ -122,8 +121,43 @@
             text-align: center; margin-top: 30px; color: #94a3b8; font-size: 0.75rem;
         }
 
+        /* ==== Fixed bottom tabs ==== */
+        .bottom-tabs {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            display: flex; gap: 10px;
+            padding: 10px 16px 14px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+            box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+            z-index: 100;
+            max-width: 1200px; margin: 0 auto;
+        }
+        .bottom-tab {
+            flex: 1;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 14px 12px;
+            border: none; border-radius: 14px;
+            font-weight: 700; font-size: 1rem;
+            cursor: pointer;
+            background: #f1f5f9; color: #475569;
+            transition: 0.18s;
+            min-height: 54px;
+        }
+        .bottom-tab:hover { background: #e2e8f0; }
+        .bottom-tab.active[data-tab="deposits"] {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+            box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+        }
+        .bottom-tab.active[data-tab="withdrawals"] {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: white;
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
+        }
+
         @media (max-width: 600px) {
-            body { padding: 10px; }
+            body { padding: 10px; padding-bottom: 90px; }
             h1 { font-size: 1.2rem; flex-direction: column; align-items: flex-start; gap: 4px; }
             h1 small { font-size: 0.85rem; }
             .filter-bar { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
@@ -136,14 +170,16 @@
             th, td { padding: 8px 6px; }
             .badge-method { font-size: 0.6rem; padding: 1px 6px; }
             .src-badge { font-size: 0.6rem; padding: 1px 6px; }
+            .bottom-tabs { padding: 8px 10px 12px; gap: 8px; }
+            .bottom-tab { padding: 12px 8px; font-size: 0.9rem; min-height: 50px; border-radius: 12px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>
-            💳 Deposits &amp; Withdrawals
-            <small>player · manual · balance adjustments — newest first</small>
+        <h1 id="pageTitle">
+            💳 Completed Deposits
+            <small>player · manual · balance additions — newest first</small>
         </h1>
 
         <div class="filter-bar">
@@ -154,12 +190,9 @@
             <label for="sourceFilter">Source</label>
             <select id="sourceFilter">
                 <option value="all">All sources</option>
-                <option value="player">Player deposits</option>
-                <option value="manual">Manual deposits</option>
-                <option value="balance">Balance additions</option>
-                <option value="wd_player">Player withdrawals</option>
-                <option value="wd_manual">Manual withdrawals</option>
-                <option value="wd_balance">Balance deductions</option>
+                <option value="player">Player</option>
+                <option value="manual">Manual</option>
+                <option value="balance">Balance</option>
             </select>
             <button id="applyFilterBtn">Apply</button>
             <button id="todayFilterBtn" class="today-btn">Today</button>
@@ -171,10 +204,18 @@
         <div id="loadingMessage" class="loading">⏳ Loading records…</div>
 
         <div class="stats-row" id="statsRow" style="display:none;">
-            <div class="stat-item">Entries: <span class="count" id="totalCount">0</span></div>
-            <div class="stat-item">Deposits in: <span class="in" id="totalIn">0.0</span> ETB</div>
-            <div class="stat-item">Withdrawals out: <span class="out" id="totalOut">0.0</span> ETB</div>
-            <div class="stat-item">Net: <span class="net" id="netAmount">0.0</span> ETB</div>
+            <div class="stat-item">Total entries: <span class="count" id="totalCount">0</span></div>
+            <div class="stat-item">
+                Total <span id="amountLabel">deposits</span>:
+                <span class="amount-in" id="totalAmount">0.0</span> ETB
+            </div>
+            <div class="stat-item">
+                <span style="color:#166534">Player:</span> <span id="playerAmt">0</span>
+                <span class="sep">|</span>
+                <span style="color:#92400e">Manual:</span> <span id="manualAmt">0</span>
+                <span class="sep">|</span>
+                <span style="color:#1e40af">Balance:</span> <span id="balanceAmt">0</span>
+            </div>
         </div>
 
         <div class="table-wrapper">
@@ -187,7 +228,7 @@
                         <th>Time</th>
                         <th>Method</th>
                         <th>Phone</th>
-                        <th>Type</th>
+                        <th>Source</th>
                     </tr>
                 </thead>
                 <tbody id="depositTableBody">
@@ -201,6 +242,12 @@
         </footer>
     </div>
 
+    <!-- Bottom tab bar -->
+    <div class="bottom-tabs">
+        <button class="bottom-tab active" data-tab="deposits">💳 Deposits</button>
+        <button class="bottom-tab" data-tab="withdrawals">💸 Withdrawals</button>
+    </div>
+
     <script>
         // ================================================================
         //  🔑  SUPABASE CREDENTIALS
@@ -211,14 +258,18 @@
 
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        // DOM refs
+        const pageTitle      = document.getElementById('pageTitle');
         const tableBody      = document.getElementById('depositTableBody');
         const loadingEl      = document.getElementById('loadingMessage');
         const errorEl        = document.getElementById('errorContainer');
         const statsRow       = document.getElementById('statsRow');
         const totalCountEl   = document.getElementById('totalCount');
-        const totalInEl      = document.getElementById('totalIn');
-        const totalOutEl     = document.getElementById('totalOut');
-        const netAmountEl    = document.getElementById('netAmount');
+        const totalAmountEl  = document.getElementById('totalAmount');
+        const amountLabel    = document.getElementById('amountLabel');
+        const playerAmtEl    = document.getElementById('playerAmt');
+        const manualAmtEl    = document.getElementById('manualAmt');
+        const balanceAmtEl   = document.getElementById('balanceAmt');
 
         const startDateInput = document.getElementById('startDate');
         const endDateInput   = document.getElementById('endDate');
@@ -227,9 +278,13 @@
         const todayBtn       = document.getElementById('todayFilterBtn');
         const resetBtn       = document.getElementById('resetFilterBtn');
         const dateRangeLabel = document.getElementById('dateRangeLabel');
+        const tabButtons     = document.querySelectorAll('.bottom-tab');
 
+        // State
+        let allRecords = [];      // fully merged, time-sorted
         let filterStart = null;
         let filterEnd   = null;
+        let activeTab   = 'deposits'; // 'deposits' | 'withdrawals'
 
         // ---------- helpers ----------
         function showError(msg) {
@@ -271,34 +326,31 @@
         }
 
         // ---------- withdrawals: tolerant fetcher ----------
-        // Tries a couple of likely table names / status values so the page
-        // keeps working even if the schema differs slightly.
         async function fetchWithdrawals(startIso, endIso) {
-            const tables   = ['withdrawal_requests', 'withdrawals'];
-            const statusSets = [['approved', 'completed'], ['approved'], ['completed']];
-
-            for (const table of tables) {
-                for (const statuses of statusSets) {
-                    try {
-                        let q = supabase
-                            .from(table)
-                            .select('*')
-                            .in('status', statuses)
-                            .order('created_at', { ascending: false });
-                        q = applyRange(q, startIso, endIso);
-
-                        const { data, error } = await q;
-                        if (!error) return data || [];
-                    } catch (e) {
-                        /* try next combination */
-                    }
-                }
+            const attempts = [
+                { table: 'withdrawal_requests', statuses: ['approved', 'completed'] },
+                { table: 'withdrawal_requests', statuses: ['approved'] },
+                { table: 'withdrawal_requests', statuses: ['completed'] },
+                { table: 'withdrawals',          statuses: ['approved', 'completed'] },
+                { table: 'withdrawals',          statuses: ['approved'] }
+            ];
+            for (const { table, statuses } of attempts) {
+                try {
+                    let q = supabase
+                        .from(table)
+                        .select('*')
+                        .in('status', statuses)
+                        .order('created_at', { ascending: false });
+                    q = applyRange(q, startIso, endIso);
+                    const { data, error } = await q;
+                    if (!error) return data || [];
+                } catch (e) { /* try next */ }
             }
             console.warn('Withdrawals could not be fetched from any known table/status combination.');
             return [];
         }
 
-        // ---------- main loader ----------
+        // ---------- main loader (fetch all, sort by time) ----------
         async function loadRecords(startDate, endDate) {
             try {
                 loadingEl.style.display = 'block';
@@ -306,7 +358,6 @@
                 statsRow.style.display  = 'none';
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">Loading…</td></tr>';
 
-                // -------- 1. date bounds --------
                 let startIso = null, endIso = null;
                 if (startDate) {
                     const s = new Date(startDate); s.setHours(0, 0, 0, 0);
@@ -317,7 +368,6 @@
                     endIso = e.toISOString();
                 }
 
-                // -------- 2. build queries --------
                 let depQuery = supabase
                     .from('deposit_requests')
                     .select('telegram_id, username, amount, created_at, payment_type, phone, admin_id')
@@ -325,14 +375,12 @@
                     .order('created_at', { ascending: false });
                 depQuery = applyRange(depQuery, startIso, endIso);
 
-                // all adjustments: sign decides direction (+ add / − deduct)
                 let adjQuery = supabase
                     .from('admin_deposit_adjustments')
                     .select('admin_id, amount, description, type, created_at')
                     .order('created_at', { ascending: false });
                 adjQuery = applyRange(adjQuery, startIso, endIso);
 
-                // -------- 3. fetch in parallel --------
                 const [depRes, adjRes, withdrawalRows] = await Promise.all([
                     depQuery,
                     adjQuery,
@@ -341,14 +389,14 @@
 
                 if (depRes.error) throw new Error('Deposits: ' + depRes.error.message);
 
-                const deposits = depRes.data || [];
-                let adjustments = adjRes.error ? [] : (adjRes.data || []);
+                const deposits   = depRes.data || [];
+                const adjustments = adjRes.error ? [] : (adjRes.data || []);
                 if (adjRes.error) console.warn('Adjustments fetch failed:', adjRes.error.message);
 
-                // -------- 4. merge everything into one array --------
+                // ---- merge into a single list ----
                 const combined = [];
 
-                // 4a. player + manual deposits
+                // 1. Deposits (player + manual)
                 for (const d of deposits) {
                     const m = String(d.payment_type || '').toLowerCase();
                     combined.push({
@@ -363,12 +411,12 @@
                     });
                 }
 
-                // 4b. completed withdrawals (player + manual)
+                // 2. Withdrawals (player + manual)
                 for (const w of withdrawalRows) {
                     const m = String(w.payment_type || w.method || '').toLowerCase();
                     const isManual = m === 'manual';
                     combined.push({
-                        userId:    String(w.telegram_id || w.user_id || 'N/A'),
+                        userId:    String(w.telegram_id || w.user_id || w.admin_id || 'N/A'),
                         username:  w.username || '',
                         amount:    Math.abs(Number(w.amount) || 0),
                         timestamp: w.created_at || w.updated_at || w.processed_at,
@@ -379,15 +427,13 @@
                     });
                 }
 
-                // 4c. balance adjustments (positive = add, negative = deduct)
+                // 3. Balance adjustments (sign decides direction)
                 for (const a of adjustments) {
                     const amt = Number(a.amount) || 0;
                     if (!amt) continue;
                     const desc = String(a.description || '');
                     const m = desc.match(/for player (\d+)/i);
-                    const playerId = m
-                        ? m[1]
-                        : (a.telegram_id ? String(a.telegram_id) : 'N/A');
+                    const playerId = m ? m[1] : (a.telegram_id ? String(a.telegram_id) : 'N/A');
                     combined.push({
                         userId:    playerId,
                         username:  '',
@@ -400,7 +446,7 @@
                     });
                 }
 
-                // -------- 5. enrich usernames --------
+                // ---- enrich usernames ----
                 const userIds = [...new Set(
                     combined
                         .map(x => x.userId)
@@ -423,113 +469,107 @@
                     if (!x.username) x.username = 'N/A';
                 });
 
-                // -------- 6. SORT BY TIME — newest first (not by method) --------
+                // ---- SORT BY TIME (newest first) ----
                 combined.sort((a, b) => {
                     const ta = new Date(a.timestamp).getTime() || 0;
                     const tb = new Date(b.timestamp).getTime() || 0;
                     return tb - ta;
                 });
 
-                // -------- 7. apply source filter --------
-                const srcFilter = sourceFilter.value || 'all';
-                const filtered = combined.filter(x => matchesFilter(x, srcFilter));
-
-                if (filtered.length === 0) {
-                    tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">No records found for this period.</td></tr>';
-                    loadingEl.style.display = 'none';
-                    statsRow.style.display = 'none';
-                    return;
-                }
-
-                // -------- 8. stats --------
-                const totalIn  = filtered.filter(x => x.direction === 'in')
-                                        .reduce((s, x) => s + x.amount, 0);
-                const totalOut = filtered.filter(x => x.direction === 'out')
-                                        .reduce((s, x) => s + x.amount, 0);
-                const net = totalIn - totalOut;
-
-                totalCountEl.textContent = filtered.length;
-                totalInEl.textContent    = fmt(totalIn);
-                totalOutEl.textContent   = fmt(totalOut);
-                netAmountEl.textContent  = fmt(net);
-                netAmountEl.classList.toggle('neg', net < 0);
-                statsRow.style.display = 'flex';
-
-                // -------- 9. render rows (already time-sorted) --------
-                let rows = '';
-                filtered.forEach(d => {
-                    const m = String(d.method || '').toLowerCase();
-                    let methodClass = 'badge-method ' + m;
-                    if (m === 'manual')     methodClass = 'badge-method manual';
-                    if (m === 'balance' || m === 'adjustment') methodClass = 'badge-method adjustment';
-                    if (m === 'withdrawal') methodClass = 'badge-method withdrawal';
-
-                    let phoneDisplay;
-                    if (m === 'manual') phoneDisplay = 'Manual';
-                    else if (m === 'balance' || m === 'adjustment') phoneDisplay = 'Adjustment';
-                    else if (m === 'withdrawal') phoneDisplay = 'Withdrawal';
-                    else phoneDisplay = (d.phone && d.phone !== '-' ? d.phone : '-');
-
-                    let srcClass, srcLabel;
-                    if (d.direction === 'in') {
-                        if (d.source === 'player')      { srcClass = 'src-player';     srcLabel = 'Player deposit'; }
-                        else if (d.source === 'manual') { srcClass = 'src-manual';     srcLabel = 'Manual deposit'; }
-                        else                            { srcClass = 'src-balance';    srcLabel = 'Balance add'; }
-                    } else {
-                        if (d.source === 'player')      { srcClass = 'src-wd-player';  srcLabel = 'Player withdraw'; }
-                        else if (d.source === 'manual') { srcClass = 'src-wd-manual';  srcLabel = 'Manual withdraw'; }
-                        else                            { srcClass = 'src-wd-balance'; srcLabel = 'Balance deduct'; }
-                    }
-
-                    const amtClass = d.direction === 'out' ? 'amt-out' : 'amt-in';
-                    const sign     = d.direction === 'out' ? '-' : '';
-
-                    rows += `<tr>
-                        <td>${escapeHtml(d.userId)}</td>
-                        <td>${escapeHtml(d.username)}</td>
-                        <td class="${amtClass}"><strong>${sign}${fmt(d.amount)}</strong></td>
-                        <td>${formatDate(d.timestamp)}</td>
-                        <td><span class="${methodClass}">${escapeHtml(d.method)}</span></td>
-                        <td>${escapeHtml(phoneDisplay)}</td>
-                        <td><span class="src-badge ${srcClass}">${srcLabel}</span></td>
-                    </tr>`;
-                });
-                tableBody.innerHTML = rows;
-                loadingEl.style.display = 'none';
-
+                allRecords = combined;
+                render();
             } catch (err) {
                 console.error(err);
                 showError('Error loading records: ' + err.message);
                 tableBody.innerHTML = '<tr class="empty-row"><td colspan="7">Error loading data</td></tr>';
+                loadingEl.style.display = 'none';
             }
         }
 
-        // ---------- source filter mapping ----------
-        const FILTER_MAP = {
-            player:    ['player',  'in'],
-            manual:    ['manual',  'in'],
-            balance:   ['balance', 'in'],
-            wd_player: ['player',  'out'],
-            wd_manual: ['manual',  'out'],
-            wd_balance:['balance', 'out']
-        };
+        // ---------- render (based on active tab) ----------
+        function render() {
+            const dir = activeTab === 'deposits' ? 'in' : 'out';
+            const src = sourceFilter.value || 'all';
 
-        function matchesFilter(row, key) {
-            if (key === 'all' || !key) return true;
-            const m = FILTER_MAP[key];
-            return !!m && row.source === m[0] && row.direction === m[1];
+            const filtered = allRecords.filter(r =>
+                r.direction === dir && (src === 'all' || r.source === src)
+            );
+
+            // update title
+            if (activeTab === 'deposits') {
+                pageTitle.innerHTML = '💳 Completed Deposits <small>player · manual · balance additions — newest first</small>';
+                amountLabel.textContent = 'deposits';
+                totalAmountEl.className = 'amount-in';
+            } else {
+                pageTitle.innerHTML = '💸 Completed Withdrawals <small>player · manual · balance deductions — newest first</small>';
+                amountLabel.textContent = 'withdrawals';
+                totalAmountEl.className = 'amount-out';
+            }
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `<tr class="empty-row"><td colspan="7">No ${activeTab} found for this period.</td></tr>`;
+                statsRow.style.display = 'none';
+                loadingEl.style.display = 'none';
+                return;
+            }
+
+            // stats
+            const total      = filtered.reduce((s, x) => s + x.amount, 0);
+            const playerAmt  = filtered.filter(x => x.source === 'player').reduce((s, x) => s + x.amount, 0);
+            const manualAmt  = filtered.filter(x => x.source === 'manual').reduce((s, x) => s + x.amount, 0);
+            const balanceAmt = filtered.filter(x => x.source === 'balance').reduce((s, x) => s + x.amount, 0);
+
+            totalCountEl.textContent  = filtered.length;
+            totalAmountEl.textContent = fmt(total);
+            playerAmtEl.textContent   = fmt(playerAmt);
+            manualAmtEl.textContent   = fmt(manualAmt);
+            balanceAmtEl.textContent  = fmt(balanceAmt);
+            statsRow.style.display    = 'flex';
+
+            // rows (already time-sorted)
+            let rows = '';
+            filtered.forEach(d => {
+                const m = String(d.method || '').toLowerCase();
+                let methodClass = 'badge-method ' + m;
+                if (m === 'manual')     methodClass = 'badge-method manual';
+                if (m === 'balance' || m === 'adjustment') methodClass = 'badge-method adjustment';
+                if (m === 'withdrawal') methodClass = 'badge-method withdrawal';
+
+                let phoneDisplay;
+                if (m === 'manual') phoneDisplay = 'Manual';
+                else if (m === 'balance' || m === 'adjustment') phoneDisplay = 'Adjustment';
+                else if (m === 'withdrawal') phoneDisplay = 'Withdrawal';
+                else phoneDisplay = (d.phone && d.phone !== '-' ? d.phone : '-');
+
+                let srcClass, srcLabel;
+                if (d.direction === 'in') {
+                    if (d.source === 'player')      { srcClass = 'src-player';  srcLabel = 'Player deposit'; }
+                    else if (d.source === 'manual') { srcClass = 'src-manual';  srcLabel = 'Manual deposit'; }
+                    else                            { srcClass = 'src-balance'; srcLabel = 'Balance add'; }
+                } else {
+                    if (d.source === 'player')      { srcClass = 'src-wd-player';  srcLabel = 'Player withdraw'; }
+                    else if (d.source === 'manual') { srcClass = 'src-wd-manual';  srcLabel = 'Manual withdraw'; }
+                    else                            { srcClass = 'src-wd-balance'; srcLabel = 'Balance deduct'; }
+                }
+
+                const amtClass = d.direction === 'out' ? 'amt-out' : 'amt-in';
+                const sign     = d.direction === 'out' ? '-' : '';
+
+                rows += `<tr>
+                    <td>${escapeHtml(d.userId)}</td>
+                    <td>${escapeHtml(d.username)}</td>
+                    <td class="${amtClass}"><strong>${sign}${fmt(d.amount)}</strong></td>
+                    <td>${formatDate(d.timestamp)}</td>
+                    <td><span class="${methodClass}">${escapeHtml(d.method)}</span></td>
+                    <td>${escapeHtml(phoneDisplay)}</td>
+                    <td><span class="src-badge ${srcClass}">${srcLabel}</span></td>
+                </tr>`;
+            });
+            tableBody.innerHTML = rows;
+            loadingEl.style.display = 'none';
         }
 
-        const FILTER_NAMES = {
-            player: 'Player deposits',
-            manual: 'Manual deposits',
-            balance: 'Balance additions',
-            wd_player: 'Player withdrawals',
-            wd_manual: 'Manual withdrawals',
-            wd_balance: 'Balance deductions'
-        };
-
-        // ---------- UI actions ----------
+        // ---------- filter UI ----------
         function applyFilter() {
             const startVal = startDateInput.value;
             const endVal   = endDateInput.value;
@@ -553,7 +593,10 @@
                 labelText = '🌍 All time';
             }
             const s = sourceFilter.value;
-            if (s !== 'all') labelText += ` · ${FILTER_NAMES[s] || s}`;
+            if (s !== 'all') {
+                const names = { player: 'Player', manual: 'Manual', balance: 'Balance' };
+                labelText += ` · ${names[s] || s}`;
+            }
             dateRangeLabel.textContent = labelText;
 
             loadRecords(filterStart, filterEnd);
@@ -578,14 +621,28 @@
             loadRecords(null, null);
         }
 
-        applyToday();
+        // ---------- tab switching ----------
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                if (tab === activeTab) return;
+                activeTab = tab;
+                tabButtons.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+                render();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
 
+        // ---------- wire up ----------
         applyBtn.addEventListener('click', applyFilter);
         todayBtn.addEventListener('click', applyToday);
         resetBtn.addEventListener('click', resetFilter);
         sourceFilter.addEventListener('change', applyFilter);
         startDateInput.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilter(); });
         endDateInput.addEventListener('keydown',   e => { if (e.key === 'Enter') applyFilter(); });
+
+        // Default: today
+        applyToday();
     </script>
 </body>
 </html>
