@@ -6,6 +6,8 @@
 //             - Winner history broadcasting
 //             - Cascade player delete
 //             - Deposit proof photos in admin finance view
+//             - 50 Birr Stake Added
+//             - Invalid Bingo Socket Emit Added
 // ================================================================
 
 require('dotenv').config();
@@ -907,7 +909,12 @@ function handleBingoClaim(telegramId, stake, force = false) {
   if (!force) {
     const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
     if (lastCalled === null) return;
-    if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) return;
+    if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
+      getSocketByUserId(telegramId).then(socket => {
+        if (socket) socket.emit('invalidBingo');
+      });
+      return;
+    }
   }
 
   if (game.winningNumber === null) {
