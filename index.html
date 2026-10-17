@@ -1571,6 +1571,13 @@ document.querySelectorAll('.stake-option').forEach(btn => {
 
 $('randomCardBtn').addEventListener('click', () => {
     if (state.isGameActive || !socket) return;
+    
+    // NEW: Check if the player has enough balance
+    if (state.balance < state.stake) {
+        toast(`Insufficient balance. You need ${state.stake} ETB to play.`, 'error');
+        return;
+    }
+
     socket.emit('newCardNumber');
     state.selectedCard = null;
     $('selectedNumber').textContent = '...';
@@ -1578,11 +1585,20 @@ $('randomCardBtn').addEventListener('click', () => {
     updateBackToLobbyVisibility();
 });
 
-$('numberGrid').addEventListener('click', e => {
+    $('numberGrid').addEventListener('click', e => {
     const cell = e.target.closest('.grid-cell');
     if (!cell || state.isGameActive || !socket) return;
+    
+    // NEW: Check if the player has enough balance
+    if (state.balance < state.stake) {
+        toast(`Insufficient balance. You need ${state.stake} ETB to play.`, 'error');
+        return;
+    }
+
     const i = Number(cell.dataset.number);
     if (state.displayTaken.has(i) || state.serverTaken.has(i)) return;
+    
+    // ... rest of the code
     if (state.selectedCard !== null && state.selectedCard !== i) {
         state.serverTaken.delete(state.selectedCard);
         state.displayTaken.delete(state.selectedCard);
