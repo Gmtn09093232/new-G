@@ -9,6 +9,8 @@
 //             - 50 Birr Stake Added
 //             - Invalid Bingo Socket Emit Added
 //             - Bot players removed
+//             - IPv4/IPv6 sanitization for inet audit column
+//             - Telegram 409 handled as transient warning
 // ================================================================
 
 require('dotenv').config();
@@ -102,30 +104,43 @@ app.use(sessionMiddleware);
 
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
+// ---------- IP sanitizer (fixes "invalid input syntax for type inet") ----------
+function sanitizeIp(raw) {
+  if (!raw) return null;
+  // x-forwarded-for can be "1.2.3.4, 5.6.7.8, ..." — take first hop only
+  const first = String(raw).split(',')[0].trim();
+  if (!first) return null;
+  // IPv4
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(first)) return first;
+  // IPv6 (loose check — anything with a colon and only hex/colon chars)
+  if (first.includes(':') && /^[0-9a-fA-F:]+$/.test(first)) return first;
+  return null;
+}
+
 // ---------- Audit Logger ----------
 async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
   try {
     const { error } = await supabase
       .from('audit_logs')
-      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: ipAddress, details });
+      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: sanitizeIp(ipAddress), details });
     if (error) throw error;
   } catch (err) { console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message); }
 }
 
 const Audit = {
-  depositInitiated: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId: u, ipAddress: ip, details: d }),
-  depositCompleted: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId: u, ipAddress: ip, details: d }),
-  depositFailed: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId: u, ipAddress: ip, details: d }),
-  withdrawalRequested: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId: u, ipAddress: ip, details: d }),
-  withdrawalCompleted: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId: u, ipAddress: ip, details: d }),
-  withdrawalRejected: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId: u, ipAddress: ip, details: d }),
-  bingoCalled: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId: u, ipAddress: ip, details: d }),
-  bingoRejected: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId: u, ipAddress: ip, details: d }),
-  winPaidOut: (roomId, u, ip, d) => logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId: u, ipAddress: ip, details: d }),
+  depositInitiated: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  depositCompleted: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  depositFailed: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  withdrawalRequested: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  withdrawalCompleted: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  withdrawalRejected: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  bingoCalled: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  bingoRejected: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  winPaidOut: (roomId, u, ip, d) => logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
   numberDrawn: (roomId, d) => logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: d }),
-  cardAssigned: (roomId, u, ip, d) => logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId: u, ipAddress: ip, details: d }),
-  adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details: d }),
-  suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
+  cardAssigned: (roomId, u, ip, d) => logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: sanitizeIp(ip), details: d }),
+  suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d })
 };
 
 // ---------- Suspicious Activity Detector ----------
@@ -2198,7 +2213,7 @@ app.post('/super-admin/transfer-player', async (req, res) => {
         telegram_id: String(telegramId), username: user.username,
         invite_code: targetAdmin.invite_code || user.invite_code,
         admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-        ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
+        ip_address: sanitizeIp(req.ip) || null, user_agent: req.headers['user-agent'] || null
       });
     }
 
@@ -2257,7 +2272,7 @@ app.post('/super-admin/transfer-players', async (req, res) => {
           telegram_id: user.telegram_id, username: user.username,
           invite_code: targetAdmin.invite_code || user.invite_code,
           admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-          ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
+          ip_address: sanitizeIp(req.ip) || null, user_agent: req.headers['user-agent'] || null
         });
       }
 
@@ -2418,7 +2433,13 @@ const botToken = process.env.BOT_TOKEN;
 if (botToken) {
   try {
     const TelegramBot = require('node-telegram-bot-api');
-    const bot = new TelegramBot(botToken, { polling: true });
+    const bot = new TelegramBot(botToken, {
+      polling: {
+        autoStart: true,
+        interval: 500,
+        params: { timeout: 10 }
+      }
+    });
     console.log('🤖 Telegram bot started (polling)');
 
     bot.onText(/\/start(.+)?/, async (msg, match) => {
@@ -2476,9 +2497,11 @@ if (botToken) {
     });
 
     bot.on('polling_error', (err) => {
-      console.error('❌ Telegram Polling Error:', err.message);
-      if (err.message.includes('409')) {
-        console.error('🚨 CONFLICT: Another instance is polling this bot! Please ensure only one server instance is running, or restart the server.');
+      if (err.message && err.message.includes('409')) {
+        // Transient: another instance is polling during deploy. Auto-retry.
+        console.warn('⚠️ Telegram 409 conflict (likely deploy overlap). Will auto-retry.');
+      } else {
+        console.error('❌ Telegram Polling Error:', err.message);
       }
     });
   } catch (err) {
@@ -2538,7 +2561,7 @@ io.on('connection', async (socket) => {
     const existing = game.players.find(p => p.telegramId === socket.userId);
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(num);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    const ip = sanitizeIp(socket.handshake.headers['x-forwarded-for']) || socket.handshake.address || null;
     const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
@@ -2560,7 +2583,7 @@ io.on('connection', async (socket) => {
     const existing = game.players.find(p => p.telegramId === socket.userId);
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(randomNum);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+    const ip = sanitizeIp(socket.handshake.headers['x-forwarded-for']) || socket.handshake.address || null;
     const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
