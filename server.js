@@ -1,5 +1,5 @@
 // ================================================================
-//  server.js – Full Bingo Server
+//  server.js – Full Bingo Server (corrected)
 //             - No secret backdoor
 //             - Real-time admin events
 //             - Session-auth admin sockets
@@ -8,9 +8,7 @@
 //             - Deposit proof photos in admin finance view
 //             - 50 Birr Stake Added
 //             - Invalid Bingo Socket Emit Added
-//             - Bot players removed
-//             - IPv4/IPv6 sanitization for inet audit column
-//             - Telegram 409 handled as transient warning
+//             - 2 bots only, no force win
 // ================================================================
 
 require('dotenv').config();
@@ -104,43 +102,30 @@ app.use(sessionMiddleware);
 
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
 
-// ---------- IP sanitizer (fixes "invalid input syntax for type inet") ----------
-function sanitizeIp(raw) {
-  if (!raw) return null;
-  // x-forwarded-for can be "1.2.3.4, 5.6.7.8, ..." — take first hop only
-  const first = String(raw).split(',')[0].trim();
-  if (!first) return null;
-  // IPv4
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(first)) return first;
-  // IPv6 (loose check — anything with a colon and only hex/colon chars)
-  if (first.includes(':') && /^[0-9a-fA-F:]+$/.test(first)) return first;
-  return null;
-}
-
 // ---------- Audit Logger ----------
 async function logAuditEvent({ eventType, roomId = null, userId = 'system', ipAddress = null, details = {} }) {
   try {
     const { error } = await supabase
       .from('audit_logs')
-      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: sanitizeIp(ipAddress), details });
+      .insert({ event_type: eventType, room_id: roomId, user_id: userId, ip_address: ipAddress, details });
     if (error) throw error;
   } catch (err) { console.error(`[AUDIT FAIL] ${eventType} (user ${userId}):`, err.message); }
 }
 
 const Audit = {
-  depositInitiated: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  depositCompleted: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  depositFailed: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  withdrawalRequested: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  withdrawalCompleted: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  withdrawalRejected: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  bingoCalled: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  bingoRejected: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  winPaidOut: (roomId, u, ip, d) => logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
+  depositInitiated: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_INITIATED', userId: u, ipAddress: ip, details: d }),
+  depositCompleted: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_COMPLETED', userId: u, ipAddress: ip, details: d }),
+  depositFailed: (u, ip, d) => logAuditEvent({ eventType: 'DEPOSIT_FAILED', userId: u, ipAddress: ip, details: d }),
+  withdrawalRequested: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REQUESTED', userId: u, ipAddress: ip, details: d }),
+  withdrawalCompleted: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_COMPLETED', userId: u, ipAddress: ip, details: d }),
+  withdrawalRejected: (u, ip, d) => logAuditEvent({ eventType: 'WITHDRAWAL_REJECTED', userId: u, ipAddress: ip, details: d }),
+  bingoCalled: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_CALLED', roomId, userId: u, ipAddress: ip, details: d }),
+  bingoRejected: (roomId, u, ip, d) => logAuditEvent({ eventType: 'BINGO_REJECTED', roomId, userId: u, ipAddress: ip, details: d }),
+  winPaidOut: (roomId, u, ip, d) => logAuditEvent({ eventType: 'WIN_PAID_OUT', roomId, userId: u, ipAddress: ip, details: d }),
   numberDrawn: (roomId, d) => logAuditEvent({ eventType: 'NUMBER_DRAWN', roomId, details: d }),
-  cardAssigned: (roomId, u, ip, d) => logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d }),
-  adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: sanitizeIp(ip), details: d }),
-  suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: sanitizeIp(ip), details: d })
+  cardAssigned: (roomId, u, ip, d) => logAuditEvent({ eventType: 'CARD_ASSIGNED', roomId, userId: u, ipAddress: ip, details: d }),
+  adminAction: (eventType, adminId, ip, d) => logAuditEvent({ eventType, userId: adminId, ipAddress: ip, details: d }),
+  suspicious: (roomId, u, ip, d) => logAuditEvent({ eventType: 'SUSPICIOUS_BEHAVIOR_DETECTED', roomId, userId: u, ipAddress: ip, details: d })
 };
 
 // ---------- Suspicious Activity Detector ----------
@@ -810,13 +795,32 @@ function createGameState(entryFee) {
     calledNumbers: [], entryFee, prizePool: 0,
     lobbyTimer: null, callInterval: null, lobbyEndTime: 0,
     cardSet: Array.from({ length: 100 }, () => generateCard()),
-    winners: [], bingoGraceTimeout: null, winningNumber: null
+    winners: [], bingoGraceTimeout: null, winningNumber: null,
+    botTimeouts: []
   };
 }
 
 const games = { 10: createGameState(10), 20: createGameState(20), 30: createGameState(30), 50: createGameState(50) };
 
+const BOT_IDS = ['1945854','8696548'];
+const botBalances = new Map();
+BOT_IDS.forEach(id => botBalances.set(id, 1000));
+
+const ETHIOPIAN_MALE_NAMES = [
+  'Abe','Alex','mekia','Dawit','Fikru','Girma','Haile','zid','sura cr7','nega',
+  'Mekonnen','Nebiyu','baye','Robel','teddy','Tadesse','Wondia','Yared','Zemenu','Birukee',
+  'bura','Ermias','Fitsum','shaki','belaya','Mulugeta','Nati','dera','Tekle','Worku',
+  'jhone','Aman','Belete','Daniel','Endalk','Gashaw','Habtia','kassish','Lul','Mengistu',
+  'Mulu','abela','Tesfaye','Wolde'
+];
+function getRandomMaleEthiopianName() { return ETHIOPIAN_MALE_NAMES[Math.floor(Math.random() * ETHIOPIAN_MALE_NAMES.length)]; }
+
 let gameCounter = 0;
+const botLastWinGame = new Map();
+BOT_IDS.forEach(id => botLastWinGame.set(id, 0));
+let botGameHistory = [];
+const BOT_NAME_REFRESH_MS = 12 * 60 * 60 * 1000;
+const botNameAssignments = new Map();
 
 // ---------- Winner history ----------
 const winnerHistory = [];
@@ -838,20 +842,79 @@ function recordWinnerEntry(stake, winner, prizeEach, totalPrize, winningNumber) 
   return entry;
 }
 
-function handleBingoClaim(telegramId, stake) {
+function getBotName(botId) {
+  const now = Date.now();
+  const entry = botNameAssignments.get(botId);
+  if (entry && (now - entry.assignedAt) < BOT_NAME_REFRESH_MS) return entry.name;
+  const newName = getRandomMaleEthiopianName();
+  botNameAssignments.set(botId, { name: newName, assignedAt: now });
+  return newName;
+}
+
+function addSingleBotToGame(botId, stake) {
+  if (stake !== 20) return false;
+  const game = getGame(stake);
+  if (!game || game.status !== 'lobby') return false;
+  if (game.players.find(p => p.telegramId === botId)) return false;
+  const balance = botBalances.get(botId) || 0;
+  if (balance < game.entryFee) return false;
+  const available = [];
+  for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) available.push(i);
+  if (!available.length) return false;
+  const cardNumber = available[Math.floor(Math.random() * available.length)];
+  const card = game.cardSet[cardNumber - 1];
+  const botName = getBotName(botId);
+  game.players.push({
+    telegramId: botId, username: botName, card, markedNumbers: [],
+    cardNumber, ip: '127.0.0.1', isBot: true, hasCalledBingo: false
+  });
+  game.takenCardNumbers.add(cardNumber);
+  io.to(`stake_${stake}`).emit('cardTaken', { stake, number: cardNumber, takenNumbers: Array.from(game.takenCardNumbers) });
+  broadcastPlayerCount(stake);
+  notifyAdminClients();
+  return true;
+}
+
+function updateBotsOnNumber(stake, number) {
+  if (stake !== 20) return;
+  const game = getGame(stake);
+  if (game.status !== 'running') return;
+  const bots = game.players.filter(p => p.isBot);
+  for (const bot of bots) {
+    const flat = bot.card.flat();
+    if (flat.includes(number) && !bot.markedNumbers.includes(number)) bot.markedNumbers.push(number);
+    const lastCalled = game.calledNumbers[game.calledNumbers.length - 1];
+    if (lastCalled === undefined) continue;
+    if (isBingoValidOnLastCall(bot.card, bot.markedNumbers, lastCalled)) {
+      if (!bot.hasCalledBingo && !game.winners.find(w => w.telegramId === bot.telegramId)) {
+        bot.hasCalledBingo = true;
+        const delay = Math.random() < 0.2 ? 0 : 500 + Math.random() * 1500;
+        setTimeout(() => {
+          if (game.status !== 'running') return;
+          if (game.winners.find(w => w.telegramId === bot.telegramId)) return;
+          handleBingoClaim(bot.telegramId, stake);
+        }, delay);
+      }
+    }
+  }
+}
+
+function handleBingoClaim(telegramId, stake, force = false) {
   const game = getGame(stake);
   if (game.status !== 'running') return;
   const player = game.players.find(p => p.telegramId === telegramId);
   if (!player) return;
   if (game.winners.find(w => w.telegramId === telegramId)) return;
 
-  const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
-  if (lastCalled === null) return;
-  if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
-    getSocketByUserId(telegramId).then(socket => {
-      if (socket) socket.emit('invalidBingo');
-    });
-    return;
+  if (!force) {
+    const lastCalled = game.calledNumbers.length > 0 ? game.calledNumbers[game.calledNumbers.length - 1] : null;
+    if (lastCalled === null) return;
+    if (!isBingoValidOnLastCall(player.card, player.markedNumbers, lastCalled)) {
+      getSocketByUserId(telegramId).then(socket => {
+        if (socket) socket.emit('invalidBingo');
+      });
+      return;
+    }
   }
 
   if (game.winningNumber === null) {
@@ -859,13 +922,16 @@ function handleBingoClaim(telegramId, stake) {
   }
   game.winners.push({
     telegramId, username: player.username,
+    isBot: player.isBot || false, isForced: force,
     cardNumber: player.cardNumber
   });
 
-  Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, {
-    cardId: player.cardNumber, cardGrid: player.card,
-    calledNumber: game.winningNumber, winType: 'bingo_line'
-  });
+  if (!player.isBot && !force) {
+    Audit.bingoCalled(`stake_${stake}`, telegramId, player.ip || null, {
+      cardId: player.cardNumber, cardGrid: player.card,
+      calledNumber: game.winningNumber, winType: 'bingo_line'
+    });
+  }
 
   if (!game.bingoGraceTimeout) {
     io.to(`stake_${stake}`).emit('multipleBingoPossible', { stake, message: 'Bingo claimed! Waiting for other potential winners...' });
@@ -884,7 +950,8 @@ function getAllPlayersList() {
       allPlayers.push({
         telegramId: p.telegramId, username: p.username,
         cardNumber: p.cardNumber, stake,
-        telegram_handle: user ? user.telegram_handle : null
+        telegram_handle: user ? user.telegram_handle : null,
+        isBot: p.isBot || false
       });
     });
   }
@@ -918,6 +985,8 @@ function resetGame(stake) {
   clearInterval(game.callInterval);
   clearTimeout(game.lobbyTimer);
   clearTimeout(game.bingoGraceTimeout);
+  for (const timeout of game.botTimeouts) clearTimeout(timeout);
+  game.botTimeouts = [];
   game.status = 'lobby';
   game.players = [];
   game.takenCardNumbers.clear();
@@ -928,6 +997,19 @@ function resetGame(stake) {
   game.winningNumber = null;
   game.lobbyEndTime = Date.now() + 45000;
   game.cardSet = Array.from({ length: 100 }, () => generateCard());
+
+  if (stake === 20) {
+    const lobbyDuration = 45000;
+    for (const botId of BOT_IDS) {
+      const delay = 1000 + Math.random() * (lobbyDuration - 2000);
+      const timeout = setTimeout(() => {
+        if (game.status === 'lobby' && !game.players.find(p => p.telegramId === botId)) {
+          addSingleBotToGame(botId, stake);
+        }
+      }, delay);
+      game.botTimeouts.push(timeout);
+    }
+  }
 
   io.to(`stake_${stake}`).emit('lobbyState', {
     stake, startsIn: 45,
@@ -947,11 +1029,18 @@ function resetGame(stake) {
 
 async function startGame(stake) {
   const game = getGame(stake);
+  for (const timeout of game.botTimeouts) clearTimeout(timeout);
+  game.botTimeouts = [];
 
   const toRemove = [];
   for (const p of game.players) {
-    const user = users[p.telegramId];
-    if (!user || user.balance < game.entryFee) toRemove.push(p);
+    if (p.isBot) {
+      const bal = botBalances.get(p.telegramId) || 0;
+      if (bal < game.entryFee) toRemove.push(p);
+    } else {
+      const user = users[p.telegramId];
+      if (!user || user.balance < game.entryFee) toRemove.push(p);
+    }
   }
   for (const p of toRemove) {
     const idx = game.players.findIndex(pl => pl.telegramId === p.telegramId);
@@ -972,6 +1061,11 @@ async function startGame(stake) {
   }
 
   for (const p of game.players) {
+    if (p.isBot) {
+      const bal = botBalances.get(p.telegramId) || 0;
+      botBalances.set(p.telegramId, bal - game.entryFee);
+      continue;
+    }
     const user = users[p.telegramId];
     if (user) {
       user.balance -= game.entryFee;
@@ -987,6 +1081,7 @@ async function startGame(stake) {
   game.status = 'running';
   game.calledNumbers = [];
   game.winningNumber = null;
+  for (const p of game.players) if (p.isBot) p.hasCalledBingo = false;
 
   io.to(`stake_${stake}`).emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
   notifyAdminClients();
@@ -1010,6 +1105,8 @@ function startCalling(stake) {
     game.calledNumbers.push(number);
     io.to(`stake_${stake}`).emit('numberCalled', { stake, number, calledNumbers: game.calledNumbers });
     Audit.numberDrawn(`stake_${stake}`, { drawnNumber: number, drawIndex: game.calledNumbers.length, timestamp: new Date().toISOString() });
+
+    if (stake === 20) updateBotsOnNumber(stake, number);
   }, 4000);
 }
 
@@ -1059,6 +1156,7 @@ async function endGameWithWinners(stake) {
   if (gameRoundId && houseProfit > 0) {
     const adminGroups = {};
     for (const player of game.players) {
+      if (player.isBot) continue;
       let user = users[player.telegramId];
       if (!user) {
         try { user = await loadUser(player.telegramId, player.username, null, null, true); }
@@ -1090,26 +1188,58 @@ async function endGameWithWinners(stake) {
     }
   }
 
-  if (game.winners.length > 0) {
-    const prizeEach = Math.floor(game.prizePool / game.winners.length);
+  if (stake === 20) {
+    const botsInGame = game.players.filter(p => p.isBot);
+    for (const bot of botsInGame) {
+      const winner = game.winners.find(w => w.telegramId === bot.telegramId);
+      const prizeWon = winner ? (game.prizePool / game.winners.length) : 0;
+      botGameHistory.push({
+        botId: bot.telegramId, gameNumber: gameCounter,
+        date: new Date().toISOString(), stake: game.entryFee, prizeWon
+      });
+    }
+  }
 
-    for (const w of game.winners) {
+  const realWinnersFinal = game.winners.filter(w => !w.isBot);
+  if (realWinnersFinal.length > 0) {
+    game.winners = game.winners.filter(w => !w.isBot);
+  }
+
+  if (game.winners.length > 0) {
+    const finalRealWinners = game.winners.filter(w => !w.isBot);
+    const finalBotWinners = game.winners.filter(w => w.isBot);
+    let prizeEachReal = 0, prizeEachBot = 0;
+    if (finalRealWinners.length > 0) {
+      prizeEachReal = Math.floor(game.prizePool / finalRealWinners.length);
+      prizeEachBot = 0;
+    } else {
+      prizeEachBot = Math.floor(game.prizePool / finalBotWinners.length);
+    }
+
+    for (const w of finalRealWinners) {
       const user = users[w.telegramId];
       if (user) {
-        user.balance += prizeEach;
+        user.balance += prizeEachReal;
         await supabase.from('users').update({ balance: user.balance }).eq('telegram_id', w.telegramId);
         const winnerSocket = await getSocketByUserId(w.telegramId);
         if (winnerSocket) winnerSocket.emit('balanceUpdate', user.balance);
         Audit.winPaidOut(`stake_${stake}`, w.telegramId, null, {
-          amount: prizeEach, currency: 'ETB', totalPrizePool: game.prizePool,
+          amount: prizeEachReal, currency: 'ETB', totalPrizePool: game.prizePool,
           totalWinners: game.winners.length, stake
         });
         detectRapidWins(`stake_${stake}`, w.telegramId, null);
       }
     }
 
+    for (const w of finalBotWinners) {
+      const bal = botBalances.get(w.telegramId) || 0;
+      botBalances.set(w.telegramId, bal + prizeEachBot);
+    }
+
     for (const w of game.winners) {
-      const entry = recordWinnerEntry(stake, w, prizeEach, game.prizePool, game.winningNumber);
+      const entry = recordWinnerEntry(stake, w,
+        finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
+        game.prizePool, game.winningNumber);
       adminNamespace.emit('admin:winner', entry);
     }
 
@@ -1118,7 +1248,7 @@ async function endGameWithWinners(stake) {
     io.to(`stake_${stake}`).emit('gameEnded', {
       stake,
       winningCards: winningCards,
-      prizeEach,
+      prizeEach: finalRealWinners.length > 0 ? prizeEachReal : prizeEachBot,
       totalPrize: game.prizePool,
       winnerCount: game.winners.length,
       winningNumber: game.winningNumber
@@ -1145,6 +1275,47 @@ async function endGameWithWinners(stake) {
   setTimeout(() => resetGame(stake), 5000);
   notifyAdminClients();
 }
+
+// ---------- Bot Admin Endpoints ----------
+app.get('/admin/bots-status', (req, res) => {
+  const { secret } = req.query;
+  if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  const botData = BOT_IDS.map(id => {
+    const balance = botBalances.get(id) || 0;
+    const lastWin = botLastWinGame.get(id) || 0;
+    const game = getGame(20);
+    const player = game.players.find(p => p.telegramId === id);
+    return {
+      id, username: player ? player.username : 'not in game',
+      balance, lastWinGame: lastWin, inGame: !!player,
+      cardNumber: player ? player.cardNumber : null
+    };
+  });
+  res.json({ success: true, bots: botData, currentGame: gameCounter });
+});
+
+app.post('/admin/bot-reset-balance', async (req, res) => {
+  const { secret, botId, newBalance } = req.body;
+  if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  if (!BOT_IDS.includes(botId)) return res.status(400).json({ error: 'Invalid bot ID' });
+  const bal = Number(newBalance);
+  if (isNaN(bal) || bal < 0) return res.status(400).json({ error: 'Balance must be non-negative' });
+  botBalances.set(botId, bal);
+  Audit.adminAction('BOT_BALANCE_RESET', 'admin', req.ip, { botId, newBalance: bal });
+  res.json({ success: true, newBalance: bal });
+});
+
+app.get('/admin/bot-history', (req, res) => {
+  const { secret, from, to } = req.query;
+  if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
+  let history = botGameHistory;
+  if (from) { const f = new Date(from); f.setHours(0,0,0,0); history = history.filter(e => new Date(e.date) >= f); }
+  if (to) { const t = new Date(to); t.setHours(23,59,59,999); history = history.filter(e => new Date(e.date) <= t); }
+  res.json({ success: true, history, from: from || null, to: to || null });
+});
+
+app.get('/admin-bots', (req, res) => res.sendFile(path.join(__dirname, 'admin-bots.html')));
+app.get('/admin-bot-stats', (req, res) => res.sendFile(path.join(__dirname, 'admin-bot-stats.html')));
 
 // ---------- Player deposit ----------
 const handleDepositRequest = async (req, res) => {
@@ -2213,7 +2384,7 @@ app.post('/super-admin/transfer-player', async (req, res) => {
         telegram_id: String(telegramId), username: user.username,
         invite_code: targetAdmin.invite_code || user.invite_code,
         admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-        ip_address: sanitizeIp(req.ip) || null, user_agent: req.headers['user-agent'] || null
+        ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
       });
     }
 
@@ -2272,7 +2443,7 @@ app.post('/super-admin/transfer-players', async (req, res) => {
           telegram_id: user.telegram_id, username: user.username,
           invite_code: targetAdmin.invite_code || user.invite_code,
           admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-          ip_address: sanitizeIp(req.ip) || null, user_agent: req.headers['user-agent'] || null
+          ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
         });
       }
 
@@ -2433,13 +2604,7 @@ const botToken = process.env.BOT_TOKEN;
 if (botToken) {
   try {
     const TelegramBot = require('node-telegram-bot-api');
-    const bot = new TelegramBot(botToken, {
-      polling: {
-        autoStart: true,
-        interval: 500,
-        params: { timeout: 10 }
-      }
-    });
+    const bot = new TelegramBot(botToken, { polling: true });
     console.log('🤖 Telegram bot started (polling)');
 
     bot.onText(/\/start(.+)?/, async (msg, match) => {
@@ -2497,11 +2662,9 @@ if (botToken) {
     });
 
     bot.on('polling_error', (err) => {
-      if (err.message && err.message.includes('409')) {
-        // Transient: another instance is polling during deploy. Auto-retry.
-        console.warn('⚠️ Telegram 409 conflict (likely deploy overlap). Will auto-retry.');
-      } else {
-        console.error('❌ Telegram Polling Error:', err.message);
+      console.error('❌ Telegram Polling Error:', err.message);
+      if (err.message.includes('409')) {
+        console.error('🚨 CONFLICT: Another instance is polling this bot! Please ensure only one server instance is running, or restart the server.');
       }
     });
   } catch (err) {
@@ -2534,6 +2697,7 @@ io.on('connection', async (socket) => {
       const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
       socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
 
+      // NEW: Restore card if player is already in the lobby
       const player = game.players.find(p => p.telegramId === socket.userId);
       if (player) {
         socket.emit('yourCard', player.card);
@@ -2561,7 +2725,7 @@ io.on('connection', async (socket) => {
     const existing = game.players.find(p => p.telegramId === socket.userId);
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(num);
-    const ip = sanitizeIp(socket.handshake.headers['x-forwarded-for']) || socket.handshake.address || null;
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
@@ -2583,7 +2747,7 @@ io.on('connection', async (socket) => {
     const existing = game.players.find(p => p.telegramId === socket.userId);
     if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
     game.takenCardNumbers.add(randomNum);
-    const ip = sanitizeIp(socket.handshake.headers['x-forwarded-for']) || socket.handshake.address || null;
+    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
     const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip };
     game.players.push(player);
     Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
