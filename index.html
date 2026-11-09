@@ -691,7 +691,8 @@ const I18N = {
     }
 };
 
-let lang = localStorage.getItem('dot_bingo_lang') === 'en' ? 'en' : 'am';
+// Changed default language to 'en' if not explicitly set to 'am'
+let lang = localStorage.getItem('dot_bingo_lang') === 'am' ? 'am' : 'en';
 const t = k => I18N[lang][k] || I18N.en[k] || k;
 
 function applyLang() {
@@ -1341,6 +1342,11 @@ function showWinner(d) {
     $('winListContainer').innerHTML = winningCards.map(c => `<span class="winner-badge">Card ${c}</span>`).join('');
     $('winPrize').innerHTML = each + ' <small>ETB</small>';
     $('winnerOverlay').classList.add('active');
+    
+    // Auto-hide the winner overlay after 6 seconds
+    setTimeout(() => {
+        $('winnerOverlay').classList.remove('active');
+    }, 6000);
 
     if (state.currentGameId) addRecord(true, each, d.totalPrize || 0, winningCards.join(', '), winningNumber);
 }
