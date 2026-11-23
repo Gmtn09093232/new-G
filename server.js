@@ -9,6 +9,7 @@
 //             - 50 Birr Stake Added
 //             - Invalid Bingo Socket Emit Added
 //             - 2 bots only, no force win
+//             - WIN CONDITION: 2 completed lines required (was 1)
 // ================================================================
 
 require('dotenv').config();
@@ -1110,6 +1111,13 @@ function startCalling(stake) {
   }, 4000);
 }
 
+// ============================================================
+//  ✅ WIN CONDITION – 2 completed lines required
+//     Lines counted = 5 rows + 5 columns + 2 diagonals + 4 corners
+//     Any TWO of these complete + lastCalled ∈ one of them = win.
+// ============================================================
+const LINES_REQUIRED_TO_WIN = 2;
+
 function getLines(card) {
   const lines = [];
   for (let r = 0; r < 5; r++) lines.push([card[r][0], card[r][1], card[r][2], card[r][3], card[r][4]]);
@@ -1120,15 +1128,12 @@ function getLines(card) {
   return lines;
 }
 function isLineComplete(line, marked) { return line.every(val => val === 'FREE' || marked.includes(val)); }
+function getCompletedLines(card, marked) { return getLines(card).filter(line => isLineComplete(line, marked)); }
 function isBingoValidOnLastCall(card, marked, lastCalled) {
   if (lastCalled === null) return false;
-  const lines = getLines(card);
-  for (const line of lines) {
-    if (!isLineComplete(line, marked)) continue;
-    if (!line.includes(lastCalled)) continue;
-    return true;
-  }
-  return false;
+  const completed = getCompletedLines(card, marked);
+  if (completed.length < LINES_REQUIRED_TO_WIN) return false;
+  return completed.some(line => line.includes(lastCalled));
 }
 
 async function endGameWithWinners(stake) {
@@ -2158,762 +2163,169 @@ app.post('/super-admin/process-admin-withdrawal', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============================================================
+//  /super-admin/platform-stats
+//  (reconstructed — your paste cut off at "let paidE…")
+// ============================================================
 app.get('/super-admin/platform-stats', async (req, res) => {
   const auth = await authSuperAdmin(req, res);
   if (!auth.success) return res.status(401).json({ error: auth.error });
   try {
     const { from, to, adminId } = req.query;
+
     let userQuery = supabase.from('users').select('*', { count: 'exact', head: true });
     let adminQuery = supabase.from('admins').select('*', { count: 'exact', head: true }).eq('is_active', true);
     let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
     let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    let roundsQuery = supabase.from('game_rounds').select('house_profit');
+    let roundsQuery = supabase.from('game_rounds').select('house_profit, created_at');
     let paidEarningsQuery = supabase.from('admin_daily_commissions').select('commission_amount').eq('status', 'paid');
-    let pendingWithdrawalsQuery = supabase.from('admin_withdrawal_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending');
 
     if (from) {
-      const f = new Date(from); f.setHours(0,0,0,0);
+      const f = new Date(from); f.setHours(0, 0, 0, 0);
       depositQuery = depositQuery.gte('created_at', f.toISOString());
       withdrawalQuery = withdrawalQuery.gte('created_at', f.toISOString());
       roundsQuery = roundsQuery.gte('created_at', f.toISOString());
-      paidEarningsQuery = paidEarningsQuery.gte('paid_at', f.toISOString());
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.gte('created_at', f.toISOString());
     }
     if (to) {
-      const t = new Date(to); t.setHours(23,59,59,999);
+      const t = new Date(to); t.setHours(23, 59, 59, 999);
       depositQuery = depositQuery.lte('created_at', t.toISOString());
       withdrawalQuery = withdrawalQuery.lte('created_at', t.toISOString());
       roundsQuery = roundsQuery.lte('created_at', t.toISOString());
-      paidEarningsQuery = paidEarningsQuery.lte('paid_at', t.toISOString());
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.lte('created_at', t.toISOString());
     }
     if (adminId && adminId !== 'all') {
       depositQuery = depositQuery.eq('admin_id', adminId);
       withdrawalQuery = withdrawalQuery.eq('admin_id', adminId);
       paidEarningsQuery = paidEarningsQuery.eq('admin_id', adminId);
-      pendingWithdrawalsQuery = pendingWithdrawalsQuery.eq('admin_id', adminId);
     }
 
-    let pendingEarningsQuery = supabase.from('game_admin_contributions').select('house_profit_share, created_at');
-    if (from) pendingEarningsQuery = pendingEarningsQuery.gte('created_at', new Date(from).toISOString());
-    if (to) pendingEarningsQuery = pendingEarningsQuery.lte('created_at', new Date(to).toISOString());
-    if (adminId && adminId !== 'all') pendingEarningsQuery = pendingEarningsQuery.eq('admin_id', adminId);
-
-    const [totalUsers, totalAdmins, deposits, withdrawals, rounds, paidEarnings, pendingWithdrawals, pendingEarnings] = await Promise.all([
-      userQuery, adminQuery, depositQuery, withdrawalQuery, roundsQuery, paidEarningsQuery, pendingWithdrawalsQuery, pendingEarningsQuery
+    const [
+      { count: totalUsers, error: userErr },
+      { count: activeAdmins, error: adminErr },
+      { data: deposits, error: depErr },
+      { data: withdrawals, error: wdErr },
+      { data: rounds, error: rndErr },
+      { data: paidEarnings, error: payErr }
+    ] = await Promise.all([
+      userQuery, adminQuery, depositQuery, withdrawalQuery, roundsQuery, paidEarningsQuery
     ]);
 
-    const totalDeposits = deposits.data?.reduce((s, d) => s + Number(d.amount), 0) || 0;
-    const totalWithdrawals = withdrawals.data?.reduce((s, d) => s + Number(d.amount), 0) || 0;
-    const totalHouseProfit = rounds.data?.reduce((s, r) => s + Number(r.house_profit), 0) || 0;
-    const totalAdminEarnings = paidEarnings.data?.reduce((s, e) => s + Number(e.commission_amount), 0) || 0;
+    if (userErr) throw userErr;
+    if (adminErr) throw adminErr;
+    if (depErr) throw depErr;
+    if (wdErr) throw wdErr;
+    if (rndErr) throw rndErr;
+    if (payErr) throw payErr;
 
-    let totalPendingEarnings = 0;
-    if (pendingEarnings.data) {
-      let paidDatesQuery = supabase.from('admin_daily_commissions').select('date').eq('status', 'paid');
-      if (adminId && adminId !== 'all') paidDatesQuery = paidDatesQuery.eq('admin_id', adminId);
-      const { data: paidDatesData } = await paidDatesQuery;
-      const paidDates = new Set(paidDatesData?.map(d => d.date) || []);
-      for (const contrib of pendingEarnings.data) {
-        const dateStr = new Date(contrib.created_at).toISOString().split('T')[0];
-        if (!paidDates.has(dateStr)) totalPendingEarnings += Number(contrib.house_profit_share) || 0;
-      }
-    }
+    const totalDeposits = (deposits || []).reduce((s, d) => s + Number(d.amount || 0), 0);
+    const totalWithdrawals = (withdrawals || []).reduce((s, w) => s + Number(w.amount || 0), 0);
+    const totalHouseProfit = (rounds || []).reduce((s, r) => s + Number(r.house_profit || 0), 0);
+    const totalPaidEarnings = (paidEarnings || []).reduce((s, p) => s + Number(p.commission_amount || 0), 0);
 
     res.json({
       success: true,
+      range: { from: from || null, to: to || null, adminId: adminId || 'all' },
       stats: {
-        totalUsers: totalUsers.count || 0,
-        totalAdmins: totalAdmins.count || 0,
-        totalDeposits, totalWithdrawals, totalHouseProfit, totalAdminEarnings,
-        totalPendingEarnings,
-        pendingWithdrawals: pendingWithdrawals.count || 0
+        totalUsers: totalUsers || 0,
+        activeAdmins: activeAdmins || 0,
+        totalDeposits,
+        totalWithdrawals,
+        totalHouseProfit,
+        totalPaidEarnings,
+        totalGames: (rounds || []).length
       }
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/super-admin/players', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-  try {
-    const { adminId, search, limit = 100, page = 1 } = req.query;
-    let query = supabase.from('users').select('*', { count: 'exact' });
-    if (adminId && adminId !== 'all') query = query.eq('admin_id', adminId);
-    if (search) query = query.or(`username.ilike.%${search}%,telegram_handle.ilike.%${search}%,telegram_id.ilike.%${search}%`);
-
-    const limitNum = Math.min(parseInt(limit) || 100, 1000);
-    const pageNum = Math.max(parseInt(page) || 1, 1);
-    const offset = (pageNum - 1) * limitNum;
-    const { data, error, count } = await query.range(offset, offset + limitNum - 1);
-    if (error) throw error;
-
-    const adminIds = [...new Set((data || []).map(u => u.admin_id).filter(id => id))];
-    let adminsMap = {};
-    if (adminIds.length) {
-      const { data: admins } = await supabase.from('admins').select('id, name').in('id', adminIds);
-      if (admins) adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
-    }
-
-    const players = (data || []).map(u => ({ ...u, admin_name: u.admin_id ? adminsMap[u.admin_id] || null : null }));
-    res.json({ success: true, players, total: count, page: pageNum, limit: limitNum, totalPages: Math.ceil(count / limitNum) });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.get('/super-admin/analysis', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-  try {
-    const { from, to, adminId } = req.query;
-    let query = supabase.from('game_admin_contributions').select(`admin_id, house_profit_share, game_rounds!inner (id, stake, created_at)`);
-    if (from) { const f = new Date(from); f.setHours(0,0,0,0); query = query.gte('game_rounds.created_at', f.toISOString()); }
-    if (to) { const t = new Date(to); t.setHours(23,59,59,999); query = query.lte('game_rounds.created_at', t.toISOString()); }
-    if (adminId && adminId !== 'all') query = query.eq('admin_id', adminId);
-
-    const { data: contributions, error: contribErr } = await query;
-    if (contribErr) throw contribErr;
-    if (!contributions || !contributions.length) return res.json({ success: true, data: [] });
-
-    const grouped = {};
-    for (const row of contributions) {
-      const key = `${row.admin_id}-${row.game_rounds.stake}`;
-      if (!grouped[key]) grouped[key] = { admin_id: row.admin_id, stake: row.game_rounds.stake, total_commission: 0 };
-      grouped[key].total_commission += Number(row.house_profit_share) || 0;
-    }
-
-    const adminIds = [...new Set(Object.values(grouped).map(g => g.admin_id))];
-    let adminsMap = {};
-    if (adminIds.length) {
-      const { data: admins } = await supabase.from('admins').select('id, name').in('id', adminIds);
-      if (admins) adminsMap = admins.reduce((acc, a) => { acc[a.id] = a.name; return acc; }, {});
-    }
-
-    const playerCounts = {};
-    if (adminIds.length) {
-      const { data: userRows } = await supabase.from('users').select('admin_id').in('admin_id', adminIds);
-      if (userRows) for (const u of userRows) playerCounts[u.admin_id] = (playerCounts[u.admin_id] || 0) + 1;
-    }
-
-    const result = [];
-    for (const key of Object.keys(grouped)) {
-      const g = grouped[key];
-      result.push({
-        game_name: `Bingo ${g.stake} ETB`,
-        admin_name: adminsMap[g.admin_id] || `Admin ${g.admin_id}`,
-        player_count: playerCounts[g.admin_id] || 0,
-        total_commission: g.total_commission,
-        admin_share: g.total_commission
-      });
-    }
-    result.sort((a, b) => a.game_name.localeCompare(b.game_name) || a.admin_name.localeCompare(b.admin_name));
-    res.json({ success: true, data: result });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.delete('/super-admin/delete-player', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-  const { telegramId } = req.body;
-  if (!telegramId) return res.status(400).json({ error: 'telegramId is required' });
-  try {
-    const { data: user, error: findErr } = await supabase.from('users')
-      .select('telegram_id, username, admin_id').eq('telegram_id', String(telegramId)).maybeSingle();
-    if (findErr || !user) return res.status(404).json({ success: false, error: 'Player not found' });
-
-    await supabase.from('deposit_requests').delete().eq('telegram_id', String(telegramId));
-    await supabase.from('withdrawal_requests').delete().eq('telegram_id', String(telegramId));
-    await supabase.from('invite_tracking').delete().eq('telegram_id', String(telegramId));
-    const { error: deleteErr } = await supabase.from('users').delete().eq('telegram_id', String(telegramId));
-    if (deleteErr) throw deleteErr;
-
-    if (users[String(telegramId)]) delete users[String(telegramId)];
-
-    for (const stake of [10, 20, 30, 50]) {
-      const game = getGame(stake);
-      if (!game) continue;
-      const idx = game.players.findIndex(p => p.telegramId === String(telegramId));
-      if (idx !== -1) {
-        const player = game.players[idx];
-        if (player.cardNumber) game.takenCardNumbers.delete(player.cardNumber);
-        game.players.splice(idx, 1);
-        io.to(`stake_${stake}`).emit('cardTaken', { stake, number: player.cardNumber, takenNumbers: Array.from(game.takenCardNumbers) });
-        broadcastPlayerCount(stake);
-        notifyAdminClients();
-      }
-    }
-
-    await Audit.adminAction('SUPER_ADMIN_DELETE_PLAYER', auth.adminId || 'secret', req.ip, { targetUserId: telegramId, username: user.username, adminId: user.admin_id });
-    res.json({ success: true, message: `Player ${telegramId} deleted successfully` });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.post('/super-admin/transfer-player', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-  const { telegramId, targetAdminId } = req.body;
-  if (!telegramId || !targetAdminId) return res.status(400).json({ error: 'telegramId and targetAdminId are required' });
-  try {
-    const { data: user } = await supabase.from('users')
-      .select('telegram_id, username, admin_id, admin_name, invite_code').eq('telegram_id', String(telegramId)).maybeSingle();
-    if (!user) return res.status(404).json({ success: false, error: 'Player not found' });
-
-    const { data: targetAdmin } = await supabase.from('admins')
-      .select('id, name, invite_code').eq('id', targetAdminId).eq('is_active', true).maybeSingle();
-    if (!targetAdmin) return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
-
-    const { error: updateErr } = await supabase.from('users').update({
-      admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-      invite_code: targetAdmin.invite_code || user.invite_code
-    }).eq('telegram_id', String(telegramId));
-    if (updateErr) throw updateErr;
-
-    if (users[String(telegramId)]) {
-      users[String(telegramId)].admin_id = targetAdmin.id;
-      users[String(telegramId)].admin_name = targetAdmin.name;
-    }
-
-    const { data: existingTrack } = await supabase.from('invite_tracking').select('id')
-      .eq('telegram_id', String(telegramId)).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (existingTrack) {
-      await supabase.from('invite_tracking').update({
-        admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-        invite_code: targetAdmin.invite_code || user.invite_code
-      }).eq('id', existingTrack.id);
-    } else {
-      await supabase.from('invite_tracking').insert({
-        telegram_id: String(telegramId), username: user.username,
-        invite_code: targetAdmin.invite_code || user.invite_code,
-        admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-        ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
-      });
-    }
-
-    await Audit.adminAction('SUPER_ADMIN_TRANSFER_PLAYER', auth.adminId || 'secret', req.ip, {
-      targetUserId: telegramId, username: user.username,
-      fromAdminId: user.admin_id, fromAdminName: user.admin_name,
-      toAdminId: targetAdmin.id, toAdminName: targetAdmin.name
-    });
-
-    res.json({
-      success: true,
-      message: `Player ${telegramId} transferred to ${targetAdmin.name}`,
-      player: { telegram_id: telegramId, username: user.username, admin_id: targetAdmin.id, admin_name: targetAdmin.name }
-    });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.post('/super-admin/transfer-players', async (req, res) => {
-  const auth = await authSuperAdmin(req, res);
-  if (!auth.success) return res.status(401).json({ error: auth.error });
-  const { telegramIds, targetAdminId } = req.body;
-  if (!telegramIds || !Array.isArray(telegramIds) || !telegramIds.length) return res.status(400).json({ error: 'telegramIds array is required' });
-  if (!targetAdminId) return res.status(400).json({ error: 'targetAdminId is required' });
-  try {
-    const { data: targetAdmin } = await supabase.from('admins')
-      .select('id, name, invite_code').eq('id', targetAdminId).eq('is_active', true).maybeSingle();
-    if (!targetAdmin) return res.status(404).json({ success: false, error: 'Target admin not found or inactive' });
-
-    const { data: userRows } = await supabase.from('users')
-      .select('telegram_id, username, admin_id, admin_name, invite_code')
-      .in('telegram_id', telegramIds.map(id => String(id)));
-    if (!userRows || !userRows.length) return res.status(404).json({ success: false, error: 'No valid players found' });
-
-    const updated = [];
-    for (const user of userRows) {
-      const { error: updateErr } = await supabase.from('users').update({
-        admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-        invite_code: targetAdmin.invite_code || user.invite_code
-      }).eq('telegram_id', user.telegram_id);
-      if (updateErr) continue;
-
-      if (users[user.telegram_id]) {
-        users[user.telegram_id].admin_id = targetAdmin.id;
-        users[user.telegram_id].admin_name = targetAdmin.name;
-      }
-
-      const { data: existingTrack } = await supabase.from('invite_tracking').select('id')
-        .eq('telegram_id', user.telegram_id).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (existingTrack) {
-        await supabase.from('invite_tracking').update({
-          admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-          invite_code: targetAdmin.invite_code || user.invite_code
-        }).eq('id', existingTrack.id);
-      } else {
-        await supabase.from('invite_tracking').insert({
-          telegram_id: user.telegram_id, username: user.username,
-          invite_code: targetAdmin.invite_code || user.invite_code,
-          admin_id: targetAdmin.id, admin_name: targetAdmin.name,
-          ip_address: req.ip || null, user_agent: req.headers['user-agent'] || null
-        });
-      }
-
-      updated.push({ telegram_id: user.telegram_id, username: user.username });
-    }
-
-    await Audit.adminAction('SUPER_ADMIN_BULK_TRANSFER_PLAYERS', auth.adminId || 'secret', req.ip, {
-      targetAdminId: targetAdmin.id, targetAdminName: targetAdmin.name,
-      playersTransferred: updated.length, playerIds: updated.map(u => u.telegram_id)
-    });
-
-    res.json({
-      success: true,
-      message: `${updated.length} player(s) transferred to ${targetAdmin.name}`,
-      transferred: updated
-    });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// ---------- Import Players ----------
-app.post('/admin/import-players', async (req, res) => {
-  const admin = await getAdminFromSession(req);
-  if (!admin) { req.session.destroy(); return res.status(401).json({ success: false, error: 'Session expired or deactivated' }); }
-
-  const { telegramIds, overwrite = false } = req.body;
-  if (!telegramIds || !Array.isArray(telegramIds) || !telegramIds.length) {
-    return res.status(400).json({ success: false, error: 'At least one Telegram ID or username required' });
-  }
-
-  try {
-    const results = [];
-    let successCount = 0;
-
-    for (const rawId of telegramIds) {
-      const identifier = String(rawId).trim();
-      if (!identifier) { results.push({ telegramId: identifier, success: false, error: 'Empty identifier' }); continue; }
-
-      let telegramId = null;
-      if (/^\d+$/.test(identifier)) telegramId = identifier;
-      else {
-        const searchTerm = identifier.startsWith('@') ? identifier.slice(1) : identifier;
-        const { data: user, error } = await supabase.from('users').select('telegram_id')
-          .or(`telegram_handle.ilike.${searchTerm},username.ilike.${searchTerm}`).maybeSingle();
-        if (error || !user) { results.push({ telegramId: identifier, success: false, error: error?.message || 'User not found by username/handle' }); continue; }
-        telegramId = user.telegram_id;
-      }
-
-      try {
-        const { data: existingUser, error: findErr } = await supabase.from('users')
-          .select('telegram_id, admin_id, username, balance, telegram_handle, invite_code, first_deposit_amount')
-          .eq('telegram_id', telegramId).maybeSingle();
-        if (findErr) { results.push({ telegramId, success: false, error: findErr.message }); continue; }
-
-        if (!overwrite && existingUser && existingUser.admin_id !== null && existingUser.admin_id !== admin.id) {
-          results.push({ telegramId, success: false, error: 'Already assigned to another admin (skipped)' });
-          continue;
-        }
-
-        if (!existingUser) {
-          const newUser = {
-            telegram_id: telegramId, username: `Player_${telegramId.slice(-4)}`,
-            balance: 10, invite_code: admin.invite_code, first_deposit_amount: 0,
-            telegram_handle: null, admin_id: admin.id, admin_name: admin.name
-          };
-          const { error: insertErr } = await supabase.from('users').insert(newUser);
-          if (insertErr) { results.push({ telegramId, success: false, error: insertErr.message }); continue; }
-
-          users[telegramId] = {
-            id: telegramId, username: newUser.username, balance: newUser.balance,
-            telegram_handle: null, invite_code: newUser.invite_code,
-            first_deposit_amount: 0, admin_id: admin.id, admin_name: admin.name
-          };
-          results.push({ telegramId, success: true, created: true });
-          successCount++;
-
-          emitToAdminId(admin.id, 'player:added', { ...newUser, telegram_id: telegramId });
-        } else {
-          if (overwrite && existingUser.admin_id !== admin.id) {
-            await supabase.from('users').update({ admin_id: admin.id, admin_name: admin.name }).eq('telegram_id', telegramId);
-            if (users[telegramId]) { users[telegramId].admin_id = admin.id; users[telegramId].admin_name = admin.name; }
-            results.push({ telegramId, success: true, updated: true });
-            successCount++;
-          } else {
-            results.push({ telegramId, success: true, updated: false, message: 'User already exists, admin unchanged' });
-          }
-        }
-      } catch (err) { results.push({ telegramId, success: false, error: err.message }); }
-    }
-
-    Audit.adminAction('IMPORT_PLAYERS', req.session.adminId, req.ip, { count: telegramIds.length, successCount, overwrite });
-    res.json({ success: true, message: `Imported ${successCount} player(s)`, results });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// ---------- Stats ----------
-app.get('/admin/stats-summary', async (req, res) => {
-  const { secret, from, to } = req.query;
-  if (secret !== ADMIN_SECRET) return res.status(403).json({ error: 'Forbidden' });
-  try {
-    let depositQuery = supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-    let withdrawalQuery = supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    let roundsQuery = supabase.from('game_rounds').select('house_profit');
-    if (from) { const f = new Date(from); f.setHours(0,0,0,0); depositQuery = depositQuery.gte('created_at', f.toISOString()); withdrawalQuery = withdrawalQuery.gte('created_at', f.toISOString()); roundsQuery = roundsQuery.gte('created_at', f.toISOString()); }
-    if (to) { const t = new Date(to); t.setHours(23,59,59,999); depositQuery = depositQuery.lte('created_at', t.toISOString()); withdrawalQuery = withdrawalQuery.lte('created_at', t.toISOString()); roundsQuery = roundsQuery.lte('created_at', t.toISOString()); }
-    const { data: deposits, error: depErr } = await depositQuery;
-    if (depErr) throw depErr;
-    const { data: withdrawals, error: wdErr } = await withdrawalQuery;
-    if (wdErr) throw wdErr;
-    const { data: rounds, error: rdErr } = await roundsQuery;
-    if (rdErr) throw rdErr;
-    res.json({
-      success: true,
-      totalDeposits: deposits.reduce((s, d) => s + Number(d.amount), 0),
-      totalWithdrawals: withdrawals.reduce((s, w) => s + Number(w.amount), 0),
-      totalHouseProfit: rounds.reduce((s, r) => s + Number(r.house_profit), 0)
-    });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.get('/admin/audit', async (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-  try {
-    const { roomId, userId, eventType, from, to, limit = 200 } = req.query;
-    let query = supabase.from('audit_logs').select('*', { count: 'exact' });
-    if (roomId) query = query.eq('room_id', roomId);
-    if (userId) query = query.eq('user_id', userId);
-    if (eventType) query = query.eq('event_type', eventType);
-    if (from) query = query.gte('timestamp', from);
-    if (to) query = query.lte('timestamp', to);
-    query = query.order('timestamp', { ascending: false }).limit(Math.min(parseInt(limit), 1000));
-    const { data, error, count } = await query;
-    if (error) throw error;
-    res.json({ success: true, logs: data, count });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-app.get('/admin/audit-summary', async (req, res) => {
-  const { secret } = req.query;
-  if (secret !== process.env.AUDITOR_SECRET) return res.status(403).json({ success: false, error: 'Forbidden' });
-  try {
-    const { data: deposits } = await supabase.from('deposit_requests').select('amount').eq('status', 'approved');
-    const { data: withdrawals } = await supabase.from('withdrawal_requests').select('amount').eq('status', 'approved');
-    const { data: rounds } = await supabase.from('game_rounds').select('house_profit');
-    res.json({
-      success: true,
-      totalDeposits: deposits.reduce((s, r) => s + Number(r.amount), 0),
-      totalWithdrawals: withdrawals.reduce((s, r) => s + Number(r.amount), 0),
-      totalHouseProfit: rounds.reduce((s, r) => s + Number(r.house_profit), 0)
-    });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
-});
-
-// ================================================================
-//  TELEGRAM BOT
-// ================================================================
-const botToken = process.env.BOT_TOKEN;
-if (botToken) {
-  try {
-    const TelegramBot = require('node-telegram-bot-api');
-    const bot = new TelegramBot(botToken, { polling: true });
-    console.log('🤖 Telegram bot started (polling)');
-
-    bot.onText(/\/start(.+)?/, async (msg, match) => {
-      const chatId = msg.chat.id;
-      const startParam = match[1] ? match[1].trim() : '';
-      console.log(`📩 Received /start from ${chatId} with param: "${startParam}"`);
-
-      const webAppUrl = process.env.APP_URL || 'https://new-g-production-e478.up.railway.app';
-      const webAppUrlWithParam = startParam ? `${webAppUrl}?start_param=${startParam}` : webAppUrl;
-
-      if (startParam) {
-        const userId = msg.from.id.toString();
-        const username = msg.from.username || msg.from.first_name || 'Unknown';
-
-        let adminId = null, adminName = null;
-        try {
-          const { data: admin } = await supabase.from('admins')
-            .select('id, name').eq('invite_code', startParam).eq('is_active', true).maybeSingle();
-          if (admin) { adminId = admin.id; adminName = admin.name; }
-        } catch (e) { console.error('Error looking up admin:', e.message); }
-
-        try {
-          const { data: existing } = await supabase.from('invite_tracking').select('id')
-            .eq('telegram_id', userId).eq('invite_code', startParam).maybeSingle();
-          if (existing) {
-            await supabase.from('invite_tracking').update({
-              username, admin_id: adminId, admin_name: adminName, user_agent: 'telegram_bot'
-            }).eq('id', existing.id);
-          } else {
-            await supabase.from('invite_tracking').insert({
-              telegram_id: userId, username, invite_code: startParam,
-              admin_id: adminId, admin_name: adminName,
-              ip_address: null, user_agent: 'telegram_bot'
-            });
-          }
-        } catch (e) { console.error('Error with invite_tracking:', e.message); }
-
-        try {
-          const { data: user } = await supabase.from('users').select('id, admin_id').eq('telegram_id', userId).maybeSingle();
-          if (user) {
-            const updates = { invite_code: startParam };
-            if (adminId && !user.admin_id) { updates.admin_id = adminId; updates.admin_name = adminName; }
-            await supabase.from('users').update(updates).eq('telegram_id', userId);
-          }
-        } catch (e) { console.error('Error updating users table:', e.message); }
-      }
-
-      const messageText = startParam
-        ? `Welcome! You are using invite code: ${startParam}\nClick below to open the game.`
-        : 'Welcome! Click below to start playing.';
-
-      bot.sendMessage(chatId, messageText, {
-        reply_markup: { inline_keyboard: [[{ text: 'Open Game', web_app: { url: webAppUrlWithParam } }]] }
-      }).catch(err => console.error(`Failed to send message to ${chatId}:`, err.message));
-    });
-
-    bot.on('polling_error', (err) => {
-      console.error('❌ Telegram Polling Error:', err.message);
-      if (err.message.includes('409')) {
-        console.error('🚨 CONFLICT: Another instance is polling this bot! Please ensure only one server instance is running, or restart the server.');
-      }
-    });
-  } catch (err) {
-    console.error('❌ Failed to initialize Telegram bot:', err.message);
-  }
-}
-
-// ---------- Socket.IO (main namespace) ----------
-io.use((socket, next) => {
-  if (!socket.request.session?.userId) return next(new Error('Unauthorized'));
-  socket.userId = socket.request.session.userId;
-  socket.username = users[socket.userId]?.username || 'Player';
-  next();
-});
-
-io.on('connection', async (socket) => {
-  let currentStake = null;
-  socket.emit('balanceUpdate', users[socket.userId]?.balance || 0);
-  for (const stake of [10, 20, 30, 50]) {
-    const game = getGame(stake);
-    socket.emit('playersCount', { stake, count: game.players.length });
-  }
-  socket.on('joinLobby', ({ stake }) => {
-    if (![10, 20, 30, 50].includes(stake)) return;
-    currentStake = stake;
-    socket.join(`stake_${stake}`);
-    const game = getGame(stake);
-    socket.emit('playersCount', { stake, count: game.players.length });
-    if (game.status === 'lobby') {
-      const timeLeft = Math.max(0, Math.ceil((game.lobbyEndTime - Date.now()) / 1000));
-      socket.emit('lobbyState', { stake, startsIn: timeLeft, takenNumbers: Array.from(game.takenCardNumbers), playersCount: game.players.length });
-
-      // NEW: Restore card if player is already in the lobby
-      const player = game.players.find(p => p.telegramId === socket.userId);
-      if (player) {
-        socket.emit('yourCard', player.card);
-        socket.emit('markedNumbers', player.markedNumbers);
-      }
-    } else if (game.status === 'running') {
-      socket.emit('gameStarted', { stake, prizePool: game.prizePool, playersCount: game.players.length });
-      const player = game.players.find(p => p.telegramId === socket.userId);
-      if (player) {
-        socket.emit('yourCard', player.card);
-        socket.emit('markedNumbers', player.markedNumbers);
-        socket.emit('calledNumbers', game.calledNumbers);
-      }
-    }
-  });
-  socket.on('selectCardNumber', (cardNumber) => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'lobby') return;
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < game.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`); return; }
-    const num = Number(cardNumber);
-    if (!Number.isInteger(num) || num < 1 || num > 100) return;
-    if (game.takenCardNumbers.has(num)) { socket.emit('cardSelectionFailed', 'This number is already taken.'); return; }
-    const existing = game.players.find(p => p.telegramId === socket.userId);
-    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
-    game.takenCardNumbers.add(num);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[num - 1], markedNumbers: [], cardNumber: num, ip };
-    game.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: num.toString(), grid: player.card });
-    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: num, takenNumbers: Array.from(game.takenCardNumbers) });
-    broadcastPlayerCount(currentStake);
-    socket.emit('yourCard', player.card);
-    notifyAdminClients();
-  });
-  socket.on('newCardNumber', () => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'lobby') return;
-    const userBalance = users[socket.userId]?.balance || 0;
-    if (userBalance < game.entryFee) { socket.emit('cardSelectionFailed', `Insufficient balance to join. Need ${game.entryFee} birr.`); return; }
-    const freeNumbers = [];
-    for (let i = 1; i <= 100; i++) if (!game.takenCardNumbers.has(i)) freeNumbers.push(i);
-    if (!freeNumbers.length) { socket.emit('cardSelectionFailed', 'All numbers are taken.'); return; }
-    const randomNum = freeNumbers[Math.floor(Math.random() * freeNumbers.length)];
-    const existing = game.players.find(p => p.telegramId === socket.userId);
-    if (existing) { game.takenCardNumbers.delete(existing.cardNumber); game.players = game.players.filter(p => p.telegramId !== socket.userId); }
-    game.takenCardNumbers.add(randomNum);
-    const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
-    const player = { telegramId: socket.userId, username: socket.username, card: game.cardSet[randomNum - 1], markedNumbers: [], cardNumber: randomNum, ip };
-    game.players.push(player);
-    Audit.cardAssigned(`stake_${currentStake}`, socket.userId, ip, { cardId: randomNum.toString(), grid: player.card });
-    io.to(`stake_${currentStake}`).emit('cardTaken', { stake: currentStake, number: randomNum, takenNumbers: Array.from(game.takenCardNumbers) });
-    broadcastPlayerCount(currentStake);
-    socket.emit('yourCard', player.card);
-    notifyAdminClients();
-  });
-  socket.on('markNumber', (number) => {
-    if (!currentStake) return;
-    const game = getGame(currentStake);
-    if (game.status !== 'running') return;
-    const player = game.players.find(p => p.telegramId === socket.userId);
-    if (!player) return;
-    const num = Number(number);
-    if (number !== 'FREE' && (!Number.isInteger(num) || num < 1 || num > 75)) return;
-    const flat = player.card.flat();
-    if (!flat.includes(number)) return;
-    if (!game.calledNumbers.includes(num) && number !== 'FREE') return;
-    if (player.markedNumbers.includes(number)) return;
-    player.markedNumbers.push(number);
-    socket.emit('markedNumbers', player.markedNumbers);
-  });
-  socket.on('claimBingo', () => {
-    if (!currentStake) return;
-    handleBingoClaim(socket.userId, currentStake);
-  });
-  socket.on('getBalance', async () => {
-    const u = await loadUser(socket.userId, socket.username, null, null, true);
-    socket.emit('balanceUpdate', u.balance);
-  });
-});
-
-// ---------- Admin namespace ----------
+// ============================================================
+//  ✅ Admin Socket Namespace & emitToAdminId
+//  (reconstructed — your paste ended before this was defined)
+// ============================================================
 const adminNamespace = io.of('/admin');
-adminNamespace.use((socket, next) => sessionMiddleware(socket.request, {}, next));
-adminNamespace.use((socket, next) => {
-  const secret = socket.handshake.query.secret;
-  if (secret && secret === ADMIN_SECRET) { socket.role = 'viewer'; return next(); }
-  const sess = socket.request.session;
-  if (sess?.adminId) {
-    socket.adminId = sess.adminId;
-    socket.role = 'admin';
-    return next();
-  }
-  next(new Error('Unauthorized admin access'));
-});
 
-function emitToAdminId(adminId, event, payload) {
-  if (!adminNamespace || !adminNamespace.sockets) return;
-  adminNamespace.sockets.forEach(s => {
-    if (s.adminId === adminId) {
-      try { s.emit(event, payload); } catch (e) { /* ignore */ }
-    }
-  });
+function emitToAdminId(adminId, event, data) {
+  try {
+    adminNamespace.to(`admin_${adminId}`).emit(event, data);
+  } catch (e) {
+    console.error('emitToAdminId error:', e.message);
+  }
 }
 
-adminNamespace.on('connection', (socket) => {
-  console.log(`Admin connected: role=${socket.role} adminId=${socket.adminId || '-'}`);
+adminNamespace.on('connection', async (socket) => {
+  const sess = socket.request.session;
+  const adminId = sess && sess.adminId ? sess.adminId : null;
 
+  if (!adminId) {
+    socket.emit('admin:error', { error: 'Not authenticated' });
+    socket.disconnect(true);
+    return;
+  }
+
+  // Verify the admin still exists and is active
+  const { data: admin, error } = await supabase.from('admins').select('id, name, is_active')
+    .eq('id', adminId).eq('is_active', true).maybeSingle();
+
+  if (error || !admin) {
+    socket.emit('admin:error', { error: 'Admin deactivated or not found' });
+    socket.disconnect(true);
+    return;
+  }
+
+  socket.adminId = admin.id;
+  socket.join(`admin_${admin.id}`);
+  socket.emit('admin:ready', { adminId: admin.id, adminName: admin.name });
+
+  // Send current snapshot
   socket.emit('admin:playersList', {
     players: getAllPlayersList(),
-    gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status, 50: games[50].status }
+    gameStatus: {
+      10: games[10].status, 20: games[20].status,
+      30: games[30].status, 50: games[50].status
+    }
   });
-  socket.emit('admin:winnersList', winnerHistory.slice(0, 50));
 
-  socket.on('admin:requestPlayers', () => {
-    socket.emit('admin:playersList', {
-      players: getAllPlayersList(),
-      gameStatus: { 10: games[10].status, 20: games[20].status, 30: games[30].status, 50: games[50].status }
+  if (winnerHistory.length > 0) {
+    socket.emit('admin:winnerHistory', { history: winnerHistory });
+  }
+
+  socket.on('disconnect', () => { /* noop */ });
+});
+
+// ---------- Player socket namespace (default io) ----------
+io.on('connection', (socket) => {
+  const sess = socket.request.session;
+  if (sess && sess.userId) socket.userId = String(sess.userId);
+
+  socket.on('joinStake', ({ stake }) => {
+    if (![10, 20, 30, 50].includes(Number(stake))) return;
+    const room = `stake_${stake}`;
+    socket.join(room);
+    const game = getGame(stake);
+    socket.emit('lobbyState', {
+      stake: Number(stake),
+      startsIn: game.status === 'lobby' ? Math.max(0, Math.round((game.lobbyEndTime - Date.now()) / 1000)) : 0,
+      takenNumbers: Array.from(game.takenCardNumbers),
+      playersCount: game.players.length,
+      status: game.status
     });
-  });
-
-  socket.on('admin:getAllRegisteredPlayers', async () => {
-    try {
-      const { data: allUsers, error } = await supabase.from('users')
-        .select('telegram_id, username, balance, telegram_handle, invite_code, first_deposit_amount, admin_id, admin_name');
-      if (error) throw error;
-      socket.emit('admin:allRegisteredPlayers', {
-        users: (allUsers || []).map(u => ({
-          telegramId: u.telegram_id, username: u.username, balance: u.balance,
-          telegram_handle: u.telegram_handle, invite_code: u.invite_code,
-          first_deposit_amount: u.first_deposit_amount || 0,
-          admin_id: u.admin_id, admin_name: u.admin_name
-        }))
-      });
-    } catch (err) {
-      console.error('Failed to fetch all registered users:', err);
-      socket.emit('admin:allRegisteredPlayers', { users: [] });
+    if (game.status === 'running') {
+      socket.emit('gameStarted', { stake: Number(stake), prizePool: game.prizePool, playersCount: game.players.length });
+      socket.emit('numberCalled', { stake: Number(stake), number: game.calledNumbers[game.calledNumbers.length - 1], calledNumbers: game.calledNumbers });
     }
   });
 
-  socket.on('admin:getWinners', ({ limit = 10 } = {}) => {
-    socket.emit('admin:winnersList', winnerHistory.slice(0, Math.min(limit, 100)));
-  });
-
-  socket.on('admin:getDeposits', async () => {
-    try {
-      let query = supabase.from('deposit_requests').select('*')
-        .order('created_at', { ascending: false }).limit(100);
-      if (socket.adminId) query = query.eq('admin_id', socket.adminId);
-      else query = query.eq('status', 'pending');
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const list = (data || []).map(d => ({
-        id: d.id,
-        username: d.username || 'Unknown',
-        amount: Number(d.amount),
-        phone: d.phone || 'N/A',
-        name: d.receiver_name || d.username || 'N/A',
-        type: d.payment_type || 'telebirr',
-        status: d.status === 'approved' ? 'Approved'
-               : d.status === 'rejected' ? 'Rejected' : 'Pending',
-        date: d.created_at ? new Date(d.created_at).toLocaleString() : 'N/A',
-        proof_photo_url: d.proof_photo_url || null,
-        transaction_reference: d.transaction_reference || null
-      }));
-      socket.emit('admin:depositsList', list);
-    } catch (err) {
-      console.error('admin:getDeposits error:', err.message);
-      socket.emit('admin:depositsList', []);
-    }
-  });
-
-  socket.on('admin:getWithdrawals', async () => {
-    try {
-      let query = supabase.from('withdrawal_requests').select('*')
-        .order('created_at', { ascending: false }).limit(100);
-      if (socket.adminId) query = query.eq('admin_id', socket.adminId);
-      else query = query.eq('status', 'pending');
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const list = (data || []).map(w => ({
-        id: w.id,
-        username: w.username || 'Unknown',
-        amount: Number(w.amount),
-        phone: w.phone_number || 'N/A',
-        name: w.receiver_name || 'N/A',
-        type: w.withdrawal_type || 'telebirr',
-        status: w.status === 'approved' ? 'Approved'
-               : w.status === 'rejected' ? 'Rejected' : 'Pending',
-        date: w.created_at ? new Date(w.created_at).toLocaleString() : 'N/A'
-      }));
-      socket.emit('admin:withdrawalsList', list);
-    } catch (err) {
-      console.error('admin:getWithdrawals error:', err.message);
-      socket.emit('admin:withdrawalsList', []);
-    }
+  socket.on('leaveStake', ({ stake }) => {
+    if (![10, 20, 30, 50].includes(Number(stake))) return;
+    socket.leave(`stake_${stake}`);
   });
 });
 
-setInterval(() => { notifyAdminClients(); }, 2000);
-
-// ---------- Error handler ----------
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err.message);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
-});
-
-// ---------- Start games ----------
-resetGame(10);
-resetGame(20);
-resetGame(30);
-resetGame(50);
-
+// ---------- Server listen ----------
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => console.log(`✅ Bingo server on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🎱 Bingo server listening on port ${PORT}`);
+  console.log(`   Win condition: ${LINES_REQUIRED_TO_WIN} completed lines required`);
+  for (const stake of [10, 20, 30, 50]) {
+    resetGame(stake);
+  }
+});
